@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Ensure all dependencies are copied to output -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TechieRag\TechieRag.csproj" />
+    <ProjectReference Include="..\..\src\TechieRag.Embedded\TechieRag.Embedded.csproj" />
+  </ItemGroup>
+
+  <!-- Direct references to ensure all required DLLs are copied -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.30.2" />
+  </ItemGroup>
+
+  <!-- Copy ONNX Runtime native DLLs to output root for reliable loading -->
+  <Target Name="CopyOnnxNativeDlls" AfterTargets="Build">
+    <ItemGroup>
+      <OnnxNativeDlls Include="$(OutputPath)runtimes\win-x64\native\onnxruntime*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OnnxNativeDlls)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

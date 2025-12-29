@@ -1,0 +1,826 @@
+@page "/settings"
+@rendermode InteractiveServer
+@using TechieRagWeb.Services
+@inject TechieRagConfigService ConfigService
+@inject TechieRagManager RagManager
+@inject ILogger<Settings> Logger
+
+<PageTitle>TechieRag Settings</PageTitle>
+
+<div class="settings-container">
+    <div class="page-header">
+        <h1>TechieRag Configuration</h1>
+        <p class="page-description">Configure embedding providers, vector stores, and processing options.</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading configuration...</p>
+        </div>
+    }
+    else
+    {
+        <div class="settings-grid">
+            <!-- Embedding Configuration -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h2>Embedding Configuration</h2>
+                    <p>Configure how text is converted to vector embeddings.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="embeddingSource">Embedding Source</label>
+                    <select id="embeddingSource" @bind="config.Embedding.Source" class="form-control">
+                        <option value="@EmbeddingSource.Embedded">Embedded BGE-M3 (Auto-download)</option>
+                        <option value="@EmbeddingSource.Ollama">Ollama (Local)</option>
+                        <option value="@EmbeddingSource.LmStudio">LM Studio (Local)</option>
+                        <option value="@EmbeddingSource.Onnx">ONNX (Custom Model)</option>
+                        <option value="@EmbeddingSource.Http">HTTP Service (Docker/Custom)</option>
+                        <option value="@EmbeddingSource.AzureOpenAI">Azure OpenAI (Cloud)</option>
+                        <option value="@EmbeddingSource.OpenAI">OpenAI (Cloud)</option>
+                    </select>
+                    <span class="form-hint">Select where embedding vectors will be generated.</span>
+                </div>
+
+                @if (config.Embedding.Source == EmbeddingSource.Embedded)
+                {
+                    <div class="info-box">
+                        <strong>BGE-M3 Model (Auto-download)</strong>
+                        <ul>
+                            <li>High-quality 1024-dimension embeddings</li>
+                            <li>Supports 100+ languages</li>
+                            <li>Model (~2.3GB) downloads automatically on first use</li>
+                            <li>No configuration required</li>
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <div class="form-group">
+                        <label for="embeddingModel">Model Name</label>
+                        <input type="text"
+                               id="embeddingModel"
+                               @bind="config.Embedding.Model"
+                               class="form-control"
+                               placeholder="@GetModelPlaceholder()" />
+                        <span class="form-hint">@GetModelHint()</span>
+                    </div>
+                }
+
+                @if (config.Embedding.Source == EmbeddingSource.Onnx)
+                {
+                    <div class="form-group">
+                        <label for="modelPath">Model Path</label>
+                        <input type="text"
+                               id="modelPath"
+                               @bind="config.Embedding.ModelPath"
+                               class="form-control"
+                               placeholder="C:\Models\bge-m3-onnx" />
+                        <span class="form-hint">Path to the directory containing ONNX model files.</span>
+                    </div>
+                }
+                else if (config.Embedding.Source != EmbeddingSource.Embedded)
+                {
+                    <div class="form-group">
+                        <label for="endpoint">Endpoint URL</label>
+                        <input type="text"
+                               id="endpoint"
+                               @bind="config.Embedding.Endpoint"
+                               class="form-control"
+                               placeholder="@GetEndpointPlaceholder()" />
+                        <span class="form-hint">@GetEndpointHint()</span>
+                    </div>
+                }
+
+                @if (RequiresApiKey())
+                {
+                    <div class="form-group">
+                        <label for="apiKey">API Key</label>
+                        <input type="password"
+                               id="apiKey"
+                               @bind="config.Embedding.ApiKey"
+                               class="form-control"
+                               placeholder="Enter your API key" />
+                        <span class="form-hint">Your API key for authentication. Keep this secure.</span>
+                    </div>
+                }
+
+                @if (config.Embedding.Source == EmbeddingSource.Http)
+                {
+                    <div class="form-group">
+                        <label for="apiFormat">API Format</label>
+                        <select id="apiFormat" @bind="config.Embedding.ApiFormat" class="form-control">
+                            <option value="@HttpApiFormat.OpenAI">OpenAI-Compatible (Most Common)</option>
+                            <option value="@HttpApiFormat.Ollama">Ollama-Compatible</option>
+                            <option value="@HttpApiFormat.Simple">Simple JSON</option>
+                        </select>
+                        <span class="form-hint">Select the API format your embedding service uses.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="apiPath">API Path (Optional)</label>
+                        <input type="text"
+                               id="apiPath"
+                               @bind="config.Embedding.ApiPath"
+                               class="form-control"
+                               placeholder="@GetApiPathPlaceholder()" />
+                        <span class="form-hint">Custom API path. Leave empty for default: @GetApiPathPlaceholder()</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="dimensions">Vector Dimensions</label>
+                        <input type="number"
+                               id="dimensions"
+                               @bind="config.Embedding.Dimensions"
+                               class="form-control"
+                               min="128"
+                               max="4096"
+                               step="128" />
+                        <span class="form-hint">Embedding dimensions (1024 for BGE-M3, 1536 for OpenAI ada-002).</span>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>HTTP Embedding Service</strong>
+                        <ul>
+                            <li>Use for ONNX models deployed in Docker containers</li>
+                            <li>Use for TechieRag.Embedded exposed as a web service</li>
+                            <li>Use for any OpenAI-compatible embedding API</li>
+                            <li>Example: http://localhost:7997 for a local ONNX container</li>
+                        </ul>
+                    </div>
+                }
+            </div>
+
+            <!-- Vector Store Configuration -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h2>Vector Store Configuration</h2>
+                    <p>Configure where vector embeddings are stored and searched.</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="vectorStoreType">Vector Store Type</label>
+                    <select id="vectorStoreType" @bind="config.VectorStore.Type" class="form-control">
+                        <option value="@VectorStoreType.SqliteVec">SQLite-vec (Embedded Database)</option>
+                        <option value="@VectorStoreType.PgVector">PGVector (PostgreSQL)</option>
+                        <option value="@VectorStoreType.Qdrant">Qdrant (Vector Database)</option>
+                    </select>
+                    <span class="form-hint">@GetVectorStoreHint()</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="connectionString">@GetConnectionStringLabel()</label>
+                    <input type="text"
+                           id="connectionString"
+                           @bind="vectorStoreConnectionInput"
+                           class="form-control"
+                           placeholder="@GetConnectionStringPlaceholder()" />
+                    <span class="form-hint">@GetConnectionStringHint()</span>
+                </div>
+            </div>
+
+            <!-- Processing Configuration -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h2>Document Processing</h2>
+                    <p>Configure how documents are split into chunks for embedding.</p>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label for="chunkSize">Chunk Size (characters)</label>
+                        <input type="number"
+                               id="chunkSize"
+                               @bind="config.Processing.DefaultChunkSize"
+                               class="form-control"
+                               min="100"
+                               max="2000"
+                               step="50" />
+                        <span class="form-hint">Recommended: 300-800 characters.</span>
+                    </div>
+
+                    <div class="form-group half">
+                        <label for="chunkOverlap">Chunk Overlap (characters)</label>
+                        <input type="number"
+                               id="chunkOverlap"
+                               @bind="config.Processing.DefaultChunkOverlap"
+                               class="form-control"
+                               min="0"
+                               max="500"
+                               step="10" />
+                        <span class="form-hint">Overlap helps maintain context across chunks.</span>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <strong>Chunking Tips:</strong>
+                    <ul>
+                        <li>Larger chunks preserve more context but may reduce precision.</li>
+                        <li>Smaller chunks improve precision but may lose important context.</li>
+                        <li>Overlap ensures important text at boundaries is not lost.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="settings-card">
+                <div class="card-header">
+                    <h2>Advanced Settings</h2>
+                    <p>Additional configuration options.</p>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="config.EnableTelemetry" />
+                        <span class="checkbox-text">Enable Telemetry</span>
+                    </label>
+                    <span class="form-hint">Collect metrics and logging data for monitoring.</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-bar">
+            <div class="action-left">
+                <button @onclick="ResetToDefaults" class="btn btn-secondary" disabled="@isSaving">
+                    Reset to Defaults
+                </button>
+            </div>
+            <div class="action-right">
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <span class="status-message @(saveSuccess ? "success" : "error")">
+                        @statusMessage
+                    </span>
+                }
+                <button @onclick="SaveConfigAsync" class="btn btn-primary" disabled="@isSaving">
+                    @if (isSaving)
+                    {
+                        <span class="btn-spinner"></span>
+                        <span>Saving...</span>
+                    }
+                    else
+                    {
+                        <span>Save Configuration</span>
+                    }
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .settings-container {
+        padding: 0 1rem 2rem;
+    }
+
+    .page-header {
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+        font-weight: 600;
+        color: #1e3a5f;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .page-description {
+        color: #6b7280;
+        margin: 0;
+    }
+
+    .loading-spinner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 4rem;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #3b82f6;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .settings-grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    }
+
+    .settings-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+    }
+
+    .card-header {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .card-header h2 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1f2937;
+        margin: 0 0 0.25rem 0;
+    }
+
+    .card-header p {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    .form-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.9375rem;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background-color: white;
+        transition: border-color 0.15s, box-shadow 0.15s;
+        box-sizing: border-box;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .form-control::placeholder {
+        color: #9ca3af;
+    }
+
+    select.form-control {
+        cursor: pointer;
+    }
+
+    .form-hint {
+        display: block;
+        font-size: 0.8125rem;
+        color: #6b7280;
+        margin-top: 0.375rem;
+    }
+
+    .form-row {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .form-group.half {
+        flex: 1;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-right: 0.5rem;
+        cursor: pointer;
+    }
+
+    .checkbox-text {
+        font-size: 0.9375rem;
+        color: #374151;
+    }
+
+    .info-box {
+        background-color: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .info-box strong {
+        display: block;
+        color: #1e40af;
+        margin-bottom: 0.5rem;
+    }
+
+    .info-box ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        color: #3b82f6;
+        font-size: 0.875rem;
+    }
+
+    .info-box li {
+        margin-bottom: 0.25rem;
+    }
+
+    .info-box li:last-child {
+        margin-bottom: 0;
+    }
+
+    .action-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding: 1.5rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9375rem;
+        font-weight: 500;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background-color: #3b82f6;
+        color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+        background-color: #2563eb;
+    }
+
+    .btn-secondary {
+        background-color: #f3f4f6;
+        color: #4b5563;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+        background-color: #e5e7eb;
+    }
+
+    .btn-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    .status-message {
+        font-size: 0.875rem;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+    }
+
+    .status-message.success {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+
+    .status-message.error {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+
+    @@media (max-width: 768px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-row {
+            flex-direction: column;
+        }
+
+        .action-bar {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .action-left, .action-right {
+            width: 100%;
+        }
+
+        .action-right {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+        }
+    }
+</style>
+
+@code {
+    private TechieRagConfig config = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? statusMessage;
+    private bool saveSuccess = false;
+    private string vectorStoreConnectionInput = "";
+
+    /// <summary>
+    /// Loads configuration when the component initializes.
+    /// </summary>
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            config = await ConfigService.LoadConfigAsync();
+            // Extract user-friendly value from connection string
+            vectorStoreConnectionInput = ExtractConnectionInput(config.VectorStore.Type, config.VectorStore.ConnectionString);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load configuration");
+            statusMessage = "Failed to load configuration. Using defaults.";
+            saveSuccess = false;
+            config = new TechieRagConfig();
+            vectorStoreConnectionInput = "techierag.db";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// Extracts a user-friendly value from the connection string based on vector store type.
+    /// </summary>
+    private static string ExtractConnectionInput(VectorStoreType type, string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return type == VectorStoreType.SqliteVec ? "techierag.db" : "";
+        }
+
+        if (type == VectorStoreType.SqliteVec)
+        {
+            // Extract database path from SQLite connection string
+            // Handle formats like "Data Source=techierag.db" or just "techierag.db"
+            var lower = connectionString.ToLowerInvariant();
+            if (lower.StartsWith("data source="))
+            {
+                return connectionString.Substring("data source=".Length).Trim().TrimEnd(';');
+            }
+            // Already just the filename
+            return connectionString;
+        }
+
+        // For other stores, return as-is
+        return connectionString;
+    }
+
+    /// <summary>
+    /// Builds the proper connection string from user input based on vector store type.
+    /// </summary>
+    private static string BuildConnectionString(VectorStoreType type, string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return type switch
+            {
+                VectorStoreType.SqliteVec => "Data Source=techierag.db",
+                VectorStoreType.Qdrant => "http://localhost:6334",
+                _ => ""
+            };
+        }
+
+        if (type == VectorStoreType.SqliteVec)
+        {
+            // User enters just the filename, we build the connection string
+            var trimmed = input.Trim();
+            var lower = trimmed.ToLowerInvariant();
+
+            // If user already entered a full connection string, use it
+            if (lower.StartsWith("data source="))
+            {
+                return trimmed;
+            }
+
+            // Otherwise, build the connection string from the filename
+            return $"Data Source={trimmed}";
+        }
+
+        // For other stores, use input as-is
+        return input.Trim();
+    }
+
+    /// <summary>
+    /// Saves the current configuration.
+    /// </summary>
+    private async Task SaveConfigAsync()
+    {
+        isSaving = true;
+        statusMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // Build the proper connection string from user input before saving
+            config.VectorStore.ConnectionString = BuildConnectionString(
+                config.VectorStore.Type,
+                vectorStoreConnectionInput);
+
+            await ConfigService.SaveConfigAsync(config);
+
+            // Reconfigure TechieRag with new settings (no restart required)
+            await RagManager.ReconfigureAsync();
+
+            statusMessage = "Configuration saved and applied successfully!";
+            saveSuccess = true;
+            Logger.LogInformation("Configuration saved and applied successfully");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save or apply configuration");
+            statusMessage = $"Failed to save: {ex.Message}";
+            saveSuccess = false;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    /// <summary>
+    /// Resets configuration to defaults.
+    /// </summary>
+    private async Task ResetToDefaults()
+    {
+        ConfigService.ResetToDefaults();
+        config = await ConfigService.LoadConfigAsync();
+        statusMessage = "Configuration reset to defaults.";
+        saveSuccess = true;
+    }
+
+    /// <summary>
+    /// Checks if the current embedding source requires an API key.
+    /// </summary>
+    private bool RequiresApiKey() => config.Embedding.Source switch
+    {
+        EmbeddingSource.AzureOpenAI => true,
+        EmbeddingSource.OpenAI => true,
+        _ => false
+    };
+
+    /// <summary>
+    /// Gets the placeholder text for the model field based on embedding source.
+    /// </summary>
+    private string GetModelPlaceholder() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => "bge-m3",
+        EmbeddingSource.LmStudio => "bge-m3",
+        EmbeddingSource.Onnx => "bge-m3",
+        EmbeddingSource.Http => "bge-m3",
+        EmbeddingSource.AzureOpenAI => "text-embedding-3-small",
+        EmbeddingSource.OpenAI => "text-embedding-3-small",
+        _ => "bge-m3"
+    };
+
+    /// <summary>
+    /// Gets the hint text for the model field based on embedding source.
+    /// </summary>
+    private string GetModelHint() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => "Model name as shown in 'ollama list' (e.g., bge-m3, nomic-embed-text).",
+        EmbeddingSource.LmStudio => "Model identifier used by LM Studio.",
+        EmbeddingSource.Onnx => "Name of the ONNX model (typically bge-m3).",
+        EmbeddingSource.Http => "Model name sent in API requests (optional for some services).",
+        EmbeddingSource.AzureOpenAI => "Deployment name in Azure OpenAI resource.",
+        EmbeddingSource.OpenAI => "Model name (e.g., text-embedding-3-small, text-embedding-3-large).",
+        _ => "The embedding model to use."
+    };
+
+    /// <summary>
+    /// Gets the placeholder text for the endpoint field based on embedding source.
+    /// </summary>
+    private string GetEndpointPlaceholder() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => "http://localhost:11434",
+        EmbeddingSource.LmStudio => "http://localhost:1234",
+        EmbeddingSource.Http => "http://localhost:7997",
+        EmbeddingSource.AzureOpenAI => "https://your-resource.openai.azure.com",
+        EmbeddingSource.OpenAI => "https://api.openai.com",
+        _ => ""
+    };
+
+    /// <summary>
+    /// Gets the hint text for the endpoint field based on embedding source.
+    /// </summary>
+    private string GetEndpointHint() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => "Ollama server URL. Default port is 11434.",
+        EmbeddingSource.LmStudio => "LM Studio server URL. Default port is 1234.",
+        EmbeddingSource.Http => "HTTP embedding service URL (e.g., Docker container endpoint).",
+        EmbeddingSource.AzureOpenAI => "Your Azure OpenAI resource endpoint URL.",
+        EmbeddingSource.OpenAI => "OpenAI API base URL.",
+        _ => "The API endpoint URL."
+    };
+
+    /// <summary>
+    /// Gets the default API path placeholder based on selected API format.
+    /// </summary>
+    private string GetApiPathPlaceholder() => config.Embedding.ApiFormat switch
+    {
+        HttpApiFormat.OpenAI => "/v1/embeddings",
+        HttpApiFormat.Ollama => "/api/embeddings",
+        HttpApiFormat.Simple => "/embed",
+        _ => "/v1/embeddings"
+    };
+
+    /// <summary>
+    /// Gets the hint text for the vector store type dropdown.
+    /// </summary>
+    private string GetVectorStoreHint() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => "Embedded database - no setup required. Great for development.",
+        VectorStoreType.PgVector => "PostgreSQL with pgvector extension. Production-ready.",
+        VectorStoreType.Qdrant => "High-performance vector database. Can run via Docker.",
+        _ => "Select a vector database for storing embeddings."
+    };
+
+    /// <summary>
+    /// Gets the label for the connection string field based on vector store type.
+    /// </summary>
+    private string GetConnectionStringLabel() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => "Database File Path",
+        VectorStoreType.PgVector => "Connection String",
+        VectorStoreType.Qdrant => "Endpoint URL",
+        _ => "Connection String"
+    };
+
+    /// <summary>
+    /// Gets the placeholder text for the connection string field.
+    /// </summary>
+    private string GetConnectionStringPlaceholder() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => "techierag.db",
+        VectorStoreType.PgVector => "Host=localhost;Database=techierag;Username=postgres;Password=...",
+        VectorStoreType.Qdrant => "http://localhost:6334",
+        _ => ""
+    };
+
+    /// <summary>
+    /// Gets the hint text for the connection string field.
+    /// </summary>
+    private string GetConnectionStringHint() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => "Just enter the filename (e.g., techierag.db). File will be created if it doesn't exist.",
+        VectorStoreType.PgVector => "PostgreSQL connection string with pgvector extension enabled.",
+        VectorStoreType.Qdrant => "Qdrant HTTP API endpoint URL.",
+        _ => "Connection details for the vector store."
+    };
+}

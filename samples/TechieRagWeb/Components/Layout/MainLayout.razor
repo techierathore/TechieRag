@@ -1,0 +1,29 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <NavMenu />
+    <main>
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<style>
+    .page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    main {
+        flex: 1;
+        background-color: #f5f7fa;
+    }
+
+    .content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+</style>

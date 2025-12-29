@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+
+  <Folder Name="/src/">
+    <Project Path="src/TechieRag/TechieRag.csproj" />
+    <Project Path="src/TechieRag.Embedded/TechieRag.Embedded.csproj" />
+  </Folder>
+
+  <Folder Name="/samples/">
+    <Project Path="samples/TechieRagWeb/TechieRagWeb.csproj" />
+  </Folder>
+
+  <Folder Name="/tests/">
+    <Project Path="tests/TechieRag.Tests/TechieRag.Tests.csproj" />
+  </Folder>
+</Solution>

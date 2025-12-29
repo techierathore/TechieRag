@@ -1,0 +1,22 @@
+{
+  "embedding": {
+    "source": 1,
+    "endpoint": "http://localhost:7997",
+    "apiKey": null,
+    "model": "bge-m3",
+    "modelPath": null,
+    "apiFormat": 0,
+    "apiPath": "/embeddings",
+    "dimensions": 1024,
+    "requestDelayMs": 100
+  },
+  "vectorStore": {
+    "type": 1,
+    "connectionString": "Host=localhost;Port=5432;Database=EmBedCheckDb;Username=PgVectorAdmin;Password=AdminPass@2025"
+  },
+  "processing": {
+    "defaultChunkSize": 500,
+    "defaultChunkOverlap": 50
+  },
+  "enableTelemetry": true
+}

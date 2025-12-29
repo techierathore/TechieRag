@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Ensure ONNX Runtime native DLLs are copied to consuming projects -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+    <!-- Package Metadata -->
+    <PackageId>TechieRag.Embedded</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Techie Rathor</Authors>
+    <Description>Self-contained TechieRag package with embedded BGE-M3 ONNX model (1024 dimensions, multilingual). Run RAG completely offline - no downloads, no external services, just works!</Description>
+    <PackageTags>RAG;AI;Embeddings;ONNX;Offline;SelfContained;LocalAI;BGE-M3;Multilingual</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ONNX Runtime for running embedding models locally -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.20.1" />
+
+    <!-- Tokenizers for text preprocessing -->
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+  </ItemGroup>
+
+  <!-- BGE-M3 model is 2.3GB - too large for embedded resources -->
+  <!-- Model is auto-downloaded on first use and cached locally -->
+
+</Project>

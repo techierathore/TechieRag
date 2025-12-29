@@ -1,0 +1,138 @@
+@* Navigation menu component for TechieRagWeb *@
+
+<div class="nav-menu">
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/" class="brand-link">
+                <span class="brand-icon">T</span>
+                <span class="brand-text">TechieRag</span>
+            </a>
+        </div>
+
+        <div class="nav-links">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="nav-icon">&#x1F3E0;</span>
+                <span class="nav-text">Home</span>
+            </NavLink>
+
+            <NavLink class="nav-link" href="settings">
+                <span class="nav-icon">&#x2699;</span>
+                <span class="nav-text">Settings</span>
+            </NavLink>
+
+            <NavLink class="nav-link" href="ingestion">
+                <span class="nav-icon">&#x1F4C4;</span>
+                <span class="nav-text">Ingestion</span>
+            </NavLink>
+
+            <NavLink class="nav-link" href="chat">
+                <span class="nav-icon">&#x1F4AC;</span>
+                <span class="nav-text">Chat</span>
+            </NavLink>
+        </div>
+    </nav>
+</div>
+
+<style>
+    .nav-menu {
+        background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+        padding: 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .navbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 1rem;
+    }
+
+    .nav-brand {
+        padding: 0.5rem 0;
+    }
+
+    .brand-link {
+        display: flex;
+        align-items: center;
+        text-decoration: none;
+        color: white;
+    }
+
+    .brand-icon {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+
+    .brand-text {
+        font-size: 1.25rem;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        color: rgba(255, 255, 255, 0.85);
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+    }
+
+    .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.15);
+        color: white;
+    }
+
+    .nav-icon {
+        margin-right: 0.5rem;
+        font-size: 1.1rem;
+    }
+
+    .nav-text {
+        font-weight: 500;
+    }
+
+    @@media (max-width: 768px) {
+        .navbar {
+            flex-direction: column;
+            padding: 0.5rem;
+        }
+
+        .nav-links {
+            width: 100%;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .nav-icon {
+            margin-right: 0.25rem;
+        }
+    }
+</style>

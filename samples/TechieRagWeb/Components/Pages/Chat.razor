@@ -1,0 +1,537 @@
+@page "/chat"
+@using TechieRag
+@using TechieRag.Models
+@inject ITechieRag Rag
+@inject ILogger<Chat> Logger
+@rendermode InteractiveServer
+
+<PageTitle>RAG Chat - TechieRag</PageTitle>
+
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 80px);
+        max-width: 1000px;
+        margin: 0 auto;
+        background: #f8fafc;
+    }
+
+    .chat-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 16px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .chat-header h1 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .chat-controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        font-size: 0.875rem;
+    }
+
+    .chat-controls select {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+
+    .chat-controls select option {
+        background: #374151;
+        color: white;
+    }
+
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .message-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .message {
+        max-width: 85%;
+        padding: 14px 18px;
+        border-radius: 18px;
+        line-height: 1.5;
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-user {
+        align-self: flex-end;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+
+    .message-assistant {
+        align-self: flex-start;
+        background: white;
+        color: #1f2937;
+        border: 1px solid #e5e7eb;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .message-label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+        opacity: 0.7;
+    }
+
+    .message-user .message-label {
+        text-align: right;
+    }
+
+    .result-card {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 10px;
+        border-left: 3px solid;
+    }
+
+    .result-card.high { border-color: #10b981; }
+    .result-card.medium { border-color: #3b82f6; }
+    .result-card.low { border-color: #f59e0b; }
+
+    .result-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .score-badge {
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 3px 8px;
+        border-radius: 12px;
+    }
+
+    .score-badge.high { background: #d1fae5; color: #065f46; }
+    .score-badge.medium { background: #dbeafe; color: #1e40af; }
+    .score-badge.low { background: #fef3c7; color: #92400e; }
+
+    .result-text {
+        font-size: 0.9rem;
+        color: #374151;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .result-source {
+        font-size: 0.75rem;
+        color: #6b7280;
+        margin-top: 8px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .chat-input-container {
+        background: white;
+        border-top: 1px solid #e5e7eb;
+        padding: 16px 24px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+
+    .chat-input-wrapper {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+    }
+
+    .chat-input {
+        flex: 1;
+        border: 2px solid #e5e7eb;
+        border-radius: 24px;
+        padding: 12px 20px;
+        font-size: 1rem;
+        outline: none;
+        transition: border-color 0.2s;
+        resize: none;
+        min-height: 48px;
+        max-height: 120px;
+    }
+
+    .chat-input:focus {
+        border-color: #667eea;
+    }
+
+    .chat-input::placeholder {
+        color: #9ca3af;
+    }
+
+    .send-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s, opacity 0.2s;
+    }
+
+    .send-button:hover:not(:disabled) {
+        transform: scale(1.05);
+    }
+
+    .send-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .typing-indicator {
+        display: flex;
+        gap: 4px;
+        padding: 14px 18px;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 18px;
+        align-self: flex-start;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .typing-dot {
+        width: 8px;
+        height: 8px;
+        background: #9ca3af;
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out;
+    }
+
+    .typing-dot:nth-child(1) { animation-delay: 0s; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @@keyframes bounce {
+        0%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-6px); }
+    }
+
+    .welcome-message {
+        text-align: center;
+        padding: 40px;
+        color: #6b7280;
+    }
+
+    .welcome-message h2 {
+        font-size: 1.5rem;
+        color: #374151;
+        margin-bottom: 12px;
+    }
+
+    .welcome-message p {
+        font-size: 0.95rem;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .clear-button {
+        background: rgba(255,255,255,0.2);
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: background 0.2s;
+    }
+
+    .clear-button:hover {
+        background: rgba(255,255,255,0.3);
+    }
+
+    .nav-link {
+        color: rgba(255,255,255,0.8);
+        text-decoration: none;
+        font-size: 0.8rem;
+    }
+
+    .nav-link:hover {
+        color: white;
+    }
+</style>
+
+<div class="chat-container">
+    <!-- Header -->
+    <div class="chat-header">
+        <div>
+            <h1>🤖 TechieRag Chat</h1>
+        </div>
+        <div class="chat-controls">
+            <label>Top K:</label>
+            <select @bind="topK">
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+            </select>
+
+            <label>Filter:</label>
+            <select @bind="selectedDocumentFilter" style="max-width: 150px;">
+                <option value="">All Docs</option>
+                @foreach (var doc in documents)
+                {
+                    <option value="@doc.Id">@TruncateName(doc.Name, 20)</option>
+                }
+            </select>
+
+            @if (conversationHistory.Any())
+            {
+                <button class="clear-button" @onclick="ClearConversation">Clear Chat</button>
+            }
+
+            <a href="/ingestion" class="nav-link">← Back</a>
+        </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div class="chat-messages" @ref="messagesContainer">
+        @if (!conversationHistory.Any())
+        {
+            <div class="welcome-message">
+                <h2>Welcome to TechieRag Chat</h2>
+                <p>Ask questions about your ingested documents. I'll search through them and provide relevant answers with source citations.</p>
+            </div>
+        }
+
+        @foreach (var item in conversationHistory)
+        {
+            <div class="message-group">
+                <!-- User Question -->
+                <div class="message message-user">
+                    <div class="message-label">You</div>
+                    @item.Query
+                </div>
+
+                <!-- Assistant Response -->
+                <div class="message message-assistant">
+                    <div class="message-label">TechieRag</div>
+                    @if (item.Results.Any())
+                    {
+                        <div>Found @item.Results.Count relevant result(s):</div>
+                        @foreach (var result in item.Results)
+                        {
+                            var scoreClass = GetScoreClass(result.Score);
+                            <div class="result-card @scoreClass">
+                                <div class="result-header">
+                                    <span class="score-badge @scoreClass">@((result.Score * 100).ToString("F0"))% match</span>
+                                    <span style="font-size: 0.7rem; color: #9ca3af;">Chunk #@(result.Chunk.ChunkIndex ?? 0)</span>
+                                </div>
+                                <div class="result-text">@result.Chunk.Text</div>
+                                <div class="result-source">
+                                    @if (result.Chunk.Metadata.TryGetValue("FileName", out var fileName))
+                                    {
+                                        <span>📄 @fileName</span>
+                                    }
+                                    @if (result.Chunk.PageNumber.HasValue)
+                                    {
+                                        <span>📖 Page @result.Chunk.PageNumber</span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div style="color: #6b7280;">No relevant results found for your query. Try rephrasing your question or check if documents have been ingested.</div>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (isSearching)
+        {
+            <div class="message-group">
+                <div class="message message-user">
+                    <div class="message-label">You</div>
+                    @currentQuery
+                </div>
+                <div class="typing-indicator">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Input Area -->
+    <div class="chat-input-container">
+        @if (errorMessage is not null)
+        {
+            <div style="background: #fee2e2; color: #991b1b; padding: 10px 16px; border-radius: 8px; margin-bottom: 12px; font-size: 0.875rem;">
+                @errorMessage
+            </div>
+        }
+        <div class="chat-input-wrapper">
+            <input type="text"
+                   class="chat-input"
+                   value="@query"
+                   @oninput="OnQueryInput"
+                   @onkeydown="HandleKeyDown"
+                   placeholder="Ask a question about your documents..."
+                   disabled="@isSearching" />
+            <button class="send-button" @onclick="SearchAsync" disabled="@(isSearching || string.IsNullOrWhiteSpace(query))">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string query = "";
+    private string currentQuery = "";
+    private int topK = 5;
+    private string selectedDocumentFilter = "";
+    private bool isSearching;
+    private string? errorMessage;
+    private List<Document> documents = new();
+    private List<ConversationItem> conversationHistory = new();
+    private ElementReference messagesContainer;
+
+    private class ConversationItem
+    {
+        public required string Query { get; init; }
+        public required List<SearchResult> Results { get; init; }
+        public DateTime Timestamp { get; init; } = DateTime.Now;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await Rag.InitializeAsync();
+            await LoadDocumentsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize chat page");
+            errorMessage = $"Initialization error: {ex.Message}";
+        }
+    }
+
+    private async Task LoadDocumentsAsync()
+    {
+        try
+        {
+            documents = (await Rag.ListDocumentsAsync()).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load documents list");
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(query)) return;
+
+        currentQuery = query;
+        query = "";
+        isSearching = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        // Scroll to bottom
+        await ScrollToBottom();
+
+        try
+        {
+            var documentFilter = string.IsNullOrEmpty(selectedDocumentFilter) ? null : selectedDocumentFilter;
+            var searchResults = await Rag.SearchAsync(currentQuery, topK, documentFilter);
+
+            conversationHistory.Add(new ConversationItem
+            {
+                Query = currentQuery,
+                Results = searchResults.ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Search failed for query: {Query}", currentQuery);
+            errorMessage = $"Search error: {ex.Message}";
+        }
+        finally
+        {
+            isSearching = false;
+            currentQuery = "";
+            StateHasChanged();
+            await ScrollToBottom();
+        }
+    }
+
+    private void OnQueryInput(ChangeEventArgs e)
+    {
+        query = e.Value?.ToString() ?? "";
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey && !isSearching && !string.IsNullOrWhiteSpace(query))
+        {
+            await SearchAsync();
+        }
+    }
+
+    private void ClearConversation()
+    {
+        conversationHistory.Clear();
+        errorMessage = null;
+        StateHasChanged();
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await Task.Delay(50); // Allow DOM to update
+        // JavaScript interop would be needed for actual scroll - this is a placeholder
+    }
+
+    private static string GetScoreClass(float score)
+    {
+        if (score >= 0.7f) return "high";
+        if (score >= 0.4f) return "medium";
+        return "low";
+    }
+
+    private static string TruncateName(string name, int maxLength)
+    {
+        if (name.Length <= maxLength) return name;
+        return name[..(maxLength - 3)] + "...";
+    }
+}
