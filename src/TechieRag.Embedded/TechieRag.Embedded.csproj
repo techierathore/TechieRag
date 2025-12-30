@@ -6,17 +6,25 @@
     <Nullable>enable</Nullable>
     <!-- Ensure ONNX Runtime native DLLs are copied to consuming projects -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <!-- Package Metadata -->
     <PackageId>TechieRag.Embedded</PackageId>
     <Version>1.0.0</Version>
     <Authors>Techie Rathor</Authors>
-    <Description>Self-contained TechieRag package with embedded BGE-M3 ONNX model (1024 dimensions, multilingual). Run RAG completely offline - no downloads, no external services, just works!</Description>
-    <PackageTags>RAG;AI;Embeddings;ONNX;Offline;SelfContained;LocalAI;BGE-M3;Multilingual</PackageTags>
+    <Company>TechieRathor</Company>
+    <Description>Self-contained TechieRag package with embedded BGE-M3 ONNX model (1024 dimensions, multilingual). Run RAG completely offline - no downloads, no external services, just works! Perfect for air-gapped environments and edge deployments.</Description>
+    <PackageTags>RAG;AI;Embeddings;ONNX;Offline;SelfContained;LocalAI;BGE-M3;Multilingual;EdgeAI</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TechieRag\TechieRag.csproj" />

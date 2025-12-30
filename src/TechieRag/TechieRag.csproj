@@ -4,11 +4,25 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Package Metadata -->
     <PackageId>TechieRag</PackageId>
     <Version>1.0.0</Version>
     <Authors>Techie Rathor</Authors>
-    <Description>Configurable RAG library for .NET</Description>
+    <Company>TechieRathor</Company>
+    <Description>A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. Supports multiple embedding providers (Ollama, LM Studio, OpenAI, Azure OpenAI, ONNX, HTTP) and vector stores (SQLite-vec, PostgreSQL/pgvector, Qdrant). Built-in document processors for PDF, DOCX, HTML, Markdown, JSON, TOML, and code files.</Description>
+    <PackageTags>RAG;AI;Embeddings;VectorStore;LLM;OpenAI;Ollama;Qdrant;pgvector;SQLite;DocumentProcessing</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.35" />
