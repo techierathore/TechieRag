@@ -63,9 +63,10 @@ public class QdrantStore : IVectorStore
     /// <param name="endpoint">The Qdrant server endpoint URL (e.g., "http://localhost:6334").</param>
     /// <param name="dimensions">The dimensionality of vector embeddings. Defaults to 1024 for BGE-M3.</param>
     /// <param name="collectionName">The name of the collection to use. Defaults to "techierag_chunks".</param>
+    /// <param name="apiKey">Optional API key for Qdrant authentication.</param>
     /// <exception cref="ArgumentNullException">Thrown when endpoint is null or empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when dimensions is less than or equal to zero.</exception>
-    public QdrantStore(string endpoint, int dimensions = 1024, string collectionName = ChunksCollectionName)
+    public QdrantStore(string endpoint, int dimensions = 1024, string collectionName = ChunksCollectionName, string? apiKey = null)
     {
         if (string.IsNullOrWhiteSpace(endpoint))
         {
@@ -82,7 +83,7 @@ public class QdrantStore : IVectorStore
         this.initialized = false;
 
         var uri = new Uri(endpoint);
-        this.client = new QdrantClient(uri.Host, uri.Port);
+        this.client = new QdrantClient(uri.Host, uri.Port, https: false, apiKey: apiKey);
     }
 
     /// <summary>

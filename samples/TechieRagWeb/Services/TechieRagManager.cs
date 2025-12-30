@@ -172,7 +172,9 @@ public class TechieRagManager : ITechieRag, IDisposable
                     builder.UsePgVector(savedConfig.VectorStore.ConnectionString ?? "");
                     break;
                 case VectorStoreType.Qdrant:
-                    builder.UseQdrant(savedConfig.VectorStore.ConnectionString ?? "http://localhost:6334");
+                    builder.UseQdrant(
+                        savedConfig.VectorStore.ConnectionString ?? "http://localhost:6334",
+                        savedConfig.VectorStore.ApiKey);
                     break;
                 default:
                     builder.UseSqliteVec();

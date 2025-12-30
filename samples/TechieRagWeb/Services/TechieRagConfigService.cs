@@ -98,7 +98,8 @@ public class TechieRagConfigService
                         Type = Enum.TryParse<VectorStoreType>(section["VectorStore:Type"], out var storeType)
                             ? storeType
                             : VectorStoreType.SqliteVec,
-                        ConnectionString = section["VectorStore:ConnectionString"] ?? "Data Source=techierag.db"
+                        ConnectionString = section["VectorStore:ConnectionString"] ?? "Data Source=techierag.db",
+                        ApiKey = section["VectorStore:ApiKey"]
                     },
                     Processing = new ProcessingConfig
                     {

@@ -190,6 +190,15 @@ public class VectorStoreConfig
     /// For Qdrant: HTTP endpoint URL (e.g., "http://localhost:6334")
     /// </remarks>
     public string ConnectionString { get; set; } = "Data Source=techierag.db";
+
+    /// <summary>
+    /// Gets or sets the API key for vector store authentication.
+    /// </summary>
+    /// <remarks>
+    /// Required for Qdrant when API key authentication is enabled.
+    /// Not needed for SqliteVec or PgVector (they use connection string auth).
+    /// </remarks>
+    public string? ApiKey { get; set; }
 }
 
 /// <summary>

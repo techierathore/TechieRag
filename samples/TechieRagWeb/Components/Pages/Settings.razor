@@ -179,6 +179,29 @@
                            placeholder="@GetConnectionStringPlaceholder()" />
                     <span class="form-hint">@GetConnectionStringHint()</span>
                 </div>
+
+                @if (config.VectorStore.Type == VectorStoreType.Qdrant)
+                {
+                    <div class="form-group">
+                        <label for="qdrantApiKey">Qdrant API Key (if required)</label>
+                        <input type="password"
+                               id="qdrantApiKey"
+                               @bind="config.VectorStore.ApiKey"
+                               class="form-control"
+                               placeholder="Enter Qdrant API key..." />
+                        <span class="form-hint">API key for Qdrant authentication. Leave empty if not configured.</span>
+                    </div>
+
+                    <div class="info-box">
+                        <strong>Qdrant Connection</strong>
+                        <ul>
+                            <li>Use the Qdrant Admin page to find running containers</li>
+                            <li>Default gRPC port is 6334 (HTTP port is 6333)</li>
+                            <li>API key is required if Qdrant is configured with authentication</li>
+                            <li>Connection string format: http://hostname:port</li>
+                        </ul>
+                    </div>
+                }
             </div>
 
             <!-- Processing Configuration -->

@@ -110,13 +110,14 @@ public class TechieRagBuilder
         return this;
     }
 
-    public TechieRagBuilder UseVectorStore(VectorStoreType type, string connectionString)
+    public TechieRagBuilder UseVectorStore(VectorStoreType type, string connectionString, string? apiKey = null)
     {
         ArgumentNullException.ThrowIfNull(connectionString);
         config.VectorStore = new VectorStoreConfig
         {
             Type = type,
-            ConnectionString = connectionString
+            ConnectionString = connectionString,
+            ApiKey = apiKey
         };
         return this;
     }
@@ -130,8 +131,8 @@ public class TechieRagBuilder
         return UseVectorStore(VectorStoreType.PgVector, connectionString);
     }
 
-    public TechieRagBuilder UseQdrant(string endpoint = "http://localhost:6334")
-        => UseVectorStore(VectorStoreType.Qdrant, endpoint);
+    public TechieRagBuilder UseQdrant(string endpoint = "http://localhost:6334", string? apiKey = null)
+        => UseVectorStore(VectorStoreType.Qdrant, endpoint, apiKey);
 
     public TechieRagBuilder WithChunkSize(int size, int overlap = 50)
     {
@@ -172,7 +173,7 @@ public class TechieRagBuilder
         {
             VectorStoreType.SqliteVec => new VectorStores.SqliteVecStore(config.VectorStore.ConnectionString),
             VectorStoreType.PgVector => CreatePgVectorStore(),
-            VectorStoreType.Qdrant => new VectorStores.QdrantStore(config.VectorStore.ConnectionString),
+            VectorStoreType.Qdrant => new VectorStores.QdrantStore(config.VectorStore.ConnectionString, apiKey: config.VectorStore.ApiKey),
             _ => throw new InvalidOperationException($"Unsupported vector store type: {config.VectorStore.Type}")
         };
     }

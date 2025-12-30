@@ -11,8 +11,9 @@
     "requestDelayMs": 100
   },
   "vectorStore": {
-    "type": 1,
-    "connectionString": "Host=localhost;Port=5432;Database=EmBedCheckDb;Username=PgVectorAdmin;Password=AdminPass@2025"
+    "type": 0,
+    "connectionString": "Data Source=techieragex.db",
+    "apiKey": "V45x5j1V36zW19kNYF4Hkc"
   },
   "processing": {
     "defaultChunkSize": 500,

@@ -23,3 +23,8 @@ src/TechieRag.Embedded/Models/
 
 # Logs
 *.log
+
+# Claude/AI tooling
+.bmad-core/
+.claude/
+CLAUDE.md
