@@ -16,10 +16,10 @@ A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. 
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `TechieRag` | Core library with all embedding providers and vector stores |
-| `TechieRag.Embedded` | Self-contained package with embedded BGE-M3 ONNX model for offline use |
+| Package | Description | User Guide |
+|---------|-------------|------------|
+| `TechieRag` | Core library with all embedding providers and vector stores | [User Guide](docs/TechieRag-UserGuide.md) |
+| `TechieRag.Embedded` | Self-contained package with embedded BGE-M3 ONNX model for offline use | [User Guide](docs/TechieRag.Embedded-UserGuide.md) |
 
 ## Installation
 
@@ -83,9 +83,16 @@ var rag = new TechieRagBuilder()
 // Initialize (downloads model on first run, ~2.3GB, cached locally)
 await rag.InitializeAsync();
 
-// Ingest documents
+// Ingest documents from files
 await rag.IngestAsync("path/to/document.pdf");
 await rag.IngestDirectoryAsync("./docs", "*.md");
+
+// Ingest raw text directly (great for database content, API responses, etc.)
+await rag.IngestTextAsync(
+    text: "Your article or story content here...",
+    documentName: "my-article",
+    metadata: new Dictionary<string, object> { { "Source", "database" } }
+);
 
 // Search
 var results = await rag.SearchAsync("What is machine learning?", topK: 5);
@@ -277,10 +284,37 @@ services.AddSingleton<ITechieRag>(sp =>
 });
 ```
 
+### Text Ingestion (Raw Text)
+
+Perfect for ingesting content from databases, APIs, or any text source without saving to files first:
+
+```csharp
+// Ingest text content directly
+var documentId = await rag.IngestTextAsync(
+    text: articleContent,           // Your raw text content
+    documentName: "article-123",    // Unique name for this document
+    metadata: new Dictionary<string, object>
+    {
+        { "Source", "PostgreSQL" },
+        { "ArticleId", 123 },
+        { "Category", "Technology" }
+    }
+);
+
+Console.WriteLine($"Ingested with ID: {documentId}");
+```
+
+Use cases:
+- Embedding articles fetched from a database
+- Processing API responses (news feeds, blog posts)
+- Ingesting user-generated content
+- Testing embeddings with sample text
+
 ## Sample Application
 
 The repository includes a Blazor Server sample application (`TechieRagWeb`) demonstrating:
-- Document ingestion UI
+- **File Ingestion UI** - Upload and process documents from local directories
+- **Text Ingestion UI** - Paste and ingest raw text content directly
 - Search interface
 - Configuration management
 - Qdrant database administration
@@ -290,6 +324,13 @@ Run it with:
 cd samples/TechieRagWeb
 dotnet run
 ```
+
+## Documentation
+
+For comprehensive guides on using TechieRag, see:
+
+- **[TechieRag User Guide](docs/TechieRag-UserGuide.md)** - Complete guide for the core package
+- **[TechieRag.Embedded User Guide](docs/TechieRag.Embedded-UserGuide.md)** - Guide for the self-contained embedded package
 
 ## Requirements
 

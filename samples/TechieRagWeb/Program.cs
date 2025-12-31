@@ -19,6 +19,12 @@ builder.Logging.AddFilter("Grpc", LogLevel.Debug);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Configure SignalR for larger message sizes (needed for text ingestion with large content)
+builder.Services.AddSignalR(options =>
+{
+    options.MaximumReceiveMessageSize = 1024 * 1024; // 1 MB max message size
+});
+
 // Register TechieRagManager as singleton - it manages the ITechieRag lifecycle
 // and allows dynamic reconfiguration without app restart
 builder.Services.AddSingleton<TechieRagManager>();
