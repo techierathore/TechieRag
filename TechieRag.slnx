@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+
 <Solution>
   <Configurations>
     <Platform Name="Any CPU" />
@@ -7,8 +7,17 @@
   </Configurations>
 
   <Folder Name="/src/">
-    <Project Path="src/TechieRag/TechieRag.csproj" />
     <Project Path="src/TechieRag.Embedded/TechieRag.Embedded.csproj" />
+    <Project Path="src/TechieRag/TechieRag.csproj" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/brainstorming-session-results.md" />
+    <File Path="docs/EMBEDDED-PACKAGE-GUIDE.md" />
+    <File Path="docs/NUGET-PUBLISHING-GUIDE.md" />
+    <File Path="docs/SETUP-AND-TESTING-GUIDE.md" />
+    <File Path="docs/TechieRag-UserGuide.md" />
+    <File Path="docs/TechieRag.Embedded-UserGuide.md" />
+    <File Path="docs/trrag-refactoring-roadmap.md" />
   </Folder>
 
   <Folder Name="/samples/">
