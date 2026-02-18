@@ -1,3 +1,4 @@
+using TechieRag.Abstractions;
 using TechieRag.Models;
 
 namespace TechieRag;
@@ -98,4 +99,101 @@ public interface ITechieRag
     /// validates embedding provider connectivity, and prepares for operations.</para>
     /// </remarks>
     Task InitializeAsync(CancellationToken cancellationToken = default);
+
+    // === NEW: LLM-Powered RAG Methods ===
+
+    /// <summary>
+    /// Performs a complete RAG operation: searches for relevant context and generates an answer.
+    /// </summary>
+    /// <param name="question">The user's question.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="documentFilter">Optional document ID to restrict search scope.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A RagResponse containing the answer, sources, and token usage.</returns>
+    /// <remarks>
+    /// <para><b>Flow:</b> 1) Embeds the question, 2) Searches vector store for relevant chunks,
+    /// 3) Builds prompt with context, 4) Calls LLM to generate answer, 5) Returns answer with sources.</para>
+    /// <para><b>Requires:</b> Both IEmbeddingProvider and ILlmProvider must be configured.</para>
+    /// </remarks>
+    Task<RagResponse> AskAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Performs a complete RAG operation with streaming response.
+    /// </summary>
+    /// <param name="question">The user's question.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="documentFilter">Optional document ID to restrict search scope.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>An async enumerable of response tokens for real-time streaming.</returns>
+    IAsyncEnumerable<string> AskStreamAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Performs a RAG-powered chat operation with conversation history.
+    /// </summary>
+    /// <param name="userMessage">The latest user message.</param>
+    /// <param name="conversationHistory">Previous messages in the conversation (optional if using ConversationMemory).</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A RagResponse containing the answer, sources, and token usage.</returns>
+    Task<RagResponse> ChatWithRagAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Performs a RAG-powered chat operation with streaming response.
+    /// </summary>
+    /// <param name="userMessage">The latest user message.</param>
+    /// <param name="conversationHistory">Previous messages in the conversation.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>An async enumerable of response tokens.</returns>
+    IAsyncEnumerable<string> ChatWithRagStreamAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the configured LLM provider for direct access.
+    /// </summary>
+    /// <returns>The ILlmProvider instance, or null if no LLM is configured.</returns>
+    ILlmProvider? GetLlmProvider();
+
+    /// <summary>
+    /// Gets the token usage tracker for monitoring consumption.
+    /// </summary>
+    /// <returns>The ITokenTracker instance.</returns>
+    ITokenTracker GetTokenTracker();
+
+    /// <summary>
+    /// Gets the conversation memory component (if configured).
+    /// </summary>
+    /// <returns>The IConversationMemory instance, or null if not configured.</returns>
+    IConversationMemory? GetConversationMemory();
 }

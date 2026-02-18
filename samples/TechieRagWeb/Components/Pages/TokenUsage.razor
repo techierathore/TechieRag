@@ -1,0 +1,183 @@
+@page "/token-usage"
+@rendermode InteractiveServer
+@using TechieRag.Abstractions
+@using TechieRag.Models
+@inject ITechieRag TechieRag
+@inject ToastService ToastService
+@implements IDisposable
+
+<PageTitle>Token Usage</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <TypographyH2>Token Usage Dashboard</TypographyH2>
+            <TypographyMuted>Monitor token consumption, costs, and budget status.</TypographyMuted>
+        </div>
+        <Button Variant="ButtonVariant.Outline" OnClick="ResetSession">
+            <Button.Icon><LucideIcon Name="rotate-ccw" Size="16" /></Button.Icon>
+            Reset Session
+        </Button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid gap-4 md:grid-cols-4">
+        <Card>
+            <CardHeader Class="pb-2">
+                <CardDescription>Total Tokens</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">@sessionUsage.TotalTokens.ToString("N0")</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader Class="pb-2">
+                <CardDescription>Input / Output</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">@sessionUsage.TotalInputTokens.ToString("N0") / @sessionUsage.TotalOutputTokens.ToString("N0")</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader Class="pb-2">
+                <CardDescription>Estimated Cost</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">$@sessionUsage.TotalEstimatedCostUsd.ToString("F4")</div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader Class="pb-2">
+                <CardDescription>Operations</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div class="text-2xl font-bold">@sessionUsage.OperationCount</div>
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- Budget Status -->
+    @if (budgetStatus != null)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>Budget Status</CardTitle>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                @if (budgetStatus.Budget.MaxTotalTokens > 0)
+                {
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span>Token Budget</span>
+                            <span>@sessionUsage.TotalTokens.ToString("N0") / @budgetStatus.Budget.MaxTotalTokens.ToString("N0")</span>
+                        </div>
+                        <Progress Value="@((double)(budgetStatus.TokenUtilization * 100))" Class="@GetBudgetClass(budgetStatus.TokenUtilization)" />
+                    </div>
+                }
+
+                @if (budgetStatus.Budget.MaxCostUsd > 0)
+                {
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span>Cost Budget</span>
+                            <span>$@sessionUsage.TotalEstimatedCostUsd.ToString("F4") / $@budgetStatus.Budget.MaxCostUsd.ToString("F2")</span>
+                        </div>
+                        <Progress Value="@((double)(budgetStatus.CostUtilization * 100))" Class="@GetBudgetClass(budgetStatus.CostUtilization)" />
+                    </div>
+                }
+
+                @if (budgetStatus.IsExceeded)
+                {
+                    <Alert Variant="AlertVariant.Danger">
+                        <AlertTitle>Budget Exceeded</AlertTitle>
+                        <AlertDescription>One or more budget limits have been exceeded.</AlertDescription>
+                    </Alert>
+                }
+                else if (budgetStatus.IsAlertTriggered)
+                {
+                    <Alert Variant="AlertVariant.Warning">
+                        <AlertTitle>Budget Alert</AlertTitle>
+                        <AlertDescription>Usage is approaching configured limits.</AlertDescription>
+                    </Alert>
+                }
+            </CardContent>
+        </Card>
+    }
+
+    <!-- Usage by Model -->
+    <Card>
+        <CardHeader>
+            <CardTitle>Usage by Model</CardTitle>
+        </CardHeader>
+        <CardContent>
+            @if (modelUsage.Count == 0)
+            {
+                <TypographyMuted>No usage data yet.</TypographyMuted>
+            }
+            else
+            {
+                <DataTable TData="ModelUsageRow" Data="@modelUsage" ShowPagination="false" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="ModelUsageRow" TValue="string" Property="@(r => r.Model)" Header="Model" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="int" Property="@(r => r.Requests)" Header="Requests" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="long" Property="@(r => r.InputTokens)" Header="Input Tokens" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="long" Property="@(r => r.OutputTokens)" Header="Output Tokens" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="string" Property="@(r => r.CostDisplay)" Header="Cost" />
+                    </Columns>
+                </DataTable>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private ITokenTracker tracker = null!;
+    private TokenUsageSummary sessionUsage = new();
+    private BudgetStatus? budgetStatus;
+    private List<ModelUsageRow> modelUsage = new();
+    private Timer? refreshTimer;
+
+    protected override void OnInitialized()
+    {
+        tracker = TechieRag.GetTokenTracker();
+        RefreshData();
+        refreshTimer = new Timer(_ => InvokeAsync(() => { RefreshData(); StateHasChanged(); }), null, 5000, 5000);
+    }
+
+    private void RefreshData()
+    {
+        sessionUsage = tracker.GetSessionUsage();
+        budgetStatus = tracker.GetBudgetStatus();
+
+        var usageByModel = tracker.GetUsageByModel();
+        modelUsage = usageByModel
+            .Select(kvp => new ModelUsageRow(
+                kvp.Key,
+                kvp.Value.OperationCount,
+                kvp.Value.TotalInputTokens,
+                kvp.Value.TotalOutputTokens,
+                $"${kvp.Value.TotalEstimatedCostUsd:F4}"))
+            .ToList();
+    }
+
+    private static string GetBudgetClass(float utilization) => utilization switch
+    {
+        >= 0.8f => "h-2 [&>div]:bg-destructive",
+        >= 0.6f => "h-2 [&>div]:bg-yellow-500",
+        _ => "h-2"
+    };
+
+    private void ResetSession()
+    {
+        tracker.Reset();
+        RefreshData();
+        ToastService.Success("Token usage session reset.", "Reset");
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+
+    private record ModelUsageRow(string Model, int Requests, long InputTokens, long OutputTokens, string CostDisplay);
+}

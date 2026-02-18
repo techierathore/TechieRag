@@ -1,5 +1,7 @@
 using TechieRag;
 using TechieRagWeb.Services;
+using TrBlazeUI.Primitives.Extensions;
+using TrBlazeUI.Components.Toast;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +39,10 @@ builder.Services.AddScoped<TechieRagConfigService>();
 builder.Services.AddSingleton<IDockerContainerService, DockerContainerService>();
 builder.Services.AddSingleton<IQdrantAdminService, QdrantAdminService>();
 
+// TrBlazeUI Services
+builder.Services.AddTrBlazeUIPrimitives();
+builder.Services.AddScoped<ToastService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -50,6 +56,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
+app.MapStaticAssets();
 app.MapRazorComponents<TechieRagWeb.Components.App>()
     .AddInteractiveServerRenderMode();
 

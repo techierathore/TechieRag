@@ -21,25 +21,40 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- AI Agent Files: Distributed to consumer projects via NuGet -->
+  <!-- TechieRag.targets auto-deploys these to the consumer project on every build -->
+  <!-- Content files are packed under BOTH build\ and buildTransitive\ so that -->
+  <!-- $(MSBuildThisFileDirectory)content\ resolves correctly for both direct and transitive refs -->
+  <ItemGroup>
+    <None Include="build\TechieRag.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="build\TechieRag.targets" Pack="true" PackagePath="build\" />
+    <None Include="build\content\TechieRag-AI-Reference.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\techierag-claude-command.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\TechieRag-AI-Reference.md" Pack="true" PackagePath="build\content\" />
+    <None Include="build\content\techierag-claude-command.md" Pack="true" PackagePath="build\content\" />
+    <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="build\content\" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.35" />
-    <PackageReference Include="DocumentFormat.OpenXml" Version="3.2.0" />
-    <PackageReference Include="HtmlAgilityPack" Version="1.11.72" />
-    <PackageReference Include="Markdig" Version="0.38.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
-    <PackageReference Include="Npgsql" Version="9.0.2" />
-    <PackageReference Include="PdfPig" Version="0.1.9" />
-    <PackageReference Include="Pgvector" Version="0.3.0" />
-    <PackageReference Include="Qdrant.Client" Version="1.12.0" />
-    <PackageReference Include="Tomlyn" Version="0.19.0" />
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.4.1" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageReference Include="Markdig" Version="0.45.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.3" />
+    <PackageReference Include="Npgsql" Version="10.0.1" />
+    <PackageReference Include="PdfPig" Version="0.1.13" />
+    <PackageReference Include="Pgvector" Version="0.3.2" />
+    <PackageReference Include="Qdrant.Client" Version="1.16.1" />
+    <PackageReference Include="Tomlyn" Version="0.20.0" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
   </ItemGroup>
 

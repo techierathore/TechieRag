@@ -2,6 +2,107 @@
 
 <PageTitle>TechieRag Demo</PageTitle>
 
-<h1>TechieRag Demo Application</h1>
+<div class="space-y-6">
+    <div>
+        <TypographyH1>TechieRag Demo Application</TypographyH1>
+        <TypographyLead>A configurable RAG + LLM management platform for .NET</TypographyLead>
+    </div>
 
-<p>Welcome to the TechieRag demonstration application.</p>
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+            <CardHeader>
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="file-text" Size="20" />
+                    <CardTitle>Document Ingestion</CardTitle>
+                </div>
+                <CardDescription>Ingest files and text into the vector store for semantic search.</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button Href="/ingestion" Variant="ButtonVariant.Outline" Class="w-full">
+                    <Button.Icon><LucideIcon Name="upload" Size="16" /></Button.Icon>
+                    File Ingestion
+                </Button>
+            </CardFooter>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="message-square" Size="20" />
+                    <CardTitle>RAG Chat</CardTitle>
+                </div>
+                <CardDescription>Ask questions and get AI-generated answers using your documents as context.</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button Href="/chat" Variant="ButtonVariant.Outline" Class="w-full">
+                    <Button.Icon><LucideIcon Name="message-square" Size="16" /></Button.Icon>
+                    Open Chat
+                </Button>
+            </CardFooter>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="terminal" Size="20" />
+                    <CardTitle>LLM Playground</CardTitle>
+                </div>
+                <CardDescription>Test LLM completions, structured output, and streaming directly.</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button Href="/llm-playground" Variant="ButtonVariant.Outline" Class="w-full">
+                    <Button.Icon><LucideIcon Name="terminal" Size="16" /></Button.Icon>
+                    Open Playground
+                </Button>
+            </CardFooter>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="wrench" Size="20" />
+                    <CardTitle>Tool Calling Demo</CardTitle>
+                </div>
+                <CardDescription>Explore the agent tool-calling loop with built-in demo tools.</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button Href="/tool-demo" Variant="ButtonVariant.Outline" Class="w-full">
+                    <Button.Icon><LucideIcon Name="wrench" Size="16" /></Button.Icon>
+                    Tool Demo
+                </Button>
+            </CardFooter>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="bar-chart-3" Size="20" />
+                    <CardTitle>Token Usage</CardTitle>
+                </div>
+                <CardDescription>Monitor token consumption, costs, and budget status.</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button Href="/token-usage" Variant="ButtonVariant.Outline" Class="w-full">
+                    <Button.Icon><LucideIcon Name="bar-chart-3" Size="16" /></Button.Icon>
+                    View Usage
+                </Button>
+            </CardFooter>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <div class="flex items-center gap-2">
+                    <LucideIcon Name="settings" Size="20" />
+                    <CardTitle>Configuration</CardTitle>
+                </div>
+                <CardDescription>Configure embedding providers, vector stores, and LLM settings.</CardDescription>
+            </CardHeader>
+            <CardFooter>
+                <Button Href="/settings" Variant="ButtonVariant.Outline" Class="w-full">
+                    <Button.Icon><LucideIcon Name="settings" Size="16" /></Button.Icon>
+                    Settings
+                </Button>
+            </CardFooter>
+        </Card>
+    </div>
+</div>

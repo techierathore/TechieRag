@@ -23,7 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,8 +32,8 @@
 
   <ItemGroup>
     <!-- ONNX Runtime for running embedding models locally -->
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.20.1" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.20.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.1" />
 
     <!-- Tokenizers for text preprocessing -->
     <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />

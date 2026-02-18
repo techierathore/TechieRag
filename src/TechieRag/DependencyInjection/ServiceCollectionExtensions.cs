@@ -166,6 +166,57 @@ public static class ServiceCollectionExtensions
 
             // Configure telemetry
             builder.WithTelemetry(config.EnableTelemetry);
+
+            // Configure LLM (if specified)
+            if (config.Llm.Source != LlmSource.None)
+            {
+                builder.UseLlm(
+                    config.Llm.Source,
+                    config.Llm.Endpoint,
+                    config.Llm.ApiKey,
+                    config.Llm.Model,
+                    config.Llm.Temperature,
+                    config.Llm.MaxTokens);
+            }
+
+            // Configure fallback LLM
+            if (config.LlmFallback is not null && config.LlmFallback.Source != LlmSource.None)
+            {
+                builder.WithFallbackLlm(fb =>
+                {
+                    fb.Source = config.LlmFallback.Source;
+                    fb.Endpoint = config.LlmFallback.Endpoint;
+                    fb.ApiKey = config.LlmFallback.ApiKey;
+                    fb.Model = config.LlmFallback.Model;
+                    fb.Temperature = config.LlmFallback.Temperature;
+                    fb.MaxTokens = config.LlmFallback.MaxTokens;
+                });
+            }
+
+            // Configure usage tracking
+            if (config.UsageTracking.Enabled)
+            {
+                builder.WithUsageTracking(tracking =>
+                {
+                    tracking.MaxTotalTokens = config.UsageTracking.MaxTotalTokens;
+                    tracking.MaxCostUsd = config.UsageTracking.MaxCostUsd;
+                    tracking.AlertThreshold = config.UsageTracking.AlertThreshold;
+                    tracking.BlockOnExceeded = config.UsageTracking.BlockOnExceeded;
+                });
+            }
+
+            // Configure resilience
+            builder.WithResilience(r =>
+            {
+                r.MaxRetries = config.Resilience.MaxRetries;
+                r.InitialRetryDelayMs = config.Resilience.InitialRetryDelayMs;
+                r.MaxRetryDelayMs = config.Resilience.MaxRetryDelayMs;
+                r.BackoffMultiplier = config.Resilience.BackoffMultiplier;
+                r.HandleRateLimiting = config.Resilience.HandleRateLimiting;
+                r.CircuitBreakerThreshold = config.Resilience.CircuitBreakerThreshold;
+                r.CircuitBreakerRecoverySeconds = config.Resilience.CircuitBreakerRecoverySeconds;
+                r.TimeoutSeconds = config.Resilience.TimeoutSeconds;
+            });
         });
     }
 

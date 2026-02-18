@@ -50,6 +50,21 @@ public class TechieRagConfig
     /// </remarks>
     public bool EnableTelemetry { get; set; } = true;
 
+    /// <summary>Gets or sets the LLM provider configuration.</summary>
+    public LlmConfig Llm { get; set; } = new();
+
+    /// <summary>Gets or sets the LLM fallback provider configuration (optional).</summary>
+    public LlmConfig? LlmFallback { get; set; }
+
+    /// <summary>Gets or sets the usage tracking configuration.</summary>
+    public UsageTrackingConfig UsageTracking { get; set; } = new();
+
+    /// <summary>Gets or sets the prompt template configuration.</summary>
+    public PromptConfig Prompt { get; set; } = new();
+
+    /// <summary>Gets or sets the resilience/retry configuration.</summary>
+    public ResilienceConfig Resilience { get; set; } = new();
+
     /// <summary>
     /// Internal logger factory set by the builder or DI container.
     /// </summary>
@@ -382,4 +397,121 @@ public enum VectorStoreType
     /// Can be run locally via Docker or as a managed cloud service.
     /// </remarks>
     Qdrant
+}
+
+/// <summary>Supported LLM provider sources.</summary>
+public enum LlmSource
+{
+    /// <summary>No LLM configured (embedding/retrieval only mode).</summary>
+    None,
+    /// <summary>Ollama local model server.</summary>
+    Ollama,
+    /// <summary>LM Studio local model server.</summary>
+    LmStudio,
+    /// <summary>OpenAI-compatible REST API.</summary>
+    OpenAICompatible,
+    /// <summary>Azure AI Foundry (formerly Azure OpenAI).</summary>
+    AzureAIFoundry,
+    /// <summary>Google Gemini API.</summary>
+    GoogleGemini,
+    /// <summary>Anthropic Claude API.</summary>
+    Anthropic
+}
+
+/// <summary>Configuration for LLM provider selection and settings.</summary>
+public class LlmConfig
+{
+    /// <summary>Gets or sets the LLM source type.</summary>
+    public LlmSource Source { get; set; } = LlmSource.None;
+
+    /// <summary>Gets or sets the API endpoint URL.</summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>Gets or sets the API key for authentication.</summary>
+    public string? ApiKey { get; set; }
+
+    /// <summary>Gets or sets the model name/deployment.</summary>
+    public string Model { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the default temperature.</summary>
+    public float Temperature { get; set; } = 0.7f;
+
+    /// <summary>Gets or sets the default max output tokens.</summary>
+    public int MaxTokens { get; set; } = 2048;
+
+    /// <summary>Gets or sets the API version (for Azure AI Foundry).</summary>
+    public string? ApiVersion { get; set; }
+
+    /// <summary>Gets or sets the project ID (for Google Gemini).</summary>
+    public string? ProjectId { get; set; }
+
+    /// <summary>Gets or sets the maximum context window size in tokens.</summary>
+    public int MaxContextTokens { get; set; } = 128000;
+}
+
+/// <summary>Configuration for token usage tracking and budgets.</summary>
+public class UsageTrackingConfig
+{
+    /// <summary>Gets or sets whether token tracking is enabled.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Gets or sets the maximum total tokens budget (0 = unlimited).</summary>
+    public long MaxTotalTokens { get; set; }
+
+    /// <summary>Gets or sets the maximum cost budget in USD (0 = unlimited).</summary>
+    public decimal MaxCostUsd { get; set; }
+
+    /// <summary>Gets or sets the budget alert threshold percentage (0.0-1.0).</summary>
+    public float AlertThreshold { get; set; } = 0.8f;
+
+    /// <summary>Gets or sets whether to block requests when budget is exceeded.</summary>
+    public bool BlockOnExceeded { get; set; }
+}
+
+/// <summary>Configuration for prompt templates used in RAG operations.</summary>
+public class PromptConfig
+{
+    /// <summary>Gets or sets the default system prompt for RAG operations.</summary>
+    public string SystemPrompt { get; set; } =
+        "You are a helpful assistant. Answer the user's question based on the provided context. " +
+        "If the context doesn't contain relevant information, say so. " +
+        "Cite the source documents when possible.";
+
+    /// <summary>Gets or sets the template for formatting context chunks.</summary>
+    public string ContextChunkTemplate { get; set; } =
+        "[Source {index}: {source} (relevance: {score:P0})]\n{text}";
+
+    /// <summary>Gets or sets the maximum number of context chunks to include.</summary>
+    public int MaxContextChunks { get; set; } = 5;
+
+    /// <summary>Gets or sets the maximum tokens to allocate for context.</summary>
+    public int MaxContextTokens { get; set; } = 4000;
+}
+
+/// <summary>Configuration for retry and resilience behavior.</summary>
+public class ResilienceConfig
+{
+    /// <summary>Gets or sets the maximum number of retry attempts.</summary>
+    public int MaxRetries { get; set; } = 3;
+
+    /// <summary>Gets or sets the initial delay between retries in milliseconds.</summary>
+    public int InitialRetryDelayMs { get; set; } = 1000;
+
+    /// <summary>Gets or sets the maximum delay between retries in milliseconds.</summary>
+    public int MaxRetryDelayMs { get; set; } = 30000;
+
+    /// <summary>Gets or sets the backoff multiplier for exponential backoff.</summary>
+    public float BackoffMultiplier { get; set; } = 2.0f;
+
+    /// <summary>Gets or sets whether to automatically handle rate limiting.</summary>
+    public bool HandleRateLimiting { get; set; } = true;
+
+    /// <summary>Gets or sets the circuit breaker failure threshold.</summary>
+    public int CircuitBreakerThreshold { get; set; } = 5;
+
+    /// <summary>Gets or sets the circuit breaker recovery time in seconds.</summary>
+    public int CircuitBreakerRecoverySeconds { get; set; } = 30;
+
+    /// <summary>Gets or sets the request timeout in seconds.</summary>
+    public int TimeoutSeconds { get; set; } = 120;
 }

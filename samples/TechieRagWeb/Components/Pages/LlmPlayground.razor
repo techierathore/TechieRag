@@ -1,0 +1,332 @@
+@page "/llm-playground"
+@rendermode InteractiveServer
+@using TechieRag.Abstractions
+@using TechieRag.Models
+@inject ITechieRag TechieRag
+@inject ToastService ToastService
+
+<PageTitle>LLM Playground</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <TypographyH2>LLM Playground</TypographyH2>
+        <TypographyMuted>Test LLM completions, structured output, and streaming directly.</TypographyMuted>
+    </div>
+
+    <Tabs DefaultValue="completion">
+        <TabsList Class="grid w-full grid-cols-3">
+            <TabsTrigger Value="completion">Completion</TabsTrigger>
+            <TabsTrigger Value="structured">Structured Output</TabsTrigger>
+            <TabsTrigger Value="chat">Chat</TabsTrigger>
+        </TabsList>
+
+        <!-- Completion Tab -->
+        <TabsContent Value="completion">
+            <div class="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Prompt</CardTitle>
+                    </CardHeader>
+                    <CardContent Class="space-y-4">
+                        <Field>
+                            <FieldLabel>System Prompt</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="systemPrompt" Placeholder="You are a helpful assistant" Class="min-h-[60px]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>User Prompt</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="userPrompt" Placeholder="Write a haiku about coding" Class="min-h-[80px]" />
+                            </FieldContent>
+                        </Field>
+                        <div class="grid grid-cols-3 gap-4">
+                            <Field>
+                                <FieldLabel>Temperature</FieldLabel>
+                                <FieldContent>
+                                    <Input Type="InputType.Number" @bind-Value="temperatureString" Placeholder="0.7" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Max Tokens</FieldLabel>
+                                <FieldContent>
+                                    <Input Type="InputType.Number" @bind-Value="maxTokensString" Placeholder="2048" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Streaming</FieldLabel>
+                                <FieldContent>
+                                    <div class="flex items-center space-x-2 pt-2">
+                                        <Switch @bind-Checked="useStreaming" Id="pg-streaming" />
+                                        <Label For="pg-streaming">@(useStreaming ? "On" : "Off")</Label>
+                                    </div>
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <Button OnClick="GenerateCompletion" Disabled="isGenerating">
+                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Generating...</span> }
+                            else { <span>Generate</span> }
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                @if (!string.IsNullOrEmpty(completionResponse))
+                {
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Response</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4">@completionResponse</div>
+                            @if (!string.IsNullOrEmpty(completionStats))
+                            {
+                                <TypographyMuted Class="mt-2">@completionStats</TypographyMuted>
+                            }
+                        </CardContent>
+                    </Card>
+                }
+            </div>
+        </TabsContent>
+
+        <!-- Structured Output Tab -->
+        <TabsContent Value="structured">
+            <div class="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Typed Response Test</CardTitle>
+                    </CardHeader>
+                    <CardContent Class="space-y-4">
+                        <Field>
+                            <FieldLabel>Prompt</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="structuredPrompt" Placeholder="Analyze the sentiment of: I love this product!" Class="min-h-[80px]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>Response Type</FieldLabel>
+                            <FieldContent>
+                                <Select @bind-Value="structuredType" TValue="string">
+                                    <SelectTrigger>
+                                        <SelectValue Placeholder="Select type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem Value="@("sentiment")" Text="SentimentAnalysis" TValue="string">Sentiment Analysis</SelectItem>
+                                        <SelectItem Value="@("weather")" Text="WeatherForecast" TValue="string">Weather Forecast</SelectItem>
+                                        <SelectItem Value="@("book")" Text="BookSummary" TValue="string">Book Summary</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FieldContent>
+                        </Field>
+                        <Button OnClick="GenerateStructured" Disabled="isGenerating">
+                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Generating...</span> }
+                            else { <span>Generate Typed Response</span> }
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                @if (!string.IsNullOrEmpty(structuredResponse))
+                {
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Parsed Result</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4 font-mono">@structuredResponse</div>
+                        </CardContent>
+                    </Card>
+                }
+            </div>
+        </TabsContent>
+
+        <!-- Chat Tab -->
+        <TabsContent Value="chat">
+            <Card Class="h-[500px] flex flex-col">
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <CardTitle>Direct LLM Chat</CardTitle>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearDirectChat">Clear</Button>
+                    </div>
+                </CardHeader>
+                <CardContent Class="flex-1 overflow-y-auto space-y-3">
+                    @foreach (var msg in directChatMessages)
+                    {
+                        <div class="@(msg.Role == "user" ? "flex justify-end" : "flex justify-start")">
+                            <div class="@(msg.Role == "user" ? "bg-primary text-primary-foreground" : "bg-muted") rounded-lg px-3 py-2 max-w-[80%]">
+                                <div class="whitespace-pre-wrap text-sm">@msg.Content</div>
+                            </div>
+                        </div>
+                    }
+                    @if (isGenerating && !string.IsNullOrEmpty(streamContent))
+                    {
+                        <div class="flex justify-start">
+                            <div class="bg-muted rounded-lg px-3 py-2">
+                                <div class="whitespace-pre-wrap text-sm">@streamContent<span class="animate-pulse">|</span></div>
+                            </div>
+                        </div>
+                    }
+                </CardContent>
+                <CardFooter Class="gap-2">
+                    <Textarea @bind-Value="directChatInput" Placeholder="Type a message..." Class="flex-1 min-h-[44px]" />
+                    <Button OnClick="SendDirectChat" Disabled="@(isGenerating || string.IsNullOrWhiteSpace(directChatInput))">
+                        <LucideIcon Name="send" Size="16" />
+                    </Button>
+                </CardFooter>
+            </Card>
+        </TabsContent>
+    </Tabs>
+</div>
+
+@code {
+    private string? systemPrompt = "You are a helpful assistant.";
+    private string? userPrompt;
+    private string? structuredPrompt;
+    private string structuredType = "sentiment";
+    private string? directChatInput;
+    private bool useStreaming = true;
+    private bool isGenerating;
+    private string completionResponse = "";
+    private string? completionStats;
+    private string? structuredResponse;
+    private string streamContent = "";
+    private List<ChatMsg> directChatMessages = new();
+
+    private string? temperatureString = "0.7";
+    private string? maxTokensString = "2048";
+
+    private ILlmProvider? GetProvider()
+    {
+        var provider = TechieRag.GetLlmProvider();
+        if (provider is null)
+            ToastService.Error("No LLM provider configured. Go to LLM Settings.", "Error");
+        return provider;
+    }
+
+    private async Task GenerateCompletion()
+    {
+        var provider = GetProvider();
+        if (provider is null || string.IsNullOrWhiteSpace(userPrompt)) return;
+
+        isGenerating = true;
+        completionResponse = "";
+        completionStats = null;
+        StateHasChanged();
+
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            if (useStreaming)
+            {
+                var prompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
+                await foreach (var token in provider.CompleteStreamAsync(prompt))
+                {
+                    completionResponse += token;
+                    StateHasChanged();
+                }
+                sw.Stop();
+                completionStats = $"{sw.ElapsedMilliseconds}ms";
+            }
+            else
+            {
+                var prompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
+                var response = await provider.CompleteAsync(prompt);
+                sw.Stop();
+                completionResponse = response.Content ?? "";
+                completionStats = $"{sw.ElapsedMilliseconds}ms | Input: {response.Usage.InputTokens} | Output: {response.Usage.OutputTokens}";
+            }
+        }
+        catch (Exception ex)
+        {
+            completionResponse = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task GenerateStructured()
+    {
+        var provider = GetProvider();
+        if (provider is null || string.IsNullOrWhiteSpace(structuredPrompt)) return;
+
+        isGenerating = true;
+        structuredResponse = null;
+        StateHasChanged();
+
+        try
+        {
+            var jsonPrompt = structuredType switch
+            {
+                "sentiment" => $"Analyze the sentiment and respond with JSON: {{\"sentiment\": \"positive|negative|neutral\", \"confidence\": 0.0-1.0, \"explanation\": \"...\"}}\n\n{structuredPrompt}",
+                "weather" => $"Create a weather forecast and respond with JSON: {{\"city\": \"...\", \"temperature\": 0, \"condition\": \"...\", \"humidity\": 0}}\n\n{structuredPrompt}",
+                "book" => $"Summarize the book and respond with JSON: {{\"title\": \"...\", \"author\": \"...\", \"summary\": \"...\", \"rating\": 0.0-5.0}}\n\n{structuredPrompt}",
+                _ => structuredPrompt
+            };
+
+            var options = new LlmCompletionOptions { JsonMode = true };
+            var response = await provider.CompleteAsync(jsonPrompt, options);
+            structuredResponse = response.Content;
+        }
+        catch (Exception ex)
+        {
+            structuredResponse = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task SendDirectChat()
+    {
+        var provider = GetProvider();
+        if (provider is null || string.IsNullOrWhiteSpace(directChatInput)) return;
+
+        var input = directChatInput!.Trim();
+        directChatInput = "";
+        directChatMessages.Add(new ChatMsg("user", input));
+        isGenerating = true;
+        streamContent = "";
+        StateHasChanged();
+
+        try
+        {
+            var chatMessages = directChatMessages
+                .Select(m => new ChatMessage { Role = m.Role, Content = m.Content })
+                .ToList()
+                .AsReadOnly();
+
+            if (useStreaming)
+            {
+                await foreach (var token in provider.ChatStreamAsync(chatMessages))
+                {
+                    streamContent += token;
+                    StateHasChanged();
+                }
+                directChatMessages.Add(new ChatMsg("assistant", streamContent));
+            }
+            else
+            {
+                var response = await provider.ChatAsync(chatMessages);
+                directChatMessages.Add(new ChatMsg("assistant", response.Content ?? ""));
+            }
+        }
+        catch (Exception ex)
+        {
+            directChatMessages.Add(new ChatMsg("assistant", $"Error: {ex.Message}"));
+        }
+        finally
+        {
+            isGenerating = false;
+            streamContent = "";
+        }
+    }
+
+    private void ClearDirectChat()
+    {
+        directChatMessages.Clear();
+    }
+
+    private record ChatMsg(string Role, string Content);
+}
