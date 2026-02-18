@@ -4,6 +4,8 @@ using TechieRag.Abstractions;
 using TechieRag.Models;
 using System.Text.Json;
 
+using Document = TechieRag.Models.Document;
+
 namespace TechieRag.VectorStores;
 
 /// <summary>

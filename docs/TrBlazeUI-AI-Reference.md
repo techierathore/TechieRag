@@ -182,8 +182,8 @@ builder.Services.AddScoped<ToastService>();  // Required for Toast notifications
 ### CSS Imports (in order)
 
 ```html
-<link rel="stylesheet" href="_content/TrBlazeUI.Components/css/trblazeui.css" />
 <link rel="stylesheet" href="styles/theme.css" />
+<link rel="stylesheet" href="_content/TrBlazeUI.Components/trblazeui.css" />
 <link rel="stylesheet" href="styles/base.css" />
 ```
 

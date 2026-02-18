@@ -1,5 +1,7 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using TechieRag;
+using TechieRag.Abstractions;
 using TechieRag.Embedded;
 using TechieRag.Models;
 
@@ -185,6 +187,60 @@ public class TechieRagManager : ITechieRag, IDisposable
             builder.WithChunkSize(
                 savedConfig.Processing.DefaultChunkSize,
                 savedConfig.Processing.DefaultChunkOverlap);
+
+            // Configure LLM provider
+            if (savedConfig.Llm.Source != LlmSource.None)
+            {
+                builder.UseLlm(
+                    savedConfig.Llm.Source,
+                    savedConfig.Llm.Endpoint,
+                    savedConfig.Llm.ApiKey,
+                    savedConfig.Llm.Model,
+                    savedConfig.Llm.Temperature,
+                    savedConfig.Llm.MaxTokens);
+            }
+
+            // Configure fallback LLM
+            if (savedConfig.LlmFallback is not null && savedConfig.LlmFallback.Source != LlmSource.None)
+            {
+                builder.WithFallbackLlm(fb =>
+                {
+                    fb.Source = savedConfig.LlmFallback.Source;
+                    fb.Endpoint = savedConfig.LlmFallback.Endpoint;
+                    fb.ApiKey = savedConfig.LlmFallback.ApiKey;
+                    fb.Model = savedConfig.LlmFallback.Model;
+                    fb.Temperature = savedConfig.LlmFallback.Temperature;
+                    fb.MaxTokens = savedConfig.LlmFallback.MaxTokens;
+                });
+            }
+
+            // Configure usage tracking
+            if (savedConfig.UsageTracking.Enabled)
+            {
+                builder.WithUsageTracking(tracking =>
+                {
+                    tracking.MaxTotalTokens = savedConfig.UsageTracking.MaxTotalTokens;
+                    tracking.MaxCostUsd = savedConfig.UsageTracking.MaxCostUsd;
+                    tracking.AlertThreshold = savedConfig.UsageTracking.AlertThreshold;
+                    tracking.BlockOnExceeded = savedConfig.UsageTracking.BlockOnExceeded;
+                });
+            }
+
+            // Configure resilience
+            builder.WithResilience(r =>
+            {
+                r.MaxRetries = savedConfig.Resilience.MaxRetries;
+                r.InitialRetryDelayMs = savedConfig.Resilience.InitialRetryDelayMs;
+                r.MaxRetryDelayMs = savedConfig.Resilience.MaxRetryDelayMs;
+                r.BackoffMultiplier = savedConfig.Resilience.BackoffMultiplier;
+                r.HandleRateLimiting = savedConfig.Resilience.HandleRateLimiting;
+                r.CircuitBreakerThreshold = savedConfig.Resilience.CircuitBreakerThreshold;
+                r.CircuitBreakerRecoverySeconds = savedConfig.Resilience.CircuitBreakerRecoverySeconds;
+                r.TimeoutSeconds = savedConfig.Resilience.TimeoutSeconds;
+            });
+
+            // Configure conversation memory
+            builder.WithConversationMemory();
         }
         else
         {
@@ -250,6 +306,78 @@ public class TechieRagManager : ITechieRag, IDisposable
     {
         var instance = await GetInstanceAsync();
         await instance.ClearAsync(cancellationToken);
+    }
+
+    public async Task<RagResponse> AskAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await GetInstanceAsync();
+        return await instance.AskAsync(question, topK, systemPrompt, documentFilter, options, cancellationToken);
+    }
+
+    public async IAsyncEnumerable<string> AskStreamAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var instance = await GetInstanceAsync();
+        await foreach (var token in instance.AskStreamAsync(question, topK, systemPrompt, documentFilter, options, cancellationToken))
+        {
+            yield return token;
+        }
+    }
+
+    public async Task<RagResponse> ChatWithRagAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await GetInstanceAsync();
+        return await instance.ChatWithRagAsync(userMessage, conversationHistory, topK, systemPrompt, options, cancellationToken);
+    }
+
+    public async IAsyncEnumerable<string> ChatWithRagStreamAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var instance = await GetInstanceAsync();
+        await foreach (var token in instance.ChatWithRagStreamAsync(userMessage, conversationHistory, topK, systemPrompt, options, cancellationToken))
+        {
+            yield return token;
+        }
+    }
+
+    public ILlmProvider? GetLlmProvider()
+    {
+        var instance = GetInstanceAsync().GetAwaiter().GetResult();
+        return instance.GetLlmProvider();
+    }
+
+    public ITokenTracker GetTokenTracker()
+    {
+        var instance = GetInstanceAsync().GetAwaiter().GetResult();
+        return instance.GetTokenTracker();
+    }
+
+    public IConversationMemory? GetConversationMemory()
+    {
+        var instance = GetInstanceAsync().GetAwaiter().GetResult();
+        return instance.GetConversationMemory();
     }
 
     #endregion

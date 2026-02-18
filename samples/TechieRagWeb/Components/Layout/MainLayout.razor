@@ -1,29 +1,138 @@
 @inherits LayoutComponentBase
 
-<div class="page">
-    <NavMenu />
-    <main>
-        <article class="content px-4">
+<SidebarProvider DefaultOpen="true" HeightClass="h-screen">
+    <Sidebar Collapsible="true">
+        <SidebarHeader>
+            <SidebarHeaderContent>
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+                    T
+                </div>
+                <SidebarHeaderInfo>
+                    <span class="truncate font-semibold">TechieRag</span>
+                    <span class="truncate text-xs text-muted-foreground">RAG + LLM Platform</span>
+                </SidebarHeaderInfo>
+            </SidebarHeaderContent>
+        </SidebarHeader>
+        <SidebarContent>
+            <SidebarGroup>
+                <SidebarGroupLabel>General</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/" Match="NavLinkMatch.All" Tooltip="Home">
+                                <LucideIcon Name="house" Size="16" />
+                                <span>Home</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/settings" Tooltip="Settings">
+                                <LucideIcon Name="settings" Size="16" />
+                                <span>Settings</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/llm-settings" Tooltip="LLM Settings">
+                                <LucideIcon Name="cpu" Size="16" />
+                                <span>LLM Settings</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Data</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/ingestion" Tooltip="File Ingestion">
+                                <LucideIcon Name="file-text" Size="16" />
+                                <span>File Ingestion</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/text-ingestion" Tooltip="Text Ingestion">
+                                <LucideIcon Name="type" Size="16" />
+                                <span>Text Ingestion</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>AI Features</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/chat" Tooltip="RAG Chat">
+                                <LucideIcon Name="message-square" Size="16" />
+                                <span>RAG Chat</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/llm-playground" Tooltip="LLM Playground">
+                                <LucideIcon Name="terminal" Size="16" />
+                                <span>LLM Playground</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/tool-demo" Tooltip="Tool Demo">
+                                <LucideIcon Name="wrench" Size="16" />
+                                <span>Tool Demo</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Monitoring</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/token-usage" Tooltip="Token Usage">
+                                <LucideIcon Name="bar-chart-3" Size="16" />
+                                <span>Token Usage</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/qdrant-admin" Tooltip="Qdrant Admin">
+                                <LucideIcon Name="database" Size="16" />
+                                <span>Qdrant Admin</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+        </SidebarContent>
+    </Sidebar>
+
+    <SidebarInset>
+        <header class="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+            <SidebarTrigger />
+        </header>
+        <div class="flex-1 overflow-auto p-6 md:p-8">
             @Body
-        </article>
-    </main>
-</div>
+        </div>
+    </SidebarInset>
+</SidebarProvider>
 
-<style>
-    .page {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-    }
-
-    main {
-        flex: 1;
-        background-color: #f5f7fa;
-    }
-
-    .content {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 1.5rem;
-    }
-</style>
+<ToastProvider Position="ToastPosition.BottomRight" />
+<PortalHost />

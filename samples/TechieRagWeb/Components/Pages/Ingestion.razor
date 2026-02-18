@@ -1,255 +1,157 @@
 @page "/ingestion"
-@using TechieRag
 @using TechieRag.Models
 @using TechieRag.Embedded
 @implements IDisposable
 @inject ITechieRag Rag
+@inject ToastService ToastService
 @inject ILogger<Ingestion> Logger
 @rendermode InteractiveServer
 
 <PageTitle>Document Ingestion - TechieRag</PageTitle>
 
-<div style="max-width: 900px; margin: 0 auto; padding: 24px;">
-    <h1 style="font-size: 1.75rem; font-weight: bold; margin-bottom: 24px; color: #1f2937;">Document Ingestion</h1>
+<div class="space-y-6">
+    <div>
+        <TypographyH2>Document Ingestion</TypographyH2>
+        <TypographyMuted>Ingest files from a directory into the vector store for semantic search.</TypographyMuted>
+    </div>
 
     <!-- Model Download Progress -->
     @if (isDownloadingModel)
     {
-        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                <div class="download-spinner"></div>
-                <h3 style="font-size: 1rem; font-weight: 600; color: #92400e; margin: 0;">Downloading BGE-M3 Model</h3>
-            </div>
-            <p style="font-size: 0.875rem; color: #78350f; margin: 0 0 12px 0;">
+        <Alert Variant="AlertVariant.Warning">
+            <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
+            <AlertTitle>Downloading BGE-M3 Model</AlertTitle>
+            <AlertDescription>
                 @downloadProgress?.StatusMessage
-            </p>
-            <div style="width: 100%; background: #fde68a; border-radius: 9999px; height: 8px; margin-bottom: 8px;">
-                <div style="background: #f59e0b; height: 8px; border-radius: 9999px; transition: width 0.3s; width: @(downloadProgress?.CurrentFileProgressPercent ?? 0)%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #92400e;">
-                <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
-                <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
-            </div>
-        </div>
-        <style>
-            .download-spinner {
-                width: 20px;
-                height: 20px;
-                border: 3px solid #fde68a;
-                border-top-color: #f59e0b;
-                border-radius: 50%;
-                animation: download-spin 1s linear infinite;
-            }
-            @@keyframes download-spin {
-                to { transform: rotate(360deg); }
-            }
-        </style>
+                <Progress Value="@(downloadProgress?.CurrentFileProgressPercent ?? 0)" Class="mt-2" />
+                <div class="flex justify-between text-xs mt-1">
+                    <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
+                    <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
+                </div>
+            </AlertDescription>
+        </Alert>
     }
 
     <!-- Ingestion Controls -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 16px; color: #374151;">Ingest Documents</h2>
+    <Card>
+        <CardHeader>
+            <CardTitle>Ingest Documents</CardTitle>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <Field>
+                <FieldLabel>Documents Folder Path</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="documentsPath" Placeholder="C:\Documents\RAGData" />
+                </FieldContent>
+            </Field>
 
-        <div style="display: flex; flex-direction: column; gap: 16px;">
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; color: #374151;">Documents Folder Path</label>
-                <input type="text" @bind="documentsPath"
-                       style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 0.875rem;"
-                       placeholder="C:\Documents\RAGData" />
-            </div>
+            <Field>
+                <FieldLabel>File Pattern</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="filePattern" Placeholder="*.*" />
+                    <FieldDescription>Supported: PDF, DOCX, TXT, MD, HTML, JSON, TOML, and 70+ code file types. Use *.* for all.</FieldDescription>
+                </FieldContent>
+            </Field>
 
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; color: #374151;">File Pattern</label>
-                <input type="text" @bind="filePattern"
-                       style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 0.875rem;"
-                       placeholder="*.pdf" />
-                <p style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
-                    Supported: PDF, DOCX, TXT, MD, HTML, JSON, TOML, and 70+ code file types (JS, TS, PY, CS, Java, Go, Rust, etc.) - use *.* for all
-                </p>
-            </div>
-
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <button @onclick="IngestDocumentsAsync"
-                        disabled="@isIngesting"
-                        style="background: @(isIngesting ? "#9ca3af" : "#059669"); color: white; padding: 10px 24px; border-radius: 6px; border: none; cursor: @(isIngesting ? "not-allowed" : "pointer"); font-weight: 500;">
-                    @(isIngesting ? "Ingesting..." : "Ingest Now")
-                </button>
-
+            <div class="flex gap-3">
+                <Button OnClick="IngestDocumentsAsync" Disabled="isIngesting">
+                    @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Ingesting...</span> }
+                    else { <span>Ingest Now</span> }
+                </Button>
                 @if (isIngesting)
                 {
-                    <button @onclick="StopIngestion"
-                            disabled="@isCancelling"
-                            style="background: @(isCancelling ? "#9ca3af" : "#f97316"); color: white; padding: 10px 24px; border-radius: 6px; border: none; cursor: @(isCancelling ? "not-allowed" : "pointer"); font-weight: 500;">
+                    <Button Variant="ButtonVariant.Outline" OnClick="StopIngestion" Disabled="isCancelling">
                         @(isCancelling ? "Stopping..." : "Stop Ingestion")
-                    </button>
+                    </Button>
                 }
-
-                <button @onclick="ClearVectorStoreAsync"
-                        disabled="@isIngesting"
-                        style="background: @(isIngesting ? "#9ca3af" : "#dc2626"); color: white; padding: 10px 16px; border-radius: 6px; border: none; cursor: @(isIngesting ? "not-allowed" : "pointer"); font-weight: 500;">
+                <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">
                     Clear All Data
-                </button>
-            </div>
-        </div>
-
-        <!-- Progress -->
-        @if (isIngesting)
-        {
-            <div style="margin-top: 16px;">
-                <div style="width: 100%; background: #e5e7eb; border-radius: 9999px; height: 8px;">
-                    <div style="background: #2563eb; height: 8px; border-radius: 9999px; transition: width 0.3s; width: @(progress)%;"></div>
-                </div>
-                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 4px;">@progressMessage</p>
-            </div>
-        }
-
-        <!-- Status Message -->
-        @if (statusMessage is not null)
-        {
-            <div style="margin-top: 16px; padding: 12px; border-radius: 6px; background: @(statusSuccess ? "#d1fae5" : "#fee2e2"); color: @(statusSuccess ? "#065f46" : "#991b1b");">
-                @statusMessage
-            </div>
-        }
-
-        <!-- Ingestion Results Details -->
-        @if (ingestionResults.Any())
-        {
-            <div style="margin-top: 16px; max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
-                    <thead style="position: sticky; top: 0; background: #f9fafb;">
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                            <th style="text-align: left; padding: 8px 12px; font-weight: 600; color: #374151;">Status</th>
-                            <th style="text-align: left; padding: 8px 12px; font-weight: 600; color: #374151;">File</th>
-                            <th style="text-align: left; padding: 8px 12px; font-weight: 600; color: #374151;">Details</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var result in ingestionResults)
-                        {
-                            <tr style="border-bottom: 1px solid #e5e7eb;">
-                                <td style="padding: 8px 12px;">
-                                    @if (result.Success)
-                                    {
-                                        <span style="color: #059669; font-weight: 500;">Success</span>
-                                    }
-                                    else
-                                    {
-                                        <span style="color: #dc2626; font-weight: 500;">Failed</span>
-                                    }
-                                </td>
-                                <td style="padding: 8px 12px; color: #1f2937; word-break: break-all;">@result.FileName</td>
-                                <td style="padding: 8px 12px; color: @(result.Success ? "#6b7280" : "#dc2626"); font-size: 0.8125rem;">
-                                    @if (result.Success)
-                                    {
-                                        <span>ID: @result.DocumentId</span>
-                                    }
-                                    else
-                                    {
-                                        <span>@result.ErrorMessage</span>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-            <div style="margin-top: 8px; display: flex; gap: 16px; font-size: 0.875rem; color: #6b7280;">
-                <span>Total: @ingestionResults.Count</span>
-                <span style="color: #059669;">Success: @ingestionResults.Count(r => r.Success)</span>
-                <span style="color: #dc2626;">Failed: @ingestionResults.Count(r => !r.Success)</span>
-                <button @onclick="ClearResults" style="color: #2563eb; background: none; border: none; cursor: pointer; text-decoration: underline;">
-                    Clear Results
-                </button>
-            </div>
-        }
-    </div>
-
-    <!-- Current Stats -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 16px; color: #374151;">Vector Store Statistics</h2>
-
-        @if (stats is not null)
-        {
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #2563eb;">@stats.TotalDocuments</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Documents</div>
-                </div>
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #059669;">@stats.TotalChunks</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Chunks</div>
-                </div>
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #7c3aed;">@FormatSize(stats.VectorStoreSizeBytes)</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Storage Size</div>
-                </div>
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 0.875rem; font-weight: 500; color: #374151;">@stats.VectorStoreName</div>
-                    <div style="font-size: 0.75rem; color: #6b7280;">@stats.EmbeddingProviderName</div>
-                </div>
+                </Button>
             </div>
 
-            @if (stats.LastIngestionTime.HasValue)
+            @if (isIngesting)
             {
-                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 16px;">
-                    Last ingestion: @stats.LastIngestionTime.Value.ToString("g")
-                </p>
+                <div class="space-y-2">
+                    <Progress Value="@progress" />
+                    <TypographyMuted>@progressMessage</TypographyMuted>
+                </div>
             }
-        }
-        else
+        </CardContent>
+    </Card>
+
+    <!-- Ingestion Results -->
+    @if (ingestionResults.Count > 0)
+    {
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle>Ingestion Results</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearResults">Clear</Button>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <DataTable TData="IngestionResult" Data="@ingestionResults" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.FileName)" Header="File" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? "Success" : "Failed")" Header="Status" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? r.DocumentId ?? "" : r.ErrorMessage ?? "")" Header="ID / Error" />
+                    </Columns>
+                </DataTable>
+            </CardContent>
+        </Card>
+    }
+
+    <!-- Statistics & Documents -->
+    <div class="grid gap-6 lg:grid-cols-2">
+        @if (stats != null)
         {
-            <p style="color: #6b7280;">Loading statistics...</p>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Vector Store Statistics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <TypographyMuted>Documents</TypographyMuted>
+                            <div class="text-xl font-bold">@stats.TotalDocuments</div>
+                        </div>
+                        <div>
+                            <TypographyMuted>Chunks</TypographyMuted>
+                            <div class="text-xl font-bold">@stats.TotalChunks</div>
+                        </div>
+                        <div>
+                            <TypographyMuted>Storage Size</TypographyMuted>
+                            <div class="text-xl font-bold">@FormatSize(stats.VectorStoreSizeBytes)</div>
+                        </div>
+                        <div>
+                            <TypographyMuted>Last Ingestion</TypographyMuted>
+                            <div class="text-xl font-bold">@(stats.LastIngestionTime?.ToString("g") ?? "Never")</div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         }
 
-        <button @onclick="RefreshStatsAsync" style="margin-top: 16px; color: #2563eb; background: none; border: none; cursor: pointer; font-size: 0.875rem; text-decoration: underline;">
-            Refresh Statistics
-        </button>
-    </div>
-
-    <!-- Document List -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 16px; color: #374151;">Ingested Documents</h2>
-
-        @if (documents.Any())
-        {
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #e5e7eb;">
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Name</th>
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Chunks</th>
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Ingested</th>
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var doc in documents)
-                    {
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                            <td style="padding: 12px 8px; color: #1f2937;">@doc.Name</td>
-                            <td style="padding: 12px 8px; color: #6b7280;">@doc.ChunkCount</td>
-                            <td style="padding: 12px 8px; color: #6b7280;">@doc.IngestedAt.ToString("g")</td>
-                            <td style="padding: 12px 8px;">
-                                <button @onclick="() => DeleteDocumentAsync(doc.Id)"
-                                        style="color: #dc2626; background: none; border: none; cursor: pointer; font-size: 0.875rem; text-decoration: underline;">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-        else
-        {
-            <p style="color: #6b7280;">No documents ingested yet.</p>
-        }
-    </div>
-
-    <!-- Navigation -->
-    <div style="margin-top: 24px;">
-        <a href="/chat" style="display: inline-block; background: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
-            Go to Chat
-        </a>
+        <Card>
+            <CardHeader>
+                <CardTitle>Ingested Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+                @if (documents.Count == 0)
+                {
+                    <TypographyMuted>No documents ingested yet.</TypographyMuted>
+                }
+                else
+                {
+                    <DataTable TData="Document" Data="@documents" ShowToolbar="false">
+                        <Columns>
+                            <DataTableColumn TData="Document" TValue="string" Property="@(d => d.Name)" Header="Name" />
+                            <DataTableColumn TData="Document" TValue="int" Property="@(d => d.ChunkCount)" Header="Chunks" />
+                        </Columns>
+                    </DataTable>
+                }
+            </CardContent>
+        </Card>
     </div>
 </div>
 
@@ -259,48 +161,33 @@
     private bool isIngesting;
     private int progress;
     private string? progressMessage;
-    private string? statusMessage;
-    private bool statusSuccess;
     private IngestionStats? stats;
     private List<Document> documents = new();
     private List<IngestionResult> ingestionResults = new();
-
-    // Cancellation support
     private CancellationTokenSource? ingestionCts;
     private bool isCancelling;
-
-    // Model download tracking
     private bool isDownloadingModel;
     private ModelDownloadProgress? downloadProgress;
 
-    /// <summary>
-    /// Tracks the result of ingesting a single file.
-    /// </summary>
     private record IngestionResult(string FileName, bool Success, string? ErrorMessage, string? DocumentId);
 
     protected override async Task OnInitializedAsync()
     {
-        // Subscribe to model download progress
         ModelDownloadService.Instance.ProgressChanged += OnDownloadProgressChanged;
         downloadProgress = ModelDownloadService.Instance.Progress;
 
         try
         {
-            // Check current download status
             UpdateDownloadStatus();
-
             await Rag.InitializeAsync();
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-
-            // Update status after initialization
             UpdateDownloadStatus();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to initialize ingestion page");
-            statusMessage = $"Initialization error: {ex.Message}";
-            statusSuccess = false;
+            ToastService.Error($"Initialization error: {ex.Message}", "Error");
         }
     }
 
@@ -339,19 +226,16 @@
     {
         if (string.IsNullOrWhiteSpace(documentsPath))
         {
-            statusMessage = "Please enter a documents folder path.";
-            statusSuccess = false;
+            ToastService.Error("Please enter a documents folder path.", "Validation");
             return;
         }
 
         if (!Directory.Exists(documentsPath))
         {
-            statusMessage = "The specified folder does not exist.";
-            statusSuccess = false;
+            ToastService.Error("The specified folder does not exist.", "Validation");
             return;
         }
 
-        // Create new cancellation token source
         ingestionCts?.Dispose();
         ingestionCts = new CancellationTokenSource();
         var cancellationToken = ingestionCts.Token;
@@ -359,7 +243,6 @@
         isIngesting = true;
         isCancelling = false;
         progress = 0;
-        statusMessage = null;
         ingestionResults.Clear();
         StateHasChanged();
 
@@ -368,15 +251,12 @@
             progressMessage = "Scanning folder...";
             StateHasChanged();
 
-            // Get list of files to process
             var files = Directory.GetFiles(documentsPath, filePattern, SearchOption.AllDirectories);
 
             if (files.Length == 0)
             {
-                statusMessage = $"No files matching '{filePattern}' found in the folder.";
-                statusSuccess = false;
+                ToastService.Error($"No files matching '{filePattern}' found.", "No Files");
                 isIngesting = false;
-                StateHasChanged();
                 return;
             }
 
@@ -384,14 +264,10 @@
             progressMessage = $"Found {files.Length} file(s). Starting ingestion...";
             StateHasChanged();
 
-            int successCount = 0;
-            int failedCount = 0;
-            int skippedCount = 0;
+            int successCount = 0, failedCount = 0, skippedCount = 0;
 
-            // Process each file individually for detailed progress
             for (int i = 0; i < files.Length; i++)
             {
-                // Check for cancellation
                 if (cancellationToken.IsCancellationRequested)
                 {
                     skippedCount = files.Length - i;
@@ -401,12 +277,9 @@
 
                 var file = files[i];
                 var fileName = Path.GetFileName(file);
-
                 progressMessage = $"Processing ({i + 1}/{files.Length}): {fileName}";
-                progress = 5 + (int)((i / (double)files.Length) * 90); // 5% to 95%
+                progress = 5 + (int)((i / (double)files.Length) * 90);
                 StateHasChanged();
-
-                // Force UI update on Blazor Server
                 await Task.Delay(10);
 
                 try
@@ -414,7 +287,6 @@
                     var documentId = await Rag.IngestAsync(file, cancellationToken);
                     ingestionResults.Add(new IngestionResult(fileName, true, null, documentId));
                     successCount++;
-                    Logger.LogInformation("Successfully ingested {FileName}", fileName);
                 }
                 catch (OperationCanceledException)
                 {
@@ -424,53 +296,26 @@
                 }
                 catch (Exception ex)
                 {
-                    var errorMsg = ex.Message.Length > 100 ? ex.Message.Substring(0, 100) + "..." : ex.Message;
-                    ingestionResults.Add(new IngestionResult(fileName, false, errorMsg, null));
+                    ingestionResults.Add(new IngestionResult(fileName, false, ex.Message[..Math.Min(100, ex.Message.Length)], null));
                     failedCount++;
-                    Logger.LogWarning(ex, "Failed to ingest {FileName}", fileName);
                 }
             }
 
             progress = 100;
+            progressMessage = "Complete!";
 
-            // Build status message based on results
-            if (cancellationToken.IsCancellationRequested)
-            {
-                statusMessage = $"Ingestion stopped. Ingested {successCount}, failed {failedCount}, skipped {skippedCount}.";
-                statusSuccess = successCount > 0;
-            }
-            else if (failedCount == 0)
-            {
-                statusMessage = $"Successfully ingested {successCount} document(s).";
-                statusSuccess = true;
-                progressMessage = "Complete!";
-            }
-            else if (successCount == 0)
-            {
-                statusMessage = $"All {failedCount} file(s) failed to ingest. See details below.";
-                statusSuccess = false;
-                progressMessage = "Complete with errors.";
-            }
+            if (successCount > 0)
+                ToastService.Success($"Ingested {successCount} document(s). {(failedCount > 0 ? $"{failedCount} failed." : "")}", "Done");
             else
-            {
-                statusMessage = $"Ingested {successCount} document(s), {failedCount} failed. See details below.";
-                statusSuccess = successCount > 0;
-                progressMessage = "Complete!";
-            }
+                ToastService.Error($"All {failedCount} file(s) failed to ingest.", "Failed");
 
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
         }
-        catch (OperationCanceledException)
-        {
-            statusMessage = "Ingestion was cancelled.";
-            statusSuccess = false;
-        }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Ingestion failed for path {Path}", documentsPath);
-            statusMessage = $"Error: {ex.Message}";
-            statusSuccess = false;
+            Logger.LogError(ex, "Ingestion failed");
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
         finally
         {
@@ -480,31 +325,22 @@
         }
     }
 
-    private void ClearResults()
-    {
-        ingestionResults.Clear();
-        statusMessage = null;
-        StateHasChanged();
-    }
+    private void ClearResults() { ingestionResults.Clear(); }
 
     private async Task ClearVectorStoreAsync()
     {
         try
         {
             await Rag.ClearAsync();
-            statusMessage = "All data cleared successfully.";
-            statusSuccess = true;
             ingestionResults.Clear();
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
+            ToastService.Success("All data cleared.", "Cleared");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to clear vector store");
-            statusMessage = $"Error: {ex.Message}";
-            statusSuccess = false;
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
-        StateHasChanged();
     }
 
     private async Task DeleteDocumentAsync(string documentId)
@@ -512,73 +348,39 @@
         try
         {
             await Rag.DeleteDocumentAsync(documentId);
-            statusMessage = "Document deleted successfully.";
-            statusSuccess = true;
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
+            ToastService.Success("Document deleted.", "Deleted");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to delete document {DocumentId}", documentId);
-            statusMessage = $"Error: {ex.Message}";
-            statusSuccess = false;
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
-        StateHasChanged();
     }
 
     private async Task RefreshStatsAsync()
     {
-        try
-        {
-            stats = await Rag.GetStatsAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to refresh statistics");
-        }
-        StateHasChanged();
+        try { stats = await Rag.GetStatsAsync(); } catch { }
     }
 
     private async Task RefreshDocumentsAsync()
     {
-        try
-        {
-            documents = (await Rag.ListDocumentsAsync()).ToList();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to refresh documents list");
-        }
-        StateHasChanged();
+        try { documents = (await Rag.ListDocumentsAsync()).ToList(); } catch { }
     }
 
-    private static string FormatSize(long bytes)
+    private static string FormatSize(long bytes) => bytes switch
     {
-        const long kb = 1024;
-        const long mb = kb * 1024;
-        const long gb = mb * 1024;
+        >= 1024 * 1024 * 1024 => $"{bytes / (double)(1024 * 1024 * 1024):F1} GB",
+        >= 1024 * 1024 => $"{bytes / (double)(1024 * 1024):F1} MB",
+        >= 1024 => $"{bytes / (double)1024:F1} KB",
+        _ => $"{bytes} B"
+    };
 
-        if (bytes >= gb)
-            return $"{bytes / (double)gb:F1} GB";
-        if (bytes >= mb)
-            return $"{bytes / (double)mb:F1} MB";
-        if (bytes >= kb)
-            return $"{bytes / (double)kb:F1} KB";
-        return $"{bytes} B";
-    }
-
-    private static string FormatBytes(long bytes)
+    private static string FormatBytes(long bytes) => bytes switch
     {
-        const double kb = 1024;
-        const double mb = kb * 1024;
-        const double gb = mb * 1024;
-
-        if (bytes >= gb)
-            return $"{bytes / gb:F2} GB";
-        if (bytes >= mb)
-            return $"{bytes / mb:F1} MB";
-        if (bytes >= kb)
-            return $"{bytes / kb:F0} KB";
-        return $"{bytes} B";
-    }
+        >= (long)(1024 * 1024 * 1024) => $"{bytes / (1024.0 * 1024 * 1024):F2} GB",
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B"
+    };
 }

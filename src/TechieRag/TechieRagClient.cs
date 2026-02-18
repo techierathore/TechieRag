@@ -1,7 +1,10 @@
+using System.Runtime.CompilerServices;
+using System.Text;
 using Microsoft.Extensions.Logging;
 using TechieRag.Abstractions;
 using TechieRag.Models;
 using TechieRag.Processors;
+using TechieRag.Services;
 
 namespace TechieRag;
 
@@ -25,6 +28,10 @@ public class TechieRagClient : ITechieRag
     private readonly IReadOnlyList<IDocumentProcessor> processors;
     private readonly TechieRagConfig config;
     private readonly ILogger<TechieRagClient> logger;
+    private readonly ILlmProvider? llmProvider;
+    private readonly ITokenTracker tokenTracker;
+    private readonly IConversationMemory? conversationMemory;
+    private readonly IPromptTemplate promptTemplate;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TechieRagClient"/> class.
@@ -44,7 +51,11 @@ public class TechieRagClient : ITechieRag
         IEmbeddingProvider embeddingProvider,
         IEnumerable<IDocumentProcessor> processors,
         TechieRagConfig config,
-        ILogger<TechieRagClient> logger)
+        ILogger<TechieRagClient> logger,
+        ILlmProvider? llmProvider = null,
+        ITokenTracker? tokenTracker = null,
+        IConversationMemory? conversationMemory = null,
+        IPromptTemplate? promptTemplate = null)
     {
         ArgumentNullException.ThrowIfNull(vectorStore);
         ArgumentNullException.ThrowIfNull(embeddingProvider);
@@ -57,6 +68,10 @@ public class TechieRagClient : ITechieRag
         this.processors = processors.ToList();
         this.config = config;
         this.logger = logger;
+        this.llmProvider = llmProvider;
+        this.tokenTracker = tokenTracker ?? new TokenUsageTracker();
+        this.conversationMemory = conversationMemory;
+        this.promptTemplate = promptTemplate ?? new PromptTemplateEngine(config.Prompt);
     }
 
     /// <inheritdoc/>
@@ -392,6 +407,151 @@ public class TechieRagClient : ITechieRag
         logger.LogWarning("Clearing all data from vector store");
         await vectorStore.ClearAsync(cancellationToken);
         logger.LogInformation("Successfully cleared all data from vector store");
+    }
+
+    // === NEW: LLM-Powered RAG Methods ===
+
+    /// <inheritdoc/>
+    public async Task<RagResponse> AskAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(question);
+
+        logger.LogInformation("AskAsync: Searching for relevant context (topK={TopK})", topK);
+        var searchResults = await SearchAsync(question, topK, documentFilter, cancellationToken).ConfigureAwait(false);
+
+        var messages = promptTemplate.BuildRagPrompt(question, searchResults, systemPrompt);
+        var response = await llmProvider!.ChatAsync(messages, options, cancellationToken).ConfigureAwait(false);
+
+        return new RagResponse
+        {
+            Answer = response.Content ?? string.Empty,
+            Sources = searchResults,
+            Usage = response.Usage,
+            Query = question,
+            ModelName = response.ModelName
+        };
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<string> AskStreamAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(question);
+
+        var searchResults = await SearchAsync(question, topK, documentFilter, cancellationToken).ConfigureAwait(false);
+        var messages = promptTemplate.BuildRagPrompt(question, searchResults, systemPrompt);
+
+        await foreach (var token in llmProvider!.ChatStreamAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            yield return token;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<RagResponse> ChatWithRagAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(userMessage);
+
+        // Use conversation memory if available and no explicit history provided
+        if (conversationHistory is null && conversationMemory is not null)
+        {
+            conversationHistory = await conversationMemory.GetHistoryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var searchResults = await SearchAsync(userMessage, topK, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var messages = promptTemplate.BuildRagChatPrompt(userMessage, searchResults, conversationHistory, systemPrompt);
+
+        var response = await llmProvider!.ChatAsync(messages, options, cancellationToken).ConfigureAwait(false);
+
+        // Update conversation memory if available
+        if (conversationMemory is not null)
+        {
+            await conversationMemory.AddMessageAsync(ChatMessage.User(userMessage), cancellationToken).ConfigureAwait(false);
+            await conversationMemory.AddMessageAsync(ChatMessage.Assistant(response.Content ?? string.Empty), cancellationToken).ConfigureAwait(false);
+        }
+
+        return new RagResponse
+        {
+            Answer = response.Content ?? string.Empty,
+            Sources = searchResults,
+            Usage = response.Usage,
+            Query = userMessage,
+            ModelName = response.ModelName
+        };
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<string> ChatWithRagStreamAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(userMessage);
+
+        if (conversationHistory is null && conversationMemory is not null)
+        {
+            conversationHistory = await conversationMemory.GetHistoryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var searchResults = await SearchAsync(userMessage, topK, cancellationToken: cancellationToken).ConfigureAwait(false);
+        var messages = promptTemplate.BuildRagChatPrompt(userMessage, searchResults, conversationHistory, systemPrompt);
+
+        var fullResponse = new StringBuilder();
+
+        await foreach (var token in llmProvider!.ChatStreamAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            fullResponse.Append(token);
+            yield return token;
+        }
+
+        // Update conversation memory if available
+        if (conversationMemory is not null)
+        {
+            await conversationMemory.AddMessageAsync(ChatMessage.User(userMessage), cancellationToken).ConfigureAwait(false);
+            await conversationMemory.AddMessageAsync(ChatMessage.Assistant(fullResponse.ToString()), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc/>
+    public ILlmProvider? GetLlmProvider() => llmProvider;
+
+    /// <inheritdoc/>
+    public ITokenTracker GetTokenTracker() => tokenTracker;
+
+    /// <inheritdoc/>
+    public IConversationMemory? GetConversationMemory() => conversationMemory;
+
+    private void EnsureLlmConfigured()
+    {
+        if (llmProvider is null)
+        {
+            throw new InvalidOperationException(
+                "No LLM provider configured. Configure an LLM provider using TechieRagBuilder to use this feature.");
+        }
     }
 
     /// <summary>

@@ -341,7 +341,7 @@ public class QdrantAdminService : IQdrantAdminService
                 var info = await client.GetCollectionInfoAsync(name);
                 result.Add(new CollectionInfo(
                     Name: name,
-                    VectorCount: (long)info.VectorsCount,
+                    VectorCount: (long)info.PointsCount,
                     PointCount: (long)info.PointsCount
                 ));
             }

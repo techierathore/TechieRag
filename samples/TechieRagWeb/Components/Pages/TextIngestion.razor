@@ -1,240 +1,146 @@
 @page "/text-ingestion"
-@using TechieRag
 @using TechieRag.Models
 @using TechieRag.Embedded
 @implements IDisposable
 @inject ITechieRag Rag
+@inject ToastService ToastService
 @inject ILogger<TextIngestion> Logger
 @rendermode InteractiveServer
 
 <PageTitle>Text Ingestion - TechieRag</PageTitle>
 
-<div style="max-width: 900px; margin: 0 auto; padding: 24px;">
-    <h1 style="font-size: 1.75rem; font-weight: bold; margin-bottom: 24px; color: #1f2937;">Text Ingestion</h1>
-    <p style="color: #6b7280; margin-bottom: 24px;">
-        Ingest raw text content directly into the vector database. Paste articles, stories, or any text data below.
-    </p>
+<div class="space-y-6">
+    <div>
+        <TypographyH2>Text Ingestion</TypographyH2>
+        <TypographyMuted>Ingest raw text content directly into the vector database.</TypographyMuted>
+    </div>
 
     <!-- Model Download Progress -->
     @if (isDownloadingModel)
     {
-        <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-                <div class="download-spinner"></div>
-                <h3 style="font-size: 1rem; font-weight: 600; color: #92400e; margin: 0;">Downloading BGE-M3 Model</h3>
-            </div>
-            <p style="font-size: 0.875rem; color: #78350f; margin: 0 0 12px 0;">
+        <Alert Variant="AlertVariant.Warning">
+            <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
+            <AlertTitle>Downloading BGE-M3 Model</AlertTitle>
+            <AlertDescription>
                 @downloadProgress?.StatusMessage
-            </p>
-            <div style="width: 100%; background: #fde68a; border-radius: 9999px; height: 8px; margin-bottom: 8px;">
-                <div style="background: #f59e0b; height: 8px; border-radius: 9999px; transition: width 0.3s; width: @(downloadProgress?.CurrentFileProgressPercent ?? 0)%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #92400e;">
-                <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
-                <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
-            </div>
-        </div>
-        <style>
-            .download-spinner {
-                width: 20px;
-                height: 20px;
-                border: 3px solid #fde68a;
-                border-top-color: #f59e0b;
-                border-radius: 50%;
-                animation: download-spin 1s linear infinite;
-            }
-            @@keyframes download-spin {
-                to { transform: rotate(360deg); }
-            }
-        </style>
+                <Progress Value="@(downloadProgress?.CurrentFileProgressPercent ?? 0)" Class="mt-2" />
+                <div class="flex justify-between text-xs mt-1">
+                    <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
+                    <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
+                </div>
+            </AlertDescription>
+        </Alert>
     }
 
-    <!-- Text Ingestion Controls -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 16px; color: #374151;">Ingest Text Content</h2>
+    <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Input Form -->
+        <div class="lg:col-span-2 space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Text Content</CardTitle>
+                    <CardDescription>Enter or paste the text content to ingest.</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <Field>
+                        <FieldLabel>Document Name</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="documentName" Placeholder="My Document" Required="true" />
+                            <FieldDescription>A friendly name for this document.</FieldDescription>
+                        </FieldContent>
+                    </Field>
 
-        <div style="display: flex; flex-direction: column; gap: 16px;">
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; color: #374151;">Document Name <span style="color: #dc2626;">*</span></label>
-                <input type="text" value="@documentName" @oninput="OnDocumentNameChanged"
-                       style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 0.875rem;"
-                       placeholder="my-article" />
-                <p style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
-                    A unique identifier for this text content (e.g., article title, story name)
-                </p>
-            </div>
+                    <Field>
+                        <FieldLabel>Text Content</FieldLabel>
+                        <FieldContent>
+                            <Textarea @bind-Value="textContent" Placeholder="Paste your text content here..." Class="min-h-[200px]" />
+                            <div class="flex gap-4 mt-1">
+                                <TypographyMuted>@textContent.Length.ToString("N0") characters</TypographyMuted>
+                                <TypographyMuted>@textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length words</TypographyMuted>
+                            </div>
+                        </FieldContent>
+                    </Field>
 
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; color: #374151;">Text Content <span style="color: #dc2626;">*</span></label>
-                <textarea @bind="textContent" @bind:event="oninput" @bind:after="OnTextChanged"
-                          style="width: 100%; min-height: 300px; border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; font-size: 0.875rem; font-family: inherit; resize: vertical;"
-                          placeholder="Paste your text content here..."></textarea>
-                <p style="font-size: 0.75rem; color: @(textContent.Length > 900000 ? "#dc2626" : "#6b7280"); margin-top: 4px;">
-                    @if (!string.IsNullOrEmpty(textContent))
+                    <Field>
+                        <FieldLabel>Source Info (Optional)</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="sourceInfo" Placeholder="URL or identifier" />
+                            <FieldDescription>Optional URL or identifier for the original source.</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    <div class="flex gap-3">
+                        <Button OnClick="IngestTextAsync" Disabled="isIngesting">
+                            @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Ingesting...</span> }
+                            else { <span>Ingest Text</span> }
+                        </Button>
+                        <Button Variant="ButtonVariant.Outline" OnClick="ClearForm">Clear Form</Button>
+                        <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">Clear All Data</Button>
+                    </div>
+
+                    @if (isIngesting)
                     {
-                        <span>@textContent.Length.ToString("N0") characters | ~@(textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length.ToString("N0")) words</span>
-                        @if (textContent.Length > 900000)
-                        {
-                            <span style="color: #dc2626;"> (approaching 1MB limit)</span>
-                        }
+                        <div class="space-y-2">
+                            <Progress Value="@progress" />
+                            <TypographyMuted>@progressMessage</TypographyMuted>
+                        </div>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+
+        <!-- Stats & Documents Sidebar -->
+        <div class="space-y-4">
+            @if (stats != null)
+            {
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Statistics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <TypographyMuted>Documents</TypographyMuted>
+                                <span class="font-medium">@stats.TotalDocuments</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <TypographyMuted>Chunks</TypographyMuted>
+                                <span class="font-medium">@stats.TotalChunks</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <TypographyMuted>Storage</TypographyMuted>
+                                <span class="font-medium">@FormatSize(stats.VectorStoreSizeBytes)</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            }
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    @if (documents.Count == 0)
+                    {
+                        <TypographyMuted>No documents yet.</TypographyMuted>
                     }
                     else
                     {
-                        <span>Paste articles, stories, or any text data (up to ~1MB / 1 million characters)</span>
+                        <div class="space-y-2">
+                            @foreach (var doc in documents)
+                            {
+                                <div class="flex items-center justify-between py-1">
+                                    <span class="text-sm truncate max-w-[150px]">@doc.Name</span>
+                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.IconSmall" OnClick="@(() => DeleteDocumentAsync(doc.Id))">
+                                        <LucideIcon Name="trash-2" Size="14" />
+                                    </Button>
+                                </div>
+                            }
+                        </div>
                     }
-                </p>
-            </div>
-
-            <div>
-                <label style="display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 4px; color: #374151;">Source (Optional)</label>
-                <input type="text" @bind="sourceInfo"
-                       style="width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 12px; font-size: 0.875rem;"
-                       placeholder="https://example.com/article or Database:ArticleTable:123" />
-                <p style="font-size: 0.75rem; color: #6b7280; margin-top: 4px;">
-                    Optional: Reference URL or source identifier for this content
-                </p>
-            </div>
-
-            <div style="display: flex; gap: 12px; align-items: center;">
-                <button @onclick="IngestTextAsync"
-                        disabled="@isIngesting"
-                        style="background: @(isIngesting ? "#9ca3af" : "#059669"); color: white; padding: 10px 24px; border-radius: 6px; border: none; cursor: @(isIngesting ? "not-allowed" : "pointer"); font-weight: 500;">
-                    @(isIngesting ? "Ingesting..." : "Ingest Text")
-                </button>
-
-                <button @onclick="ClearForm"
-                        disabled="@isIngesting"
-                        style="background: @(isIngesting ? "#9ca3af" : "#6b7280"); color: white; padding: 10px 16px; border-radius: 6px; border: none; cursor: @(isIngesting ? "not-allowed" : "pointer"); font-weight: 500;">
-                    Clear Form
-                </button>
-
-                <button @onclick="ClearVectorStoreAsync"
-                        disabled="@isIngesting"
-                        style="background: @(isIngesting ? "#9ca3af" : "#dc2626"); color: white; padding: 10px 16px; border-radius: 6px; border: none; cursor: @(isIngesting ? "not-allowed" : "pointer"); font-weight: 500;">
-                    Clear All Data
-                </button>
-            </div>
+                </CardContent>
+            </Card>
         </div>
-
-        <!-- Progress -->
-        @if (isIngesting)
-        {
-            <div style="margin-top: 16px;">
-                <div style="width: 100%; background: #e5e7eb; border-radius: 9999px; height: 8px;">
-                    <div style="background: #2563eb; height: 8px; border-radius: 9999px; transition: width 0.3s; width: @(progress)%;"></div>
-                </div>
-                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 4px;">@progressMessage</p>
-            </div>
-        }
-
-        <!-- Status Message -->
-        @if (statusMessage is not null)
-        {
-            <div style="margin-top: 16px; padding: 12px; border-radius: 6px; background: @(statusSuccess ? "#d1fae5" : "#fee2e2"); color: @(statusSuccess ? "#065f46" : "#991b1b");">
-                @statusMessage
-            </div>
-        }
-
-        <!-- Last Ingested Result -->
-        @if (lastIngestedDocumentId is not null)
-        {
-            <div style="margin-top: 16px; padding: 12px; border-radius: 6px; background: #eff6ff; border: 1px solid #bfdbfe;">
-                <div style="font-size: 0.875rem; color: #1e40af;">
-                    <strong>Last Ingested Document ID:</strong> @lastIngestedDocumentId
-                </div>
-            </div>
-        }
-    </div>
-
-    <!-- Current Stats -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 16px; color: #374151;">Vector Store Statistics</h2>
-
-        @if (stats is not null)
-        {
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;">
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #2563eb;">@stats.TotalDocuments</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Documents</div>
-                </div>
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #059669;">@stats.TotalChunks</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Chunks</div>
-                </div>
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 1.5rem; font-weight: bold; color: #7c3aed;">@FormatSize(stats.VectorStoreSizeBytes)</div>
-                    <div style="font-size: 0.875rem; color: #6b7280;">Storage Size</div>
-                </div>
-                <div style="text-align: center; padding: 16px; background: #f9fafb; border-radius: 6px;">
-                    <div style="font-size: 0.875rem; font-weight: 500; color: #374151;">@stats.VectorStoreName</div>
-                    <div style="font-size: 0.75rem; color: #6b7280;">@stats.EmbeddingProviderName</div>
-                </div>
-            </div>
-
-            @if (stats.LastIngestionTime.HasValue)
-            {
-                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 16px;">
-                    Last ingestion: @stats.LastIngestionTime.Value.ToString("g")
-                </p>
-            }
-        }
-        else
-        {
-            <p style="color: #6b7280;">Loading statistics...</p>
-        }
-
-        <button @onclick="RefreshStatsAsync" style="margin-top: 16px; color: #2563eb; background: none; border: none; cursor: pointer; font-size: 0.875rem; text-decoration: underline;">
-            Refresh Statistics
-        </button>
-    </div>
-
-    <!-- Document List -->
-    <div style="background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 24px; margin-bottom: 24px;">
-        <h2 style="font-size: 1.125rem; font-weight: 600; margin-bottom: 16px; color: #374151;">Ingested Documents</h2>
-
-        @if (documents.Any())
-        {
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #e5e7eb;">
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Name</th>
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Chunks</th>
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Ingested</th>
-                        <th style="text-align: left; padding: 12px 8px; font-weight: 600; color: #374151;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var doc in documents)
-                    {
-                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                            <td style="padding: 12px 8px; color: #1f2937;">@doc.Name</td>
-                            <td style="padding: 12px 8px; color: #6b7280;">@doc.ChunkCount</td>
-                            <td style="padding: 12px 8px; color: #6b7280;">@doc.IngestedAt.ToString("g")</td>
-                            <td style="padding: 12px 8px;">
-                                <button @onclick="() => DeleteDocumentAsync(doc.Id)"
-                                        style="color: #dc2626; background: none; border: none; cursor: pointer; font-size: 0.875rem; text-decoration: underline;">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        }
-        else
-        {
-            <p style="color: #6b7280;">No documents ingested yet.</p>
-        }
-    </div>
-
-    <!-- Navigation -->
-    <div style="margin-top: 24px; display: flex; gap: 12px;">
-        <a href="/ingestion" style="display: inline-block; background: #6b7280; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
-            File Ingestion
-        </a>
-        <a href="/chat" style="display: inline-block; background: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
-            Go to Chat
-        </a>
     </div>
 </div>
 
@@ -245,55 +151,28 @@
     private bool isIngesting;
     private int progress;
     private string? progressMessage;
-    private string? statusMessage;
-    private bool statusSuccess;
-    private string? lastIngestedDocumentId;
     private IngestionStats? stats;
     private List<Document> documents = new();
-
-    // Model download tracking
     private bool isDownloadingModel;
     private ModelDownloadProgress? downloadProgress;
 
-    private void OnDocumentNameChanged(ChangeEventArgs e)
-    {
-        documentName = e.Value?.ToString() ?? "";
-    }
-
-    private void OnTextContentChanged(ChangeEventArgs e)
-    {
-        textContent = e.Value?.ToString() ?? "";
-    }
-
-    private void OnTextChanged()
-    {
-        // Force UI update after text binding
-        StateHasChanged();
-    }
-
     protected override async Task OnInitializedAsync()
     {
-        // Subscribe to model download progress
         ModelDownloadService.Instance.ProgressChanged += OnDownloadProgressChanged;
         downloadProgress = ModelDownloadService.Instance.Progress;
 
         try
         {
-            // Check current download status
             UpdateDownloadStatus();
-
             await Rag.InitializeAsync();
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-
-            // Update status after initialization
             UpdateDownloadStatus();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to initialize text ingestion page");
-            statusMessage = $"Initialization error: {ex.Message}";
-            statusSuccess = false;
+            ToastService.Error($"Initialization error: {ex.Message}", "Error");
         }
     }
 
@@ -320,32 +199,24 @@
         documentName = "";
         textContent = "";
         sourceInfo = "";
-        statusMessage = null;
-        lastIngestedDocumentId = null;
-        StateHasChanged();
     }
 
     private async Task IngestTextAsync()
     {
-        // Validation
         if (string.IsNullOrWhiteSpace(documentName))
         {
-            statusMessage = "Please enter a document name.";
-            statusSuccess = false;
+            ToastService.Error("Please enter a document name.", "Validation");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(textContent))
         {
-            statusMessage = "Please enter text content to ingest.";
-            statusSuccess = false;
+            ToastService.Error("Please enter text content to ingest.", "Validation");
             return;
         }
 
         isIngesting = true;
         progress = 0;
-        statusMessage = null;
-        lastIngestedDocumentId = null;
         StateHasChanged();
 
         try
@@ -353,50 +224,30 @@
             progress = 10;
             progressMessage = "Preparing text content...";
             StateHasChanged();
-            await Task.Delay(50); // Allow UI to update
+            await Task.Delay(50);
 
-            // Build metadata
-            Dictionary<string, object>? metadata = null;
+            var metadata = new Dictionary<string, object>
+            {
+                { "ContentType", "text" },
+                { "CharacterCount", textContent.Length },
+                { "WordCount", textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length }
+            };
             if (!string.IsNullOrWhiteSpace(sourceInfo))
-            {
-                metadata = new Dictionary<string, object>
-                {
-                    { "Source", sourceInfo },
-                    { "ContentType", "text" },
-                    { "CharacterCount", textContent.Length },
-                    { "WordCount", textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length }
-                };
-            }
-            else
-            {
-                metadata = new Dictionary<string, object>
-                {
-                    { "ContentType", "text" },
-                    { "CharacterCount", textContent.Length },
-                    { "WordCount", textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length }
-                };
-            }
+                metadata["Source"] = sourceInfo;
 
             progress = 30;
             progressMessage = "Chunking and embedding text...";
             StateHasChanged();
             await Task.Delay(50);
 
-            // Call the IngestTextAsync method
             var documentId = await Rag.IngestTextAsync(textContent, documentName, metadata);
 
             progress = 100;
             progressMessage = "Complete!";
-            lastIngestedDocumentId = documentId;
-            statusMessage = $"Successfully ingested text as document '{documentName}' (ID: {documentId})";
-            statusSuccess = true;
-
-            Logger.LogInformation("Successfully ingested text document {DocumentName} with ID {DocumentId}", documentName, documentId);
+            ToastService.Success($"Ingested '{documentName}' (ID: {documentId})", "Success");
 
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-
-            // Clear form after successful ingestion
             documentName = "";
             textContent = "";
             sourceInfo = "";
@@ -404,9 +255,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to ingest text content");
-            statusMessage = $"Error: {ex.Message}";
-            statusSuccess = false;
-            progressMessage = "Failed";
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
         finally
         {
@@ -420,19 +269,14 @@
         try
         {
             await Rag.ClearAsync();
-            statusMessage = "All data cleared successfully.";
-            statusSuccess = true;
-            lastIngestedDocumentId = null;
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
+            ToastService.Success("All data cleared.", "Cleared");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to clear vector store");
-            statusMessage = $"Error: {ex.Message}";
-            statusSuccess = false;
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
-        StateHasChanged();
     }
 
     private async Task DeleteDocumentAsync(string documentId)
@@ -440,73 +284,39 @@
         try
         {
             await Rag.DeleteDocumentAsync(documentId);
-            statusMessage = "Document deleted successfully.";
-            statusSuccess = true;
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
+            ToastService.Success("Document deleted.", "Deleted");
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to delete document {DocumentId}", documentId);
-            statusMessage = $"Error: {ex.Message}";
-            statusSuccess = false;
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
-        StateHasChanged();
     }
 
     private async Task RefreshStatsAsync()
     {
-        try
-        {
-            stats = await Rag.GetStatsAsync();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to refresh statistics");
-        }
-        StateHasChanged();
+        try { stats = await Rag.GetStatsAsync(); } catch { }
     }
 
     private async Task RefreshDocumentsAsync()
     {
-        try
-        {
-            documents = (await Rag.ListDocumentsAsync()).ToList();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed to refresh documents list");
-        }
-        StateHasChanged();
+        try { documents = (await Rag.ListDocumentsAsync()).ToList(); } catch { }
     }
 
-    private static string FormatSize(long bytes)
+    private static string FormatSize(long bytes) => bytes switch
     {
-        const long kb = 1024;
-        const long mb = kb * 1024;
-        const long gb = mb * 1024;
+        >= 1024 * 1024 * 1024 => $"{bytes / (double)(1024 * 1024 * 1024):F1} GB",
+        >= 1024 * 1024 => $"{bytes / (double)(1024 * 1024):F1} MB",
+        >= 1024 => $"{bytes / (double)1024:F1} KB",
+        _ => $"{bytes} B"
+    };
 
-        if (bytes >= gb)
-            return $"{bytes / (double)gb:F1} GB";
-        if (bytes >= mb)
-            return $"{bytes / (double)mb:F1} MB";
-        if (bytes >= kb)
-            return $"{bytes / (double)kb:F1} KB";
-        return $"{bytes} B";
-    }
-
-    private static string FormatBytes(long bytes)
+    private static string FormatBytes(long bytes) => bytes switch
     {
-        const double kb = 1024;
-        const double mb = kb * 1024;
-        const double gb = mb * 1024;
-
-        if (bytes >= gb)
-            return $"{bytes / gb:F2} GB";
-        if (bytes >= mb)
-            return $"{bytes / mb:F1} MB";
-        if (bytes >= kb)
-            return $"{bytes / kb:F0} KB";
-        return $"{bytes} B";
-    }
+        >= (long)(1024 * 1024 * 1024) => $"{bytes / (1024.0 * 1024 * 1024):F2} GB",
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B"
+    };
 }

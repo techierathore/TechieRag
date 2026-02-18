@@ -2,528 +2,452 @@
 @using TechieRagWeb.Services
 @inject IDockerContainerService DockerService
 @inject IQdrantAdminService QdrantService
+@inject ToastService ToastService
 @inject ILogger<QdrantAdmin> Logger
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <PageTitle>Qdrant Admin</PageTitle>
 
-<style>
-    .admin-container { max-width: 1400px; margin: 0 auto; padding: 1.5rem; }
-    .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 1.5rem; overflow: hidden; }
-    .card-header { padding: 1rem 1.5rem; background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white; display: flex; justify-content: space-between; align-items: center; }
-    .card-header h2 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-    .card-body { padding: 1.5rem; }
-
-    .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; }
-    .status-item { background: #f8fafc; border-radius: 8px; padding: 1rem; text-align: center; border: 1px solid #e2e8f0; }
-    .status-value { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .status-value.success { color: #059669; }
-    .status-value.warning { color: #d97706; }
-    .status-value.error { color: #dc2626; }
-    .status-value.info { color: #2563eb; }
-    .status-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-
-    .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    .data-table th { background: #f1f5f9; padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: #475569; border-bottom: 2px solid #e2e8f0; }
-    .data-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; }
-    .data-table tbody tr:hover { background: #f8fafc; }
-    .data-table tbody tr.clickable { cursor: pointer; }
-    .data-table .mono { font-family: 'Consolas', monospace; font-size: 0.85rem; }
-
-    .btn { padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
-    .btn-primary { background: #2563eb; color: white; }
-    .btn-primary:hover { background: #1d4ed8; }
-    .btn-success { background: #059669; color: white; }
-    .btn-success:hover { background: #047857; }
-    .btn-danger { background: #dc2626; color: white; }
-    .btn-danger:hover { background: #b91c1c; }
-    .btn-secondary { background: #e2e8f0; color: #475569; }
-    .btn-secondary:hover { background: #cbd5e1; }
-    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .connection-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem; margin-top: 1rem; }
-    .connection-box.disconnected { background: #fef2f2; border-color: #fecaca; }
-    .connection-string { display: flex; align-items: center; gap: 0.75rem; background: white; padding: 0.75rem 1rem; border-radius: 6px; border: 1px solid #e2e8f0; }
-    .connection-string code { flex: 1; font-family: 'Consolas', monospace; font-size: 0.9rem; color: #1e40af; word-break: break-all; }
-    .connection-string .btn { flex-shrink: 0; }
-
-    .endpoint-form { display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap; margin-bottom: 1rem; }
-    .endpoint-form .form-group { display: flex; flex-direction: column; gap: 0.25rem; }
-    .endpoint-form label { font-size: 0.75rem; color: #64748b; font-weight: 500; }
-    .endpoint-form input { padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 0.9rem; }
-    .endpoint-form input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-
-    .container-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; }
-    .container-card:hover { border-color: #2563eb; }
-    .container-card.selected { border-color: #2563eb; background: #eff6ff; }
-    .container-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-    .container-name { font-weight: 600; color: #1e293b; }
-    .container-status { padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; }
-    .container-status.running { background: #dcfce7; color: #166534; }
-    .container-status.exited { background: #fef3c7; color: #92400e; }
-    .container-status.notfound { background: #fee2e2; color: #991b1b; }
-    .container-details { font-size: 0.85rem; color: #64748b; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.25rem 1rem; }
-
-    .stats-row { display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 1rem; }
-    .stat-item { text-align: center; }
-    .stat-value { font-size: 2rem; font-weight: 700; color: #1e293b; }
-    .stat-label { font-size: 0.8rem; color: #64748b; }
-
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-    .modal { background: white; border-radius: 12px; width: 100%; max-width: 500px; max-height: 90vh; overflow: auto; margin: 1rem; }
-    .modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-    .modal-header h3 { margin: 0; font-size: 1.1rem; }
-    .modal-body { padding: 1.5rem; }
-    .modal-footer { padding: 1rem 1.5rem; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 0.75rem; }
-
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.5rem; }
-    .form-group input, .form-group select { width: 100%; padding: 0.625rem 0.875rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.9rem; }
-    .form-group input:focus, .form-group select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
-    .form-hint { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
-
-    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1001; display: flex; align-items: center; gap: 0.75rem; }
-    .toast.success { background: #059669; color: white; }
-    .toast.error { background: #dc2626; color: white; }
-    .toast button { background: none; border: none; color: inherit; font-size: 1.25rem; cursor: pointer; opacity: 0.8; }
-    .toast button:hover { opacity: 1; }
-
-    .empty-state { text-align: center; padding: 3rem 1rem; color: #64748b; }
-    .empty-state p { margin: 0.5rem 0; }
-
-    .pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #f1f5f9; }
-    .pagination-info { font-size: 0.85rem; color: #64748b; }
-    .pagination-buttons { display: flex; gap: 0.5rem; }
-
-    .copy-success { color: #059669 !important; }
-</style>
-
-<div class="admin-container">
-    <h1 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.75rem;">Qdrant Database Management</h1>
-
-    <!-- Connection & Endpoint Configuration Card -->
-    <div class="card">
-        <div class="card-header">
-            <h2>Connection Configuration</h2>
-            <button class="btn btn-secondary btn-sm" @onclick="RefreshStatusAsync">Refresh</button>
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <TypographyH2>Qdrant Database Management</TypographyH2>
+            <TypographyMuted>Manage Qdrant vector database containers, collections, and vectors.</TypographyMuted>
         </div>
-        <div class="card-body">
-            <div class="endpoint-form">
-                <div class="form-group" style="flex: 1; min-width: 200px;">
-                    <label>Host</label>
-                    <input type="text" @bind="configHost" placeholder="localhost" />
-                </div>
-                <div class="form-group" style="width: 100px;">
-                    <label>gRPC Port</label>
-                    <input type="number" @bind="configPort" placeholder="6334" />
-                </div>
-                <div class="form-group" style="flex: 1; min-width: 200px;">
-                    <label>API Key (if required)</label>
-                    <input type="password" @bind="configApiKey" placeholder="Enter API key..." />
-                </div>
-                <button class="btn btn-primary" @onclick="ApplyEndpointAsync" style="margin-bottom: 0;">
-                    Connect
-                </button>
-            </div>
-
-            <div class="status-grid">
-                <div class="status-item">
-                    <div class="status-value @(isDockerAvailable ? "success" : "warning")">
-                        @(isDockerAvailable ? "Available" : "Not Available")
-                    </div>
-                    <div class="status-label">Docker</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-value @(qdrantStatus == "Connected" ? "success" : "error")">
-                        @qdrantStatus
-                    </div>
-                    <div class="status-label">Qdrant</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-value info">@(clusterInfo?.Version ?? "N/A")</div>
-                    <div class="status-label">Version</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-value info">@(clusterInfo?.TotalCollections ?? 0)</div>
-                    <div class="status-label">Collections</div>
-                </div>
-            </div>
-
-            <div class="connection-box @(qdrantStatus != "Connected" ? "disconnected" : "")">
-                <div style="font-size: 0.85rem; font-weight: 500; margin-bottom: 0.5rem; color: #374151;">
-                    Connection String (copy for Settings page)
-                </div>
-                <div class="connection-string">
-                    <code>@QdrantService.ConnectionString</code>
-                    <button class="btn btn-sm @(copiedConnection ? "btn-success" : "btn-secondary")" @onclick="CopyConnectionString">
-                        @(copiedConnection ? "Copied!" : "Copy")
-                    </button>
-                </div>
-                @if (qdrantStatus != "Connected" && !string.IsNullOrEmpty(QdrantService.LastError))
-                {
-                    <div style="margin-top: 0.75rem; padding: 0.75rem; background: #fee2e2; border-radius: 6px; font-size: 0.85rem; color: #991b1b;">
-                        <strong>Error:</strong> @QdrantService.LastError
-                    </div>
-                }
-            </div>
-        </div>
+        <Button Variant="ButtonVariant.Outline" OnClick="RefreshStatusAsync">
+            <Button.Icon><LucideIcon Name="refresh-cw" Size="16" /></Button.Icon>
+            Refresh
+        </Button>
     </div>
 
-    <!-- Docker Containers Card -->
-    <div class="card">
-        <div class="card-header">
-            <h2>Qdrant Containers</h2>
-            @if (isDockerAvailable)
-            {
-                <button class="btn btn-sm btn-primary" @onclick="ShowCreateContainerModal">+ Create Container</button>
-            }
-        </div>
-        <div class="card-body">
+    <!-- Connection & Endpoint Configuration -->
+    <Card>
+        <CardHeader>
+            <CardTitle>Connection Configuration</CardTitle>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div class="grid gap-4 md:grid-cols-4 items-end">
+                <Field>
+                    <FieldLabel>Host</FieldLabel>
+                    <FieldContent>
+                        <Input @bind-Value="configHost" Placeholder="localhost" />
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>gRPC Port</FieldLabel>
+                    <FieldContent>
+                        <Input Type="InputType.Number" @bind-Value="configPortString" Placeholder="6334" />
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>API Key (optional)</FieldLabel>
+                    <FieldContent>
+                        <Input Type="InputType.Password" @bind-Value="configApiKey" Placeholder="Enter API key..." />
+                    </FieldContent>
+                </Field>
+                <Button OnClick="ApplyEndpointAsync">
+                    <Button.Icon><LucideIcon Name="plug" Size="16" /></Button.Icon>
+                    Connect
+                </Button>
+            </div>
+
+            <!-- Status Grid -->
+            <div class="grid gap-4 md:grid-cols-4">
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>Docker</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold @(isDockerAvailable ? "text-green-600" : "text-yellow-600")">
+                            @(isDockerAvailable ? "Available" : "Not Available")
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>Qdrant</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold @(qdrantStatus == "Connected" ? "text-green-600" : "text-red-600")">
+                            @qdrantStatus
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>Version</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold text-blue-600">@(clusterInfo?.Version ?? "N/A")</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>Collections</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold text-blue-600">@(clusterInfo?.TotalCollections ?? 0)</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <!-- Connection String -->
+            <Alert Variant="@(qdrantStatus == "Connected" ? AlertVariant.Default : AlertVariant.Danger)">
+                <AlertTitle>Connection String</AlertTitle>
+                <AlertDescription>
+                    <div class="flex items-center gap-2 mt-2">
+                        <code class="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded break-all">@QdrantService.ConnectionString</code>
+                        <Button Variant="@(copiedConnection ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" OnClick="CopyConnectionString">
+                            @(copiedConnection ? "Copied!" : "Copy")
+                        </Button>
+                    </div>
+                    @if (qdrantStatus != "Connected" && !string.IsNullOrEmpty(QdrantService.LastError))
+                    {
+                        <div class="mt-2 text-sm text-destructive">
+                            <strong>Error:</strong> @QdrantService.LastError
+                        </div>
+                    }
+                </AlertDescription>
+            </Alert>
+        </CardContent>
+    </Card>
+
+    <!-- Docker Containers -->
+    <Card>
+        <CardHeader>
+            <div class="flex items-center justify-between">
+                <CardTitle>Qdrant Containers</CardTitle>
+                @if (isDockerAvailable)
+                {
+                    <Dialog @bind-Open="showCreateContainerModal">
+                        <DialogTrigger AsChild>
+                            <Button Size="ButtonSize.Small">
+                                <Button.Icon><LucideIcon Name="plus" Size="16" /></Button.Icon>
+                                Create Container
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Create Qdrant Container</DialogTitle>
+                                <DialogDescription>Create a new Docker container running Qdrant.</DialogDescription>
+                            </DialogHeader>
+                            <div class="space-y-4 py-4">
+                                <Field>
+                                    <FieldLabel>Container Name</FieldLabel>
+                                    <FieldContent>
+                                        <Input @bind-Value="newContainerName" Placeholder="techierag-qdrant" />
+                                    </FieldContent>
+                                </Field>
+                                <Field>
+                                    <FieldLabel>Volume Path (optional)</FieldLabel>
+                                    <FieldContent>
+                                        <Input @bind-Value="newContainerVolume" Placeholder="C:\QdrantData" />
+                                        <FieldDescription>Leave empty for non-persistent storage.</FieldDescription>
+                                    </FieldContent>
+                                </Field>
+                            </div>
+                            <DialogFooter>
+                                <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCreateContainerModal = false)">Cancel</Button>
+                                <Button OnClick="CreateContainerAsync" Disabled="@(string.IsNullOrWhiteSpace(newContainerName) || isCreatingContainer)">
+                                    @(isCreatingContainer ? "Creating..." : "Create")
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                }
+            </div>
+        </CardHeader>
+        <CardContent>
             @if (!isDockerAvailable)
             {
-                <div class="empty-state">
-                    <p style="font-weight: 500; color: #dc2626;">Docker Not Available</p>
-                    <p>Install Docker Desktop or ensure Docker daemon is running to manage containers.</p>
-                </div>
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertTitle>Docker Not Available</AlertTitle>
+                    <AlertDescription>Install Docker Desktop or ensure Docker daemon is running to manage containers.</AlertDescription>
+                </Alert>
             }
             else if (qdrantContainers.Count == 0)
             {
-                <div class="empty-state">
-                    <p style="font-weight: 500;">No Qdrant Containers Found</p>
-                    <p>Create a new container or start an existing one.</p>
-                </div>
+                <TypographyMuted>No Qdrant containers found. Create a new container to get started.</TypographyMuted>
             }
             else
             {
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Container</th>
-                            <th>Image</th>
-                            <th>HTTP Port</th>
-                            <th>gRPC Port</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var container in qdrantContainers)
-                        {
-                            <tr class="clickable" @onclick="() => UseContainer(container)">
-                                <td>
-                                    <div style="font-weight: 500;">@container.ContainerName</div>
-                                    <div class="mono" style="font-size: 0.75rem; color: #64748b;">@container.ContainerId</div>
-                                </td>
-                                <td class="mono" style="font-size: 0.8rem;">@container.ImageName</td>
-                                <td>@(container.HttpPort?.ToString() ?? "-")</td>
-                                <td>@(container.GrpcPort?.ToString() ?? "-")</td>
-                                <td>
-                                    <span class="container-status @container.Status.ToString().ToLower()">
-                                        @container.Status
-                                    </span>
-                                </td>
-                                <td @onclick:stopPropagation="true">
-                                    @if (container.Status == ContainerStatus.Running)
+                <DataTable TData="QdrantContainerInfo" Data="@qdrantContainers" ShowPagination="false" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.ContainerName)" Header="Container" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.ImageName)" Header="Image" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.HttpPort.HasValue ? c.HttpPort.Value.ToString() : "-")" Header="HTTP Port" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.GrpcPort.HasValue ? c.GrpcPort.Value.ToString() : "-")" Header="gRPC Port" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.Status.ToString())" Header="Status" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => "")" Header="Actions">
+                            <CellTemplate Context="ct">
+                                <div class="flex gap-2">
+                                    @if (ct.Status == ContainerStatus.Running)
                                     {
-                                        <button class="btn btn-sm btn-secondary" @onclick="() => StopContainerAsync(container.ContainerName)">
-                                            Stop
-                                        </button>
+                                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => StopContainerAsync(ct.ContainerName))">Stop</Button>
                                     }
-                                    else if (container.Status == ContainerStatus.Exited || container.Status == ContainerStatus.Created)
+                                    else if (ct.Status == ContainerStatus.Exited || ct.Status == ContainerStatus.Created)
                                     {
-                                        <button class="btn btn-sm btn-success" @onclick="() => StartContainerAsync(container.ContainerName)">
-                                            Start
-                                        </button>
+                                        <Button Size="ButtonSize.Small" OnClick="@(() => StartContainerAsync(ct.ContainerName))">Start</Button>
                                     }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="@(() => UseContainer(ct))">
+                                        <LucideIcon Name="plug" Size="14" />
+                                    </Button>
+                                </div>
+                            </CellTemplate>
+                        </DataTableColumn>
+                    </Columns>
+                </DataTable>
             }
-        </div>
-    </div>
+        </CardContent>
+    </Card>
 
-    <!-- Collections Card -->
-    <div class="card">
-        <div class="card-header">
-            <h2>Collections</h2>
-            <button class="btn btn-sm btn-primary" @onclick="ShowCreateCollectionModal" disabled="@(qdrantStatus != "Connected")">
-                + New Collection
-            </button>
-        </div>
-        <div class="card-body">
+    <!-- Collections -->
+    <Card>
+        <CardHeader>
+            <div class="flex items-center justify-between">
+                <CardTitle>Collections</CardTitle>
+                <Dialog @bind-Open="showCreateCollectionModal">
+                    <DialogTrigger AsChild>
+                        <Button Size="ButtonSize.Small" Disabled="@(qdrantStatus != "Connected")">
+                            <Button.Icon><LucideIcon Name="plus" Size="16" /></Button.Icon>
+                            New Collection
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Create New Collection</DialogTitle>
+                            <DialogDescription>Create a new vector collection in Qdrant.</DialogDescription>
+                        </DialogHeader>
+                        <div class="space-y-4 py-4">
+                            <Field>
+                                <FieldLabel>Collection Name</FieldLabel>
+                                <FieldContent>
+                                    <Input @bind-Value="newCollectionName" Placeholder="my_collection" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Vector Dimensions</FieldLabel>
+                                <FieldContent>
+                                    <Input Type="InputType.Number" @bind-Value="newCollectionDimensionsString" />
+                                    <FieldDescription>Common: 384 (MiniLM), 768 (BERT), 1024 (BGE-M3)</FieldDescription>
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Distance Metric</FieldLabel>
+                                <FieldContent>
+                                    <Select @bind-Value="newCollectionDistance" TValue="string">
+                                        <SelectTrigger>
+                                            <SelectValue Placeholder="Select metric" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem Value="@("Cosine")" Text="Cosine (Recommended)" TValue="string">Cosine (Recommended)</SelectItem>
+                                            <SelectItem Value="@("Euclid")" Text="Euclidean" TValue="string">Euclidean</SelectItem>
+                                            <SelectItem Value="@("Dot")" Text="Dot Product" TValue="string">Dot Product</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <DialogFooter>
+                            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCreateCollectionModal = false)">Cancel</Button>
+                            <Button OnClick="CreateCollectionAsync" Disabled="@string.IsNullOrWhiteSpace(newCollectionName)">Create</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </CardHeader>
+        <CardContent>
             @if (qdrantStatus != "Connected")
             {
-                <div class="empty-state">
-                    <p style="font-weight: 500;">Not Connected</p>
-                    <p>Connect to Qdrant to view collections.</p>
-                </div>
+                <TypographyMuted>Connect to Qdrant to view collections.</TypographyMuted>
             }
             else if (collections.Count == 0)
             {
-                <div class="empty-state">
-                    <p style="font-weight: 500;">No Collections</p>
-                    <p>Create a new collection to start storing vectors.</p>
-                </div>
+                <TypographyMuted>No collections. Create a new collection to start storing vectors.</TypographyMuted>
             }
             else
             {
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Points</th>
-                            <th>Vectors</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var collection in collections)
-                        {
-                            <tr class="clickable" @onclick="() => SelectCollection(collection.Name)">
-                                <td style="font-weight: 500;">@collection.Name</td>
-                                <td>@collection.PointCount.ToString("N0")</td>
-                                <td>@collection.VectorCount.ToString("N0")</td>
-                                <td @onclick:stopPropagation="true">
-                                    <button class="btn btn-sm btn-secondary" @onclick="() => SelectCollection(collection.Name)" style="margin-right: 0.5rem;">
-                                        Browse
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteCollectionAsync(collection.Name)">
-                                        Delete
-                                    </button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+                <DataTable TData="CollectionInfo" Data="@collections" ShowPagination="false" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.Name)" Header="Name" />
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.PointCount.ToString("N0"))" Header="Points" />
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.VectorCount.ToString("N0"))" Header="Vectors" />
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => "")" Header="Actions">
+                            <CellTemplate Context="col">
+                                <div class="flex gap-2">
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => SelectCollection(col.Name))">Browse</Button>
+                                    <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Small" OnClick="@(() => DeleteCollectionAsync(col.Name))">Delete</Button>
+                                </div>
+                            </CellTemplate>
+                        </DataTableColumn>
+                    </Columns>
+                </DataTable>
             }
-        </div>
-    </div>
+        </CardContent>
+    </Card>
 
-    <!-- Collection Detail Card -->
+    <!-- Collection Detail -->
     @if (selectedCollection != null && selectedCollectionDetail != null)
     {
-        <div class="card">
-            <div class="card-header">
-                <h2>Collection: @selectedCollection</h2>
-                <button class="btn btn-sm btn-secondary" @onclick="() => selectedCollection = null">Close</button>
-            </div>
-            <div class="card-body">
-                <div class="stats-row">
-                    <div class="stat-item">
-                        <div class="stat-value">@selectedCollectionDetail.PointCount.ToString("N0")</div>
-                        <div class="stat-label">Points</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value">@selectedCollectionDetail.VectorSize</div>
-                        <div class="stat-label">Vector Size</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" style="font-size: 1.5rem;">@selectedCollectionDetail.DistanceMetric</div>
-                        <div class="stat-label">Distance</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-value" style="font-size: 1.5rem; color: @(selectedCollectionDetail.Status == "Green" ? "#059669" : "#d97706");">
-                            @selectedCollectionDetail.Status
-                        </div>
-                        <div class="stat-label">Status</div>
-                    </div>
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle>Collection: @selectedCollection</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => selectedCollection = null)">Close</Button>
+                </div>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                <!-- Collection Stats -->
+                <div class="grid gap-4 md:grid-cols-4">
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>Points</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-2xl font-bold">@selectedCollectionDetail.PointCount.ToString("N0")</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>Vector Size</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-2xl font-bold">@selectedCollectionDetail.VectorSize</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>Distance</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-xl font-bold">@selectedCollectionDetail.DistanceMetric</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>Status</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-xl font-bold @(selectedCollectionDetail.Status == "Green" ? "text-green-600" : "text-yellow-600")">
+                                @selectedCollectionDetail.Status
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
-                <h3 style="font-size: 1rem; margin: 1.5rem 0 1rem; color: #374151;">Vectors</h3>
-                @if (currentVectorPage != null && currentVectorPage.Vectors.Count > 0)
-                {
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Document</th>
-                                <th>Chunk Preview</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var vector in currentVectorPage.Vectors)
-                            {
-                                <tr>
-                                    <td class="mono">@TruncateId(vector.Id)</td>
-                                    <td>@(vector.DocumentName ?? "N/A")</td>
-                                    <td style="color: #64748b; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                        @TruncateText(vector.ChunkText, 60)
-                                    </td>
-                                    <td>
-                                        <button class="btn btn-sm btn-secondary" @onclick="() => ViewVectorAsync(vector.Id)" style="margin-right: 0.25rem;">
-                                            View
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" @onclick="() => DeleteVectorAsync(vector.Id)">
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
+                <!-- Vectors Table -->
+                <div>
+                    <TypographyH4>Vectors</TypographyH4>
+                    @if (currentVectorPage != null && currentVectorPage.Vectors.Count > 0)
+                    {
+                        <DataTable TData="VectorSummary" Data="@currentVectorPage.Vectors" ShowPagination="false" ShowToolbar="false">
+                            <Columns>
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => TruncateId(v.Id))" Header="ID" />
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => v.DocumentName ?? "N/A")" Header="Document" />
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => TruncateText(v.ChunkText, 60))" Header="Chunk Preview" />
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => "")" Header="Actions">
+                                    <CellTemplate Context="vec">
+                                        <div class="flex gap-2">
+                                            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => ViewVectorAsync(vec.Id))">View</Button>
+                                            <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Small" OnClick="@(() => DeleteVectorAsync(vec.Id))">Delete</Button>
+                                        </div>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                            </Columns>
+                        </DataTable>
 
-                    <div class="pagination">
-                        <div class="pagination-info">
-                            Showing @(currentVectorPage.Offset + 1)-@(currentVectorPage.Offset + currentVectorPage.Vectors.Count)
-                            of @currentVectorPage.TotalCount.ToString("N0") vectors
+                        <div class="flex justify-between items-center mt-4 pt-4 border-t">
+                            <TypographyMuted>
+                                Showing @(currentVectorPage.Offset + 1)-@(currentVectorPage.Offset + currentVectorPage.Vectors.Count)
+                                of @currentVectorPage.TotalCount.ToString("N0") vectors
+                            </TypographyMuted>
+                            <div class="flex gap-2">
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PreviousPage" Disabled="@(currentVectorPage.Offset == 0)">
+                                    Previous
+                                </Button>
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="NextPage"
+                                        Disabled="@(currentVectorPage.Offset + currentVectorPage.Limit >= currentVectorPage.TotalCount)">
+                                    Next
+                                </Button>
+                            </div>
                         </div>
-                        <div class="pagination-buttons">
-                            <button class="btn btn-sm btn-secondary" @onclick="PreviousPage" disabled="@(currentVectorPage.Offset == 0)">
-                                Previous
-                            </button>
-                            <button class="btn btn-sm btn-secondary" @onclick="NextPage"
-                                    disabled="@(currentVectorPage.Offset + currentVectorPage.Limit >= currentVectorPage.TotalCount)">
-                                Next
-                            </button>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <div class="empty-state">
-                        <p>No vectors in this collection.</p>
-                    </div>
-                }
-            </div>
-        </div>
+                    }
+                    else
+                    {
+                        <TypographyMuted>No vectors in this collection.</TypographyMuted>
+                    }
+                </div>
+            </CardContent>
+        </Card>
     }
 </div>
 
-<!-- Create Collection Modal -->
-@if (showCreateCollectionModal)
-{
-    <div class="modal-overlay" @onclick="() => showCreateCollectionModal = false">
-        <div class="modal" @onclick:stopPropagation="true">
-            <div class="modal-header">
-                <h3>Create New Collection</h3>
-                <button style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;" @onclick="() => showCreateCollectionModal = false">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Collection Name</label>
-                    <input type="text" @bind="newCollectionName" placeholder="my_collection" />
-                </div>
-                <div class="form-group">
-                    <label>Vector Dimensions</label>
-                    <input type="number" @bind="newCollectionDimensions" />
-                    <div class="form-hint">Common: 384 (MiniLM), 768 (BERT), 1024 (BGE-M3)</div>
-                </div>
-                <div class="form-group">
-                    <label>Distance Metric</label>
-                    <select @bind="newCollectionDistance">
-                        <option value="Cosine">Cosine (Recommended)</option>
-                        <option value="Euclid">Euclidean</option>
-                        <option value="Dot">Dot Product</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" @onclick="() => showCreateCollectionModal = false">Cancel</button>
-                <button class="btn btn-primary" @onclick="CreateCollectionAsync" disabled="@string.IsNullOrWhiteSpace(newCollectionName)">
-                    Create
-                </button>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- Create Container Modal -->
-@if (showCreateContainerModal)
-{
-    <div class="modal-overlay" @onclick="() => showCreateContainerModal = false">
-        <div class="modal" @onclick:stopPropagation="true">
-            <div class="modal-header">
-                <h3>Create Qdrant Container</h3>
-                <button style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;" @onclick="() => showCreateContainerModal = false">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label>Container Name</label>
-                    <input type="text" @bind="newContainerName" placeholder="techierag-qdrant" />
-                </div>
-                <div class="form-group">
-                    <label>Volume Path (optional)</label>
-                    <input type="text" @bind="newContainerVolume" placeholder="C:\QdrantData" />
-                    <div class="form-hint">Leave empty for non-persistent storage</div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" @onclick="() => showCreateContainerModal = false">Cancel</button>
-                <button class="btn btn-primary" @onclick="CreateContainerAsync" disabled="@(string.IsNullOrWhiteSpace(newContainerName) || isCreatingContainer)">
-                    @(isCreatingContainer ? "Creating..." : "Create")
-                </button>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- Vector Detail Modal -->
-@if (selectedVector != null)
-{
-    <div class="modal-overlay" @onclick="() => selectedVector = null">
-        <div class="modal" style="max-width: 700px;" @onclick:stopPropagation="true">
-            <div class="modal-header">
-                <h3>Vector Details</h3>
-                <button style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;" @onclick="() => selectedVector = null">&times;</button>
-            </div>
-            <div class="modal-body" style="max-height: 70vh; overflow: auto;">
-                <div class="form-group">
-                    <label>ID</label>
-                    <div class="mono" style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px;">@selectedVector.Id</div>
-                </div>
+<!-- Vector Detail Dialog -->
+<Dialog @bind-Open="showVectorDetailDialog">
+    <DialogContent Class="max-w-2xl">
+        <DialogHeader>
+            <DialogTitle>Vector Details</DialogTitle>
+        </DialogHeader>
+        @if (selectedVector != null)
+        {
+            <div class="space-y-4 max-h-[70vh] overflow-auto py-4">
+                <Field>
+                    <FieldLabel>ID</FieldLabel>
+                    <FieldContent>
+                        <div class="font-mono text-sm bg-muted px-3 py-2 rounded">@selectedVector.Id</div>
+                    </FieldContent>
+                </Field>
                 @if (!string.IsNullOrEmpty(selectedVector.DocumentName))
                 {
-                    <div class="form-group">
-                        <label>Document</label>
-                        <div style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px;">@selectedVector.DocumentName</div>
-                    </div>
+                    <Field>
+                        <FieldLabel>Document</FieldLabel>
+                        <FieldContent>
+                            <div class="text-sm bg-muted px-3 py-2 rounded">@selectedVector.DocumentName</div>
+                        </FieldContent>
+                    </Field>
                 }
                 @if (selectedVector.ChunkIndex.HasValue)
                 {
-                    <div class="form-group">
-                        <label>Chunk Index</label>
-                        <div style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px;">@selectedVector.ChunkIndex</div>
-                    </div>
+                    <Field>
+                        <FieldLabel>Chunk Index</FieldLabel>
+                        <FieldContent>
+                            <div class="text-sm bg-muted px-3 py-2 rounded">@selectedVector.ChunkIndex</div>
+                        </FieldContent>
+                    </Field>
                 }
                 @if (!string.IsNullOrEmpty(selectedVector.ChunkText))
                 {
-                    <div class="form-group">
-                        <label>Chunk Text</label>
-                        <div style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px; max-height: 200px; overflow: auto; white-space: pre-wrap;">@selectedVector.ChunkText</div>
-                    </div>
+                    <Field>
+                        <FieldLabel>Chunk Text</FieldLabel>
+                        <FieldContent>
+                            <div class="text-sm bg-muted px-3 py-2 rounded max-h-[200px] overflow-auto whitespace-pre-wrap">@selectedVector.ChunkText</div>
+                        </FieldContent>
+                    </Field>
                 }
-                <div class="form-group">
-                    <label>Payload</label>
-                    <pre style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px; font-size: 0.8rem; max-height: 150px; overflow: auto; margin: 0;">@FormatPayload(selectedVector.Payload)</pre>
-                </div>
-                <div class="form-group">
-                    <label>Vector (first 10 values)</label>
-                    <div class="mono" style="background: #f1f5f9; padding: 0.75rem; border-radius: 6px; font-size: 0.8rem;">
-                        [@string.Join(", ", selectedVector.Vector.Take(10).Select(v => v.ToString("F4")))]...
-                    </div>
-                </div>
+                <Field>
+                    <FieldLabel>Payload</FieldLabel>
+                    <FieldContent>
+                        <pre class="text-xs bg-muted px-3 py-2 rounded max-h-[150px] overflow-auto m-0">@FormatPayload(selectedVector.Payload)</pre>
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>Vector (first 10 values)</FieldLabel>
+                    <FieldContent>
+                        <div class="font-mono text-xs bg-muted px-3 py-2 rounded">
+                            [@string.Join(", ", selectedVector.Vector.Take(10).Select(v => v.ToString("F4")))]...
+                        </div>
+                    </FieldContent>
+                </Field>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" @onclick="() => selectedVector = null">Close</button>
-                <button class="btn btn-danger" @onclick="() => DeleteVectorAsync(selectedVector.Id)">Delete</button>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- Toast Notification -->
-@if (!string.IsNullOrEmpty(statusMessage))
-{
-    <div class="toast @(statusSuccess ? "success" : "error")">
-        @statusMessage
-        <button @onclick="() => statusMessage = null">&times;</button>
-    </div>
-}
+            <DialogFooter>
+                <Button Variant="ButtonVariant.Outline" OnClick="@(() => { selectedVector = null; showVectorDetailDialog = false; })">Close</Button>
+                <Button Variant="ButtonVariant.Destructive" OnClick="@(() => DeleteVectorAsync(selectedVector.Id))">Delete</Button>
+            </DialogFooter>
+        }
+    </DialogContent>
+</Dialog>
 
 @code {
     // Connection state
@@ -539,11 +463,18 @@
     private string? configApiKey;
     private bool copiedConnection;
 
+    private string configPortString
+    {
+        get => configPort.ToString();
+        set { if (int.TryParse(value, out var p)) configPort = p; }
+    }
+
     // Collection browsing
     private string? selectedCollection;
     private CollectionDetailInfo? selectedCollectionDetail;
     private VectorPage? currentVectorPage;
     private VectorDetail? selectedVector;
+    private bool showVectorDetailDialog;
 
     // Modals
     private bool showCreateCollectionModal;
@@ -551,14 +482,16 @@
     private int newCollectionDimensions = 1024;
     private string newCollectionDistance = "Cosine";
 
+    private string newCollectionDimensionsString
+    {
+        get => newCollectionDimensions.ToString();
+        set { if (int.TryParse(value, out var d)) newCollectionDimensions = d; }
+    }
+
     private bool showCreateContainerModal;
     private string newContainerName = "techierag-qdrant";
     private string? newContainerVolume;
     private bool isCreatingContainer;
-
-    // Status messages
-    private string? statusMessage;
-    private bool statusSuccess;
 
     protected override async Task OnInitializedAsync()
     {
@@ -571,13 +504,11 @@
     {
         try
         {
-            // Check Docker and find containers
             isDockerAvailable = await DockerService.IsDockerAvailableAsync();
             if (isDockerAvailable)
             {
                 qdrantContainers = (await DockerService.ListQdrantContainersAsync()).ToList();
 
-                // Auto-detect endpoint from running container if not connected
                 if (qdrantStatus != "Connected" && qdrantContainers.Count > 0)
                 {
                     var runningContainer = qdrantContainers.FirstOrDefault(c => c.Status == ContainerStatus.Running);
@@ -590,7 +521,6 @@
                 }
             }
 
-            // Check Qdrant connection
             var connected = await QdrantService.TestConnectionAsync();
             qdrantStatus = connected ? "Connected" : "Disconnected";
 
@@ -608,7 +538,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to refresh status");
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
     }
 
@@ -619,12 +549,12 @@
 
         if (qdrantStatus == "Connected")
         {
-            ShowStatus($"Connected to {configHost}:{configPort}", true);
+            ToastService.Success($"Connected to {configHost}:{configPort}", "Connected");
         }
         else
         {
             var errorDetail = QdrantService.LastError ?? "Unknown error";
-            ShowStatus($"Failed to connect: {errorDetail}", false);
+            ToastService.Error($"Failed to connect: {errorDetail}", "Connection Failed");
             Logger.LogWarning("Connection failed to {Host}:{Port}. Error: {Error}", configHost, configPort, errorDetail);
         }
     }
@@ -635,7 +565,6 @@
         {
             configHost = "localhost";
             configPort = container.GrpcPort.Value;
-            // Keep the existing API key when switching containers
             _ = ApplyEndpointAsync();
         }
     }
@@ -653,15 +582,8 @@
         }
         catch
         {
-            ShowStatus("Failed to copy to clipboard", false);
+            ToastService.Error("Failed to copy to clipboard.", "Error");
         }
-    }
-
-    private void ShowCreateContainerModal()
-    {
-        newContainerName = "techierag-qdrant";
-        newContainerVolume = null;
-        showCreateContainerModal = true;
     }
 
     private async Task CreateContainerAsync()
@@ -673,15 +595,14 @@
 
             await DockerService.CreateQdrantContainerAsync(newContainerName, newContainerVolume);
             showCreateContainerModal = false;
-            ShowStatus($"Container '{newContainerName}' created!", true);
+            ToastService.Success($"Container '{newContainerName}' created!", "Created");
 
-            // Wait for container to start
             await Task.Delay(2000);
             await RefreshStatusAsync();
         }
         catch (Exception ex)
         {
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
         finally
         {
@@ -694,13 +615,13 @@
         try
         {
             await DockerService.StartContainerAsync(containerName);
-            ShowStatus($"Container '{containerName}' started!", true);
+            ToastService.Success($"Container '{containerName}' started!", "Started");
             await Task.Delay(1500);
             await RefreshStatusAsync();
         }
         catch (Exception ex)
         {
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
     }
 
@@ -709,12 +630,12 @@
         try
         {
             await DockerService.StopContainerAsync(containerName);
-            ShowStatus($"Container '{containerName}' stopped!", true);
+            ToastService.Success($"Container '{containerName}' stopped!", "Stopped");
             await RefreshStatusAsync();
         }
         catch (Exception ex)
         {
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
     }
 
@@ -732,12 +653,12 @@
         {
             await QdrantService.CreateCollectionAsync(newCollectionName, newCollectionDimensions, newCollectionDistance);
             showCreateCollectionModal = false;
-            ShowStatus($"Collection '{newCollectionName}' created!", true);
+            ToastService.Success($"Collection '{newCollectionName}' created!", "Created");
             await RefreshStatusAsync();
         }
         catch (Exception ex)
         {
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
     }
 
@@ -746,7 +667,7 @@
         try
         {
             await QdrantService.DeleteCollectionAsync(name);
-            ShowStatus($"Collection '{name}' deleted!", true);
+            ToastService.Success($"Collection '{name}' deleted!", "Deleted");
             if (selectedCollection == name)
             {
                 selectedCollection = null;
@@ -756,7 +677,7 @@
         }
         catch (Exception ex)
         {
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
     }
 
@@ -770,7 +691,7 @@
         }
         catch (Exception ex)
         {
-            ShowStatus($"Error: {ex.Message}", false);
+            ToastService.Error($"Error: {ex.Message}", "Error");
         }
     }
 
@@ -800,6 +721,7 @@
         if (selectedCollection != null)
         {
             selectedVector = await QdrantService.GetVectorByIdAsync(selectedCollection, id);
+            showVectorDetailDialog = true;
         }
     }
 
@@ -811,27 +733,15 @@
             {
                 await QdrantService.DeleteVectorAsync(selectedCollection, id);
                 selectedVector = null;
+                showVectorDetailDialog = false;
                 currentVectorPage = await QdrantService.BrowseVectorsAsync(selectedCollection, currentVectorPage?.Offset ?? 0, 20);
-                ShowStatus("Vector deleted!", true);
+                ToastService.Success("Vector deleted!", "Deleted");
             }
             catch (Exception ex)
             {
-                ShowStatus($"Error: {ex.Message}", false);
+                ToastService.Error($"Error: {ex.Message}", "Error");
             }
         }
-    }
-
-    private void ShowStatus(string message, bool success)
-    {
-        statusMessage = message;
-        statusSuccess = success;
-        StateHasChanged();
-
-        _ = Task.Delay(4000).ContinueWith(_ =>
-        {
-            statusMessage = null;
-            InvokeAsync(StateHasChanged);
-        });
     }
 
     private static string TruncateId(string id) => id.Length > 16 ? id[..16] + "..." : id;
