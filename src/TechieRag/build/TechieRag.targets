@@ -1,0 +1,46 @@
+<Project>
+
+  <!--
+    TechieRag AI Agent Integration Targets
+
+    These targets automatically deploy AI agent skill files and reference documentation
+    to consumer projects when TechieRag NuGet package is installed.
+
+    On every build, copies (overwriting existing files to ensure latest version):
+    - TechieRag-AI-Reference.md → .techierag/TechieRag-AI-Reference.md
+    - techierag-claude-command.md → .claude/commands/techierag.md
+    - techierag-opencode-command.md → .opencode/command/techierag.md
+
+    SkipUnchangedFiles=true ensures files are only written when content has actually changed,
+    so builds remain fast when files are already up to date.
+  -->
+
+  <PropertyGroup>
+    <TechieRagContentDir>$(MSBuildThisFileDirectory)content\</TechieRagContentDir>
+  </PropertyGroup>
+
+  <!-- Deploy AI Reference Doc on every build -->
+  <Target Name="TechieRagDeployReferenceDoc" AfterTargets="Build">
+    <MakeDir Directories="$(ProjectDir).techierag" />
+    <Copy SourceFiles="$(TechieRagContentDir)TechieRag-AI-Reference.md"
+          DestinationFiles="$(ProjectDir).techierag\TechieRag-AI-Reference.md"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Deploy Claude Code skill file on every build -->
+  <Target Name="TechieRagDeployClaudeSkill" AfterTargets="Build">
+    <MakeDir Directories="$(ProjectDir).claude\commands" />
+    <Copy SourceFiles="$(TechieRagContentDir)techierag-claude-command.md"
+          DestinationFiles="$(ProjectDir).claude\commands\techierag.md"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Deploy OpenCode skill file on every build -->
+  <Target Name="TechieRagDeployOpenCodeSkill" AfterTargets="Build">
+    <MakeDir Directories="$(ProjectDir).opencode\command" />
+    <Copy SourceFiles="$(TechieRagContentDir)techierag-opencode-command.md"
+          DestinationFiles="$(ProjectDir).opencode\command\techierag.md"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

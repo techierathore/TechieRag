@@ -24,6 +24,21 @@
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <!-- AI Agent Files: Distributed to consumer projects via NuGet -->
+  <!-- TechieRag.targets auto-deploys these to the consumer project on every build -->
+  <!-- Content files are packed under BOTH build\ and buildTransitive\ so that -->
+  <!-- $(MSBuildThisFileDirectory)content\ resolves correctly for both direct and transitive refs -->
+  <ItemGroup>
+    <None Include="build\TechieRag.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="build\TechieRag.targets" Pack="true" PackagePath="build\" />
+    <None Include="build\content\TechieRag-AI-Reference.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\techierag-claude-command.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\TechieRag-AI-Reference.md" Pack="true" PackagePath="build\content\" />
+    <None Include="build\content\techierag-claude-command.md" Pack="true" PackagePath="build\content\" />
+    <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="build\content\" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.4.1" />
