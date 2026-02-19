@@ -17,29 +17,45 @@
 
   <PropertyGroup>
     <TechieRagContentDir>$(MSBuildThisFileDirectory)content\</TechieRagContentDir>
+
+    <!--
+      Resolve the repository/solution root for deploying AI agent files.
+      AI tools (Claude Code, OpenCode) expect their skill files at the repo root,
+      not inside individual project directories.
+
+      Resolution order:
+        1. Git repository root (walk up from project dir looking for .git)
+        2. SolutionDir (set when building via .sln or Visual Studio)
+        3. ProjectDir (fallback - original behavior)
+    -->
+    <TechieRagRepoRoot>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.git'))</TechieRagRepoRoot>
+    <TechieRagRepoRoot Condition="'$(TechieRagRepoRoot)' == '' AND '$(SolutionDir)' != '' AND '$(SolutionDir)' != '*Undefined*'">$(SolutionDir)</TechieRagRepoRoot>
+    <TechieRagRepoRoot Condition="'$(TechieRagRepoRoot)' == ''">$(ProjectDir)</TechieRagRepoRoot>
+    <!-- Ensure trailing slash -->
+    <TechieRagRepoRoot Condition="!$(TechieRagRepoRoot.EndsWith('\')) AND !$(TechieRagRepoRoot.EndsWith('/'))">$(TechieRagRepoRoot)\</TechieRagRepoRoot>
   </PropertyGroup>
 
-  <!-- Deploy AI Reference Doc on every build -->
+  <!-- Deploy AI Reference Doc to repo root on every build -->
   <Target Name="TechieRagDeployReferenceDoc" AfterTargets="Build">
-    <MakeDir Directories="$(ProjectDir).techierag" />
+    <MakeDir Directories="$(TechieRagRepoRoot).techierag" />
     <Copy SourceFiles="$(TechieRagContentDir)TechieRag-AI-Reference.md"
-          DestinationFiles="$(ProjectDir).techierag\TechieRag-AI-Reference.md"
+          DestinationFiles="$(TechieRagRepoRoot).techierag\TechieRag-AI-Reference.md"
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Deploy Claude Code skill file on every build -->
+  <!-- Deploy Claude Code skill file to repo root on every build -->
   <Target Name="TechieRagDeployClaudeSkill" AfterTargets="Build">
-    <MakeDir Directories="$(ProjectDir).claude\commands" />
+    <MakeDir Directories="$(TechieRagRepoRoot).claude\commands" />
     <Copy SourceFiles="$(TechieRagContentDir)techierag-claude-command.md"
-          DestinationFiles="$(ProjectDir).claude\commands\techierag.md"
+          DestinationFiles="$(TechieRagRepoRoot).claude\commands\techierag.md"
           SkipUnchangedFiles="true" />
   </Target>
 
-  <!-- Deploy OpenCode skill file on every build -->
+  <!-- Deploy OpenCode skill file to repo root on every build -->
   <Target Name="TechieRagDeployOpenCodeSkill" AfterTargets="Build">
-    <MakeDir Directories="$(ProjectDir).opencode\command" />
+    <MakeDir Directories="$(TechieRagRepoRoot).opencode\command" />
     <Copy SourceFiles="$(TechieRagContentDir)techierag-opencode-command.md"
-          DestinationFiles="$(ProjectDir).opencode\command\techierag.md"
+          DestinationFiles="$(TechieRagRepoRoot).opencode\command\techierag.md"
           SkipUnchangedFiles="true" />
   </Target>
 

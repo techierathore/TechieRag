@@ -204,29 +204,44 @@ dotnet nuget locals all --list
 
   <PropertyGroup>
     <TechieRagContentDir>$(MSBuildThisFileDirectory)content\</TechieRagContentDir>
+
+    <!--
+      Resolve the repository/solution root for deploying AI agent files.
+      AI tools (Claude Code, OpenCode) expect their skill files at the repo root,
+      not inside individual project directories.
+
+      Resolution order:
+        1. Git repository root (walk up from project dir looking for .git)
+        2. SolutionDir (set when building via .sln or Visual Studio)
+        3. ProjectDir (fallback - original behavior)
+    -->
+    <TechieRagRepoRoot>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), '.git'))</TechieRagRepoRoot>
+    <TechieRagRepoRoot Condition="'$(TechieRagRepoRoot)' == '' AND '$(SolutionDir)' != '' AND '$(SolutionDir)' != '*Undefined*'">$(SolutionDir)</TechieRagRepoRoot>
+    <TechieRagRepoRoot Condition="'$(TechieRagRepoRoot)' == ''">$(ProjectDir)</TechieRagRepoRoot>
+    <TechieRagRepoRoot Condition="!$(TechieRagRepoRoot.EndsWith('\')) AND !$(TechieRagRepoRoot.EndsWith('/'))">$(TechieRagRepoRoot)\</TechieRagRepoRoot>
   </PropertyGroup>
 
   <!-- Target 1: Deploy AI Reference Doc -->
   <Target Name="TechieRagDeployReferenceDoc" AfterTargets="Build">
-    <MakeDir Directories="$(ProjectDir).techierag" />
+    <MakeDir Directories="$(TechieRagRepoRoot).techierag" />
     <Copy SourceFiles="$(TechieRagContentDir)TechieRag-AI-Reference.md"
-          DestinationFiles="$(ProjectDir).techierag\TechieRag-AI-Reference.md"
+          DestinationFiles="$(TechieRagRepoRoot).techierag\TechieRag-AI-Reference.md"
           SkipUnchangedFiles="true" />
   </Target>
 
   <!-- Target 2: Deploy Claude Code Skill -->
   <Target Name="TechieRagDeployClaudeSkill" AfterTargets="Build">
-    <MakeDir Directories="$(ProjectDir).claude\commands" />
+    <MakeDir Directories="$(TechieRagRepoRoot).claude\commands" />
     <Copy SourceFiles="$(TechieRagContentDir)techierag-claude-command.md"
-          DestinationFiles="$(ProjectDir).claude\commands\techierag.md"
+          DestinationFiles="$(TechieRagRepoRoot).claude\commands\techierag.md"
           SkipUnchangedFiles="true" />
   </Target>
 
   <!-- Target 3: Deploy OpenCode Skill -->
   <Target Name="TechieRagDeployOpenCodeSkill" AfterTargets="Build">
-    <MakeDir Directories="$(ProjectDir).opencode\command" />
+    <MakeDir Directories="$(TechieRagRepoRoot).opencode\command" />
     <Copy SourceFiles="$(TechieRagContentDir)techierag-opencode-command.md"
-          DestinationFiles="$(ProjectDir).opencode\command\techierag.md"
+          DestinationFiles="$(TechieRagRepoRoot).opencode\command\techierag.md"
           SkipUnchangedFiles="true" />
   </Target>
 
@@ -239,7 +254,8 @@ dotnet nuget locals all --list
 |----------|-------------|---------|
 | `$(MSBuildThisFileDirectory)` | Directory containing the `.targets` file itself (inside NuGet cache) | `~/.nuget/packages/techierag/1.0.0/buildTransitive/` |
 | `$(TechieRagContentDir)` | Custom property - path to content files in NuGet cache | `~/.nuget/packages/techierag/1.0.0/buildTransitive/content/` |
-| `$(ProjectDir)` | Consumer project's root directory | `C:\MyApp\src\MyApp\` |
+| `$(TechieRagRepoRoot)` | Resolved repo/solution root where AI agent files are deployed. Found by walking up from project dir looking for `.git`, then falling back to `$(SolutionDir)`, then `$(ProjectDir)` | `C:\MyApp\` |
+| `$(ProjectDir)` | Consumer project's directory (NOT used for deployment - only as last-resort fallback) | `C:\MyApp\src\MyApp\` |
 
 ### Behavior
 
