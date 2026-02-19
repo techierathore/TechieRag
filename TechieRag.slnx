@@ -11,6 +11,7 @@
     <Project Path="src/TechieRag/TechieRag.csproj" />
   </Folder>
   <Folder Name="/docs/">
+    <File Path="docs/ai-agent-autodistribution-guide.md" />
     <File Path="docs/brainstorming-session-results.md" />
     <File Path="docs/Coding-Standards.md" />
     <File Path="docs/EMBEDDED-PACKAGE-GUIDE.md" />
