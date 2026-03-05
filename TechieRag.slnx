@@ -15,6 +15,7 @@
     <File Path="docs/brainstorming-session-results.md" />
     <File Path="docs/Coding-Standards.md" />
     <File Path="docs/EMBEDDED-PACKAGE-GUIDE.md" />
+    <File Path="docs/integration-testing-guide.md" />
     <File Path="docs/NUGET-PUBLISHING-GUIDE.md" />
     <File Path="docs/SETUP-AND-TESTING-GUIDE.md" />
     <File Path="docs/TechieRag-UserGuide.md" />
