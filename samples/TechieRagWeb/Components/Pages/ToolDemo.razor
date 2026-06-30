@@ -265,8 +265,15 @@
                 ChatMessage.User(agentInput!)
             };
 
+            // Live execution trace — append each reported step and re-render as it arrives.
+            var progress = new Progress<AgentStep>(step =>
+            {
+                executionSteps.Add(ToExecutionStep(step));
+                InvokeAsync(StateHasChanged);
+            });
+
             var sw = System.Diagnostics.Stopwatch.StartNew();
-            var response = await runner.RunAsync(messages);
+            var response = await runner.RunAsync(messages, progress: progress);
             sw.Stop();
 
             finalAnswer = response.Content;
@@ -285,6 +292,26 @@
         {
             isRunning = false;
         }
+    }
+
+    private ExecutionStep ToExecutionStep(AgentStep step)
+    {
+        var number = executionSteps.Count + 1;
+        return step.Kind switch
+        {
+            AgentStepKind.ToolCallRequested =>
+                new ExecutionStep(number, $"LLM requested tool(s): {step.ToolName}", null),
+            AgentStepKind.ToolExecuted =>
+                new ExecutionStep(
+                    number,
+                    step.IsSuccess
+                        ? $"Executed {step.ToolName}({step.ToolArgumentsJson})"
+                        : $"Tool {step.ToolName} failed",
+                    step.IsSuccess ? step.Content : step.ErrorMessage),
+            AgentStepKind.MaxIterationsReached =>
+                new ExecutionStep(number, "Max iterations reached — forced final answer", null),
+            _ => new ExecutionStep(number, "LLM generated final answer", null)
+        };
     }
 
     private record ToolDisplayRow(string Name, string Description, string Status);

@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Status — TechieRag Status</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieRag — Status</h1>
+    <div class="sub">Last rendered: 2026-06-30</div>
+    <div class="group">Contents</div>
+    <ol>
+      <li><a href="#where-i-am">Where I am</a></li>
+      <li><a href="#next-command-to-run">Next command to run</a></li>
+      <li><a href="#open-requirements">Open requirements</a></li>
+      <li><a href="#known-blockers">Known blockers</a></li>
+      <li><a href="#verification-log">Verification log</a></li>
+      <li><a href="#library-feedback-summary">Library feedback summary</a></li>
+      <li><a href="#standards-compliance-last-verifier-check">Standards compliance (last verifier check)</a></li>
+      <li><a href="#deferred--future">Deferred / future</a></li>
+      <li><a href="#framework-migration-note-2026-06-27">Framework migration note (2026-06-27)</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieRag — Status</h1>
+    <div class="subtitle">Project status · last updated 2026-06-27</div>
+<blockquote><p>Migrated to the single-checklist framework (2026-06-27); prior Verified/Done verdicts predate the new visual-truth gate and have not been visually confirmed.</p></blockquote>
+<div class="toc-inline">
+  <div>Contents</div>
+  <ol>
+    <li><a href="#where-i-am">Where I am</a></li>
+    <li><a href="#next-command-to-run">Next command to run</a></li>
+    <li><a href="#open-requirements">Open requirements</a></li>
+    <li><a href="#known-blockers">Known blockers</a></li>
+    <li><a href="#verification-log">Verification log</a></li>
+    <li><a href="#library-feedback-summary">Library feedback summary</a></li>
+    <li><a href="#standards-compliance-last-verifier-check">Standards compliance (last verifier check)</a></li>
+    <li><a href="#deferred--future">Deferred / future</a></li>
+    <li><a href="#framework-migration-note-2026-06-27">Framework migration note (2026-06-27)</a></li>
+  </ol>
+</div>
+<h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
+<p>TechieRag is a configurable .NET 10 RAG library (NuGet), ~96% complete. Day-1 docs were reverse-engineered on 2026-06-25 from the codebase plus the v1.1 refactoring roadmap (completed 2025-12-30) and the v2 LLM implementation spec (completed 2026-02-18). The v1.1 core (config/builder, 3 vector stores, 9 document processors, 6 embedding providers, semantic search, the <code>TechieRagWeb</code> sample, and Qdrant admin) and the entire v2 LLM layer (6 LLM providers, auto-RAG generation, agent/tool loop, conversation memory, token tracking, resilience, fallback, prompt templates, and 4 new sample pages) are all shipped and were validated by manual/integration testing (21 documented scenarios). The roadmap + spec were migrated this session into the UI + Functional checklists — every requirement is marked <code>Done (pre-existing)</code>. The two library packages and the test project build green; the sample is blocked from restoring only by a missing TrBlazeUI GitHub Packages credential. Remaining work is a formal automated test suite and optional OpenTelemetry exporters (both deferred — not BRD requirements).</p>
+<p>DevGuide generated 2026-06-25, refreshed 2026-06-30 (<code>--update</code>: Tool Calling Demo re-mapped to as-built agent-loop anchors; core lib re-built clean, 0 errors; 0 new defects): docs/TechieRag-DevGuide.md (single doc — 1 role/anonymous, 11 screens) + .html. ⚠ STATIC-ONLY (sample can't boot without the TrBlazeUI PAT). 11 code-confirmed defects logged to the UI checklist; 6 REQs flagged <code>Needs re-verify</code> (REQ-UI-003/005/006/007/012/013).</p>
+<h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
+<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag      (OpenCode: /flow-master *build-phase TechieRag)</code></pre>
+<p>Adds the remaining tests to the open REQ tail in docs/TechieRag-Checklist.md (Done items not rebuilt). Live UI verify of samples/TechieRagWeb still needs the TrBlazeUI GitHub Packages token (externally blocked).</p>
+<h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
+<ul>
+<li>6 UI requirements flagged <code>Needs re-verify</code> by the 2026-06-25 DevGuide (static code-confirmed defects): REQ-UI-003 (LLM Settings Reset is a no-op), REQ-UI-005 (Chat streaming footer never counts tokens/cost + double retrieval), REQ-UI-006 (Playground Temperature/MaxTokens no-op + Structured output not parsed), REQ-UI-007 (Tool Demo execution trace unwired — library <code>AgentLoopRunner</code> has no step callback), REQ-UI-012 (Qdrant version hard-coded, Vectors col duplicates Points), REQ-UI-013 (vector pagination cursor bug).</li>
+<li>All other <code>REQ-UI-*</code>, 3 <code>REQ-FN-*</code>, 14 <code>REQ-RAG-*</code>, and 7 <code>REQ-NFR-*</code> remain <code>Done (pre-existing)</code>. See the <strong>Requirements Status</strong> table in docs/TechieRag-Checklist.md.</li>
+</ul>
+<h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
+<ul>
+<li><strong>Sample restore needs a credential (not a code defect):</strong> <code>samples/TechieRagWeb</code> references <code>TrBlazeUI.Components</code> and <code>TrBlazeUI.Icons.Lucide</code> from GitHub Packages (<code>nuget.pkg.github.com/techierathore</code>), which return <strong>401 Unauthorized</strong> without an authenticated <code>nuget.config</code> token. The two shipped library packages restore from nuget.org alone. Add a GitHub PAT with <code>read:packages</code> to <code>nuget.config</code> to build the sample.</li>
+<li><strong>Dependency advisory (NU1903):</strong> <code>SQLitePCLRaw.lib.e_sqlite3</code> 2.1.11 (transitive via the SQLite-vec store / test project) has a known high-severity advisory — bump when an updated version is available.</li>
+</ul>
+<h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Phase</th>
+<th>Result</th>
+<th>Status table</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-06-25</td>
+<td>Discovery (day-1 brownfield)</td>
+<td>Docs generated; roadmap+spec migrated; build PASS (rung #2, 3 non-sample projects)</td>
+<td>docs/TechieRag-Checklist.md#requirements-status</td>
+</tr>
+</tbody>
+</table>
+<h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
+<ul>
+<li>TrBlazeUI: 0 major, 0 minor — docs/TechieRag-TrBlazeUI-Feedback.md</li>
+<li>TechieRag: 0 major, 0 minor — docs/TechieRag-TechieRag-Feedback.md</li>
+</ul>
+<h2 id="standards-compliance-last-verifier-check">Standards compliance (last verifier check)<a class="anchor-link" href="#standards-compliance-last-verifier-check">#</a></h2>
+<ul>
+<li>Underscore fields: 0 violations (grep over src/ + tests/, 2026-06-25)</li>
+<li>Test method underscores: 0 violations (grep over tests/, 2026-06-25)</li>
+<li>Mis-prefixed fields: N/A — no-prefix project (camelCase convention; no obj-prefix grep applies)</li>
+</ul>
+<h2 id="deferred--future">Deferred / future<a class="anchor-link" href="#deferred--future">#</a></h2>
+<ul>
+<li>Formal automated xUnit test suite (v2 Phase 7 — validated manually only).</li>
+<li>OpenTelemetry metrics (<code>TechieRagMetrics</code>) + distributed tracing (<code>TechieRagActivitySource</code>) for Prometheus/Grafana/Jaeger.</li>
+<li>Resolve the SQLitePCLRaw advisory (NU1903) by upgrading the transitive package.</li>
+</ul>
+<h2 id="framework-migration-note-2026-06-27">Framework migration note (2026-06-27)<a class="anchor-link" href="#framework-migration-note-2026-06-27">#</a></h2>
+<ul>
+<li>The two checklists merged into ONE <code>docs/TechieRag-Checklist.md</code> (all REQ-UI/FN/RAG/NFR-* in one Requirements Status table; originals archived to docs/OldDocs/, every verdict verbatim).</li>
+<li>The build commands <code>*build-ui-phase</code>/<code>*build-rag-phase</code>/<code>*build-functional-phase</code> were dissolved into ONE <code>*build-phase TechieRag</code> (flow-master; it calls /trblazeui + /techierag as sub-agents).</li>
+<li>New VISUAL-TRUTH gate: the verifier now also checks each screen LOOKS right (no overlap/clip/off-viewport), not just that controls have data — every prior Verified/Done verdict predates this and is not yet visually confirmed.</li>
+<li>New <code>*fix-issues TechieRag {folder}</code> (flow-master): drop screenshots of broken screens in a folder → it triages + fixes + re-verifies.</li>
+<li>RESTART any open Claude Code / OpenCode session against this project to load the new task/agent defs.</li>
+</ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

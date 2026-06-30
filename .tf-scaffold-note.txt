@@ -1,0 +1,41 @@
+Scaffolded by the TechieFlow v4 customized brownfield scaffold script.
+
+This is a BROWNFIELD project — your existing src/, tests/, and docs/ contents
+were NOT touched. Only the TechieFlow framework files were added.
+
+Added (only missing files filled — re-runs are safe):
+  .tfcore/                  ← TechieFlow v4 customized (agents, tasks, templates)
+  .claude/commands/            ← Claude Code slash commands (TechieFlow agents)
+  .claude/settings.json        ← yolo-except-git permissions
+  .opencode/command/TechieFlow/      ← OpenCode slash commands
+  WORKFLOW.html                ← the human workflow guide (open in a browser; §17 = macOS / Windows / Linux)
+  opencode.jsonc               ← OpenCode config
+
+All TechieFlow templates the analyst will need live LOCALLY in this project under:
+  .tfcore/templates/v4custom/
+
+So the project is portable — copy this whole tree to another machine and the
+analyst can author every doc without reaching back to the original template.
+
+Library agents (TrBlazeUI, TechieRag) auto-deploy on `dotnet build` IF the
+project already references the NuGet packages. To add them:
+  dotnet add <YourProject>.csproj package TrBlazeUI
+  dotnet add <YourProject>.csproj package TechieRag
+  dotnet build
+
+Next step (brownfield day-1):
+  Start Claude Code in this folder and run:
+    /analyst *day1-brownfield <AppName>
+  (Replace <AppName> with PascalCase name, e.g. AppManager, TrTools.)
+
+  That single command will produce all six day-1 deliverables in one pass:
+    docs/<AppName>-Architecture.md
+    docs/<AppName>-BRD.md
+    docs/<AppName>-Coding-Standards.md
+    .editorconfig
+    PROJECT-STATUS.md
+    CLAUDE.md
+
+  Then review the docs and edit directly if needed.
+
+You can delete this note once you've read it.

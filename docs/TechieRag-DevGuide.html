@@ -1,0 +1,2479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Developer Guide (Screen-by-Screen Code Map) — TechieRag DevGuide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieRag — Developer Guide (Screen-by-Screen Code Map)</h1>
+    <div class="sub">Last rendered: 2026-06-30</div>
+    <div class="group">Contents</div>
+    <ol>
+      <li><a href="#how-to-use-this-guide">How to use this guide</a></li>
+      <li><a href="#architecture-cheat-sheet">Architecture cheat-sheet</a></li>
+      <li><a href="#roles-and-menu-map">Roles and menu map</a></li>
+      <li class="h3"><a href="#anonymous--menu-structure-mainlayoutrazor-sidebar">Anonymous — menu structure (<code>MainLayout.razor</code> sidebar)</a></li>
+      <li><a href="#screen-by-screen-code-map">Screen-by-screen code map</a></li>
+      <li class="h3"><a href="#anonymous--home">Anonymous · Home</a></li>
+      <li class="h3"><a href="#anonymous--settings">Anonymous · Settings</a></li>
+      <li class="h3"><a href="#anonymous--llmsettings">Anonymous · LlmSettings</a></li>
+      <li class="h3"><a href="#anonymous--ingestion-file-ingestion">Anonymous · Ingestion (File Ingestion)</a></li>
+      <li class="h3"><a href="#anonymous--textingestion-text-ingestion">Anonymous · TextIngestion (Text Ingestion)</a></li>
+      <li class="h3"><a href="#anonymous--rag-chat">Anonymous · RAG Chat</a></li>
+      <li class="h3"><a href="#anonymous--llm-playground">Anonymous · LLM Playground</a></li>
+      <li class="h3"><a href="#anonymous--tool-calling-demo">Anonymous · Tool Calling Demo</a></li>
+      <li class="h3"><a href="#anonymous--token-usage">Anonymous · Token Usage</a></li>
+      <li class="h3"><a href="#anonymous--qdrant-admin">Anonymous · Qdrant Admin</a></li>
+      <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
+      <li class="h3"><a href="#configuration-load--save--apply">Configuration load / save / apply</a></li>
+      <li class="h3"><a href="#ingestion-pipeline-file--text">Ingestion pipeline (file + text)</a></li>
+      <li class="h3"><a href="#query--auto-rag-used-by-chat-tool-demo-search-tool">Query / Auto-RAG (used by Chat, Tool Demo search tool)</a></li>
+      <li class="h3"><a href="#resilience--token-tracking-automatic-on-llm-calls">Resilience + token tracking (automatic on LLM calls)</a></li>
+      <li><a href="#how-to-fix-a-bug-with-this-guide">How to fix a bug with this guide</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieRag — Developer Guide (Screen-by-Screen Code Map)</h1>
+    <div class="subtitle">Screen-by-screen code map · ⚠ STATIC-ONLY (refreshed 2026-06-30)</div>
+<blockquote><p>⚠ <strong>STATIC-ONLY (2026-06-30 — incremental <code>--update</code>)</strong> — built from code reading; <strong>NOT yet runtime-verified</strong>. Render-status is unconfirmed until <code>*verify</code> runs against the running app. A boot was re-attempted on 2026-06-30: the <code>TechieRagWeb</code> sample still cannot be restored because the <code>TrBlazeUI.Components</code> / <code>TrBlazeUI.Icons.Lucide</code> packages on GitHub Packages return <strong>401 (Unauthorized)</strong> without an authenticated PAT in <code>nuget.config</code> — a credential gap, not a code defect. The core library (<code>src/TechieRag</code>) <strong>re-built clean (0 errors)</strong>. Every control below is tagged <code>static-only (unconfirmed)</code>, except where reading the code itself proves a defect (those are called out and logged to the checklists). This refresh re-mapped only the <strong>Tool Calling Demo</strong> screen (the one screen whose source changed since 2026-06-25: <code>ToolDemo.razor</code>, <code>AgentLoopRunner.cs</code>, new <code>AgentStep.cs</code>); all other screens are preserved verbatim.</p></blockquote>
+<blockquote><p><strong>Purpose — this is the document a HUMAN developer uses to trace any screen, control, or number on the page all the way down to its data source, so they can find and fix a bug, or verify that AI-generated code is actually correct.</strong> The BRD explains <em>what</em> the app does; the Architecture explains <em>how the system is shaped</em>. Neither tells a developer "the Chat footer's token count comes from <code>Chat.razor</code>'s <code>HandleAutoRag()</code> → <code>TechieRagManager.AskAsync()</code> → <code>TechieRagClient.AskAsync()</code> → <code>response.Usage</code>." This guide does exactly that, per screen, down to the provider call.</p>
+<p>It documents the <strong>AS-BUILT code</strong>, not the plan. Regenerate it with <code>*devguide TechieRag</code> after meaningful code changes.</p></blockquote>
+<blockquote><p><strong>What "the database" means here.</strong> TechieRag is a <strong>configurable RAG library</strong>, not a CRUD app — there is <strong>no relational database and no stored procedures</strong>. The sample app's "data layer" is the library API (<code>ITechieRag</code> / <code>TechieRagClient</code>) over pluggable providers: an <strong>embedding provider</strong> (HTTP to Ollama/LM Studio/Azure, or in-process ONNX), a <strong>vector store</strong> (SQLite-vec default · PostgreSQL/pgvector · Qdrant), and an <strong>LLM provider</strong> (HTTP to Ollama/LM Studio/OpenAI-compatible/Azure/Gemini/Anthropic). Config is persisted to a JSON file (<code>techierag-config.json</code>), not a DB. So every lineage row reads <strong>Razor → sample Service (or injected <code>ITechieRag</code>) → library API → provider / JSON file</strong>.</p></blockquote>
+<div class="toc-inline">
+  <div>Contents</div>
+  <ol>
+    <li><a href="#how-to-use-this-guide">How to use this guide</a></li>
+    <li><a href="#architecture-cheat-sheet">Architecture cheat-sheet</a></li>
+    <li><a href="#roles-and-menu-map">Roles and menu map</a></li>
+    <li><a href="#screen-by-screen-code-map">Screen-by-screen code map</a></li>
+    <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
+    <li><a href="#how-to-fix-a-bug-with-this-guide">How to fix a bug with this guide</a></li>
+  </ol>
+</div>
+<h2 id="how-to-use-this-guide">How to use this guide<a class="anchor-link" href="#how-to-use-this-guide">#</a></h2>
+<ul>
+<li><strong>Find your screen</strong> in §4. There is only one role (the sample has no authentication — a single anonymous user), so screens are grouped by sidebar menu group in navigation order. Each screen tells you the route, the Razor file, every control, and where each control's data comes from.</li>
+<li><strong>Chasing a wrong number / missing data?</strong> Find the control in that screen's <em>Data lineage</em> table → it names the Razor handler → the service method → the library API call → the provider/persistence target. Open those files in order.</li>
+<li><strong>Verifying AI-generated code?</strong> Compare what this guide claims against the actual files. If a row says a value comes from <code>response.Usage</code> but the streaming branch never reads it, the guide (or the code) is wrong — that mismatch is exactly the kind of bug this guide is meant to catch (several real ones are flagged in §4 "Known issues").</li>
+<li><strong>Render-status is STATIC-ONLY.</strong> Nothing here was observed at runtime. Treat every "renders" claim as a hypothesis until <code>*verify</code> (or a re-run of <code>*devguide</code> with the app booted) confirms it.</li>
+</ul>
+<h2 id="architecture-cheat-sheet">Architecture cheat-sheet<a class="anchor-link" href="#architecture-cheat-sheet">#</a></h2>
+<p>Brief — just enough to navigate the code. (Full detail in <code>docs/TechieRag-Architecture.md</code>.)</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Project / folder</th>
+<th>What lives here</th>
+<th>Example types</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>UI (Blazor Server)</td>
+<td><code>samples/TechieRagWeb/Components/Pages</code></td>
+<td>The 11 routed Razor pages + layout/sidebar</td>
+<td><code>Chat.razor</code>, <code>Settings.razor</code>, <code>MainLayout.razor</code></td>
+</tr>
+<tr>
+<td>Sample services</td>
+<td><code>samples/TechieRagWeb/Services</code></td>
+<td>Builds/holds the live <code>ITechieRag</code>; config persistence; Qdrant/Docker admin</td>
+<td><code>TechieRagManager</code>, <code>TechieRagConfigService</code>, <code>QdrantAdminService</code>, <code>DockerContainerService</code></td>
+</tr>
+<tr>
+<td>Library (orchestrator)</td>
+<td><code>src/TechieRag</code></td>
+<td>The RAG engine consumed via <code>ITechieRag</code></td>
+<td><code>TechieRagClient</code>, <code>AgentLoopRunner</code>, <code>ToolRegistry</code>, <code>TokenUsageTracker</code></td>
+</tr>
+<tr>
+<td>Provider abstractions</td>
+<td><code>src/TechieRag/Abstractions</code></td>
+<td>Pluggable backend contracts (the keystone)</td>
+<td><code>IEmbeddingProvider</code>, <code>IVectorStore</code>, <code>ILlmProvider</code>, <code>ITokenTracker</code></td>
+</tr>
+<tr>
+<td>Embedding (offline)</td>
+<td><code>src/TechieRag.Embedded</code></td>
+<td>BGE-M3 ONNX provider + model download</td>
+<td><code>EmbeddedEmbeddingProvider</code>, <code>ModelDownloadService</code></td>
+</tr>
+<tr>
+<td>Persistence</td>
+<td>(no DB)</td>
+<td>Vector store backends + a JSON config file</td>
+<td>SQLite-vec / pgvector / Qdrant; <code>techierag-config.json</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>No stored procs / no ORM entities.</strong> Reads/writes go through the library: ingestion = <code>processor/chunker → embeddingProvider.EmbedBatchAsync → vectorStore.UpsertBatchAsync</code>; query = <code>embeddingProvider.EmbedAsync → vectorStore.SearchAsync → promptTemplate.BuildRagPrompt → llmProvider.Chat/Complete</code>.</li>
+<li><strong>How a Razor page gets its data:</strong> two patterns. The <strong>ingestion/chat-style pages inject <code>ITechieRag Rag</code> directly</strong> (the singleton built at startup) and call it. The <strong>config/admin pages inject the sample services</strong> (<code>TechieRagConfigService</code> for JSON load/save, <code>TechieRagManager</code> to rebuild the live client, <code>QdrantAdminService</code>/<code>DockerContainerService</code> for the Qdrant console).</li>
+<li><strong><code>TechieRagManager</code></strong> is the bridge: <code>ReconfigureAsync()</code> rebuilds the <code>ITechieRag</code> instance from the saved config; <code>GetLlmProvider()</code> / <code>GetTokenTracker()</code> expose library sub-services to the playground/monitoring pages. Note <code>GetLlmProvider()</code> blocks sync-over-async (<code>GetInstanceAsync().GetAwaiter().GetResult()</code>, <code>TechieRagManager.cs:367</code>).</li>
+</ul>
+<h2 id="roles-and-menu-map">Roles and menu map<a class="anchor-link" href="#roles-and-menu-map">#</a></h2>
+<p>The sample app has <strong>no authentication, no login, and no roles</strong> (confirmed: zero <code>[Authorize]</code> / <code>AddAuthentication</code> / <code>AddAuthorization</code> in <code>samples/TechieRagWeb</code>; <code>docs/TechieRag-UsageGuide.md</code> test-users table records "none — no auth"). It is a single-user, config-driven demo.</p>
+<table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Test user</th>
+<th>Authorization</th>
+<th>Menus this role sees</th>
+<th>Detail</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Anonymous (single user)</td>
+<td>none — no login</td>
+<td>none (no auth anywhere in the sample)</td>
+<td>All groups: General · Configuration · Data · AI Features · Monitoring · Admin</td>
+<td>§4 (this doc)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Landing-truth.</strong> There is no post-login redirect because there is no login. The router (<code>Components/Routes.razor</code>) has no custom redirect; the default landing is <code>Home</code> at <code>@page "/"</code> (<code>Components/Pages/Home.razor:1</code>), reached directly by URL. The sidebar (<code>Components/Layout/MainLayout.razor</code>) is the only navigation; every page is reached by its menu item below — none is inferred from folder names.</p>
+<h3 id="anonymous--menu-structure-mainlayoutrazor-sidebar">Anonymous — menu structure (<code>MainLayout.razor</code> sidebar)<a class="anchor-link" href="#anonymous--menu-structure-mainlayoutrazor-sidebar">#</a></h3>
+<ul>
+<li><strong>General</strong> → <strong>Home</strong> → opens <code>/</code> (<code>Pages/Home.razor</code>) — see <a href="#anonymous--home">§4 · Home</a></li>
+<li><strong>Configuration</strong> → <strong>Settings</strong> → opens <code>/settings</code> (<code>Pages/Settings.razor</code>) — see <a href="#anonymous--settings">§4 · Settings</a></li>
+<li><strong>Configuration</strong> → <strong>LLM Settings</strong> → opens <code>/llm-settings</code> (<code>Pages/LlmSettings.razor</code>) — see <a href="#anonymous--llmsettings">§4 · LlmSettings</a></li>
+<li><strong>Data</strong> → <strong>File Ingestion</strong> → opens <code>/ingestion</code> (<code>Pages/Ingestion.razor</code>) — see <a href="#anonymous--ingestion-file-ingestion">§4 · Ingestion</a></li>
+<li><strong>Data</strong> → <strong>Text Ingestion</strong> → opens <code>/text-ingestion</code> (<code>Pages/TextIngestion.razor</code>) — see <a href="#anonymous--textingestion-text-ingestion">§4 · TextIngestion</a></li>
+<li><strong>AI Features</strong> → <strong>RAG Chat</strong> → opens <code>/chat</code> (<code>Pages/Chat.razor</code>) — see <a href="#anonymous--rag-chat">§4 · RAG Chat</a></li>
+<li><strong>AI Features</strong> → <strong>LLM Playground</strong> → opens <code>/llm-playground</code> (<code>Pages/LlmPlayground.razor</code>) — see <a href="#anonymous--llm-playground">§4 · LLM Playground</a></li>
+<li><strong>AI Features</strong> → <strong>Tool Demo</strong> → opens <code>/tool-demo</code> (<code>Pages/ToolDemo.razor</code>) — see <a href="#anonymous--tool-calling-demo">§4 · Tool Demo</a></li>
+<li><strong>Monitoring</strong> → <strong>Token Usage</strong> → opens <code>/token-usage</code> (<code>Pages/TokenUsage.razor</code>) — see <a href="#anonymous--token-usage">§4 · Token Usage</a></li>
+<li><strong>Admin</strong> → <strong>Qdrant Admin</strong> → opens <code>/qdrant-admin</code> (<code>Pages/QdrantAdmin.razor</code>) — see <a href="#anonymous--qdrant-admin">§4 · Qdrant Admin</a></li>
+</ul>
+<blockquote><p><strong>Discovery count:</strong> 1 role, 11 distinct screens (Home + 10 feature pages; <code>NavMenu.razor</code> is an empty stub — nav lives in <code>MainLayout.razor</code>).</p></blockquote>
+<h2 id="screen-by-screen-code-map">Screen-by-screen code map<a class="anchor-link" href="#screen-by-screen-code-map">#</a></h2>
+<hr>
+<h3 id="anonymous--home">Anonymous · Home<a class="anchor-link" href="#anonymous--home">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/"</code> (<code>samples/TechieRagWeb/Components/Pages/Home.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/Home.razor</code></li>
+<li><strong>Reached via:</strong> General → Home; <strong>Log in as:</strong> no auth (single anonymous user). This is the default landing route <code>/</code>.</li>
+<li><strong>What this screen does:</strong> Static landing dashboard. Renders six navigation cards (Document Ingestion, RAG Chat, LLM Playground, Tool Calling Demo, Token Usage, Configuration) that link to other pages. No data access, no <code>@code</code> block, no service injection.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["Home.razor (@page slash)"] --> H["Header: TechieRag Demo Application"]
+  P --> G["Card grid (6 cards)"]
+  G --> C1["Card: Document Ingestion -> Button Href /ingestion"]
+  G --> C2["Card: RAG Chat -> Button Href /chat"]
+  G --> C3["Card: LLM Playground -> Button Href /llm-playground"]
+  G --> C4["Card: Tool Calling Demo -> Button Href /tool-demo"]
+  G --> C5["Card: Token Usage -> Button Href /token-usage"]
+  G --> C6["Card: Configuration -> Button Href /settings"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>File Ingestion</td>
+<td>Button (Href <code>/ingestion</code>)</td>
+<td>Navigate to ingestion page</td>
+<td>Static markup (Home.razor:21)</td>
+</tr>
+<tr>
+<td>Open Chat</td>
+<td>Button (Href <code>/chat</code>)</td>
+<td>Navigate to RAG chat</td>
+<td>Static markup (Home.razor:37)</td>
+</tr>
+<tr>
+<td>Open Playground</td>
+<td>Button (Href <code>/llm-playground</code>)</td>
+<td>Navigate to LLM playground</td>
+<td>Static markup (Home.razor:53)</td>
+</tr>
+<tr>
+<td>Tool Demo</td>
+<td>Button (Href <code>/tool-demo</code>)</td>
+<td>Navigate to tool-calling demo</td>
+<td>Static markup (Home.razor:69)</td>
+</tr>
+<tr>
+<td>View Usage</td>
+<td>Button (Href <code>/token-usage</code>)</td>
+<td>Navigate to token usage</td>
+<td>Static markup (Home.razor:85)</td>
+</tr>
+<tr>
+<td>Settings</td>
+<td>Button (Href <code>/settings</code>)</td>
+<td>Navigate to Settings</td>
+<td>Static markup (Home.razor:101)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>All 6 cards</td>
+<td>Home.razor:12-106</td>
+<td>none (no injected service)</td>
+<td>none</td>
+<td>none</td>
+<td>static-only (unconfirmed). Pure navigation links; no data binding</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>None. No <code>@code</code> block, no conditionals, no service calls.</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li>No <code>@rendermode</code> directive (only <code>@page "/"</code> at line 1), so it renders as static SSR. Acceptable because the page is link-only with no interactivity.</li>
+<li>Card titles/descriptions are hardcoded English strings; no localization.</li>
+</ul>
+<hr>
+<h3 id="anonymous--settings">Anonymous · Settings<a class="anchor-link" href="#anonymous--settings">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/settings"</code> (<code>samples/TechieRagWeb/Components/Pages/Settings.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/Settings.razor</code></li>
+<li><strong>Reached via:</strong> Configuration → Settings; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Edits embedding provider, vector store, document-processing, and telemetry config. Loads from <code>techierag-config.json</code> (fallback <code>appsettings.json</code> / defaults), saves back to that JSON file, then rebuilds the live <code>ITechieRag</code> instance via <code>ReconfigureAsync</code>.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["Settings.razor (@page settings)"] --> I["OnInitializedAsync"]
+  I --> L["ConfigService.LoadConfigAsync()"]
+  L --> F["read techierag-config.json -> appsettings -> defaults"]
+  I --> R{"isLoading?"}
+  R -->|"true"| SP["Spinner"]
+  R -->|"false"| FORM["4 config cards + action buttons"]
+  FORM --> EMB["Embedding card (Source/Model/Path/Endpoint/ApiKey)"]
+  FORM --> VEC["Vector Store card (Type/Connection/ApiKey)"]
+  FORM --> PROC["Processing card (ChunkSize/Overlap)"]
+  FORM --> ADV["Advanced card (EnableTelemetry switch)"]
+  FORM --> SAVE["Save Configuration -> SaveConfigAsync"]
+  FORM --> RESET["Reset to Defaults -> ResetToDefaults"]
+  SAVE --> BCS["BuildConnectionString()"]
+  SAVE --> SC["ConfigService.SaveConfigAsync(config)"]
+  SC --> WRITE["write techierag-config.json"]
+  SAVE --> RC["RagManager.ReconfigureAsync()"]
+  RC --> REBUILD["TechieRagBuilder rebuild + InitializeAsync"]
+  RESET --> RD["ConfigService.ResetToDefaults() (delete json)"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Embedding Source</td>
+<td>Select (7 items)</td>
+<td>Choose embedding provider</td>
+<td><code>embeddingSourceString</code> get/set over <code>config.Embedding.Source</code> (Settings.razor:35, 220-224)</td>
+</tr>
+<tr>
+<td>BGE-M3 info Alert</td>
+<td>Alert (Info)</td>
+<td>Shows only when Source=Embedded</td>
+<td><code>config.Embedding.Source == EmbeddingSource.Embedded</code> (Settings.razor:53)</td>
+</tr>
+<tr>
+<td>Model Name</td>
+<td>Input</td>
+<td>Embedding model name (non-Embedded)</td>
+<td><code>config.Embedding.Model</code>; placeholder <code>GetModelPlaceholder()</code>, hint <code>GetModelHint()</code> (Settings.razor:65-66)</td>
+</tr>
+<tr>
+<td>Model Path</td>
+<td>Input</td>
+<td>ONNX model dir (Source=Onnx only)</td>
+<td><code>config.Embedding.ModelPath</code> (Settings.razor:76)</td>
+</tr>
+<tr>
+<td>Endpoint URL</td>
+<td>Input</td>
+<td>Provider endpoint (non-Embedded, non-Onnx)</td>
+<td><code>config.Embedding.Endpoint</code>; <code>GetEndpointPlaceholder()/GetEndpointHint()</code> (Settings.razor:86-87)</td>
+</tr>
+<tr>
+<td>API Key</td>
+<td>Input (Password)</td>
+<td>Key for Azure/OpenAI embedding</td>
+<td>shown when <code>RequiresApiKey()</code>; <code>config.Embedding.ApiKey</code> (Settings.razor:92-97)</td>
+</tr>
+<tr>
+<td>Vector Store Type</td>
+<td>Select (3 items)</td>
+<td>Choose vector store</td>
+<td><code>vectorStoreTypeString</code> get/set over <code>config.VectorStore.Type</code> (Settings.razor:115, 226-230)</td>
+</tr>
+<tr>
+<td>Connection / Path</td>
+<td>Input</td>
+<td>Store connection string</td>
+<td><code>vectorStoreConnectionInput</code> (Settings.razor:132); label/placeholder/hint helpers</td>
+</tr>
+<tr>
+<td>Qdrant API Key</td>
+<td>Input (Password)</td>
+<td>Qdrant auth (Type=Qdrant only)</td>
+<td><code>config.VectorStore.ApiKey</code> (Settings.razor:142)</td>
+</tr>
+<tr>
+<td>Chunk Size</td>
+<td>Input (Number)</td>
+<td>Chunk size in chars</td>
+<td><code>chunkSizeString</code> over <code>config.Processing.DefaultChunkSize</code> (Settings.razor:161, 232-236)</td>
+</tr>
+<tr>
+<td>Chunk Overlap</td>
+<td>Input (Number)</td>
+<td>Overlap in chars</td>
+<td><code>chunkOverlapString</code> over <code>config.Processing.DefaultChunkOverlap</code> (Settings.razor:168, 238-242)</td>
+</tr>
+<tr>
+<td>Enable Telemetry</td>
+<td>Switch</td>
+<td>Toggle telemetry flag</td>
+<td><code>config.EnableTelemetry</code> (Settings.razor:184)</td>
+</tr>
+<tr>
+<td>Reset to Defaults</td>
+<td>Button</td>
+<td>Delete saved JSON, reload</td>
+<td><code>ResetToDefaults</code> (Settings.razor:195, 326-331)</td>
+</tr>
+<tr>
+<td>Save Configuration</td>
+<td>Button</td>
+<td>Persist + apply config</td>
+<td><code>SaveConfigAsync</code> (Settings.razor:198, 303-324)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial load</td>
+<td>OnInitializedAsync Settings.razor:244-262</td>
+<td><code>ConfigService.LoadConfigAsync()</code> (TechieRagConfigService.cs:54)</td>
+<td><code>JsonSerializer.Deserialize&lt;TechieRagConfig&gt;</code> of <code>techierag-config.json</code>; fallback <code>configuration.GetSection("TechieRag")</code> (TechieRagConfigService.cs:64-120)</td>
+<td>File <code>techierag-config.json</code> → else <code>appsettings.json</code> → else <code>new TechieRagConfig()</code></td>
+<td>static-only (unconfirmed). Cached in <code>cachedConfig</code></td>
+</tr>
+<tr>
+<td>All form fields</td>
+<td>Settings.razor:35-184</td>
+<td>bound to in-memory <code>config</code> (field, Settings.razor:215)</td>
+<td>none until Save</td>
+<td>in-memory</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Save Configuration</td>
+<td>SaveConfigAsync Settings.razor:303-324</td>
+<td><code>ConfigService.SaveConfigAsync(config)</code> (TechieRagConfigService.cs:148) then <code>RagManager.ReconfigureAsync()</code> (TechieRagManager.cs:63)</td>
+<td><code>File.WriteAllTextAsync(configFilePath, json)</code> (TechieRagConfigService.cs:160); rebuild via <code>TechieRagBuilder</code> (TechieRagManager.cs:94-253) + <code>InitializeAsync</code> (TechieRagManager.cs:81)</td>
+<td>Writes <code>techierag-config.json</code>; rebuilds live <code>ITechieRag</code> (embedding/vector/LLM providers)</td>
+<td>static-only (unconfirmed). Connection string normalized by <code>BuildConnectionString</code> (Settings.razor:280-301) before save</td>
+</tr>
+<tr>
+<td>Reset to Defaults</td>
+<td>ResetToDefaults Settings.razor:326-331</td>
+<td><code>ConfigService.ResetToDefaults()</code> (TechieRagConfigService.cs:190) then <code>LoadConfigAsync()</code></td>
+<td><code>File.Delete(configFilePath)</code> + clear cache (TechieRagConfigService.cs:192-198)</td>
+<td>Deletes <code>techierag-config.json</code></td>
+<td><strong>suspected defect</strong> — does NOT call <code>ReconfigureAsync</code>, so the live instance keeps old settings until a later Save — static</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>Conditional fields: Embedded source hides Model/Endpoint/Path and shows an Info alert (Settings.razor:53-90); ONNX shows Model Path; Azure/OpenAI show API Key via <code>RequiresApiKey()</code> (line 333); Qdrant shows its own API Key (line 137).</li>
+<li>SQLite connection input is path-only in the UI; <code>BuildConnectionString</code> wraps it as <code>Data Source=...</code> and <code>ExtractConnectionInput</code> strips that prefix on load (Settings.razor:264-301).</li>
+<li>Placeholders/hints/labels are computed per selected source/type via the <code>Get*</code> helper switch methods (Settings.razor:335-401).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>Reset does not re-apply to the running instance</strong> (<code>Settings.razor:326-331</code>): it deletes the JSON and reloads the form but never calls <code>RagManager.ReconfigureAsync()</code>; the live RAG instance keeps old settings until the next Save. State mismatch. <em>(logged to REQ-UI-002)</em></li>
+<li><strong><code>EnableTelemetry</code> is a no-op for the applied instance</strong>: it is saved to JSON but <code>TechieRagManager.CreateInstanceFromConfigAsync</code> never reads <code>savedConfig.EnableTelemetry</code> (no usage in <code>TechieRagManager.cs:94-253</code>) — the toggle is persisted but has no runtime effect. <em>(logged to REQ-UI-002)</em></li>
+<li><code>LoadConfigAsync</code> caches in <code>cachedConfig</code> and Settings + LlmSettings share the same scoped service instance and cached object, so edits on one page's <code>config</code> object can leak to the other if not reloaded.</li>
+</ul>
+<hr>
+<h3 id="anonymous--llmsettings">Anonymous · LlmSettings<a class="anchor-link" href="#anonymous--llmsettings">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/llm-settings"</code> (<code>samples/TechieRagWeb/Components/Pages/LlmSettings.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/LlmSettings.razor</code></li>
+<li><strong>Reached via:</strong> Configuration → LLM Settings; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Tabbed editor (Provider / Fallback / Usage / Prompts) for LLM provider config plus a live "Test LLM Connection" button. Loads/saves the same <code>techierag-config.json</code> and applies via <code>ReconfigureAsync</code>; the test calls the configured provider's <code>CompleteAsync</code> over HTTP.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["LlmSettings.razor (@page llm-settings)"] --> I["OnInitializedAsync"]
+  I --> L["ConfigService.LoadConfigAsync()"]
+  I --> FBK{"LlmFallback set & not None?"}
+  FBK -->|"yes"| EF["enableFallback=true"]
+  I --> R{"isLoading?"}
+  R -->|"true"| SP["Spinner"]
+  R -->|"false"| TABS["Tabs"]
+  TABS --> T1["Provider tab -> RenderLlmFields(config.Llm)"]
+  TABS --> T2["Fallback tab -> Switch + RenderLlmFields(fallbackConfig)"]
+  TABS --> T3["Usage tab -> tracking/budget fields"]
+  TABS --> T4["Prompts tab -> prompt + resilience fields"]
+  P --> CT["Connection Test card"]
+  CT --> TEST["Test LLM Connection -> TestLlmConnectionAsync"]
+  TEST --> GP["RagManager.GetLlmProvider()"]
+  GP --> CALL["provider.CompleteAsync('Say hello...')"]
+  CALL --> HTTP["HTTP to Ollama/LMStudio/OpenAI/Azure/Gemini/Anthropic"]
+  P --> SAVE["Save -> SaveConfigAsync"]
+  SAVE --> SC["ConfigService.SaveConfigAsync()"]
+  SAVE --> RC["RagManager.ReconfigureAsync()"]
+  P --> RST["Reset -> ResetToDefaultsAsync"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reset</td>
+<td>Button</td>
+<td>Reset LLM/usage/resilience/prompt to defaults</td>
+<td><code>ResetToDefaultsAsync</code> (LlmSettings.razor:17, 415-425)</td>
+</tr>
+<tr>
+<td>Save</td>
+<td>Button</td>
+<td>Persist + apply config</td>
+<td><code>SaveConfigAsync</code> (LlmSettings.razor:18, 392-413)</td>
+</tr>
+<tr>
+<td>Tabs (Provider/Fallback/Usage/Prompts)</td>
+<td>Tabs</td>
+<td>Section switching</td>
+<td>static, <code>DefaultValue="provider"</code> (LlmSettings.razor:33)</td>
+</tr>
+<tr>
+<td>Source (primary/fallback)</td>
+<td>Select (7 LlmSource items)</td>
+<td>Choose LLM provider</td>
+<td><code>@bind-Value</code> to <code>llmConfig.Source</code> in <code>RenderLlmFields</code> (LlmSettings.razor:300)</td>
+</tr>
+<tr>
+<td>Endpoint</td>
+<td>Input</td>
+<td>Provider URL (when Source≠None)</td>
+<td><code>llmConfig.Endpoint</code>; placeholder <code>GetLlmEndpointPlaceholder</code> (LlmSettings.razor:322, 370-379)</td>
+</tr>
+<tr>
+<td>API Key</td>
+<td>Input (Password)</td>
+<td>Key for OpenAICompatible/Azure/Gemini/Anthropic</td>
+<td><code>llmConfig.ApiKey</code> (LlmSettings.razor:326-334)</td>
+</tr>
+<tr>
+<td>Model</td>
+<td>Input</td>
+<td>Model name</td>
+<td><code>llmConfig.Model</code>; placeholder <code>GetLlmModelPlaceholder</code> (LlmSettings.razor:339, 381-390)</td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td>Slider (0-2)</td>
+<td>Sampling temperature</td>
+<td><code>llmConfig.Temperature</code> via ValueChanged (LlmSettings.razor:347)</td>
+</tr>
+<tr>
+<td>Max Tokens</td>
+<td>Input (Number)</td>
+<td>Max output tokens</td>
+<td><code>llmConfig.MaxTokens</code> via ValueChanged (LlmSettings.razor:353)</td>
+</tr>
+<tr>
+<td>Enable Fallback Provider</td>
+<td>Switch</td>
+<td>Toggle fallback section</td>
+<td><code>enableFallback</code> (LlmSettings.razor:61)</td>
+</tr>
+<tr>
+<td>Enable Token Tracking</td>
+<td>Switch</td>
+<td>Toggle usage tracking</td>
+<td><code>config.UsageTracking.Enabled</code> (LlmSettings.razor:82)</td>
+</tr>
+<tr>
+<td>Max Total Tokens</td>
+<td>Input (Number)</td>
+<td>Token budget</td>
+<td><code>maxTotalTokensString</code> over <code>config.UsageTracking.MaxTotalTokens</code> (LlmSettings.razor:93, 231-235)</td>
+</tr>
+<tr>
+<td>Max Cost (USD)</td>
+<td>Input (Number)</td>
+<td>Cost budget</td>
+<td><code>maxCostString</code> over <code>config.UsageTracking.MaxCostUsd</code> (LlmSettings.razor:99, 237-241)</td>
+</tr>
+<tr>
+<td>Alert Threshold</td>
+<td>Slider (0-100)</td>
+<td>Budget alert %</td>
+<td><code>alertThresholdSlider</code> over <code>config.UsageTracking.AlertThreshold</code> (LlmSettings.razor:107, 225-229)</td>
+</tr>
+<tr>
+<td>Block When Exceeded</td>
+<td>Switch</td>
+<td>Block on budget exceed</td>
+<td><code>config.UsageTracking.BlockOnExceeded</code> (LlmSettings.razor:112)</td>
+</tr>
+<tr>
+<td>System Prompt</td>
+<td>Textarea</td>
+<td>RAG system prompt</td>
+<td><code>config.Prompt.SystemPrompt</code> (LlmSettings.razor:131)</td>
+</tr>
+<tr>
+<td>Context Template</td>
+<td>Textarea</td>
+<td>Context chunk template</td>
+<td><code>config.Prompt.ContextChunkTemplate</code> (LlmSettings.razor:137)</td>
+</tr>
+<tr>
+<td>Max Context Chunks / Tokens</td>
+<td>Input (Number)</td>
+<td>Context limits</td>
+<td><code>maxContextChunksString</code> / <code>maxContextTokensString</code> (LlmSettings.razor:144,150, 243-253)</td>
+</tr>
+<tr>
+<td>Max Retries / Timeout / CB Threshold</td>
+<td>Input (Number)</td>
+<td>Resilience tuning</td>
+<td><code>maxRetriesString</code> / <code>timeoutString</code> / <code>cbThresholdString</code> (LlmSettings.razor:167,173,184, 255-271)</td>
+</tr>
+<tr>
+<td>Handle Rate Limiting</td>
+<td>Switch</td>
+<td>Resilience toggle</td>
+<td><code>config.Resilience.HandleRateLimiting</code> (LlmSettings.razor:178)</td>
+</tr>
+<tr>
+<td>Test LLM Connection</td>
+<td>Button</td>
+<td>Live provider ping</td>
+<td><code>TestLlmConnectionAsync</code> (LlmSettings.razor:200, 427-459)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial load</td>
+<td>OnInitializedAsync LlmSettings.razor:273-293</td>
+<td><code>ConfigService.LoadConfigAsync()</code> (TechieRagConfigService.cs:54)</td>
+<td>deserialize <code>techierag-config.json</code> / appsettings (TechieRagConfigService.cs:64-120)</td>
+<td>File / appsettings / defaults</td>
+<td>static-only (unconfirmed). Fallback flag derived from <code>config.LlmFallback</code></td>
+</tr>
+<tr>
+<td>All tab fields</td>
+<td>LlmSettings.razor:41-189</td>
+<td>bound to in-memory <code>config</code> / <code>fallbackConfig</code> (LlmSettings.razor:216-217)</td>
+<td>none until Save</td>
+<td>in-memory</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Save</td>
+<td>SaveConfigAsync LlmSettings.razor:392-413</td>
+<td><code>ConfigService.SaveConfigAsync(config)</code> (TechieRagConfigService.cs:148); <code>RagManager.ReconfigureAsync()</code> (TechieRagManager.cs:63)</td>
+<td><code>File.WriteAllTextAsync</code> (TechieRagConfigService.cs:160); rebuild via <code>builder.UseLlm/WithFallbackLlm/WithUsageTracking/WithResilience</code> (TechieRagManager.cs:191-243)</td>
+<td>Writes <code>techierag-config.json</code>; rebuilds <code>ITechieRag</code> LLM provider</td>
+<td>static-only (unconfirmed). <code>config.LlmFallback</code> set to <code>fallbackConfig</code> or null before save (line 399)</td>
+</tr>
+<tr>
+<td>Test LLM Connection</td>
+<td>TestLlmConnectionAsync LlmSettings.razor:427-459</td>
+<td><code>RagManager.GetLlmProvider()</code> (TechieRagManager.cs:365)</td>
+<td><code>instance.GetLlmProvider()</code> then <code>provider.CompleteAsync("Say 'hello'...")</code> (ILlmProvider.cs:31; e.g. OllamaLlmProvider/OpenAICompatibleLlmProvider/AnthropicLlmProvider <code>CompleteAsync</code>)</td>
+<td>Live HTTP call to the configured provider</td>
+<td>static-only (unconfirmed). Uses the CURRENTLY BUILT instance; unsaved edits are not reflected until Save — see gotchas</td>
+</tr>
+<tr>
+<td>Reset</td>
+<td>ResetToDefaultsAsync LlmSettings.razor:415-425</td>
+<td>none (no service call)</td>
+<td>none</td>
+<td>in-memory only</td>
+<td><strong>suspected defect</strong> — Reset never persists or reconfigures; resets form objects + shows success toast only — static</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li><code>RenderLlmFields(llmConfig, prefix)</code> is reused for both primary and fallback; Endpoint/API Key/Model/Temp/MaxTokens only render when <code>Source != None</code>, API Key only for OpenAICompatible/Azure/Gemini/Anthropic (LlmSettings.razor:317-334).</li>
+<li>Usage and Prompt/Resilience sub-fields only render when their parent toggle is on (<code>config.UsageTracking.Enabled</code>, line 86; <code>enableFallback</code>, line 65).</li>
+<li>Slider/numeric string adapters convert between bound primitives and string inputs (LlmSettings.razor:225-271); <code>alertThresholdSlider</code> scales 0-1 ↔ 0-100.</li>
+<li>Default Anthropic model placeholder is <code>claude-sonnet-4-5-20250929</code> (LlmSettings.razor:388) and default endpoint <code>https://api.anthropic.com</code> (line 377) — placeholders only, not applied values.</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>Reset is in-memory only and silent to the backend</strong> (<code>ResetToDefaultsAsync</code>, <code>LlmSettings.razor:415-425</code>): resets the form objects and shows a success toast but never calls <code>SaveConfigAsync</code> or <code>RagManager.ReconfigureAsync()</code>. The "reset" is lost unless the user also clicks Save (and is inconsistent with Settings.razor's Reset, which at least deletes the JSON). <em>(logged to REQ-UI-003)</em></li>
+<li><strong>Test-vs-edit staleness</strong>: <code>TestLlmConnectionAsync</code> (line 435) uses <code>RagManager.GetLlmProvider()</code> which returns the provider from the last-built instance. Unsaved edits in the form are not reflected; you must Save (→ <code>ReconfigureAsync</code>) before Test reflects new settings. Not obvious from the UI. <em>(logged to REQ-UI-009)</em></li>
+<li><code>GetLlmProvider()</code> calls <code>GetInstanceAsync().GetAwaiter().GetResult()</code> (<code>TechieRagManager.cs:367</code>) — sync-over-async blocking on the Blazor circuit thread; can stall/deadlock under load.</li>
+<li>Dead code: <code>GetMaxTokensString</code>/<code>SetMaxTokens</code> (LlmSettings.razor:360-368) are defined but never referenced (Max Tokens uses inline ValueChanged at line 353). The awaited <code>CompleteAsync</code> result (<code>response</code>, line 444) is discarded — the success message reports only model name + elapsed ms (cosmetic).</li>
+</ul>
+<hr>
+<h3 id="anonymous--ingestion-file-ingestion">Anonymous · Ingestion (File Ingestion)<a class="anchor-link" href="#anonymous--ingestion-file-ingestion">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/ingestion"</code> (<code>samples/TechieRagWeb/Components/Pages/Ingestion.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/Ingestion.razor</code></li>
+<li><strong>Reached via:</strong> Data → File Ingestion; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Scans a server-side folder for files matching a pattern and ingests each one into the vector store (read → chunk → embed → upsert), showing per-file results, vector-store stats, and the document list.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["Ingestion.razor (/ingestion)"] --> INIT["OnInitializedAsync: subscribe model download, Rag.InitializeAsync, refresh stats and documents"]
+  INIT --> DL{"isDownloadingModel?"}
+  DL -->|"yes"| ALERT["Alert: Downloading BGE-M3 Model with Progress"]
+  DL -->|"no"| FORM["Ingest Documents card: Folder Path, File Pattern inputs"]
+  FORM --> BTN_ING["Button: Ingest Now -> IngestDocumentsAsync"]
+  FORM --> BTN_STOP["Button: Stop Ingestion -> StopIngestion (cancels CTS)"]
+  FORM --> BTN_CLEAR["Button: Clear All Data -> ClearVectorStoreAsync"]
+  BTN_ING --> VAL{"path empty or folder missing?"}
+  VAL -->|"invalid"| TOAST_V["ToastService.Error (Validation)"]
+  VAL -->|"valid"| SCAN["Directory.GetFiles(path, pattern, AllDirectories)"]
+  SCAN --> LOOP["For each file: Rag.IngestAsync(file, token)"]
+  LOOP --> RESULTS["ingestionResults list -> Results DataTable"]
+  LOOP --> REFRESH["RefreshStatsAsync + RefreshDocumentsAsync"]
+  REFRESH --> STATS["Vector Store Statistics card"]
+  REFRESH --> DOCS["Ingested Documents DataTable"]
+  BTN_CLEAR --> CLEARLIB["Rag.ClearAsync -> refresh"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Documents Folder Path</td>
+<td><code>Input</code> (<code>@bind documentsPath</code>)</td>
+<td>Server-side folder to scan</td>
+<td>Two-way bind to <code>documentsPath</code> (Ingestion.razor:44, 159)</td>
+</tr>
+<tr>
+<td>File Pattern</td>
+<td><code>Input</code> (<code>@bind filePattern</code>)</td>
+<td>Glob pattern (<code>*.*</code> default)</td>
+<td>Two-way bind to <code>filePattern</code> (Ingestion.razor:51, 160)</td>
+</tr>
+<tr>
+<td>Ingest Now</td>
+<td><code>Button</code></td>
+<td>Starts folder ingestion</td>
+<td><code>IngestDocumentsAsync</code> (Ingestion.razor:57, 225)</td>
+</tr>
+<tr>
+<td>Stop Ingestion</td>
+<td><code>Button</code> (while ingesting)</td>
+<td>Cancels run</td>
+<td><code>StopIngestion</code> → <code>ingestionCts.Cancel()</code> (Ingestion.razor:63, 214)</td>
+</tr>
+<tr>
+<td>Clear All Data</td>
+<td><code>Button</code> (Destructive)</td>
+<td>Wipes vector store</td>
+<td><code>ClearVectorStoreAsync</code> → <code>Rag.ClearAsync</code> (Ingestion.razor:67, 330)</td>
+</tr>
+<tr>
+<td>Progress / progressMessage</td>
+<td><code>Progress</code> + <code>TypographyMuted</code></td>
+<td>Live progress</td>
+<td><code>progress</code> / <code>progressMessage</code> set in loop (Ingestion.razor:75-76, 280-281)</td>
+</tr>
+<tr>
+<td>Model download alert</td>
+<td><code>Alert</code> + <code>Progress</code></td>
+<td>BGE-M3 download status</td>
+<td><code>ModelDownloadService.Instance</code> events (Ingestion.razor:19-33, 176)</td>
+</tr>
+<tr>
+<td>Ingestion Results</td>
+<td><code>DataTable&lt;IngestionResult&gt;</code></td>
+<td>Per-file success/error</td>
+<td><code>ingestionResults</code> local record list (Ingestion.razor:93, 172, 288)</td>
+</tr>
+<tr>
+<td>Vector Store Statistics</td>
+<td>Card</td>
+<td>Doc/chunk count, size, last time</td>
+<td><code>stats</code> from <code>Rag.GetStatsAsync</code> (Ingestion.razor:106-129, 363)</td>
+</tr>
+<tr>
+<td>Ingested Documents</td>
+<td><code>DataTable&lt;Document&gt;</code></td>
+<td>Name + chunk count</td>
+<td><code>documents</code> from <code>Rag.ListDocumentsAsync</code> (Ingestion.razor:146, 368)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Page init</td>
+<td>OnInitializedAsync (Ingestion.razor:174)</td>
+<td>none — injects <code>ITechieRag Rag</code> directly (Ingestion.razor:5)</td>
+<td><code>ITechieRag.InitializeAsync</code> → <code>TechieRagClient.InitializeAsync</code> (TechieRagClient.cs:82) → <code>vectorStore.InitializeAsync</code> (TechieRagClient.cs:85)</td>
+<td>IVectorStore (default SqliteVecStore, <code>Data Source=techierag.db</code> — TechieRagConfigService.cs:100-101)</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Ingest Now (per file)</td>
+<td>IngestDocumentsAsync loop (Ingestion.razor:287)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.IngestAsync</code> → <code>TechieRagClient.IngestAsync</code> (TechieRagClient.cs:104): <code>processor.ProcessAsync</code> → <code>embeddingProvider.EmbedBatchAsync</code> (TechieRagClient.cs:160) → <code>vectorStore.UpsertBatchAsync</code> (TechieRagClient.cs:172)</td>
+<td>Embedding provider (HTTP Ollama/LmStudio/Azure, or ONNX <code>EmbeddedEmbeddingProvider.cs:324</code>) + IVectorStore upsert</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>File scan</td>
+<td>Directory.GetFiles (Ingestion.razor:254)</td>
+<td>n/a (in-component <code>System.IO</code>)</td>
+<td>n/a</td>
+<td>local filesystem (server-side)</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Clear All Data</td>
+<td>ClearVectorStoreAsync (Ingestion.razor:334)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.ClearAsync</code> → <code>TechieRagClient.ClearAsync</code> (TechieRagClient.cs:405) → <code>vectorStore.ClearAsync</code> (TechieRagClient.cs:408)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Vector Store Statistics</td>
+<td>stats card (Ingestion.razor:106)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.GetStatsAsync</code> → <code>TechieRagClient.GetStatsAsync</code> (TechieRagClient.cs:383) → <code>vectorStore.GetStatsAsync</code> (TechieRagClient.cs:386)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Ingested Documents table</td>
+<td>documents table (Ingestion.razor:146)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.ListDocumentsAsync</code> → <code>TechieRagClient.ListDocumentsAsync</code> (TechieRagClient.cs:370) → <code>vectorStore.ListDocumentsAsync</code> (TechieRagClient.cs:373)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Delete document</td>
+<td><code>DeleteDocumentAsync</code> (Ingestion.razor:346)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.DeleteDocumentAsync</code> → <code>TechieRagClient.DeleteDocumentAsync</code> (TechieRagClient.cs:356) → <code>vectorStore.DeleteByDocumentAsync</code> (TechieRagClient.cs:361)</td>
+<td>IVectorStore</td>
+<td><strong>unreachable from UI</strong> — no control binds to it on this page — static</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>Pre-flight validation: empty path or non-existent folder aborts with a validation toast (Ingestion.razor:227-237).</li>
+<li>Recursive scan: <code>Directory.GetFiles(..., SearchOption.AllDirectories)</code> (Ingestion.razor:254); zero matches aborts with toast (256-261).</li>
+<li>Progress math: <code>progress = 5 + (int)((i / files.Length) * 90)</code> during loop, 100 on complete (Ingestion.razor:281, 304).</li>
+<li>Per-file failures are caught and recorded (truncated to 100 chars) without stopping the batch; cancellation breaks the loop and marks remaining as skipped (Ingestion.razor:291-301, 271-276).</li>
+<li>Document ID is generated in the library as <code>Guid.NewGuid()</code> (TechieRagClient.cs:129), not by the screen. <code>FormatSize</code>/<code>FormatBytes</code> convert byte counts for display (Ingestion.razor:371-385).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><code>DeleteDocumentAsync</code> (Ingestion.razor:346) is defined but <strong>no control invokes it</strong> on this page — dead code here (delete exists only on TextIngestion).</li>
+<li>Server-side path input: ingestion reads folders on the <strong>server</strong> host, not the client machine — the <code>C:\Documents\RAGData</code> placeholder (Ingestion.razor:44) is misleading on a remote/Linux deployment.</li>
+<li><code>EnsureDocumentExistsAsync</code> (TechieRagClient.cs:622) is a documented no-op (<code>await Task.CompletedTask</code>, line 632); document records depend on <code>UpsertBatchAsync</code> behaviour of the chosen store.</li>
+<li>Statistics/Results cards are conditionally rendered (<code>stats != null</code>, <code>ingestionResults.Count &gt; 0</code>); on a fresh store they render-empty by design — static.</li>
+</ul>
+<hr>
+<h3 id="anonymous--textingestion-text-ingestion">Anonymous · TextIngestion (Text Ingestion)<a class="anchor-link" href="#anonymous--textingestion-text-ingestion">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/text-ingestion"</code> (<code>samples/TechieRagWeb/Components/Pages/TextIngestion.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/TextIngestion.razor</code></li>
+<li><strong>Reached via:</strong> Data → Text Ingestion; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Lets the user paste raw text with a name and optional source, then ingests it directly (chunk → embed → upsert) into the vector store; sidebar shows stats and a deletable document list.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["TextIngestion.razor (/text-ingestion)"] --> INIT["OnInitializedAsync: subscribe model download, Rag.InitializeAsync, refresh stats and documents"]
+  INIT --> DL{"isDownloadingModel?"}
+  DL -->|"yes"| ALERT["Alert: Downloading BGE-M3 Model"]
+  DL -->|"no"| FORM["Text Content card: Document Name, Textarea, Source Info"]
+  FORM --> COUNT["Live char/word counts from textContent"]
+  FORM --> BTN_ING["Button: Ingest Text -> IngestTextAsync"]
+  FORM --> BTN_CLR["Button: Clear Form -> ClearForm"]
+  FORM --> BTN_WIPE["Button: Clear All Data -> ClearVectorStoreAsync"]
+  BTN_ING --> VAL{"name or content empty?"}
+  VAL -->|"invalid"| TOAST_V["ToastService.Error (Validation)"]
+  VAL -->|"valid"| META["Build metadata dict: ContentType, CharacterCount, WordCount, Source"]
+  META --> LIB["Rag.IngestTextAsync(text, name, metadata)"]
+  LIB --> REFRESH["RefreshStatsAsync + RefreshDocumentsAsync; clear form"]
+  REFRESH --> STATS["Statistics card"]
+  REFRESH --> DOCS["Documents list with delete buttons"]
+  DOCS --> DEL["Button trash-2 -> DeleteDocumentAsync(doc.Id)"]
+  BTN_WIPE --> WIPE["Rag.ClearAsync -> refresh"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Document Name</td>
+<td><code>Input</code> (Required)</td>
+<td>Friendly name</td>
+<td>Two-way bind to <code>documentName</code> (TextIngestion.razor:47, 148)</td>
+</tr>
+<tr>
+<td>Text Content</td>
+<td><code>Textarea</code></td>
+<td>Raw text to ingest</td>
+<td>Two-way bind to <code>textContent</code> (TextIngestion.razor:55, 149)</td>
+</tr>
+<tr>
+<td>Char / word counters</td>
+<td><code>TypographyMuted</code> ×2</td>
+<td>Live counts</td>
+<td>Computed from <code>textContent</code> inline (TextIngestion.razor:57-58)</td>
+</tr>
+<tr>
+<td>Source Info</td>
+<td><code>Input</code></td>
+<td>Optional source URL/id</td>
+<td>Two-way bind to <code>sourceInfo</code> (TextIngestion.razor:66, 150)</td>
+</tr>
+<tr>
+<td>Ingest Text</td>
+<td><code>Button</code></td>
+<td>Ingests the text</td>
+<td><code>IngestTextAsync</code> (TextIngestion.razor:72, 204)</td>
+</tr>
+<tr>
+<td>Clear Form</td>
+<td><code>Button</code> (Outline)</td>
+<td>Resets the 3 fields</td>
+<td><code>ClearForm</code> (TextIngestion.razor:76, 197)</td>
+</tr>
+<tr>
+<td>Clear All Data</td>
+<td><code>Button</code> (Destructive)</td>
+<td>Wipes vector store</td>
+<td><code>ClearVectorStoreAsync</code> → <code>Rag.ClearAsync</code> (TextIngestion.razor:77, 267)</td>
+</tr>
+<tr>
+<td>Progress / message</td>
+<td><code>Progress</code> + <code>TypographyMuted</code></td>
+<td>Ingest progress</td>
+<td><code>progress</code>/<code>progressMessage</code> (TextIngestion.razor:83-84, 224-246)</td>
+</tr>
+<tr>
+<td>Statistics</td>
+<td>Card</td>
+<td>Doc/chunk count, storage</td>
+<td><code>stats</code> from <code>Rag.GetStatsAsync</code> (TextIngestion.razor:93-113, 299)</td>
+</tr>
+<tr>
+<td>Documents list</td>
+<td><code>@foreach</code> rows</td>
+<td>Names + delete button</td>
+<td><code>documents</code> from <code>Rag.ListDocumentsAsync</code> (TextIngestion.razor:130, 304)</td>
+</tr>
+<tr>
+<td>Delete (trash-2)</td>
+<td><code>Button</code> (Ghost icon)</td>
+<td>Deletes one document</td>
+<td><code>DeleteDocumentAsync(doc.Id)</code> (TextIngestion.razor:134, 282)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Page init</td>
+<td>OnInitializedAsync (TextIngestion.razor:159)</td>
+<td>none — injects <code>ITechieRag Rag</code> directly (TextIngestion.razor:5)</td>
+<td><code>ITechieRag.InitializeAsync</code> → <code>TechieRagClient.InitializeAsync</code> (TechieRagClient.cs:82) → <code>vectorStore.InitializeAsync</code> (TechieRagClient.cs:85)</td>
+<td>IVectorStore (default SqliteVecStore)</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Ingest Text</td>
+<td>IngestTextAsync (TextIngestion.razor:243)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.IngestTextAsync</code> → <code>TechieRagClient.IngestTextAsync</code> (TechieRagClient.cs:189): <code>TextChunker.ChunkText</code> (203) → <code>embeddingProvider.EmbedBatchAsync</code> (249) → <code>vectorStore.UpsertBatchAsync</code> (261)</td>
+<td>Embedding provider (HTTP/ONNX) + IVectorStore upsert</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Clear All Data</td>
+<td>ClearVectorStoreAsync (TextIngestion.razor:271)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.ClearAsync</code> → <code>TechieRagClient.ClearAsync</code> (TechieRagClient.cs:405) → <code>vectorStore.ClearAsync</code> (408)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Statistics card</td>
+<td>stats card (TextIngestion.razor:93)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.GetStatsAsync</code> → <code>TechieRagClient.GetStatsAsync</code> (TechieRagClient.cs:383) → <code>vectorStore.GetStatsAsync</code> (386)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Documents list</td>
+<td>foreach (TextIngestion.razor:130)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.ListDocumentsAsync</code> → <code>TechieRagClient.ListDocumentsAsync</code> (TechieRagClient.cs:370) → <code>vectorStore.ListDocumentsAsync</code> (373)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Delete (trash-2)</td>
+<td>DeleteDocumentAsync (TextIngestion.razor:282)</td>
+<td>none (direct <code>Rag</code>)</td>
+<td><code>ITechieRag.DeleteDocumentAsync</code> → <code>TechieRagClient.DeleteDocumentAsync</code> (TechieRagClient.cs:356) → <code>vectorStore.DeleteByDocumentAsync</code> (361)</td>
+<td>IVectorStore</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>Validation: empty <code>documentName</code> or empty <code>textContent</code> aborts with a validation toast (TextIngestion.razor:206-216).</li>
+<li>Metadata built client-side: <code>ContentType="text"</code>, <code>CharacterCount</code>, <code>WordCount</code>, and <code>Source</code> only when <code>sourceInfo</code> is non-blank (TextIngestion.razor:229-236). Word count uses <code>Split(...).Length</code> (line 58, 233).</li>
+<li>On success the form fields are cleared and stats/documents refreshed (TextIngestion.razor:249-253). Document ID generated in library via <code>Guid.NewGuid()</code> (TechieRagClient.cs:200); chunking via <code>TextChunker.ChunkText</code> using <code>config.Processing.DefaultChunkSize/Overlap</code> (TechieRagClient.cs:203-206).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>Progress bar is cosmetic/fake</strong>: hardcoded 10/30/100 steps with artificial <code>Task.Delay(50)</code> (TextIngestion.razor:227, 241) — it does not reflect actual embedding/upsert progress.</li>
+<li><code>Required="true"</code> on Document Name (line 47) is decorative — no <code>EditForm</code>/validation wraps it; enforcement is the manual null check in <code>IngestTextAsync</code> (206).</li>
+<li>Live char/word counts recompute on every render via inline <code>Split(...)</code> (line 58) — O(n) per render for large pastes (minor perf gotcha).</li>
+<li>Both ingestion pages inject <code>ITechieRag</code> directly; neither uses <code>TechieRagManager</code>/<code>TechieRagConfigService</code> at runtime (those configure/build the DI-registered <code>ITechieRag</code>).</li>
+</ul>
+<hr>
+<h3 id="anonymous--rag-chat">Anonymous · RAG Chat<a class="anchor-link" href="#anonymous--rag-chat">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/chat"</code> (<code>samples/TechieRagWeb/Components/Pages/Chat.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/Chat.razor</code></li>
+<li><strong>Reached via:</strong> AI Features → RAG Chat; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Conversational RAG UI. User asks a question; depending on the selected mode it does retrieval-only search, a direct LLM completion, or full Auto-RAG (retrieve + generate). Shows sources, a token/cost footer, and optional token-by-token streaming.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["Chat.razor"] --> CFG["Config bar: Mode / Top K / Doc Filter / Streaming"]
+  P --> IN["Textarea 'Ask a question...' + Send button"]
+  IN --> SM["SendMessage() handler"]
+  SM --> MODE{"chatMode value"}
+  MODE -->|"search-only"| SO["HandleSearchOnly()"]
+  MODE -->|"direct-llm"| DL["HandleDirectLlm()"]
+  MODE -->|"auto-rag (default)"| AR["HandleAutoRag()"]
+  SO --> SRCH["TechieRag.SearchAsync(query, topK, documentFilter)"]
+  DL --> PROV["TechieRag.GetLlmProvider()"]
+  PROV --> PCALL["provider.CompleteStreamAsync / CompleteAsync"]
+  AR --> SRCH2["TechieRag.SearchAsync (for sources)"]
+  AR --> ASK["TechieRag.AskStreamAsync / AskAsync"]
+  SRCH --> RENDER["messages list + Sources collapsible"]
+  PCALL --> RENDER
+  ASK --> RENDER
+  RENDER --> FOOT["Footer: totalTokens / totalCost / message count"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Clear Chat</td>
+<td>Button</td>
+<td>Clears messages + token/cost counters</td>
+<td><code>ClearChat()</code> Chat.razor:301</td>
+</tr>
+<tr>
+<td>New Conversation</td>
+<td>Button</td>
+<td>Clears messages + streaming buffer</td>
+<td><code>NewConversation()</code> Chat.razor:308</td>
+</tr>
+<tr>
+<td>Chat Configuration</td>
+<td>Collapsible</td>
+<td>Toggles config bar</td>
+<td><code>@bind-Open="configOpen"</code> Chat.razor:31</td>
+</tr>
+<tr>
+<td>Mode</td>
+<td>Select</td>
+<td>auto-rag / direct-llm / search-only</td>
+<td><code>@bind chatMode</code> (default "auto-rag") Chat.razor:46,178</td>
+</tr>
+<tr>
+<td>Top K</td>
+<td>Select</td>
+<td>Retrieval depth (3/5/10)</td>
+<td><code>@bind topKString</code>; <code>topK</code> derived prop Chat.razor:61,187</td>
+</tr>
+<tr>
+<td>Doc Filter</td>
+<td>Input</td>
+<td>Optional documentId filter</td>
+<td><code>@bind documentFilter</code> Chat.razor:76</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Switch</td>
+<td>Toggle token streaming</td>
+<td><code>@bind useStreaming</code> (default true) Chat.razor:83,180</td>
+</tr>
+<tr>
+<td>Message list</td>
+<td>foreach render</td>
+<td>User/assistant bubbles</td>
+<td><code>messages</code> list Chat.razor:107</td>
+</tr>
+<tr>
+<td>Sources Used (n)</td>
+<td>Collapsible per assistant msg</td>
+<td>Source docs + score badge</td>
+<td><code>msg.Sources</code> Chat.razor:113-132</td>
+</tr>
+<tr>
+<td>Streaming indicator</td>
+<td>conditional block</td>
+<td>Live streamed text + cursor, or "Thinking..."</td>
+<td><code>isProcessing</code> / <code>streamingContent</code> Chat.razor:137-154</td>
+</tr>
+<tr>
+<td>Ask a question</td>
+<td>Textarea</td>
+<td>Question input</td>
+<td><code>@bind userInput</code> Chat.razor:160</td>
+</tr>
+<tr>
+<td>Send</td>
+<td>Button</td>
+<td>Submits question</td>
+<td><code>SendMessage()</code>; disabled while processing/empty Chat.razor:161</td>
+</tr>
+<tr>
+<td>Footer stats</td>
+<td>text</td>
+<td>Session tokens / cost / msg count</td>
+<td><code>totalTokens</code>, <code>totalCost</code>, <code>messages.Count</code> Chat.razor:167-170</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Send (search-only)</td>
+<td>Chat.razor:240 <code>HandleSearchOnly</code></td>
+<td><code>TechieRagManager.SearchAsync</code> (TechieRagManager.cs:281)</td>
+<td><code>TechieRagClient.SearchAsync</code> (TechieRagClient.cs:330) → <code>embeddingProvider.EmbedAsync</code> (342) + <code>vectorStore.SearchAsync</code> (345)</td>
+<td>Embedding + vector store</td>
+<td>static-only (unconfirmed). Renders raw search results as assistant text</td>
+</tr>
+<tr>
+<td>Send (direct-llm, stream)</td>
+<td>Chat.razor:261 <code>HandleDirectLlm</code></td>
+<td><code>TechieRagManager.GetLlmProvider</code> (TechieRagManager.cs:365)</td>
+<td><code>ILlmProvider.CompleteStreamAsync</code> (ILlmProvider.cs:37)</td>
+<td>LLM provider HTTP</td>
+<td><strong>suspected defect</strong> — streaming branch never adds to <code>totalTokens</code>/<code>totalCost</code>; footer stays 0 (Chat.razor:263-264) — static</td>
+</tr>
+<tr>
+<td>Send (direct-llm, non-stream)</td>
+<td>Chat.razor:270</td>
+<td>same <code>GetLlmProvider</code></td>
+<td><code>ILlmProvider.CompleteAsync</code> (ILlmProvider.cs:31)</td>
+<td>LLM provider HTTP</td>
+<td>static-only. Updates <code>totalTokens</code> only (no cost)</td>
+</tr>
+<tr>
+<td>Send (auto-rag, stream)</td>
+<td>Chat.razor:280-288 <code>HandleAutoRag</code></td>
+<td><code>TechieRagManager.SearchAsync</code> + <code>AskStreamAsync</code> (TechieRagManager.cs:281,323)</td>
+<td><code>TechieRagClient.SearchAsync</code> (330) for sources, then <code>TechieRagClient.AskStreamAsync</code> (443) → <code>promptTemplate.BuildRagPrompt</code> (455) → <code>llmProvider.ChatStreamAsync</code> (457)</td>
+<td>Embedding + vector store + LLM provider HTTP</td>
+<td><strong>suspected defects</strong> — (1) search runs TWICE (sources + inside AskStreamAsync); (2) streaming branch never updates tokens/cost — static</td>
+</tr>
+<tr>
+<td>Send (auto-rag, non-stream)</td>
+<td>Chat.razor:292</td>
+<td><code>TechieRagManager.AskAsync</code> (TechieRagManager.cs:311)</td>
+<td><code>TechieRagClient.AskAsync</code> (TechieRagClient.cs:415)</td>
+<td>Embedding + vector store + LLM provider HTTP</td>
+<td>static-only. Updates <code>totalTokens</code> + <code>totalCost</code> from <code>response.Usage</code></td>
+</tr>
+<tr>
+<td>Sources badge</td>
+<td>Chat.razor:125</td>
+<td>n/a</td>
+<td><code>SearchResult.Score</code> / <code>Chunk.DocumentId</code> (from SearchAsync)</td>
+<td>vector store</td>
+<td>static-only. Score shown as %; DocumentName = DocumentId</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li><code>topK</code> parsed from <code>topKString</code>, default 5 on failure (Chat.razor:187). Mode routing: "search-only" → search only; "direct-llm" → LLM, no retrieval; else → Auto-RAG (Chat.razor:212-223).</li>
+<li>Footer cost/tokens accumulate only in non-streaming branches; <code>totalCost</code> only ever incremented in auto-rag non-stream (Chat.razor:294). Send disabled while <code>isProcessing</code> or empty (line 161).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>Streaming token/cost never counted (default path)</strong>: both <code>HandleDirectLlm</code> (Chat.razor:259-266) and <code>HandleAutoRag</code> (278-288) streaming branches never add to <code>totalTokens</code>/<code>totalCost</code>. Since Streaming is <strong>on by default</strong>, the footer reads "0 tokens / $0.0000" regardless of usage. <em>(logged to REQ-UI-005)</em></li>
+<li><strong>Double retrieval in streamed Auto-RAG</strong>: <code>SearchAsync</code> is called once for sources (Chat.razor:280) and again internally by <code>AskStreamAsync</code> (TechieRagClient.cs:454) — duplicate embedding + vector query cost per question. <em>(logged to REQ-UI-005)</em></li>
+<li><code>HandleAutoRag</code> streaming passes null systemPrompt and no history — no conversation memory is used even though the library supports it; each question is stateless.</li>
+<li>Source label shows <code>DocumentId</code> (often a GUID/path) as the <code>DocumentName</code> (Chat.razor:246,281,296) — cosmetic.</li>
+</ul>
+<hr>
+<h3 id="anonymous--llm-playground">Anonymous · LLM Playground<a class="anchor-link" href="#anonymous--llm-playground">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/llm-playground"</code> (<code>samples/TechieRagWeb/Components/Pages/LlmPlayground.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/LlmPlayground.razor</code></li>
+<li><strong>Reached via:</strong> AI Features → LLM Playground; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Direct LLM testbench with three tabs — Completion (single prompt, optional streaming), Structured Output (JSON-mode responses), and Chat (multi-turn direct LLM chat). Bypasses retrieval entirely; talks straight to the configured LLM provider.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["LlmPlayground.razor"] --> TABS{"Tabs: Completion / Structured / Chat"}
+  TABS -->|"Completion"| C1["GenerateCompletion()"]
+  TABS -->|"Structured Output"| C2["GenerateStructured()"]
+  TABS -->|"Chat"| C3["SendDirectChat()"]
+  C1 --> GP["GetProvider() -> TechieRag.GetLlmProvider()"]
+  C2 --> GP
+  C3 --> GP
+  GP --> COMP["provider.CompleteStreamAsync / CompleteAsync"]
+  C1 --> COMP
+  C2 --> JSON["provider.CompleteAsync(prompt, JsonMode=true)"]
+  GP --> JSON
+  C3 --> CHAT["provider.ChatStreamAsync / ChatAsync"]
+  COMP --> R1["completionResponse + completionStats"]
+  JSON --> R2["structuredResponse (raw JSON)"]
+  CHAT --> R3["directChatMessages list"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tabs (Completion/Structured/Chat)</td>
+<td>Tabs</td>
+<td>Switch test mode (default "completion")</td>
+<td><code>DefaultValue="completion"</code> LlmPlayground.razor:16</td>
+</tr>
+<tr>
+<td>System Prompt</td>
+<td>Textarea</td>
+<td>System role text</td>
+<td><code>@bind systemPrompt</code> (default "You are a helpful assistant.") :34,180</td>
+</tr>
+<tr>
+<td>User Prompt</td>
+<td>Textarea</td>
+<td>User message</td>
+<td><code>@bind userPrompt</code> :40</td>
+</tr>
+<tr>
+<td>Temperature</td>
+<td>Number Input</td>
+<td>Temperature</td>
+<td><code>@bind temperatureString</code> (default "0.7") :47,193</td>
+</tr>
+<tr>
+<td>Max Tokens</td>
+<td>Number Input</td>
+<td>Max tokens</td>
+<td><code>@bind maxTokensString</code> (default "2048") :53,194</td>
+</tr>
+<tr>
+<td>Streaming</td>
+<td>Switch</td>
+<td>Toggle streaming (completion+chat)</td>
+<td><code>@bind useStreaming</code> (default true) :60,185</td>
+</tr>
+<tr>
+<td>Generate</td>
+<td>Button</td>
+<td>Run completion</td>
+<td><code>GenerateCompletion()</code> :66</td>
+</tr>
+<tr>
+<td>Completion Response card</td>
+<td>conditional</td>
+<td>Answer + stats</td>
+<td><code>completionResponse</code>/<code>completionStats</code> :73-87</td>
+</tr>
+<tr>
+<td>Structured Prompt</td>
+<td>Textarea</td>
+<td>Prompt for typed test</td>
+<td><code>@bind structuredPrompt</code> :102</td>
+</tr>
+<tr>
+<td>Response Type</td>
+<td>Select</td>
+<td>sentiment/weather/book</td>
+<td><code>@bind structuredType</code> (default "sentiment") :108,183</td>
+</tr>
+<tr>
+<td>Generate Typed Response</td>
+<td>Button</td>
+<td>Run JSON-mode call</td>
+<td><code>GenerateStructured()</code> :120</td>
+</tr>
+<tr>
+<td>Parsed Result card</td>
+<td>conditional</td>
+<td>Raw JSON string output</td>
+<td><code>structuredResponse</code> :127-137</td>
+</tr>
+<tr>
+<td>Direct chat messages</td>
+<td>foreach render</td>
+<td>Chat bubbles</td>
+<td><code>directChatMessages</code> :151</td>
+</tr>
+<tr>
+<td>Chat input + Send</td>
+<td>Textarea + Button</td>
+<td>Send chat turn</td>
+<td><code>SendDirectChat()</code> :169-170</td>
+</tr>
+<tr>
+<td>Clear (chat)</td>
+<td>Button</td>
+<td>Clears chat history</td>
+<td><code>ClearDirectChat()</code> :147,326</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Generate (stream)</td>
+<td>LlmPlayground.razor:221 <code>GenerateCompletion</code></td>
+<td><code>TechieRagManager.GetLlmProvider</code> (TechieRagManager.cs:365)</td>
+<td><code>ILlmProvider.CompleteStreamAsync</code> (ILlmProvider.cs:37)</td>
+<td>LLM provider HTTP</td>
+<td>static-only. Stats = elapsed ms only (streaming yields strings, not usage)</td>
+</tr>
+<tr>
+<td>Generate (non-stream)</td>
+<td>LlmPlayground.razor:232</td>
+<td>same <code>GetLlmProvider</code></td>
+<td><code>ILlmProvider.CompleteAsync</code> (ILlmProvider.cs:31)</td>
+<td>LLM provider HTTP</td>
+<td>static-only. Stats include input/output tokens from <code>response.Usage</code></td>
+</tr>
+<tr>
+<td>Generate Typed Response</td>
+<td>LlmPlayground.razor:268 <code>GenerateStructured</code></td>
+<td>same <code>GetLlmProvider</code></td>
+<td><code>ILlmProvider.CompleteAsync</code> with <code>LlmCompletionOptions{JsonMode=true}</code> (ILlmProvider.cs:31)</td>
+<td>LLM provider HTTP</td>
+<td><strong>suspected defect</strong> — output rendered as raw JSON string, never deserialized into the named types — static</td>
+</tr>
+<tr>
+<td>Chat Send (stream)</td>
+<td>LlmPlayground.razor:302 <code>SendDirectChat</code></td>
+<td>same <code>GetLlmProvider</code></td>
+<td><code>ILlmProvider.ChatStreamAsync(IReadOnlyList&lt;ChatMessage&gt;)</code> (ILlmProvider.cs:49)</td>
+<td>LLM provider HTTP</td>
+<td>static-only. Sends full <code>directChatMessages</code> history each turn</td>
+</tr>
+<tr>
+<td>Chat Send (non-stream)</td>
+<td>LlmPlayground.razor:311</td>
+<td>same <code>GetLlmProvider</code></td>
+<td><code>ILlmProvider.ChatAsync</code> (ILlmProvider.cs:43)</td>
+<td>LLM provider HTTP</td>
+<td>static-only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>Provider gate: <code>GetProvider()</code> shows a toast error and returns null if no LLM configured (LlmPlayground.razor:196-202); all actions early-return.</li>
+<li>Completion concatenates system + user prompt as <code>"{system}\n\n{user}"</code> when system is non-empty (:220,231). Structured mode wraps the prompt with a hardcoded JSON-shape instruction per <code>structuredType</code> (:259-265). Chat sends the entire local message history each turn (no server-side memory).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>Temperature and Max Tokens are collected but never used</strong>: <code>temperatureString</code>/<code>maxTokensString</code> are never parsed into <code>LlmCompletionOptions</code> for any call (LlmPlayground.razor:47,53 vs 221/232/268). No-op inputs. <em>(logged to REQ-UI-006)</em></li>
+<li><strong>Structured "Parsed Result" is not parsed</strong>: it renders the raw model JSON string; the SentimentAnalysis/WeatherForecast/BookSummary types implied by the labels are never used for deserialization (:269,134). Misleading label. <em>(logged to REQ-UI-006)</em></li>
+<li>System Prompt in Completion is folded into the user-prompt string rather than passed as <code>options.SystemPrompt</code>; Structured and Chat tabs ignore the System Prompt field entirely.</li>
+</ul>
+<hr>
+<h3 id="anonymous--tool-calling-demo">Anonymous · Tool Calling Demo<a class="anchor-link" href="#anonymous--tool-calling-demo">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/tool-demo"</code> (<code>samples/TechieRagWeb/Components/Pages/ToolDemo.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/ToolDemo.razor</code></li>
+<li><strong>Reached via:</strong> AI Features → Tool Demo; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Demonstrates the agent tool-calling loop. Registers four demo tools (weather, math, document search, current time) plus user-defined mock tools, then runs a multi-iteration agent loop where the LLM decides which tools to call.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["ToolDemo.razor"] --> INIT["OnInitialized -> RegisterDemoTools + RefreshToolList"]
+  INIT --> REG["toolRegistry.Register(get_weather / calculate_math / search_documents / get_current_time)"]
+  P --> TABLE["Available Tools DataTable"]
+  P --> SHEET["Add Custom Tool sheet -> AddCustomTool()"]
+  SHEET --> REG2["toolRegistry.Register(custom mock tool)"]
+  P --> INPUT["Agent input Textarea + Run Agent Loop"]
+  INPUT --> RUN["RunAgentLoop()"]
+  RUN --> GP["TechieRag.GetLlmProvider()"]
+  GP --> RUNNER["new AgentLoopRunner(provider, toolRegistry, maxIterations: 5)"]
+  RUN --> PROG["new Progress(AgentStep) -> ToExecutionStep + InvokeAsync(StateHasChanged)"]
+  RUNNER --> EXEC["runner.RunAsync(messages, progress)"]
+  EXEC --> LOOP["loop: llmProvider.ChatAsync -> toolHandler.ExecuteToolAsync"]
+  LOOP --> RPT["progress.Report(AgentStep) per tool request / execution / final answer"]
+  RPT --> TRACE["Execution Trace (live, one row per step)"]
+  EXEC --> ANS["finalAnswer + agentStats"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Available Tools table</td>
+<td>DataTable</td>
+<td>Registered tools (Name/Description/Status)</td>
+<td><code>toolRows</code> from <code>RefreshToolList()</code> ToolDemo.razor:69,212</td>
+</tr>
+<tr>
+<td>Add Custom Tool</td>
+<td>Sheet + Button</td>
+<td>Register a mock tool</td>
+<td><code>AddCustomTool()</code> :62,219</td>
+</tr>
+<tr>
+<td>Tool Name/Description/Schema/Mock Response</td>
+<td>Inputs/Textareas</td>
+<td>Custom tool fields</td>
+<td><code>@bind</code> customTool* :39,45,51,57</td>
+</tr>
+<tr>
+<td>Agent input</td>
+<td>Textarea</td>
+<td>Prompt for the agent</td>
+<td><code>@bind agentInput</code> :86</td>
+</tr>
+<tr>
+<td>Run Agent Loop</td>
+<td>Button</td>
+<td>Executes the agent loop</td>
+<td><code>RunAgentLoop()</code> :87</td>
+</tr>
+<tr>
+<td>Execution Trace</td>
+<td>conditional</td>
+<td>Per-step description/result</td>
+<td><code>executionSteps</code> :93-111</td>
+</tr>
+<tr>
+<td>Final Answer</td>
+<td>conditional</td>
+<td>Agent final text</td>
+<td><code>finalAnswer</code> :113-119</td>
+</tr>
+<tr>
+<td>Agent stats</td>
+<td>text</td>
+<td>Elapsed ms + total tokens</td>
+<td><code>agentStats</code> :121-124</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OnInitialized registers tools</td>
+<td>ToolDemo.razor:161 <code>RegisterDemoTools</code></td>
+<td>n/a (local)</td>
+<td><code>ToolRegistry.Register</code> (ToolRegistry.cs:37,61)</td>
+<td>in-memory tool registry</td>
+<td>static-only. Four tools into local <code>toolRegistry</code></td>
+</tr>
+<tr>
+<td>search_documents tool body</td>
+<td>ToolDemo.razor:200</td>
+<td>none — injects <code>ITechieRag TechieRag</code> directly (ToolDemo.razor:7)</td>
+<td><code>ITechieRag.SearchAsync</code> (ITechieRag.cs) → <code>TechieRagClient.SearchAsync</code> (TechieRagClient.cs:330) → embed + vector search</td>
+<td>Embedding + vector store</td>
+<td>static-only. Only invoked if the LLM chooses this tool</td>
+</tr>
+<tr>
+<td>Add Tool</td>
+<td>ToolDemo.razor:219 <code>AddCustomTool</code></td>
+<td>n/a</td>
+<td><code>ToolRegistry.Register</code> (ToolRegistry.cs:61) with constant mock response</td>
+<td>in-memory registry</td>
+<td>static-only. Schema passed verbatim, no validation</td>
+</tr>
+<tr>
+<td>Run Agent Loop</td>
+<td>ToolDemo.razor:242 <code>RunAgentLoop</code></td>
+<td>none — <code>ITechieRag.GetLlmProvider()</code> (ITechieRag.cs:186) → <code>TechieRagClient.GetLlmProvider()</code> (TechieRagClient.cs:540)</td>
+<td><code>new AgentLoopRunner(provider, toolRegistry, maxIterations: 5)</code> (ToolDemo.razor:261) → <code>AgentLoopRunner.RunAsync(messages, progress)</code> (AgentLoopRunner.cs:66) → loop of <code>ILlmProvider.ChatAsync</code> (AgentLoopRunner.cs:94,155) + <code>ToolRegistry.ExecuteToolAsync</code> (ToolRegistry.cs:70)</td>
+<td>LLM provider HTTP + tool handlers</td>
+<td>static-only. Final <code>LlmResponse.Content</code> → <code>finalAnswer</code> (ToolDemo.razor:279); stats = ms + input+output tokens (ToolDemo.razor:280)</td>
+</tr>
+<tr>
+<td>Execution Trace render</td>
+<td>ToolDemo.razor:93-111 (markup) ← <code>Progress&lt;AgentStep&gt;</code> (ToolDemo.razor:269)</td>
+<td><code>ToExecutionStep</code> (ToolDemo.razor:297)</td>
+<td><code>AgentLoopRunner.RunAsync</code> <code>progress.Report(new AgentStep{…})</code> per tool-call request (AgentLoopRunner.cs:108), each tool execution (cs:132), final answer (cs:99) and max-iterations (cs:156)</td>
+<td>n/a (in-memory step list)</td>
+<td>static-only — runner reports <code>IProgress&lt;AgentStep&gt;</code> (param at AgentLoopRunner.cs:69); the page appends each step live via <code>InvokeAsync(StateHasChanged)</code> (ToolDemo.razor:272). <code>AgentStep</code>/<code>AgentStepKind</code> defined in <code>src/TechieRag/Models/AgentStep.cs</code> — confirm at runtime</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>Demo tools registered once in <code>OnInitialized</code> (ToolDemo.razor:145-149). <code>AddCustomTool</code> requires non-empty name + description (221-231). Math tool evaluates via <code>System.Data.DataTable().Compute</code> (184).</li>
+<li>Provider gate: missing LLM → toast error, abort (244-249). Agent loop capped at <code>maxIterations: 5</code> (named arg, correctly skipping the optional <code>logger</code> — AgentLoopRunner.cs:39-43).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li>✅ <strong>FIXED 2026-06-25 — Execution Trace now shows real steps.</strong> <code>AgentLoopRunner.RunAsync</code> gained an optional <code>IProgress&lt;AgentStep&gt;</code> parameter (new <code>src/TechieRag/Models/AgentStep.cs</code> + <code>AgentStepKind</code>) and reports a step for each tool-call request, each individual tool execution (name/args/result/success), and the final answer. <code>ToolDemo.razor:269</code> passes a <code>Progress&lt;AgentStep&gt;</code> that maps each <code>AgentStep.Kind</code> (<code>ToolCallRequested</code>/<code>ToolExecuted</code>/<code>FinalAnswer</code>/<code>MaxIterationsReached</code>, AgentStep.cs:4-17) via <code>ToExecutionStep</code> (ToolDemo.razor:297) and re-renders live (<code>InvokeAsync(StateHasChanged)</code>, ToolDemo.razor:272). The old hardcoded single-step fallback (ToolDemo.razor:282-285) remains only as a safety net. Core library <strong>re-built clean (0 errors, 2026-06-30)</strong>; REQ-UI-007 stays <code>Needs re-verify</code> until the sample is booted to confirm the trace renders (boot still PAT-gated — see header banner). <em>(REQ-UI-007 / REQ-RAG-009)</em></li>
+<li>The custom-tool JSON Schema textarea accepts arbitrary text passed verbatim to <code>Register</code> with no validation (ToolDemo.razor:231).</li>
+<li><code>agentStats</code> token count comes from the final response only; intermediate tool-call round-trip tokens are not summed.</li>
+</ul>
+<hr>
+<h3 id="anonymous--token-usage">Anonymous · Token Usage<a class="anchor-link" href="#anonymous--token-usage">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/token-usage"</code> (<code>samples/TechieRagWeb/Components/Pages/TokenUsage.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/TokenUsage.razor</code></li>
+<li><strong>Reached via:</strong> Monitoring → Token Usage; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Read-only dashboard that polls the library's in-memory token tracker every 5s and shows session totals, cost, budget utilization, and a per-model usage grid; one action resets the session.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["TokenUsage.razor"] --> INIT["OnInitialized() (file:140)"]
+  INIT --> GTT["TechieRag.GetTokenTracker() (file:142)"]
+  GTT --> TR["ITokenTracker (TokenUsageTracker)"]
+  INIT --> RD["RefreshData() (file:147)"]
+  INIT --> TMR["Timer every 5000ms -> RefreshData + StateHasChanged (file:144)"]
+  RD --> GSU["tracker.GetSessionUsage() (file:149)"]
+  RD --> GBS["tracker.GetBudgetStatus() (file:150)"]
+  RD --> GUM["tracker.GetUsageByModel() (file:152)"]
+  GSU --> CARDS["Summary Cards: Total / Input-Output / Cost / Operations"]
+  GBS --> BUD["Budget Status card (null-guarded) (file:60)"]
+  GUM --> GRID["DataTable 'Usage by Model' (file:119)"]
+  P --> RST["Reset Session button -> ResetSession() (file:17,170)"]
+  RST --> RESET["tracker.Reset() (file:172)"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Reset Session</td>
+<td>Button (file:17)</td>
+<td>Clears in-memory usage records</td>
+<td><code>ResetSession()</code> → <code>tracker.Reset()</code> (file:170,172)</td>
+</tr>
+<tr>
+<td>Total Tokens</td>
+<td>Card value (file:30)</td>
+<td>Session total tokens</td>
+<td><code>sessionUsage.TotalTokens</code> (= <code>TotalInputTokens+TotalOutputTokens</code>, TokenUsage.cs:38)</td>
+</tr>
+<tr>
+<td>Input / Output</td>
+<td>Card value (file:38)</td>
+<td>Input vs output counts</td>
+<td><code>sessionUsage.TotalInputTokens / TotalOutputTokens</code></td>
+</tr>
+<tr>
+<td>Estimated Cost</td>
+<td>Card value (file:46)</td>
+<td>Session cost USD</td>
+<td><code>sessionUsage.TotalEstimatedCostUsd</code> (<code>F4</code>)</td>
+</tr>
+<tr>
+<td>Operations</td>
+<td>Card value (file:54)</td>
+<td>Recorded operation count</td>
+<td><code>sessionUsage.OperationCount</code></td>
+</tr>
+<tr>
+<td>Token Budget bar</td>
+<td>Progress (file:74)</td>
+<td>Token utilization %</td>
+<td><code>budgetStatus.TokenUtilization*100</code>; class via <code>GetBudgetClass</code> (file:163)</td>
+</tr>
+<tr>
+<td>Cost Budget bar</td>
+<td>Progress (file:85)</td>
+<td>Cost utilization %</td>
+<td><code>budgetStatus.CostUtilization*100</code></td>
+</tr>
+<tr>
+<td>Budget Exceeded / Alert</td>
+<td>Alert (file:91,98)</td>
+<td>Conditional warning banners</td>
+<td><code>budgetStatus.IsExceeded</code> / <code>IsAlertTriggered</code></td>
+</tr>
+<tr>
+<td>Usage by Model grid</td>
+<td>DataTable (file:119)</td>
+<td>Per-model breakdown</td>
+<td><code>modelUsage</code> from <code>GetUsageByModel()</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tracker handle</td>
+<td>OnInitialized (TokenUsage.razor:142)</td>
+<td><code>ITechieRag.GetTokenTracker()</code> (ITechieRag.cs:192) → <code>TechieRagClient.GetTokenTracker()</code> (TechieRagClient.cs:543)</td>
+<td><code>TokenUsageTracker : ITokenTracker</code> (Services/TokenUsageTracker.cs:17)</td>
+<td>In-memory <code>ConcurrentBag&lt;TokenUsage&gt;</code> (TokenUsageTracker.cs:19) — NO DB</td>
+<td>static-only (unconfirmed)</td>
+</tr>
+<tr>
+<td>Summary cards</td>
+<td>RefreshData (TokenUsage.razor:149)</td>
+<td>n/a (direct lib call)</td>
+<td><code>TokenUsageTracker.GetSessionUsage()</code> aggregates <code>usageRecords</code> (TokenUsageTracker.cs:67)</td>
+<td>In-memory aggregation</td>
+<td>static-only; empty if no LLM calls recorded</td>
+</tr>
+<tr>
+<td>Budget Status card</td>
+<td>RefreshData (TokenUsage.razor:150)</td>
+<td>n/a</td>
+<td><code>TokenUsageTracker.GetBudgetStatus()</code> (returns null when no budget set, TokenUsageTracker.cs:127-139)</td>
+<td>In-memory <code>currentBudget</code> (from <code>UsageTrackingConfig</code>, ctor TokenUsageTracker.cs:34-48)</td>
+<td>renders-empty (expected — <code>@if (budgetStatus != null)</code> file:60; hidden unless a budget configured at build) — static</td>
+</tr>
+<tr>
+<td>Usage by Model grid</td>
+<td>RefreshData (TokenUsage.razor:152)</td>
+<td>n/a</td>
+<td><code>TokenUsageTracker.GetUsageByModel()</code> groups by <code>ModelName</code> (TokenUsageTracker.cs:87)</td>
+<td>In-memory aggregation</td>
+<td>static-only; <code>@if (modelUsage.Count==0)</code> shows "No usage data yet." (file:113)</td>
+</tr>
+<tr>
+<td>Reset Session</td>
+<td>ResetSession (TokenUsage.razor:170)</td>
+<td>n/a</td>
+<td><code>TokenUsageTracker.Reset()</code> drains the bag (TokenUsageTracker.cs:142)</td>
+<td>In-memory clear</td>
+<td>static-only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li><code>GetBudgetClass(utilization)</code> (file:163): ≥0.8 → red bar; ≥0.6 → yellow; else default. <code>TotalTokens = TotalInputTokens + TotalOutputTokens</code> (TokenUsage.cs:38).</li>
+<li>Cost computed at record time via <code>CalculateCost</code> using a built-in per-million pricing table (TokenUsageTracker.cs:158, 207-217); only models in that table get non-zero cost.</li>
+<li><code>IsExceeded</code> when tokens ≥ MaxTotalTokens OR cost ≥ MaxCostUsd (TokenUsage.cs:89); <code>IsAlertTriggered</code> when either utilization ≥ AlertThreshold (TokenUsage.cs:94). 5s timer re-pulls all three queries (file:144); disposed in <code>Dispose()</code> (file:179).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>"Estimated Cost" reads $0.0000 for any model not in the hard-coded pricing table</strong> (TokenUsageTracker.cs:207-217) even though its tokens are counted — silent under-reporting for unlisted models. <em>(logged to REQ-UI-008)</em></li>
+<li>Cards bind to <code>sessionUsage</code> while the budget bars use <code>budgetStatus</code> (whose <code>CurrentUsage</code> is a separate <code>GetSessionUsage()</code> call, TokenUsageTracker.cs:136); the 5s <code>RefreshData</code> fetches both together, but momentary skew is possible under concurrent recording.</li>
+<li>Usage is process-memory only (<code>ConcurrentBag</code>); an app restart loses all data — by design (no DB).</li>
+</ul>
+<hr>
+<h3 id="anonymous--qdrant-admin">Anonymous · Qdrant Admin<a class="anchor-link" href="#anonymous--qdrant-admin">#</a></h3>
+<ul>
+<li><strong>Route:</strong> <code>@page "/qdrant-admin"</code> (<code>samples/TechieRagWeb/Components/Pages/QdrantAdmin.razor:1</code>)</li>
+<li><strong>Razor file:</strong> <code>samples/TechieRagWeb/Components/Pages/QdrantAdmin.razor</code></li>
+<li><strong>Reached via:</strong> Admin → Qdrant Admin; <strong>Log in as:</strong> no auth (single anonymous user)</li>
+<li><strong>What this screen does:</strong> Operator console for the Qdrant vector DB — detects Docker, lists/creates/starts/stops Qdrant containers via the Docker API, tests the gRPC connection, and performs CRUD on collections and individual vectors via <code>Qdrant.Client</code>.</li>
+</ul>
+<p><strong>Screen flowchart</strong></p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  P["QdrantAdmin.razor"] --> INIT["OnInitializedAsync() (file:496)"]
+  INIT --> RS["RefreshStatusAsync() (file:503)"]
+  RS --> DAVAIL["DockerService.IsDockerAvailableAsync() (file:507)"]
+  DAVAIL --> DK["DockerContainerService -> Docker daemon ping (DockerContainerService.cs:163)"]
+  RS --> LIST["DockerService.ListQdrantContainersAsync() (file:510)"]
+  LIST --> DKL["client.Containers.ListContainersAsync (DockerContainerService.cs:187)"]
+  RS --> TEST["QdrantService.TestConnectionAsync() (file:524)"]
+  TEST --> QC["QdrantClient.ListCollectionsAsync (QdrantAdminService.cs:261)"]
+  RS --> CLU["QdrantService.GetClusterInfoAsync() (file:529)"]
+  RS --> COLS["QdrantService.ListCollectionsAsync() (file:530)"]
+  COLS --> GRIDC["Collections DataTable (file:272)"]
+  P --> CONNBTN["Connect -> ApplyEndpointAsync() (file:49,545)"]
+  CONNBTN --> CFG["QdrantService.ConfigureEndpoint(host,port,apiKey) (file:547)"]
+  P --> CREATEC["Create Container -> CreateContainerAsync() (file:152,589)"]
+  CREATEC --> DKCR["DockerService.CreateQdrantContainerAsync (DockerContainerService.cs:299)"]
+  P --> STARTSTOP["Start / Stop -> Start/StopContainerAsync (file:188,192)"]
+  STARTSTOP --> DKSS["DockerService.Start/StopContainerAsync (DockerContainerService.cs:351,365)"]
+  P --> NEWCOL["New Collection -> CreateCollectionAsync() (file:255,650)"]
+  NEWCOL --> QCRC["QdrantClient.CreateCollectionAsync (QdrantAdminService.cs:402)"]
+  P --> DELCOL["Delete -> DeleteCollectionAsync() (file:281,665)"]
+  P --> BROWSE["Browse -> SelectCollection() (file:280,684)"]
+  BROWSE --> CINFO["QdrantService.GetCollectionInfoAsync (QdrantAdminService.cs:359)"]
+  BROWSE --> BV["QdrantService.BrowseVectorsAsync (QdrantAdminService.cs:428)"]
+  BV --> SCROLL["QdrantClient.ScrollAsync (QdrantAdminService.cs:438)"]
+  BROWSE --> VGRID["Vectors DataTable (file:345)"]
+  VGRID --> PREVNEXT["Previous / Next -> Browse offset (file:367,370)"]
+  VGRID --> VIEWV["View -> ViewVectorAsync() (file:353,719)"]
+  VIEWV --> GETV["QdrantService.GetVectorByIdAsync (QdrantAdminService.cs:456)"]
+  VGRID --> DELV["Delete -> DeleteVectorAsync() (file:354,728)"]</pre>
+</div>
+<p><strong>Controls on this screen</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control</th>
+<th>Type</th>
+<th>Purpose</th>
+<th>Populated / calculated by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Refresh</td>
+<td>Button (file:18)</td>
+<td>Re-run full status refresh</td>
+<td><code>RefreshStatusAsync()</code> (file:503)</td>
+</tr>
+<tr>
+<td>Host / gRPC Port / API Key</td>
+<td>Input (file:34,40,46)</td>
+<td>Endpoint config</td>
+<td><code>configHost</code>, <code>configPortString</code>, <code>configApiKey</code> (seeded from <code>QdrantService.Host/Port</code>, file:498)</td>
+</tr>
+<tr>
+<td>Connect</td>
+<td>Button (file:49)</td>
+<td>Apply endpoint + reconnect</td>
+<td><code>ApplyEndpointAsync()</code> → <code>ConfigureEndpoint</code> (file:545,547)</td>
+</tr>
+<tr>
+<td>Docker/Qdrant/Version/Collections status cards</td>
+<td>Card values (file:62,72,82,90)</td>
+<td>Live status</td>
+<td><code>isDockerAvailable</code>, <code>qdrantStatus</code>, <code>clusterInfo?.Version</code>, <code>clusterInfo?.TotalCollections</code></td>
+</tr>
+<tr>
+<td>Connection String + Copy</td>
+<td>code + Button (file:100,101)</td>
+<td>Show/copy gRPC conn string</td>
+<td><code>QdrantService.ConnectionString</code> (QdrantAdminService.cs:202); JS clipboard (file:576)</td>
+</tr>
+<tr>
+<td>Create Container (dialog)</td>
+<td>Dialog/Button (file:123,152)</td>
+<td>Create new Qdrant container</td>
+<td><code>CreateContainerAsync()</code> (file:596)</td>
+</tr>
+<tr>
+<td>Containers grid</td>
+<td>DataTable (file:176)</td>
+<td>List containers + Start/Stop/Use</td>
+<td><code>qdrantContainers</code> (file:510)</td>
+</tr>
+<tr>
+<td>New Collection (dialog)</td>
+<td>Dialog/Button (file:211,255)</td>
+<td>Create vector collection</td>
+<td><code>CreateCollectionAsync()</code> (file:654)</td>
+</tr>
+<tr>
+<td>Collections grid</td>
+<td>DataTable (file:272)</td>
+<td>List collections + Browse/Delete</td>
+<td><code>collections</code> (file:530)</td>
+</tr>
+<tr>
+<td>Collection detail stats</td>
+<td>Cards (file:303-338)</td>
+<td>Points/Vector size/Distance/Status</td>
+<td><code>selectedCollectionDetail</code> (file:689)</td>
+</tr>
+<tr>
+<td>Vectors grid</td>
+<td>DataTable (file:345)</td>
+<td>Page through vectors + View/Delete</td>
+<td><code>currentVectorPage.Vectors</code> (file:690)</td>
+</tr>
+<tr>
+<td>Previous / Next</td>
+<td>Button (file:367,370)</td>
+<td>Custom pagination</td>
+<td><code>PreviousPage()</code>/<code>NextPage()</code> (file:698,707)</td>
+</tr>
+<tr>
+<td>Vector Detail dialog</td>
+<td>Dialog (file:388)</td>
+<td>Full vector + payload</td>
+<td><code>selectedVector</code> (file:723)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Data lineage</strong></p>
+<table>
+<thead>
+<tr>
+<th>Control / Action</th>
+<th>Razor component (file:line)</th>
+<th>Service method (file)</th>
+<th>Library / data-access call (file)</th>
+<th>Provider / persistence target</th>
+<th>Notes / render status</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Docker availability</td>
+<td>RefreshStatusAsync (QdrantAdmin.razor:507)</td>
+<td><code>DockerContainerService.IsDockerAvailableAsync()</code> (DockerContainerService.cs:156)</td>
+<td><code>DockerClient.System.PingAsync()</code> (DockerContainerService.cs:163)</td>
+<td>Docker daemon (npipe/unix socket, cs:140-142)</td>
+<td>static-only; false if daemon not running</td>
+</tr>
+<tr>
+<td>Containers grid</td>
+<td>RefreshStatusAsync (QdrantAdmin.razor:510)</td>
+<td><code>DockerContainerService.ListQdrantContainersAsync()</code> (DockerContainerService.cs:181)</td>
+<td><code>client.Containers.ListContainersAsync(All=true)</code> filtered by image "qdrant" (cs:187-202)</td>
+<td>Docker daemon</td>
+<td>static-only; ports via <code>GetHostPort</code> 6333/6334 (cs:228)</td>
+</tr>
+<tr>
+<td>Auto-connect to running container</td>
+<td>RefreshStatusAsync (QdrantAdmin.razor:512-521)</td>
+<td><code>QdrantAdminService.ConfigureEndpoint</code> (QdrantAdminService.cs:230)</td>
+<td>sets host=localhost, port=container.GrpcPort</td>
+<td>In-memory endpoint</td>
+<td>static-only; only when not Connected and a Running container has a gRPC port</td>
+</tr>
+<tr>
+<td>Connection test / status</td>
+<td>RefreshStatusAsync (QdrantAdmin.razor:524)</td>
+<td><code>QdrantAdminService.TestConnectionAsync()</code> (QdrantAdminService.cs:254)</td>
+<td><code>QdrantClient.ListCollectionsAsync()</code> (cs:261)</td>
+<td>Qdrant via gRPC (<code>new QdrantClient(host,port,https:false,apiKey)</code>, cs:243) — <strong>gRPC port 6334</strong>, not HTTP 6333</td>
+<td>static-only; <code>LastError</code> on RpcException (cs:267)</td>
+</tr>
+<tr>
+<td>Version / Collections-count cards</td>
+<td>RefreshStatusAsync (QdrantAdmin.razor:529)</td>
+<td><code>QdrantAdminService.GetClusterInfoAsync()</code> (QdrantAdminService.cs:310)</td>
+<td><code>QdrantClient.ListCollectionsAsync()</code> (cs:315)</td>
+<td>Qdrant gRPC</td>
+<td><strong>suspected defect</strong> — Version is <strong>hard-coded <code>"1.12.x"</code></strong> (cs:318), not read from the server — static</td>
+</tr>
+<tr>
+<td>Collections grid</td>
+<td>RefreshStatusAsync (QdrantAdmin.razor:530)</td>
+<td><code>QdrantAdminService.ListCollectionsAsync()</code> (QdrantAdminService.cs:331)</td>
+<td><code>ListCollectionsAsync()</code> + per-collection <code>GetCollectionInfoAsync</code> (cs:334,341)</td>
+<td>Qdrant gRPC</td>
+<td><strong>suspected defect</strong> — <code>VectorCount</code> and <code>PointCount</code> both set to the same <code>PointsCount</code> (cs:344-345); the "Vectors" column duplicates "Points" — static</td>
+</tr>
+<tr>
+<td>Connection String / Copy</td>
+<td>code (QdrantAdmin.razor:100) / CopyConnectionString (file:572)</td>
+<td><code>QdrantAdminService.ConnectionString</code> getter (cs:202)</td>
+<td>string build + JS <code>navigator.clipboard.writeText</code> (file:576)</td>
+<td>n/a</td>
+<td>static-only; conn string embeds <strong>masked</strong> API key (cs:204)</td>
+</tr>
+<tr>
+<td>Create Container</td>
+<td>CreateContainerAsync (QdrantAdmin.razor:596)</td>
+<td><code>DockerContainerService.CreateQdrantContainerAsync</code> (DockerContainerService.cs:299)</td>
+<td><code>PullQdrantImageAsync</code> + <code>CreateContainerAsync</code> + <code>StartContainerAsync</code> (cs:307,340,344)</td>
+<td>Docker daemon; <code>qdrant/qdrant:latest</code>, binds 6333/6334</td>
+<td>static-only</td>
+</tr>
+<tr>
+<td>Start / Stop container</td>
+<td>Start/StopContainerAsync (QdrantAdmin.razor:613,628)</td>
+<td><code>DockerContainerService.Start/StopContainerAsync</code> (cs:351,365)</td>
+<td><code>client.Containers.Start/StopContainerAsync</code> (cs:360,374)</td>
+<td>Docker daemon</td>
+<td>static-only</td>
+</tr>
+<tr>
+<td>Use container</td>
+<td>UseContainer (QdrantAdmin.razor:562)</td>
+<td><code>QdrantAdminService.ConfigureEndpoint</code> via <code>ApplyEndpointAsync</code> (file:568,547)</td>
+<td>sets endpoint to container GrpcPort</td>
+<td>In-memory + reconnect</td>
+<td>static-only; <strong>fire-and-forget</strong> <code>_ = ApplyEndpointAsync()</code> (file:568) swallows exceptions</td>
+</tr>
+<tr>
+<td>Create Collection</td>
+<td>CreateCollectionAsync (QdrantAdmin.razor:654)</td>
+<td><code>QdrantAdminService.CreateCollectionAsync</code> (cs:390)</td>
+<td><code>QdrantClient.CreateCollectionAsync(VectorParams{Size,Distance})</code> (cs:402)</td>
+<td>Qdrant gRPC</td>
+<td>static-only; distance Cosine/Euclid/Dot (cs:394)</td>
+</tr>
+<tr>
+<td>Delete Collection</td>
+<td>DeleteCollectionAsync (QdrantAdmin.razor:669)</td>
+<td><code>QdrantAdminService.DeleteCollectionAsync</code> (cs:413)</td>
+<td><code>QdrantClient.DeleteCollectionAsync</code> (cs:416)</td>
+<td>Qdrant gRPC</td>
+<td>static-only; no confirm dialog</td>
+</tr>
+<tr>
+<td>Browse (detail + vectors)</td>
+<td>SelectCollection (QdrantAdmin.razor:684)</td>
+<td><code>GetCollectionInfoAsync</code> (cs:359) + <code>BrowseVectorsAsync</code> (cs:428)</td>
+<td><code>GetCollectionInfoAsync</code> + <code>ScrollAsync</code> (cs:362,438)</td>
+<td>Qdrant gRPC</td>
+<td><strong>suspected defect</strong> — pagination offset built as <code>new PointId{Num=(ulong)offset}</code> (cs:437); Scroll <code>offset</code> is a point-ID cursor, not a numeric skip, so Next/Previous past page 1 misbehaves for UUID/non-sequential IDs — static</td>
+</tr>
+<tr>
+<td>Vectors grid + Prev/Next</td>
+<td>DataTable (QdrantAdmin.razor:345) / PreviousPage/NextPage (file:698,707)</td>
+<td><code>QdrantAdminService.BrowseVectorsAsync</code> (cs:428)</td>
+<td><code>QdrantClient.ScrollAsync</code> (cs:438)</td>
+<td>Qdrant gRPC</td>
+<td>grid uses <code>ShowPagination="false"</code>; pagination is custom Prev/Next (file:366) — static</td>
+</tr>
+<tr>
+<td>View vector</td>
+<td>ViewVectorAsync (QdrantAdmin.razor:719)</td>
+<td><code>QdrantAdminService.GetVectorByIdAsync</code> (cs:456)</td>
+<td><code>QdrantClient.RetrieveAsync(withPayload,withVectors)</code> (cs:465)</td>
+<td>Qdrant gRPC</td>
+<td>static-only; preview = first 10 values (cs:439)</td>
+</tr>
+<tr>
+<td>Delete vector</td>
+<td>DeleteVectorAsync (QdrantAdmin.razor:728)</td>
+<td><code>QdrantAdminService.DeleteVectorAsync</code> (cs:499)</td>
+<td><code>QdrantClient.DeleteAsync</code> by id or HasId filter (cs:507,514)</td>
+<td>Qdrant gRPC</td>
+<td>static-only</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Business rules / calculations on this screen</strong></p>
+<ul>
+<li>gRPC vs HTTP: the admin talks to Qdrant over <strong>gRPC</strong> (default 6334), not the 6333 HTTP API; container HTTP port 6333 is shown only as info (cs:243).</li>
+<li>Endpoint precedence on refresh: if not already Connected and a Running container exposes a gRPC port, the page auto-overrides host/port to <code>localhost:&lt;grpcPort&gt;</code> before testing (file:512-521).</li>
+<li>New-collection defaults: 1024 dims (BGE-M3), Cosine distance (file:482-483); distance string mapped to <code>Distance</code> enum (cs:394-400). Vector page size fixed at 20; Prev/Next compute offset as <code>±Limit</code> bounded by <code>TotalCount</code> (file:702,711).</li>
+<li>Payload field extraction tries multiple key aliases (<code>Text/ChunkText/text</code>, <code>DocumentName/DocumentId/SourceFile</code>) (cs:447-448). "New Collection" disabled unless Connected (file:213); "Create Container" hidden unless Docker available (file:121).</li>
+</ul>
+<p><strong>Known issues / gotchas</strong></p>
+<ul>
+<li><strong>Hard-coded version</strong>: <code>GetClusterInfoAsync</code> always returns <code>Version: "1.12.x"</code> regardless of the actual server (QdrantAdminService.cs:318); the "Version" card is cosmetic/misleading. <em>(logged to REQ-UI-012)</em></li>
+<li><strong>Collections grid "Vectors" column is meaningless</strong>: <code>VectorCount</code> and <code>PointCount</code> are both <code>info.PointsCount</code> (cs:344-345); the two columns (file:275,276) always show identical numbers. <em>(logged to REQ-UI-012)</em></li>
+<li><strong>Scroll pagination is fragile</strong>: offset is encoded as a numeric <code>PointId.Num</code> cursor (cs:437) rather than Qdrant's <code>next_page_offset</code>; Next/Previous beyond page 1 can return wrong/empty results for UUID or non-contiguous IDs. This is core to REQ-UI-013 (paginated browse). <em>(logged to REQ-UI-013)</em></li>
+<li>Dead/unused helper <code>ShowCreateCollectionModal()</code> (file:642) never runs (the dialog uses a <code>DialogTrigger</code>), so re-opening retains prior field values. Destructive Delete actions have no confirmation. <code>UseContainer</code> fire-and-forget swallows errors (file:568).</li>
+<li><code>{unresolved — TODO}</code>: whether TrBlazeUI <code>DataTable</code> <em>requires</em> a <code>Pagination</code> object could not be confirmed (component source is PAT-gated); given <code>ShowPagination="false"</code> it is almost certainly opt-in, so likely not a defect.</li>
+</ul>
+<hr>
+<h2 id="cross-cutting-flows">Cross-cutting flows<a class="anchor-link" href="#cross-cutting-flows">#</a></h2>
+<h3 id="configuration-load--save--apply">Configuration load / save / apply<a class="anchor-link" href="#configuration-load--save--apply">#</a></h3>
+<p>Both config pages (<code>Settings</code>, <code>LlmSettings</code>) share <code>TechieRagConfigService</code> (JSON persistence) and <code>TechieRagManager</code> (live-instance rebuild).</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  UI["Settings / LlmSettings page"] --> LOAD["ConfigService.LoadConfigAsync()"]
+  LOAD --> SRC{"techierag-config.json exists?"}
+  SRC -->|"yes"| JSON["Deserialize TechieRagConfig"]
+  SRC -->|"no"| APP["appsettings 'TechieRag' section -> else defaults"]
+  UI --> SAVE["ConfigService.SaveConfigAsync(config)"]
+  SAVE --> WRITE["File.WriteAllTextAsync(techierag-config.json)"]
+  UI --> RC["RagManager.ReconfigureAsync()"]
+  RC --> BUILD["TechieRagBuilder: UseEmbedding/UseVectorStore/UseLlm/WithFallbackLlm/WithUsageTracking/WithResilience"]
+  BUILD --> INIT["client.InitializeAsync() -> vectorStore.InitializeAsync()"]</pre>
+</div>
+<p>Lineage: <code>TechieRagConfigService.cs:54</code> (load) / <code>:148</code> (save) / <code>:190</code> (reset); <code>TechieRagManager.cs:63</code> (reconfigure) / <code>:94-253</code> (builder). <strong>Gotcha:</strong> both Reset buttons skip <code>ReconfigureAsync</code> (see Settings/LlmSettings known issues).</p>
+<h3 id="ingestion-pipeline-file--text">Ingestion pipeline (file + text)<a class="anchor-link" href="#ingestion-pipeline-file--text">#</a></h3>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  ING["Ingestion / TextIngestion page"] --> CALL["Rag.IngestAsync / IngestTextAsync"]
+  CALL --> PROC["IDocumentProcessor.ProcessAsync (files) or TextChunker.ChunkText (text)"]
+  PROC --> EMB["embeddingProvider.EmbedBatchAsync"]
+  EMB --> UP["vectorStore.UpsertBatchAsync"]
+  UP --> STORE[("Vector store: SqliteVec / PgVector / Qdrant")]</pre>
+</div>
+<p>Lineage: <code>TechieRagClient.cs:104</code> (IngestAsync) / <code>:189</code> (IngestTextAsync) → <code>:160/:249</code> embed → <code>:172/:261</code> upsert.</p>
+<h3 id="query--auto-rag-used-by-chat-tool-demo-search-tool">Query / Auto-RAG (used by Chat, Tool Demo search tool)<a class="anchor-link" href="#query--auto-rag-used-by-chat-tool-demo-search-tool">#</a></h3>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">−</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">⛶</button>
+    <button data-pop title="Open in new tab">↗</button>
+  </div>
+  <pre class="mermaid">flowchart TD
+  Q["Chat / search_documents tool"] --> S["Rag.SearchAsync"]
+  S --> QE["embeddingProvider.EmbedAsync"]
+  QE --> VS["vectorStore.SearchAsync (topK)"]
+  Q --> ASK["Rag.AskAsync / AskStreamAsync"]
+  ASK --> S2["SearchAsync (again)"]
+  S2 --> BP["promptTemplate.BuildRagPrompt"]
+  BP --> LLM["llmProvider.Chat / ChatStream"]
+  LLM --> HTTP["HTTP to configured LLM provider"]</pre>
+</div>
+<p>Lineage: <code>TechieRagClient.cs:330</code> (SearchAsync) / <code>:415</code> (AskAsync) / <code>:443</code> (AskStreamAsync). <strong>Gotcha:</strong> streamed Auto-RAG searches twice (sources + inside Ask) — see Chat known issues.</p>
+<h3 id="resilience--token-tracking-automatic-on-llm-calls">Resilience + token tracking (automatic on LLM calls)<a class="anchor-link" href="#resilience--token-tracking-automatic-on-llm-calls">#</a></h3>
+<p><code>RetryHandler</code> + <code>FallbackLlmHandler</code> decorate <code>ILlmProvider</code> (exponential backoff, HTTP-429, circuit breaker, primary→fallback). <code>TokenUsageTracker</code> subscribes to <code>ILlmProvider.OnCompletionCompleted</code> and aggregates per-model usage/cost in memory; the Token Usage page reads it via <code>GetTokenTracker()</code>. See <code>docs/TechieRag-Architecture.md</code> §Resilience.</p>
+<h2 id="how-to-fix-a-bug-with-this-guide">How to fix a bug with this guide<a class="anchor-link" href="#how-to-fix-a-bug-with-this-guide">#</a></h2>
+<ol>
+<li>Reproduce the bug and note <strong>which screen</strong> and <strong>which control</strong> shows it.</li>
+<li>Open §4, find that screen, find the control in the <strong>Data lineage</strong> table.</li>
+<li>Walk the lineage <strong>top-down</strong>: Razor handler → sample service method → library API (<code>TechieRagClient</code>) → provider / JSON file. The bug is in one of those hops.</li>
+<li>If the visible value is <em>calculated</em>, the lineage/business-rules name the method — check it (e.g. token totals only accumulate in non-streaming Chat branches).</li>
+<li>Several known defects are already flagged inline (⚠ in Known issues) and logged to the checklists — check there first.</li>
+<li>After fixing, re-run the screen's walkthrough in <code>docs/TechieRag-UsageGuide.md</code>, then re-generate this guide (<code>*devguide TechieRag</code>) if the code path changed — and run <code>*verify</code> with the app booted to upgrade the render-status from static to runtime-confirmed.</li>
+</ol>
+<hr>
+<p>_Generated 2026-06-25 · refreshed 2026-06-30 (<code>--update</code>: Tool Calling Demo re-mapped) · reflects code as built · ⚠ STATIC-ONLY (not runtime-verified — TrBlazeUI restore is PAT-gated). Regenerate with <code>*devguide TechieRag</code> after code changes._</p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

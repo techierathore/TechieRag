@@ -1,0 +1,1266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieFlow: Solo-Dev Delivery Workflow — Claude Code + OpenCode</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#161a22; --panel2:#1c2230; --line:#2a3142;
+    --ink:#e6e8ee; --muted:#9aa3b2; --accent:#7cc4ff; --accent2:#a6e3a1;
+    --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;font-size:15px}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:var(--mono);font-size:13px;background:#0a0d13;color:#e6e8ee;padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+  pre{font-family:var(--mono);font-size:12.5px;background:#0a0d13;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:#d8dde8;position:relative}
+  pre code{background:none;border:none;padding:0}
+  .copy{position:absolute;top:8px;right:8px;background:#1c2230;color:#9aa3b2;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+  .copy:hover{color:var(--accent);border-color:var(--accent)}
+  pre.mermaid{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 14px;text-align:center;color:var(--ink);overflow:auto;line-height:1.3}
+  .dcap{font-size:14px;color:var(--accent);font-weight:700;margin:18px 0 4px}
+  .dnote{font-size:12.5px;color:var(--muted);margin:0 0 6px}
+  .layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+  nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+  nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+  nav.side ol{list-style:none;padding:0;margin:0;counter-reset:n}
+  nav.side ol li{counter-increment:n;font-size:13px;margin:2px 0}
+  nav.side ol li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+  nav.side ol li a::before{content:counter(n,decimal-leading-zero);color:var(--muted);font-family:var(--mono);font-size:11px;margin-right:8px}
+  nav.side ol li a:hover{background:var(--panel2);text-decoration:none}
+  nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+  main{padding:32px 40px 80px;max-width:1100px}
+  h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+  h3{font-size:17px;margin:22px 0 6px;color:#cfd5e3;scroll-margin-top:16px}
+  h4{font-size:14px;margin:14px 0 4px;color:var(--accent)}
+  p{margin:6px 0 10px}
+  .lede{color:var(--muted);font-size:14px;margin-top:-4px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:10px 0}
+  .panel.warn{border-color:#5a4a1a;background:#241d10}
+  .panel.ok{border-color:#2f5a2f;background:#13211a}
+  .panel.danger{border-color:#5a2a3a;background:#241016}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#cfd5e3;font-weight:600}
+  tr:nth-child(even) td{background:#13171f}
+  .badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:999px;background:#1c2230;border:1px solid var(--line);color:var(--muted);font-family:var(--mono)}
+  .badge.cmd{color:var(--accent);border-color:#274d6e}
+  .badge.agent{color:#c4b5fd;border-color:#3a335a}
+  .badge.task{color:#fcd34d;border-color:#564218}
+  .badge.file{color:#86efac;border-color:#1f4a2a}
+  .tabs{display:flex;gap:0;border-bottom:1px solid var(--line);margin:14px 0 0}
+  .tabs button{background:none;color:var(--muted);border:none;border-bottom:2px solid transparent;padding:10px 16px;font:inherit;cursor:pointer}
+  .tabs button.active{color:var(--accent);border-color:var(--accent)}
+  .tabpanel{display:none;padding:16px 0}
+  .tabpanel.active{display:block}
+  .flow{display:flex;flex-direction:column;gap:6px;margin:14px 0}
+  .step{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  .step .num{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent);background:#0d2030;border:1px solid #274d6e;border-radius:8px;width:38px;height:38px;display:flex;align-items:center;justify-content:center}
+  .step .body h4{margin:0 0 4px;color:var(--ink);font-size:14.5px}
+  .step .body p{margin:2px 0;font-size:13.5px;color:#cfd5e3}
+  .step .body .cmds{margin-top:6px}
+  .arrow{display:flex;justify-content:center;color:var(--muted);font-size:18px;font-family:var(--mono)}
+  .kbd{font-family:var(--mono);background:#0a0d13;border:1px solid var(--line);padding:1px 5px;border-radius:4px;font-size:12px;color:#cfd5e3}
+  hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+  .toc-mini{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;color:var(--muted);margin:8px 0 16px}
+  .toc-mini a{color:#cfd5e3}
+  details{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:8px 14px;margin:8px 0}
+  details > summary{cursor:pointer;color:var(--ink);font-weight:600;font-size:14px}
+  details[open] > summary{margin-bottom:8px}
+  .pain{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:8px 0}
+  .pain .p{color:#f0b4be}
+  .pain .s{color:#bce6c4}
+  .pain h4{margin:0 0 4px}
+  .small{font-size:12.5px;color:var(--muted)}
+  ul.tight,ol.tight{margin:6px 0;padding-left:22px}
+  ul.tight li,ol.tight li{margin:2px 0}
+  .anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s}
+  h2:hover .anchor-link,h3:hover .anchor-link{opacity:1}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:#0d2030;color:var(--accent);font-family:var(--mono);border:1px solid #274d6e;margin-right:6px}
+  .pill.ok{background:#13211a;color:var(--ok);border-color:#2f5a2f}
+  .pill.warn{background:#241d10;color:var(--warn);border-color:#5a4a1a}
+  .pill.once{background:#241016;color:#f38ba8;border-color:#5a2a3a}
+  .audience{display:inline-block;font-size:10.5px;padding:1px 6px;border-radius:4px;font-family:var(--mono);margin-left:6px;vertical-align:middle}
+  .audience.h{background:#162a18;color:#86efac;border:1px solid #1f4a2a}
+  .audience.a{background:#1c1731;color:#c4b5fd;border:1px solid #3a335a}
+  .placeholder{color:#f9c74f;font-family:var(--mono);font-size:13px;background:#241d10;padding:0 5px;border-radius:3px;border:1px solid #5a4a1a}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="side">
+  <h1>TechieFlow: Solo-Dev Delivery Framework</h1>
+  <div class="sub">Custom workflow for Claude Max + WSL</div>
+  <div class="group">Quick reference</div>
+  <ol>
+    <li><a href="#ataglance">Process at a glance (flowcharts)</a></li>
+  </ol>
+  <div class="group">One-time</div>
+  <ol>
+    <li><a href="#wsl-bootstrap">WSL bootstrap (once, ever)</a></li>
+    <li><a href="#device-bootstrap">Device-host bootstrap (MAUI Android/iOS/Mac)</a></li>
+  </ol>
+  <div class="group">Start here</div>
+  <ol>
+    <li><a href="#overview">Overview &amp; principles</a></li>
+    <li><a href="#painpoints">Pain points → solutions</a></li>
+    <li><a href="#scaffolding">Scaffolding a project</a></li>
+    <li><a href="#naming">File-naming convention</a></li>
+    <li><a href="#structure">Project structure</a></li>
+    <li><a href="#docs">Doc artifacts &amp; audiences</a></li>
+  </ol>
+  <div class="group">Workflows</div>
+  <ol>
+    <li><a href="#flows">Brownfield / Greenfield</a></li>
+    <li><a href="#resume">Resuming a cold project</a></li>
+  </ol>
+  <div class="group">Operate</div>
+  <ol>
+    <li><a href="#libraries">Custom library agents</a></li>
+    <li><a href="#standards-enforcement">Coding standards enforcement</a></li>
+    <li><a href="#wsl-runtime">MAUI from WSL</a></li>
+    <li><a href="#permissions">Permissions (yolo-except-git)</a></li>
+  </ol>
+  <div class="group">Reference</div>
+  <ol>
+    <li><a href="#agents">Agent cheat sheet</a></li>
+    <li><a href="#quickref">Command reference</a></li>
+    <li><a href="#faq">FAQ &amp; gotchas</a></li>
+    <li><a href="#platforms">Running on macOS / Windows / Linux</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<h1 style="margin:0 0 4px;font-size:28px">TechieFlow: Solo-Dev Delivery Workflow</h1>
+<div class="lede">Compressed TechieFlow process for one-person teams. Two flows (brownfield + greenfield), human-readable BRD + Architecture with Mermaid, project-specific coding standards every agent follows, automated verification via <code>verifier</code>, your own library agents (<code>trblazeui</code>, <code>techierag</code>) baked in, zero-friction permissions.</div>
+
+<div class="toc-mini">
+  <span class="pill">Root</span> <code>/mnt/c/3AIGenCode/TechieFlow</code> &nbsp;·&nbsp;
+  <span class="pill">Harness</span> Claude Code (WSL) + OpenCode &nbsp;·&nbsp;
+  <span class="pill">Stack</span> .NET / Blazor / MAUI / TrBlazeUI / TechieRag
+</div>
+
+<!-- ============================================================ -->
+<!-- PROCESS AT A GLANCE — quick-reference flowcharts             -->
+<!-- ============================================================ -->
+<h2 id="ataglance">Process at a glance — flowcharts <span class="pill">quick reference</span><span class="anchor-link"><a href="#ataglance">#</a></span></h2>
+<p class="lede" style="font-size:15px">The whole process on one screen. Each box is the exact command to run (agent + <code>*task</code>); the deep sections (<a href="#flows">§7</a>, <a href="#resume">§8</a>) explain each step. Loops mean "repeat until the gate passes".</p>
+
+<div class="dcap">A · Greenfield — new app from scratch</div>
+<pre class="mermaid">
+flowchart TD
+  A["scaffold-greenfield.sh ."] --> B["/analyst *day1-greenfield"]
+  B --> M["/analyst *mockups (auto-run at day-1)"]
+  M --> C{"Approve BRD + Architecture + mockups"}
+  C -->|"approved"| D["/analyst *split-brd  (creates the one Checklist)"]
+  D --> E["/flow-master *build-phase  (calls trblazeui + techierag)"]
+  E --> F["/verifier *verify all  (data + visual gates)"]
+  F --> G{"All REQ Verified?"}
+  G -->|"bugs found"| X["/flow-master *fix-issues {App} {screenshots-folder}"]
+  X --> F
+  G -->|"yes"| H["/flow-master *handoff-phase"]
+</pre>
+
+<div class="dcap">B · Brownfield — existing app</div>
+<pre class="mermaid">
+flowchart TD
+  A["scaffold-brownfield.sh ."] --> B["/analyst *day1-brownfield  (reverse-doc + DevGuide)"]
+  B --> C{"Was a dev plan migrated into the Checklist?"}
+  C -->|"no"| D["/analyst *split-brd  (creates the Checklist)"]
+  C -->|"yes"| E["/flow-master *build-phase"]
+  D --> E
+  E --> F["/verifier *verify all"]
+  F --> G{"All REQ Verified?"}
+  G -->|"bugs found"| X["/flow-master *fix-issues {App} {screenshots-folder}"]
+  X --> F
+  G -->|"yes"| H["/flow-master *handoff-phase"]
+</pre>
+
+<div class="dcap">C · Which command next? — the Build to Verify to Handoff ladder</div>
+<p class="dnote">Pick the next command from the <em>weakest</em> open REQ in the Checklist. When in doubt, build.</p>
+<pre class="mermaid">
+flowchart TD
+  S{"Weakest open REQ in the Checklist?"}
+  S -->|"any REQ unbuilt (Planned / In Progress / PARTIAL), or built but not testable yet"| B["/flow-master *build-phase {App}"]
+  S -->|"all built and testable, some not yet Verified"| V["/verifier *verify all {App}"]
+  S -->|"all REQ Verified"| H["/flow-master *handoff-phase {App}"]
+</pre>
+
+<div class="dcap">D · Recovering a cold / interrupted project</div>
+<pre class="mermaid">
+flowchart LR
+  A["Session died mid-phase — PROJECT-STATUS is stale"] --> B["/flow-master *refresh-status {App}"]
+  B --> C["Rebuilds status from Checklist + files on disk + a fresh build"]
+  C --> D["Prints the exact next command to resume"]
+</pre>
+
+<div class="dcap">E · Library project (TrBlazeUI / TechieRag) — docs and DevGuide</div>
+<p class="dnote">A NuGet library is a first-class project: same doc set as an app, DevGuide driven by its demo/sample app.</p>
+<pre class="mermaid">
+flowchart TD
+  A["Library repo (TrBlazeUI / TechieRag)"] --> B["/analyst *day1-brownfield  (docs + PROJECT-STATUS)"]
+  B --> C["/analyst *split-brd  (the Checklist)"]
+  C --> D["/flow-master *devguide --update"]
+  D --> E["UI-component library: component-by-component"]
+  D --> G["Service / SDK library: service-by-service"]
+</pre>
+
+<!-- ============================================================ -->
+<h2 id="wsl-bootstrap">0. WSL bootstrap — <span class="pill once">DO ONCE, EVER</span><span class="anchor-link"><a href="#wsl-bootstrap">#</a></span></h2>
+
+<p><strong>Run this once per WSL distro.</strong> Installs headless-Chromium system libs + the MAUI bridge.</p>
+
+<pre><code class="lang-bash">sudo apt-get update && sudo apt-get install -y \
+  libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
+  libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 \
+  libcairo2 libasound2 libgtk-3-0 libx11-xcb1
+
+mkdir -p ~/bin && cat > ~/bin/winrun << 'SH'
+#!/usr/bin/env bash
+WINPATH=$(wslpath -w "$PWD")
+powershell.exe -NoProfile -Command "cd '$WINPATH'; $*"
+SH
+chmod +x ~/bin/winrun
+grep -q 'HOME/bin' ~/.bashrc || echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc</code></pre>
+
+<div class="panel ok"><strong>Verify:</strong> open a new WSL terminal and run <code>which winrun</code> → <code>/home/&lt;you&gt;/bin/winrun</code>.</div>
+
+<!-- ============================================================ -->
+<h2 id="device-bootstrap">0b. Device-host bootstrap (MAUI Android / iOS / Mac Catalyst) — <span class="pill once">DO ONCE PER HOST</span><span class="anchor-link"><a href="#device-bootstrap">#</a></span></h2>
+
+<h3>What this is, in plain words</h3>
+
+<p>The AI does its own testing of every app it builds. For a <strong>website</strong> app it can already "see" the screens — it opens the site in an invisible browser, looks at each page, and checks that everything shows up and looks right. But when an app runs on a <strong>phone, tablet, or as a Mac desktop program</strong>, the AI has no window into it: it can confirm the app <em>compiles</em>, but it can't <em>see</em> what the running app looks like. That is the gap this setup closes — without it, the AI might report "all good" while the real phone screen has buttons on top of each other, text cut off, or empty lists.</p>
+
+<div class="panel"><strong>The analogy:</strong> think of the AI as a quality inspector. For websites it already has a screen to watch. This one-time setup gives it a <strong>video feed and a remote control for a phone (and a Mac)</strong> so it can tap around the real app, take screenshots, and catch a broken-looking screen — the same way it already does for websites. You set up the camera and remote <em>once</em>; after that the AI uses them by itself every time it tests.</div>
+
+<div class="panel warn"><strong>Do you even need this?</strong> Only if the app runs on <strong>phones/tablets (Android or iPhone/iPad)</strong> or as a <strong>Mac desktop program</strong>. If your app is a normal <strong>website</strong> (Blazor), you can skip this whole section — website testing already works out of the box. You can also set up just the parts you need: only Android, or only Apple, or both.</div>
+
+<h3>A few words you'll see</h3>
+<table>
+  <tr><th>Word</th><th>What it means here</th></tr>
+  <tr><td><strong>Appium</strong></td><td>The free tool that acts as the "remote control" — it lets the AI tap buttons and read the screen of a phone or Mac app.</td></tr>
+  <tr><td><strong>Emulator</strong> / <strong>Simulator</strong></td><td>A pretend phone that runs <em>on your computer</em> in a window, so you don't need a physical phone plugged in. "Emulator" = Android; "Simulator" = iPhone/iPad.</td></tr>
+  <tr><td><strong>AVD</strong></td><td>"Android Virtual Device" — one specific pretend Android phone you've created (e.g. a Pixel running Android 14).</td></tr>
+  <tr><td><strong>SDK</strong></td><td>The official toolkit from Google (Android) or Apple (iPhone) for building and running their apps.</td></tr>
+  <tr><td><strong>WSL</strong></td><td>The Linux environment inside your Windows PC where the AI (Claude Code) actually runs.</td></tr>
+  <tr><td><strong>Endpoint / URL</strong></td><td>An address like <code>http://localhost:4723</code> that the AI uses to reach the remote control. <code>localhost</code> means "this same computer".</td></tr>
+  <tr><td><strong>Terminal</strong> / <strong>PowerShell</strong></td><td>A text window where you type commands. On Windows it's "PowerShell" or "Terminal"; on Mac it's the "Terminal" app; inside WSL it's your Ubuntu window.</td></tr>
+</table>
+
+<h3>What you'll need first</h3>
+<ul>
+  <li><strong>For Android testing:</strong> a Windows PC, plus <strong>Android Studio</strong> (the free Google app — the easiest way to get the Android toolkit, a pretend phone, and the emulator all at once) and <strong>Node.js</strong> (free, from <code>nodejs.org</code> — it provides the <code>npm</code> command used to install Appium).</li>
+  <li><strong>For iPhone / iPad / Mac-desktop testing:</strong> a <strong>Mac computer on the same Wi-Fi/network</strong> as your PC, with <strong>Xcode</strong> (free from the Mac App Store) and <strong>Node.js</strong>. This is the same Mac used to build Apple apps.</li>
+  <li>Permission to install software (you may be asked for your password), and an internet connection for the downloads.</li>
+</ul>
+
+<div class="panel"><strong>How the pieces fit:</strong> the pretend phone and its remote control run <em>where that platform lives</em> — Android on your <strong>Windows PC</strong>, iPhone/iPad and Mac-desktop on the <strong>Mac</strong>. The AI just needs the <em>address</em> to reach each one; it never needs the phone tools installed in its own Linux environment. Builds are unaffected — this only adds the AI's ability to <em>watch</em> the running app.</div>
+
+<h3>Step 1 — let the AI reach the Android remote control (Windows only, once)</h3>
+<p>By default the AI's Linux environment and the rest of Windows don't share the same network address. Turning on "mirrored networking" makes them share <code>localhost</code>, so the AI can reach the Android remote control with a simple address. Create or edit the file <code>.wslconfig</code> in your user folder (its full path is <code>%UserProfile%\.wslconfig</code> — paste that into the File Explorer address bar) and put these two lines in it:</p>
+<pre><code class="lang-ini">[wsl2]
+networkingMode=mirrored</code></pre>
+<p>Save it, then open <strong>PowerShell</strong> (click Start, type "PowerShell", press Enter) and run <code>wsl --shutdown</code>. Close and reopen your WSL window. <span class="small">(Skip this step if you're only setting up Apple testing.)</span></p>
+
+<h3>Step 2 — set up the Android pretend-phone + remote control (on the Windows PC)</h3>
+<p><strong>Easiest way (clicking):</strong> install <strong>Android Studio</strong>, open its <em>Device Manager</em>, and click "Create device" to make a pretend phone (e.g. a Pixel with Android 14). Android Studio installs the Android toolkit for you. Then install the remote control by opening <strong>PowerShell</strong> and running the two <code>appium</code> lines below.</p>
+<p><strong>Command way (does the same thing):</strong> in <strong>PowerShell</strong>:</p>
+<pre><code class="lang-powershell"># create a pretend Android phone (an "AVD")
+sdkmanager "system-images;android-34;google_apis;x86_64"
+avdmanager create avd -n Pixel_API_34 -k "system-images;android-34;google_apis;x86_64"
+
+# install the remote control (Appium) and its Android adapter
+npm install -g appium
+appium driver install uiautomator2</code></pre>
+<p>Finally, save a tiny helper file named <code>start-android-verify.ps1</code> (the AI runs this itself to switch the phone + remote control on when it tests). It contains:</p>
+<pre><code class="lang-powershell">Start-Process emulator -ArgumentList "-avd Pixel_API_34 -no-snapshot -no-boot-anim"
+Start-Process appium   -ArgumentList "--address 0.0.0.0 --port 4723"</code></pre>
+<p class="small">If you used a different phone name in Android Studio, use that name instead of <code>Pixel_API_34</code> here and in the settings file in Step 4.</p>
+
+<h3>Step 3 — set up Apple (iPhone/iPad + Mac desktop) testing (on the Mac)</h3>
+<p>On the <strong>Mac</strong> (which must be on the same network as your PC), open the <strong>Terminal</strong> app and install the remote control plus the Apple adapters:</p>
+<pre><code class="lang-bash">npm install -g appium
+appium driver install xcuitest      # for the iPhone/iPad simulator
+appium driver install mac2          # for the Mac desktop app
+appium --address 0.0.0.0 --port 4723   # start the remote control (leave this running while testing)</code></pre>
+<p>Give the Mac a <strong>fixed network address</strong> so the AI always finds it (in your Wi-Fi router, reserve an IP for the Mac — search "DHCP reservation" for your router model). Note that address down; you'll put it in Step 4. <span class="small">(Skip this step if you're only setting up Android.)</span></p>
+
+<h3>Step 4 — tell the app where the remote controls are</h3>
+<p>Each app keeps its settings in a file called <code>core-config.yaml</code>. Add a <code>runtimeVerification.appium</code> section listing only the platforms <em>this</em> app runs on. The AI reads this automatically; if a platform isn't listed (or can't be reached), the AI simply marks that platform's screens "not visually checked" rather than pretending they passed.</p>
+<pre><code class="lang-yaml">runtimeVerification:
+  appium:
+    android:     { url: http://localhost:4723, avd: Pixel_API_34, launch: 'winrun "powershell -File start-android-verify.ps1"' }
+    ios:         { url: http://192.168.1.50:4723, simulator: "iPhone 15" }
+    maccatalyst: { url: http://192.168.1.50:4723 }</code></pre>
+<p class="small">Replace <code>192.168.1.50</code> with your Mac's actual address from Step 3. Keep <code>localhost</code> for Android (that's "this PC"). Remove any platform the app doesn't have.</p>
+
+<div class="panel ok"><strong>Check it works:</strong> in your WSL window, type <code>curl http://localhost:4723/status</code> (Android) and <code>curl http://&lt;your-mac-address&gt;:4723/status</code> (Apple). If you see something containing <code>"ready":true</code>, the remote control is reachable — you're done. From now on the AI turns the pretend phone on, takes screenshots, and checks each screen by itself; you don't run anything.</div>
+
+<div class="panel warn"><strong>If something doesn't work:</strong>
+<ul class="small">
+  <li><strong>"command not found" for <code>sdkmanager</code>/<code>avdmanager</code>/<code>emulator</code>:</strong> these come with Android Studio but may not be on your command path — easiest fix is to create the pretend phone by clicking inside Android Studio's Device Manager instead.</li>
+  <li><strong>"command not found" for <code>npm</code> or <code>appium</code>:</strong> install <strong>Node.js</strong> first (from <code>nodejs.org</code>), then re-run the <code>npm install -g appium</code> line.</li>
+  <li><strong>The <code>curl</code> check fails for Android:</strong> make sure Step 1 (mirrored networking) was done and you reopened WSL, and that the emulator + Appium are actually running (run <code>start-android-verify.ps1</code> once to start them).</li>
+  <li><strong>The <code>curl</code> check fails for Apple:</strong> confirm the Mac is on and on the same Wi-Fi, that <code>appium</code> is still running in its Terminal window, and that you used the Mac's correct address.</li>
+  <li><strong>The AI says a screen is "STATIC-ONLY":</strong> that just means it couldn't reach that platform's remote control this time (e.g. the Mac was off) — it's being honest, not failing. Bring the device host up and ask it to verify again.</li>
+</ul></div>
+
+<p class="small"><strong>One more thing for whoever writes the app's screens:</strong> each important button, list, and value should be given a stable name (an <code>AutomationId</code>) so the AI can find it reliably — this is part of the coding standards (see §10). The AI handles this when it builds; you don't need to.</p>
+
+<!-- ============================================================ -->
+<h2 id="overview">1. Overview &amp; principles<span class="anchor-link"><a href="#overview">#</a></span></h2>
+
+<div class="grid3">
+  <div class="panel">
+    <h4>Compress, don't expand</h4>
+    <p class="small">No story-by-story TechieFlow. One BRD + one Architecture + one Coding-Standards doc (all human-readable) feed the unified <code>build-phase</code> — which reads ONE AI-only doc (the app Checklist) and calls the library agents (<code>/trblazeui</code>, <code>/techierag</code>) as sub-agents.</p>
+  </div>
+  <div class="panel">
+    <h4>Verify, don't trust</h4>
+    <p class="small">The <code>build-phase</code> self-smokes (data + visual) and then chains <code>verifier</code>. Headless Playwright + <code>dotnet test</code>, with a data-render gate AND a visual-truth gate. Verdicts written into the checklist's Requirements Status table.</p>
+  </div>
+  <div class="panel">
+    <h4>Standards enforced from day 1</h4>
+    <p class="small">Every project has <code>docs/&lt;APP&gt;-Coding-Standards.md</code>. Every implementation agent prompt references it. <code>CLAUDE.md</code> at project root pins it for auto-load.</p>
+  </div>
+</div>
+
+<div class="panel ok">
+  <strong>Core idea:</strong> Requirements get IDs (<code>REQ-UI-*</code>, <code>REQ-FN-*</code>, <code>REQ-RAG-*</code>, <code>REQ-NFR-*</code>) in ONE checklist. Implementing agents reference IDs in commits and follow <code>&lt;APP&gt;-Coding-Standards.md</code>. <code>verifier</code> maps IDs → test evidence (data + visual gates), written into the checklist's single Requirements Status table. Nothing is "done" until every row in that table is green.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="painpoints">2. Pain points → solutions<span class="anchor-link"><a href="#painpoints">#</a></span></h2>
+
+<div class="pain">
+  <div class="p"><h4>1. Agents miss requirements; verify-fix loop is exhausting</h4></div>
+  <div class="s"><h4>→ <code>verifier</code> mandatory + ID-driven; chain in same prompt</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>2. WSL has no GUI browser; Playwright MCP eats context</h4></div>
+  <div class="s"><h4>→ Headless Playwright CLI from §0 bootstrap</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>3. Can't build/run MAUI from WSL</h4></div>
+  <div class="s"><h4>→ <code>winrun</code> WSL→Windows bridge (§9)</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>4. Hard to scan markdown on cold re-entry</h4></div>
+  <div class="s"><h4>→ <code>&lt;APP&gt;-BRD.html</code> + <code>&lt;APP&gt;-Architecture.html</code> + <code>PROJECT-STATUS.html</code> with Mermaid (§6 + §11)</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>5. <code>npx techieflow install</code> grabs v6, breaks customizations</h4></div>
+  <div class="s"><h4>→ <code>scaffold-brownfield.sh</code> / <code>scaffold-greenfield.sh</code> copy your v4 setup (§3)</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>6. Claude Code prompts every Bash; <code>*yolo</code> doesn't help</h4></div>
+  <div class="s"><h4>→ Pre-built <code>.claude/settings.json</code> (§12)</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>7. Generated code uses inconsistent style across projects</h4></div>
+  <div class="s"><h4>→ <code>&lt;APP&gt;-Coding-Standards.md</code> per project, referenced in every impl prompt; <code>CLAUDE.md</code> pin</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>8. Agents excuse themselves from smoke-testing ("can't run on Linux / it targets Windows / it's MAUI / Playwright needs a GUI")</h4></div>
+  <div class="s"><h4>→ <code>_smoke-test-policy.md</code>: those are <strong>banned excuses</strong> — headless Playwright + the Windows/MAUI bridge are already set up (§0). Every change is self-smoked by the agent before the verifier; the user is asked to boot only after the build ladder genuinely fails. "It runs" means controls <strong>render their data</strong>, not just HTTP 200.</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>9. Smoke/verify runs pollute the DB with random throwaway test users</h4></div>
+  <div class="s"><h4>→ <code>_smoke-test-policy.md</code>: use the canonical test accounts in <code>&lt;APP&gt;-UsageGuide.md</code> (or look them up in the DB via the connection string); never auto-create — ask the owner to confirm, then record the account in the UsageGuide.</h4></div>
+</div>
+<div class="pain">
+  <div class="p"><h4>10. The data + visual gates only reached Blazor + the MAUI Windows head — Android/iOS/Mac-desktop screens were build-only (never run/observed)</h4></div>
+  <div class="s"><h4>→ <strong>Appium runtime bridge (§0b)</strong>: the verifier drives MAUI <strong>Android</strong> (emulator on the Windows host), <strong>iOS</strong> (Simulator on a LAN Mac), and <strong>Mac Catalyst</strong> (same Mac) over an HTTP WebDriver endpoint that returns the same screenshot + element tree, so the §4a/§4b gates run unchanged. Endpoints live in <code>core-config.yaml → runtimeVerification.appium</code>; an unreachable host degrades that head to <code>⚠ STATIC-ONLY</code>, never a faked pass.</h4></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="scaffolding">3. Scaffolding a new project — copy, don't npm-install<span class="anchor-link"><a href="#scaffolding">#</a></span></h2>
+
+<p>You have a customized v4 setup. <code>npx techieflow install</code> would fetch v6 and lose your customizations. Use the scaffold script:</p>
+
+<p>Three scripts: two scaffolders (one per flow) plus an updater for projects scaffolded earlier. All are idempotent (scaffolders use rsync <code>--ignore-existing</code> — existing files preserved on re-run; the updater force-refreshes framework files including <code>.claude/settings.json</code>, see <a href="#update-framework">below</a>).</p>
+
+<h3>Brownfield (existing app) — <code>scaffold-brownfield.sh</code></h3>
+<pre><code class="lang-bash">cd /path/to/existing-app
+/mnt/c/3AIGenCode/TechieFlow/scaffold-brownfield.sh .</code></pre>
+
+<p>Adds <code>.tfcore/</code>, <code>.claude/commands/</code>, <code>.opencode/command/TechieFlow/</code>, <code>WORKFLOW.html</code>, <code>opencode.jsonc</code>, and <code>.claude/settings.json</code>. <strong>Does NOT touch</strong> existing <code>src/</code>, <code>tests/</code>, or other <code>docs/</code> contents. Warns (non-blocking) if no <code>.csproj</code>/<code>.sln</code> found within 4 levels. Refuses if the target directory doesn't exist (use greenfield script for that).</p>
+
+<h3>Greenfield (new app) — <code>scaffold-greenfield.sh</code></h3>
+<pre><code class="lang-bash">mkdir /path/to/my-new-app && cd /path/to/my-new-app
+git init
+/mnt/c/3AIGenCode/TechieFlow/scaffold-greenfield.sh .
+
+dotnet new sln -n MyNewApp
+dotnet new blazor -n MyNewApp.Web -o src/MyNewApp.Web
+dotnet sln add src/MyNewApp.Web
+dotnet add src/MyNewApp.Web package TrBlazeUI    # if UI involved
+dotnet add src/MyNewApp.Web package TechieRag    # if AI/RAG involved
+dotnet build                                      # deploys library agent files</code></pre>
+
+<p>Same framework drop as brownfield, plus creates empty <code>src/</code>, <code>tests/playwright/</code>, <code>tests/unit/</code> folders ready for use.</p>
+
+<div class="panel">
+  <strong>What neither script creates:</strong> per-project doc files (BRD, Architecture, Coding Standards, the Checklist, etc.). Those are produced by <code>/analyst</code> on day 1 of the workflow (§7 step 1). Both scripts also exclude the library-deployed agent files (<code>trblazeui.md</code>, <code>techierag.md</code>) — those land via <code>dotnet build</code> after you add the NuGet packages.
+</div>
+
+<h3 id="update-framework">Updating an already-scaffolded project — <code>update-framework.sh</code></h3>
+
+<p>When the reference framework at <code>/mnt/c/3AIGenCode/TechieFlow/</code> evolves (new tasks, updated templates, agent fixes), pull those changes into an existing project with the updater. Unlike the scaffolders (<code>--ignore-existing</code>: never touch a file that's already there), the updater <strong>force-overwrites framework files</strong> and preserves everything that contains your work product.</p>
+
+<pre><code class="lang-bash"># Preview what would change (recommended first):
+/mnt/c/3AIGenCode/TechieFlow/update-framework.sh /path/to/your-app --dry-run
+
+# Apply:
+/mnt/c/3AIGenCode/TechieFlow/update-framework.sh /path/to/your-app
+
+# Run from inside the project (defaults to $PWD):
+cd /path/to/your-app
+/mnt/c/3AIGenCode/TechieFlow/update-framework.sh</code></pre>
+
+<p>Note: the script is NOT on your PATH — always invoke it with the full path shown above (a bare <code>update-framework.sh</code> gives <em>"command not found"</em>). Optional alias: <code>echo "alias update-framework.sh='/mnt/c/3AIGenCode/TechieFlow/update-framework.sh'" &gt;&gt; ~/.bashrc</code>.</p>
+
+<table>
+  <tr><th>Force-overwritten (framework — reference repo wins)</th><th>Preserved (your work product — never touched)</th></tr>
+  <tr>
+    <td><code>.tfcore/{tasks,templates,agents,checklists,data,utils,workflows,agent-teams}/</code><br>
+        <code>.claude/commands/TechieFlow/</code> subtree<br>
+        <code>.claude/commands/*.md</code> top-level commands (generate-html etc.)<br>
+        <code>.opencode/command/TechieFlow/</code> subtree<br>
+        <code>WORKFLOW.html</code><br>
+        <code>.claude/settings.json</code> (refreshed to canonical config by default; old file → <code>settings.json.bak</code>; <code>--keep-permissions</code> to skip; <code>settings.local.json</code> never touched)</td>
+    <td><code>docs/</code>, <code>src/</code>, <code>tests/</code><br>
+        <code>PROJECT-STATUS.md</code>, <code>CLAUDE.md</code>, <code>.editorconfig</code><br>
+        <code>.tfcore/core-config.yaml</code><br>
+        <code>opencode.jsonc</code><br>
+        <code>.claude/{trblazeui,techierag}.md</code> + <code>.opencode/command/{trblazeui,techierag}.md</code> (NuGet-deployed)</td>
+  </tr>
+</table>
+
+<div class="panel warn">
+  <strong>After every update: restart Claude Code</strong> in that project. New/changed tasks and agents under <code>.claude/commands/TechieFlow/</code> are only registered as skills at session start — without a restart, a freshly-synced command like <code>/TechieFlow:tasks:generate-html</code> won't resolve.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="naming">4. File-naming convention — <span class="placeholder">&lt;APP&gt;</span> prefix<span class="anchor-link"><a href="#naming">#</a></span></h2>
+
+<p>Every per-project document filename starts with the application name. Examples from the user's existing projects: <code>AppManager-Coding-Standards.md</code>, <code>AstroLyfe-Coding-Standards.md</code>. Same convention applies to every doc:</p>
+
+<table>
+  <tr><th>Pattern</th><th>Example for app "AppManager"</th><th>Example for app "AstroLyfe"</th></tr>
+  <tr><td><code>&lt;APP&gt;-BRD.md</code> / <code>.html</code></td><td><code>AppManager-BRD.md</code></td><td><code>AstroLyfe-BRD.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-Architecture.md</code> / <code>.html</code></td><td><code>AppManager-Architecture.md</code></td><td><code>AstroLyfe-Architecture.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-Coding-Standards.md</code></td><td><code>AppManager-Coding-Standards.md</code></td><td><code>AstroLyfe-Coding-Standards.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-Checklist.md</code> (ONE per app — all REQ-UI/FN/RAG/NFR-*)</td><td><code>AppManager-Checklist.md</code></td><td><code>AstroLyfe-Checklist.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-UIDesign.md</code> (greenfield mockups spec)</td><td><code>AppManager-UIDesign.md</code></td><td><code>AstroLyfe-UIDesign.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-&lt;Library&gt;-Feedback.md</code> (one per library)</td><td><code>AppManager-TrBlazeUI-Feedback.md</code></td><td><code>AstroLyfe-TechieRag-Feedback.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-UsageGuide.md</code></td><td><code>AppManager-UsageGuide.md</code></td><td><code>AstroLyfe-UsageGuide.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-DevGuide.md</code> (developer code-map)</td><td><code>AppManager-DevGuide.md</code></td><td><code>AstroLyfe-DevGuide.md</code></td></tr>
+  <tr><td><code>&lt;APP&gt;-ProductGuide.md</code> (end-user how-to manual)</td><td><code>AppManager-ProductGuide.md</code></td><td><code>AstroLyfe-ProductGuide.md</code></td></tr>
+</table>
+
+<p>Throughout this document, <span class="placeholder">&lt;APP&gt;</span> is a placeholder. When you paste a prompt to an agent, substitute it with your actual application name (no spaces; use PascalCase to match the user's two existing samples).</p>
+
+<p>Files that stay generic (not <code>&lt;APP&gt;</code>-prefixed):</p>
+<ul class="tight">
+  <li><code>PROJECT-STATUS.md</code> / <code>.html</code> — one per repo, project-name is in its content</li>
+  <li><code>CLAUDE.md</code> — Claude Code's auto-loaded session memory; one per repo</li>
+  <li><code>WORKFLOW.html</code> — this file; identical across projects</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="structure">5. Project structure<span class="anchor-link"><a href="#structure">#</a></span></h2>
+
+<pre><code>your-app/                              ← e.g. AppManager/
+├── PROJECT-STATUS.md                  ← /analyst (day 1)
+├── PROJECT-STATUS.html                ← /flow-master after each phase
+├── CLAUDE.md                          ← /analyst (day 1) — pins coding standards
+├── WORKFLOW.html                      ← from scaffold
+│
+├── .tfcore/                        ← from scaffold (your customized v4)
+├── .claude/
+│   ├── commands/TechieFlow/...              ← from scaffold
+│   ├── settings.json                  ← from scaffold (yolo-except-git)
+│   ├── trblazeui.md                   ← from `dotnet build` (TrBlazeUI NuGet)
+│   └── techierag.md                   ← from `dotnet build` (TechieRag NuGet)
+├── .opencode/command/
+│   ├── TechieFlow/...                       ← from scaffold
+│   ├── trblazeui.md                   ← from dotnet build
+│   └── techierag.md                   ← from dotnet build
+├── .trblazeui/TrBlazeUI-AI-Reference.md   ← from dotnet build
+├── .techierag/TechieRag-AI-Reference.md   ← from dotnet build
+│
+├── .editorconfig                      ← /analyst (day 1) — machine-checkable subset of coding standards
+│
+├── docs/
+│   ├── &lt;APP&gt;-BRD.md                ← /analyst — humans + AI
+│   ├── &lt;APP&gt;-BRD.html              ← /flow-master renders BRD.md → humans
+│   ├── &lt;APP&gt;-Architecture.md       ← /analyst — humans + AI (both flows!)
+│   ├── &lt;APP&gt;-Architecture.html     ← /flow-master renders Architecture.md → humans
+│   ├── &lt;APP&gt;-Coding-Standards.md   ← /analyst (day 1) — ALL agents follow this
+│   ├── &lt;APP&gt;-Checklist.md          ← /analyst (*split-brd) — ONE checklist, all REQ-UI/FN/RAG/NFR-* — AI
+│   ├── &lt;APP&gt;-UIDesign.md           ← /analyst (*mockups, greenfield) — per-screen spec + component map — humans
+│   ├── &lt;APP&gt;-UIDesign.html         ← rendered for humans
+│   ├── mockups/                    ← /analyst (*mockups, greenfield) — rendered *.html screens (TrBlazeUI-styled)
+│   ├── screenshots/&lt;APP&gt;/          ← /flow-master (*devguide OBSERVE — any built app) — per-screen *.png (DevGuide + Product Guide source)
+│   ├── &lt;APP&gt;-TrBlazeUI-Feedback.md ← agents log TrBlazeUI issues — one file PER library
+│   ├── &lt;APP&gt;-TechieRag-Feedback.md ← agents log TechieRag issues — each goes to its team
+│   ├── &lt;APP&gt;-UsageGuide.md  ← /flow-master — humans
+│   ├── &lt;APP&gt;-UsageGuide.html       ← /flow-master — rendered for humans
+│   ├── &lt;APP&gt;-DevGuide.md           ← /flow-master (*devguide) — humans (small app: single doc)
+│   ├── &lt;APP&gt;-DevGuide.html         ← /flow-master — rendered for humans
+│   ├── devguides/                  ← large app: split per-role DevGuide (index + &lt;APP&gt;-DevGuide-&lt;Role&gt;.md/.html)
+│   ├── &lt;APP&gt;-ProductGuide.md       ← /flow-master (*productguide) — END USERS / external (small app: single doc)
+│   ├── &lt;APP&gt;-ProductGuide.html     ← /flow-master — rendered for end users
+│   └── productguides/              ← large app: split per-role Product Guide (index + &lt;APP&gt;-ProductGuide-&lt;Role&gt;.md/.html)
+│
+├── tests/{playwright,unit}/  …
+└── src/  …</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="docs">6. Doc artifacts &amp; audiences<span class="anchor-link"><a href="#docs">#</a></span></h2>
+
+<table>
+  <tr><th>File</th><th>Audience</th><th>Format</th><th>Created by</th><th>Purpose</th></tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-BRD.md</code></td>
+    <td><span class="audience h">H</span> <span class="audience a">AI</span></td>
+    <td>MD + Mermaid</td>
+    <td><code>/analyst</code></td>
+    <td>Business Requirements — the WHY.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-BRD.html</code></td>
+    <td><span class="audience h">H</span></td>
+    <td>Self-contained HTML</td>
+    <td><code>/flow-master</code></td>
+    <td>Browseable BRD for stakeholders / future-you.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-Architecture.md</code></td>
+    <td><span class="audience h">H</span> <span class="audience a">AI</span></td>
+    <td>MD + Mermaid</td>
+    <td><code>/analyst</code> (both flows)</td>
+    <td>Brownfield: current architecture + planned deltas. Greenfield: target architecture.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-Architecture.html</code></td>
+    <td><span class="audience h">H</span></td>
+    <td>Self-contained HTML</td>
+    <td><code>/flow-master</code></td>
+    <td>Browseable architecture diagrams.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-Coding-Standards.md</code></td>
+    <td><span class="audience h">H</span> <span class="audience a">AI</span></td>
+    <td>Markdown</td>
+    <td><code>/analyst</code> (day 1)</td>
+    <td>Every implementation agent follows this. Pinned by CLAUDE.md.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-Checklist.md</code></td>
+    <td><span class="audience a">AI</span></td>
+    <td>Markdown w/ <code>REQ-UI-*</code>, <code>REQ-FN-*</code>, <code>REQ-RAG-*</code>, <code>REQ-NFR-*</code></td>
+    <td><code>/analyst</code> (<code>*split-brd</code>)</td>
+    <td>The ONE checklist — every REQ class in a single Requirements Status table. Input for <code>*build-phase</code> (which routes REQ-UI-* to <code>/trblazeui</code> and REQ-RAG-* to <code>/techierag</code> as sub-agents). Scopes (<code>*verify ui|functional|all</code>) filter this one table by REQ prefix. Agent-only working doc — never rendered to HTML.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-UIDesign.md</code> + <code>.html</code><br><code>docs/mockups/*.html</code></td>
+    <td><span class="audience h">H</span></td>
+    <td>MD + HTML</td>
+    <td><code>/analyst</code> (<code>*mockups</code>, greenfield)</td>
+    <td>Per-screen UI Design Spec with a <code>region → TrBlazeUI control</code> component map + rendered TrBlazeUI-styled mockups. Approved with the BRD + Architecture before build; what <code>/trblazeui</code> builds from; the verifier's visual baseline (§4b).</td>
+  </tr>
+  <tr>
+    <td><code>PROJECT-STATUS.md</code> + <code>.html</code></td>
+    <td><span class="audience h">H</span> <span class="audience a">AI</span></td>
+    <td>MD + HTML</td>
+    <td><code>/analyst</code> then <code>/flow-master</code></td>
+    <td>Single source of "where am I".</td>
+  </tr>
+  <tr>
+    <td><code>CLAUDE.md</code></td>
+    <td><span class="audience a">AI</span></td>
+    <td>Markdown</td>
+    <td><code>/analyst</code> (day 1)</td>
+    <td>Auto-loaded by Claude Code; points to coding standards, BRD, Architecture.</td>
+  </tr>
+  <tr>
+    <td><code>.editorconfig</code></td>
+    <td><span class="audience a">AI</span> (toolchain)</td>
+    <td>EditorConfig</td>
+    <td><code>/analyst</code> (day 1)</td>
+    <td>Machine-checkable subset of coding standards (file-scoped namespace, async suffix, no-underscore field naming rule).</td>
+  </tr>
+  <tr>
+    <td>Requirements Status table (inside the one checklist)</td>
+    <td><span class="audience a">AI</span> <span class="audience h">H</span></td>
+    <td>MD table</td>
+    <td>build agents + <code>/verifier</code></td>
+    <td>Per-REQ status/%/remarks — single source of truth; REQ ID → PASS/FAIL/Blocked evidence.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-TrBlazeUI-Feedback.md</code><br><code>docs/&lt;APP&gt;-TechieRag-Feedback.md</code></td>
+    <td><span class="audience h">H</span></td>
+    <td>Markdown</td>
+    <td>All implementing agents</td>
+    <td>Issues to ship back to each library's team — <strong>one file per library</strong> (separate codebases, separate teams; each file is handed to its owning team, who use this same framework to fix them).</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-UsageGuide.md</code> + <code>.html</code></td>
+    <td><span class="audience h">H</span></td>
+    <td>MD + HTML</td>
+    <td><code>/flow-master</code></td>
+    <td>Final handoff: install, run, test, smoke checklist.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-DevGuide.md</code> + <code>.html</code><br><small>(large apps: split per role into <code>docs/devguides/&lt;APP&gt;-DevGuide-{Role}.md</code> + index)</small></td>
+    <td><span class="audience h">H</span></td>
+    <td>MD + HTML</td>
+    <td><code>/flow-master</code> (<code>*devguide</code>)</td>
+    <td>Developer reference: every screen → control → service method → stored procedure, grouped by user role. Used to trace bugs and verify AI-generated code. Auto-generated at handoff; re-runnable anytime. See <a href="#docs">§6</a>.</td>
+  </tr>
+  <tr>
+    <td><code>docs/&lt;APP&gt;-ProductGuide.md</code> + <code>.html</code><br><small>(large apps: split per role into <code>docs/productguides/&lt;APP&gt;-ProductGuide-{Role}.md</code> + index)</small></td>
+    <td><span class="audience h">H</span> (end users / external)</td>
+    <td>MD + HTML</td>
+    <td><code>/flow-master</code> (<code>*productguide</code>)</td>
+    <td>End-user how-to manual: what each screen is for and how to do each task, illustrated with the screenshots captured for the DevGuide. The user-facing sibling of the DevGuide (same screens, different audience). On-demand; <code>--update</code> refreshes changed screens; always emits MD + HTML. See <a href="#docs">§6</a>.</td>
+  </tr>
+  <tr>
+    <td><code>.tfcore/TOKEN-GUIDE.md</code></td>
+    <td><span class="audience h">H</span></td>
+    <td>Markdown</td>
+    <td>framework (ships with scaffold)</td>
+    <td>Token-efficiency guide — where AI tokens go and how to keep usage low. See <a href="#quickref">§14</a>.</td>
+  </tr>
+</table>
+
+<div class="panel">
+  <strong>Mermaid in HTML.</strong> <code>/flow-master</code> renders BRD.html and Architecture.html as self-contained HTML with <code>&lt;script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"&gt;&lt;/script&gt;</code> and <code>mermaid.initialize({startOnLoad:true, theme:'dark'})</code>. ```mermaid fences in the MD become SVG diagrams in the HTML.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="flows">7. Workflows<span class="anchor-link"><a href="#flows">#</a></span></h2>
+
+<div class="panel ok">
+  <strong>No paste-and-substitute friction:</strong> every workflow step below is wrapped as a proper TechieFlow task that takes <code>{AppName}</code> as an argument. Run <code>/analyst *day1-brownfield TrTools</code> and the analyst executes the full multi-step task with the right file paths and templates already wired up. The agent will ask for the app name only if you forget to pass it.
+  <br><br>
+  The task files live in <code>.tfcore/tasks/</code>: <code>day1-brownfield.md</code>, <code>day1-greenfield.md</code>, <code>mockups.md</code>, <code>render-workflow-docs.md</code>, <code>split-brd.md</code>, <code>build-phase.md</code> (the ONE unified build), <code>verify-phase.md</code>, <code>fix-issues.md</code>, <code>devguide.md</code>, <code>handoff-phase.md</code>. Open any of them to see exactly what the agent will do.
+</div>
+
+<div class="panel warn">
+  <strong>If <code>*&lt;command&gt;</code> says "I don't have that command":</strong> Claude Code cached the old agent persona. Two things to check:
+  <ol class="tight">
+    <li>Re-run the scaffold for this project: <code>scaffold-brownfield.sh .</code> or <code>scaffold-greenfield.sh .</code>. It includes a force-sync step that copies agent files from <code>.tfcore/agents/</code> to <code>.claude/commands/TechieFlow/agents/</code> and <code>.opencode/command/TechieFlow/agents/</code> (the paths the harnesses actually load).</li>
+    <li><strong>Restart Claude Code</strong> in this project so it re-scans skills. The slash-command registry only refreshes at startup.</li>
+  </ol>
+  Rule of thumb: edit agent files only in <code>.tfcore/agents/</code>; the scaffold force-mirrors them to the two harness paths. Never edit the harness copies directly — they'll be overwritten next scaffold.
+</div>
+
+<div class="tabs">
+  <button class="active" data-tab="bf">Brownfield (existing app)</button>
+  <button data-tab="gf">Greenfield (new app)</button>
+</div>
+
+<!-- BROWNFIELD -->
+<div class="tabpanel active" id="tab-bf">
+
+<div class="panel">
+  <strong>Prereq:</strong> ran <code>scaffold-brownfield.sh</code> in the project root.
+  <br><span class="small"><strong>Typical agent invocations:</strong> 4–6 (day-1, split-brd, build-phase ×1–2, handoff). <strong>Manual checkpoints:</strong> 2 (BRD/Architecture/Standards + DevGuide-screenshot review, final UAT).</span>
+</div>
+
+<div class="flow">
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h4>Reverse-doc + create all six day-1 deliverables</h4>
+      <p>Produces, in ONE bulk pass (no per-section/per-requirement confirmation): <code>&lt;APP&gt;-Architecture.md</code>, <code>&lt;APP&gt;-BRD.md</code> (feature catalog + BRD ledger), <code>&lt;APP&gt;-Coding-Standards.md</code>, <code>.editorconfig</code>, <code>PROJECT-STATUS.md</code>, <code>CLAUDE.md</code>, the <code>&lt;APP&gt;-UsageGuide.md</code>, and — because brownfield already has built code — the screen-by-screen <code>&lt;APP&gt;-DevGuide.md</code> (§7.6) — <strong>plus the HTML render of every doc</strong> (no separate render step). Updates <code>core-config.yaml</code> with the app-specific doc paths.</p>
+      <p class="cmds"><span class="badge cmd">/analyst</span> <span class="badge task">*day1-brownfield TrTools</span></p>
+      <p class="small">Substitute <code>TrTools</code> with your app name. Asks at most twice: app name (if omitted) and which existing docs to harvest (<code>all</code> = default / a selection / extra paths / drafting instructions). It never asks merge-vs-new: deliverables are always written fresh at canonical names and pre-existing/superseded docs are archived to <code>docs/OldDocs/</code>. If a dev/phase plan exists, it's migrated into the one <code>&lt;APP&gt;-Checklist.md</code> in the same run (completed phases pre-marked Done — skip step 3 below). <strong>Brownfield-only:</strong> because the repo already has built code, it also generates the screen-by-screen <strong>DevGuide</strong> (§7.6 — the as-built page → control → service → data-access → proc map). The DevGuide's OBSERVE pass boots the app, <strong>captures a screenshot of every screen</strong> to <code>docs/screenshots/&lt;APP&gt;/</code>, embeds them, and presents an <strong>owner visual-review gate</strong> ("here is how each screen renders — what needs to change?") — the brownfield counterpart to greenfield mockups. (Commonly <code>STATIC-ONLY</code> at day-1 until the stack is up; found defects land in the one checklist.) Greenfield day-1 has no code, so instead it produces UI <strong>mockups</strong> (§7.10). Task: <code>.tfcore/tasks/day1-brownfield.md</code>.</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h4>Review the rendered HTMLs — manual checkpoint (≈15 min)</h4>
+      <p class="small">No command — day-1 already rendered everything. Open <code>&lt;APP&gt;-BRD.html</code> (business intent right?), <code>&lt;APP&gt;-Architecture.html</code> (matches what you want?), <code>PROJECT-STATUS.html</code> (next command correct?), skim Coding Standards. Cheapest catch-mistakes point. Edit the <code>.md</code> sources directly for anything wrong, then re-render just those files: <code>/generate-html @docs/&lt;APP&gt;-BRD.md</code> (see <a href="#docs">§6</a>).</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">3</div>
+    <div class="body">
+      <h4>Split BRD into the one Checklist</h4>
+      <p class="cmds"><span class="badge cmd">/analyst</span> <span class="badge task">*split-brd TrTools</span></p>
+      <p class="small">Every BRD-N maps to one or more REQ-UI-*/REQ-FN-*/REQ-RAG-*/REQ-NFR-* in the single <code>docs/&lt;APP&gt;-Checklist.md</code> (one Requirements Status table), each back-linked to its source BRD. Each <code>REQ-UI-*</code> cites the mockup screen it realizes (greenfield). Task: <code>.tfcore/tasks/split-brd.md</code>.</p>
+      <p class="small"><strong>Manual checkpoint:</strong> read the checklist, adjust if needed.</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <h4>Build phase — ONE unified build (chains self-smoke + verifier)</h4>
+      <p class="cmds"><span class="badge cmd">/flow-master</span> <span class="badge task">*build-phase TrTools</span></p>
+      <p class="small">There is no longer a separate UI / RAG / functional build. <code>*build-phase</code> reads the one checklist, clusters ALL open REQs, and fans them out — <strong>calling <code>/trblazeui</code> (REQ-UI-*, building from the approved mockups) and <code>/techierag</code> (REQ-RAG-*) as sub-agents</strong>, and building REQ-FN-* / REQ-NFR-* itself. It then <strong>self-smokes (data + visual)</strong> and auto-chains <code>/verifier</code>. You never invoke <code>/trblazeui</code> or <code>/techierag</code> directly — flow-master orchestrates them. Task: <code>.tfcore/tasks/build-phase.md</code>.</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">5</div>
+    <div class="body">
+      <h4>Verify loop (until green)</h4>
+      <p><code>*build-phase</code> self-chains <code>/verifier</code>, which writes verdicts into the one checklist's Requirements Status table and applies BOTH gates — the <strong>data-render gate</strong> (§4a: every control renders its data) AND the <strong>visual-truth gate</strong> (§4b: no overlap, every control in-viewport and non-zero-size at desktop + mobile, screenshot inspected, diffed against the mockup when one exists). A REQ is <code>Verified</code> only if acceptance passes AND data renders AND the screen looks right.</p>
+      <p class="small">If Vidur reports misses, just re-run <code>/flow-master *build-phase TrTools</code> — it detects FIX mode and fans out repair subagents (layout/visual fixes route back to <code>/trblazeui</code>). Or re-verify a scope directly with <code>/TechieFlow:agents:verifier *verify ui|functional|all</code> (it filters the one table by REQ prefix). Loop until green; <code>Blocked</code> (library-gap) items pass through. Vidur also runs the <strong>standards-compliance grep checks</strong> from <code>&lt;APP&gt;-Coding-Standards.md</code> §"Enforcement".</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">6</div>
+    <div class="body">
+      <h4>Handoff: usage doc + dev guide + status + library-feedback consolidation + HTML refresh</h4>
+      <p class="cmds"><span class="badge cmd">/flow-master</span> <span class="badge task">*handoff-phase TrTools</span></p>
+      <p class="small">Produces UsageGuide doc (test users + test plan + setup), runs <code>*devguide</code> (§3a — generates the screen-by-screen Developer Guide documenting the code as-built, capturing a screenshot of every screen), sets PROJECT-STATUS phase to Handoff, re-renders human-facing HTMLs (BRD, Architecture, UIDesign, UsageGuide, DevGuide, PROJECT-STATUS — <strong>not</strong> the checklist), consolidates each per-library feedback file with summary counts. It also points owners at <code>*productguide &lt;APP&gt;</code> (<a href="#docs">§6</a>) — the optional end-user how-to manual, built from the same screens + screenshots the DevGuide just captured. Task: <code>.tfcore/tasks/handoff-phase.md</code>.</p>
+      <p class="small"><strong>Manual checkpoint:</strong> 15-min UAT against the smoke checklist. Then hand each <code>&lt;APP&gt;-&lt;Library&gt;-Feedback.md</code> to its team / file as GitHub issues (§9.2). <strong>Found a bug after shipping?</strong> Drop screenshots into a folder and run <code>*fix-issues</code> (§7.11).</p>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /tab-bf -->
+
+<!-- GREENFIELD -->
+<div class="tabpanel" id="tab-gf">
+
+<div class="panel">
+  <strong>Prereq:</strong> scaffold + <code>dotnet new sln/blazor</code> + library NuGets + <code>dotnet build</code> (deploys library agent files).
+</div>
+
+<div class="flow">
+
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h4>Brief + BRD + Architecture + Coding-Standards + CLAUDE.md + PROJECT-STATUS + .editorconfig</h4>
+      <p class="cmds"><span class="badge cmd">/analyst</span> <span class="badge task">*day1-greenfield MyNewApp</span></p>
+      <p class="small">Asks once for the concept (ANY length — sentence, bullets, half-baked notes) and once for optional harvest paths / drafting instructions, then produces the day-1 artifacts in bulk — including a TARGET architecture with stack defaults (Blazor Server + TrBlazeUI + TechieRag-if-AI + SQLite-for-dev) and the UI <strong>mockups</strong> (<code>docs/&lt;APP&gt;-UIDesign.md</code> + <code>docs/mockups/*.html</code>, §7.10) — <strong>plus the HTML render of every doc</strong> (no separate render step). Substitute <code>MyNewApp</code> with your actual app name. Task: <code>.tfcore/tasks/day1-greenfield.md</code>.</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h4>Review the rendered HTMLs AND the mockups — manual checkpoint (approve before build)</h4>
+      <p>No command — day-1 already rendered everything. Read the BRD/Architecture HTMLs AND open <code>docs/mockups/*.html</code> + <code>docs/&lt;APP&gt;-UIDesign.md</code>: this is the visual design the UI will be built to match, so flag any screen that's wrong NOW. Edit the <code>.md</code> sources and re-render with <code>/generate-html @docs/file.md</code>, or run <code>*mockups &lt;APP&gt; --update</code>. The BRD + Architecture + mockups are <strong>approved together</strong> before any build.</p>
+      <p class="small">This is your last cheap chance to redirect before code gets written.</p>
+    </div>
+  </div>
+
+  <div class="arrow">↓</div>
+
+  <div class="step">
+    <div class="num">3–6</div>
+    <div class="body">
+      <h4>Split BRD → Build phase → Verify → Handoff</h4>
+      <p>Identical to brownfield steps 3–6. Same prompts, same one checklist, same unified <code>*build-phase</code> (which builds REQ-UI-* from your approved mockups via <code>/trblazeui</code>), same data + visual gates, same standards-compliance discipline.</p>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /tab-gf -->
+
+<h3 id="evolving-docs">7.9 Evolving the day-1 docs (the concept/requirements changed)</h3>
+
+<p>Day-1 produces a first-pass BRD + Architecture, but a project keeps moving — the greenfield concept is still being discussed, or a requirement shifts mid-development. You do <strong>not</strong> have to hand-edit and hope, and you should <strong>not</strong> silently let the docs drift out of date. Pick by how big the change is:</p>
+
+<table>
+  <thead><tr><th>Situation</th><th>Command</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Concept/requirements evolved</strong> — add / reword / drop features, a new integration, a stack tweak — but most of the docs are still right</td>
+      <td><code>*amend-docs &lt;APP&gt; "&lt;what changed&gt;"</code><br><span class="small">(analyst or flow-master)</span></td>
+      <td>Surgically amends the BRD + Architecture <strong>in place</strong>: appends new <code>BRD-N</code> (IDs are append-only — modified IDs are edited in place, removed ones struck through, never renumbered), updates the feature catalog + §4 Development-status, ripples new/changed REQs into the checklist (appends new rows, flags modified ones for re-verify — never blindly re-splits), re-renders the HTML, and runs the status gate. Confirms the parsed change-set once, then applies in bulk. <strong>Preserves every unchanged section</strong> — no <code>OldDocs</code> archive.</td>
+    </tr>
+    <tr>
+      <td><strong>Pure additions</strong> and you want to confirm each requirement one at a time</td>
+      <td><code>*create-brd &lt;APP&gt; &lt;topic&gt;</code> → <code>author-brd</code><br><span class="small">(analyst)</span></td>
+      <td>Interactive, per-item elicitation; appends confirmed <code>BRD-N</code> to the existing BRD. (<code>*amend-docs</code> defers to this for the additive part if you ask.)</td>
+    </tr>
+    <tr>
+      <td><strong>"What's built" view</strong> is what you want refreshed (not the requirements)</td>
+      <td>automatic, or <code>*refresh-status &lt;APP&gt;</code></td>
+      <td>The status gate already re-derives <code>PROJECT-STATUS</code> + the BRD §4 rollup at the end of every build/verify/handoff. <code>*refresh-status</code> rebuilds them on demand (see §8a).</td>
+    </tr>
+    <tr>
+      <td><strong>Full pivot</strong> — most of the BRD/Architecture is now wrong</td>
+      <td>re-run <code>*day1-greenfield</code> / <code>*day1-brownfield</code></td>
+      <td>The §1.6 collision policy archives the old docs to <code>docs/OldDocs/</code> and writes fresh. Use this only for a wholesale redo, never for an incremental change (it would discard unchanged content + history).</td>
+    </tr>
+    <tr>
+      <td><strong>You just hand-edited a <code>.md</code></strong></td>
+      <td><code>/generate-html @docs/&lt;file&gt;.md</code></td>
+      <td>Re-renders that one doc's HTML so the human-readable view isn't stale.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="small">Rule of thumb: <strong>amend, don't regenerate.</strong> <code>*amend-docs</code> is the default for an evolving project; re-running day-1 is the escape hatch for a true restart. After amending, if new requirements were added to an already-split project, run <code>*split-brd</code> (or the build phase the report points at) to carry them into the build.</p>
+
+<h3 id="mockups">7.10 Greenfield UI mockups (<code>*mockups</code>)</h3>
+
+<p>A greenfield app has no code, so its UI is built freehand from prose — which is exactly why a new app's UI comes out broken (overlapping controls, wrong layout, nothing to verify against). The analyst produces <strong>mockups at day-1</strong> to give the build an approved visual contract and the verifier a baseline to diff against:</p>
+
+<p class="cmds"><span class="badge cmd">/analyst</span> <span class="badge task">*mockups MyNewApp</span></p>
+
+<p>Reads the TrBlazeUI component catalog FIRST (so it designs only with controls that exist), then produces <code>docs/&lt;APP&gt;-UIDesign.md</code> — a per-screen spec with a <code>region → TrBlazeUI control</code> component map — plus rendered <code>docs/mockups/*.html</code> styled to look like TrBlazeUI, one per key screen from the BRD §9 feature catalog. Auto-run inside <code>*day1-greenfield</code>; re-runnable with <code>*mockups &lt;APP&gt; --update</code> to refresh only changed screens after an <code>*amend-docs</code> that added UI. The mockups are approved alongside the BRD + Architecture, are what <code>/trblazeui</code> builds from, and are the image the visual-truth gate (<a href="#quickref">§4b</a>) diffs the live screen against. <strong>Mockups are greenfield only</strong> — a greenfield app has no code to screenshot yet, so its mockups are the pre-build visual contract; brownfield already has built code and instead reviews real screenshots in the DevGuide's OBSERVE pass (§7.6). Note this is about <em>mockups</em>, not screenshots: once a greenfield app is built, its DevGuide OBSERVE pass captures real per-screen screenshots exactly like brownfield (<a href="#docs">§6</a>). Task: <code>.tfcore/tasks/mockups.md</code>.</p>
+
+<h3 id="fix-issues">7.11 Fixing issues you found by running the app (<code>*fix-issues</code>)</h3>
+
+<p>When the verifier passed but the running UI is still broken — overlapping controls, blank screens, wrong data — there is ONE front door:</p>
+
+<p class="cmds"><span class="badge cmd">/flow-master</span> <span class="badge task">*fix-issues MyApp ./bugshots</span></p>
+
+<p>Drop a folder of <strong>screenshots</strong> (plus an optional <code>bugs.md</code> describing what's wrong on each) and flow-master: reads every screenshot (vision), reproduces each issue live with Playwright, triages it (layout / data / logic / RAG), and <strong>fans the fix out to the right builder</strong> — <code>/trblazeui</code> for layout, its own subagents for data/logic, <code>/techierag</code> for RAG. <strong>You never invoke a builder agent yourself — flow-master calls them as sub-agents.</strong> It then re-smokes (data + visual) and re-verifies the affected REQs, and updates the DevGuide + the one checklist + PROJECT-STATUS. This is the answer to "the verifier passed but the UI is broken — who do I call?". Task: <code>.tfcore/tasks/fix-issues.md</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="resume">8. Resuming a cold project<span class="anchor-link"><a href="#resume">#</a></span></h2>
+
+<p>Two flavours of resume. Pick by asking one question: <strong>do you trust <code>PROJECT-STATUS.md</code>?</strong></p>
+
+<div class="panel warn">
+  <strong>8a. The session BROKE mid-phase → run <code>*refresh-status</code> first.</strong>
+  <p>If the last session died in the middle of a build or verify — lost internet, model access revoked/changed mid-run, terminal killed, agent crashed — then the mandatory status gate never ran. <code>PROJECT-STATUS.md</code> is now <em>stale or wrong</em>: it may point at an old "Next command", undercount work that landed after its last write, or claim a passing build that's since broken. Do NOT trust it. Run the recovery command, which rebuilds PROJECT-STATUS from <em>ground-truth evidence</em> (the checklist Requirements Status table + what's actually in the working tree, including file modification times + a fresh <code>dotnet build</code> — no git; git is manual in this framework) and tells you the exact command to resume with:</p>
+  <p class="cmds"><span class="badge cmd">/TechieFlow:agents:flow-master</span> <code>*refresh-status &lt;APP&gt;</code> &nbsp;—&nbsp; OpenCode: <code>/flow-master *refresh-status &lt;APP&gt;</code> &nbsp;·&nbsp; add <code>verify</code> to also re-run the verifier on any REQ whose true state is ambiguous.</p>
+  <p style="margin-bottom:0">It never edits source code — it only reconstructs status. When it finishes, follow its "next command", then drop into the clean flow below. This is the answer to "an experimental model lost access mid-development and I don't know where it left things."</p>
+</div>
+
+<p><strong>8b. Clean cold resume</strong> (you came back to a project whose last phase <em>did</em> finish and wrote PROJECT-STATUS): trust the file and walk the four steps.</p>
+
+<div class="flow">
+  <div class="step">
+    <div class="num">1</div>
+    <div class="body">
+      <h4>Open three HTML files in browser</h4>
+      <p><code>PROJECT-STATUS.html</code> (where am I), <code>&lt;APP&gt;-BRD.html</code> (why was I doing this), <code>&lt;APP&gt;-Architecture.html</code> (what's the shape). &lt; 5 min.</p>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step">
+    <div class="num">2</div>
+    <div class="body">
+      <h4>"What changed" check</h4>
+      <pre><code class="lang-bash">cd /path/to/project
+git log --oneline -20 && git status
+dotnet build</code></pre>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step">
+    <div class="num">3</div>
+    <div class="body">
+      <h4>Re-verify</h4>
+      <p class="cmds"><span class="badge cmd">/verifier</span> → <em>"Re-verify the checklist's Requirements Status table and run standards-compliance greps from docs/&lt;APP&gt;-Coding-Standards.md. Note regressions."</em></p>
+    </div>
+  </div>
+  <div class="arrow">↓</div>
+  <div class="step">
+    <div class="num">4</div>
+    <div class="body">
+      <h4>Execute the "Next command" from <code>PROJECT-STATUS.md</code></h4>
+    </div>
+  </div>
+</div>
+
+<div class="panel warn">
+  <strong>Discipline:</strong> every phase (build, verify, handoff) ends with <code>/flow-master</code> updating PROJECT-STATUS. Never skip it. And when a run is cut off before it can — <code>*refresh-status &lt;APP&gt;</code> (§8a) is the safety net that rebuilds it from evidence.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="libraries">9. Custom library agents — routing rules<span class="anchor-link"><a href="#libraries">#</a></span></h2>
+
+<p><code>/trblazeui</code> and <code>/techierag</code> are <strong>library agents</strong> — flow-master calls them as <strong>sub-agents</strong> during <code>*build-phase</code> and <code>*fix-issues</code> (and the analyst calls <code>/trblazeui</code> for its component catalog during <code>*mockups</code>). You drive the build/fix through flow-master; it routes each REQ cluster to the right builder by its prefix.</p>
+
+<table>
+  <tr><th>Trigger</th><th>Routed (by <code>*build-phase</code> / <code>*fix-issues</code>) to</th><th>Reads (besides &lt;APP&gt;-Coding-Standards.md)</th></tr>
+  <tr><td><code>REQ-UI-*</code> — UI work (pages, components, forms, dashboards)</td><td><code>/trblazeui</code> (sub-agent) — builds from the mockups</td><td><code>.trblazeui/TrBlazeUI-AI-Reference.md</code> + the Checklist + <code>docs/mockups/*.html</code></td></tr>
+  <tr><td><code>REQ-RAG-*</code> — AI/RAG/LLM (embedding, vector store, chat, tools)</td><td><code>/techierag</code> (sub-agent)</td><td><code>.techierag/TechieRag-AI-Reference.md</code> + the Checklist</td></tr>
+  <tr><td><code>REQ-FN-*</code> / <code>REQ-NFR-*</code> — backend / business logic / data / APIs / non-functional</td><td><code>/flow-master</code> own subagents</td><td>the Checklist + Architecture</td></tr>
+  <tr><td>Reverse-doc, BRD/Architecture/Standards, requirements splitting, mockups</td><td><code>/analyst</code></td><td>codebase / brief</td></tr>
+  <tr><td>Verification of any scope (data + visual gates)</td><td><code>/verifier</code></td><td>the Checklist + DevGuide + running app + standards grep checks</td></tr>
+  <tr><td>Unified build / fix-issues / HTML renders / status / handoff / consolidation</td><td><code>/flow-master</code></td><td>everything</td></tr>
+</table>
+
+<h3 id="add-library">9.1 Adding a new custom library agent</h3>
+<ol class="tight">
+  <li>Library's NuGet adds an MSBuild target that copies on consumer build: <code>.&lt;libname&gt;/&lt;LibName&gt;-AI-Reference.md</code>, <code>.claude/&lt;libname&gt;.md</code>, <code>.opencode/command/&lt;libname&gt;.md</code>.</li>
+  <li>Agent file's frontmatter: <code>description</code>, <code>mode: primary</code>, <code>tools</code>. Body: load reference doc on activation + REQUIRED READING clause for <code>docs/&lt;APP&gt;-Coding-Standards.md</code>.</li>
+  <li>Add routing row to the table above.</li>
+  <li>The new library gets its OWN feedback file — <code>&lt;APP&gt;-&lt;LibName&gt;-Feedback.md</code> with its own issue-ID prefix, from the shared template. Never share a feedback file between libraries.</li>
+  <li>Update <code>build-phase</code>'s cluster-routing (and <code>fix-issues</code>'s triage) to route the new ID prefix to the new sub-agent.</li>
+</ol>
+
+<h3 id="library-feedback">9.2 Library issue tracking flow</h3>
+<ol class="tight">
+  <li>Implementing agents log on encounter — into the OWNING library's file (<code>&lt;APP&gt;-TrBlazeUI-Feedback.md</code> for TR-NNN, <code>&lt;APP&gt;-TechieRag-Feedback.md</code> for TR-RAG-NNN). Clause baked into §7 prompts.</li>
+  <li>Verifier escalates library bugs → <code>Blocked</code> status in the checklist's Requirements Status table + entry in that library's feedback file.</li>
+  <li><code>/flow-master</code> consolidates each file separately at handoff: dedupe, severity sort, summary header (splits + archives any legacy combined <code>&lt;APP&gt;-Library-Feedback.md</code>).</li>
+  <li>You hand each file to its team — they use this same framework, so the file drops straight into their flow — or file as GitHub issues: <code>gh issue create --repo your-org/TrBlazeUI --title "…" --body-file …</code></li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="standards-enforcement">10. Coding standards — how enforcement actually works<span class="anchor-link"><a href="#standards-enforcement">#</a></span></h2>
+
+<p>"Every agent follows the standards" is achieved through <strong>three layered mechanisms</strong>. None alone is sufficient; all three together close the gaps.</p>
+
+<div class="grid3">
+  <div class="panel">
+    <h4>1. Prompt-level (every session)</h4>
+    <p class="small">Every implementation prompt in §7 starts with "REQUIRED READING: docs/&lt;APP&gt;-Coding-Standards.md". The agent loads it before writing any code. Cross-harness reliable.</p>
+  </div>
+  <div class="panel">
+    <h4>2. <code>CLAUDE.md</code> auto-load</h4>
+    <p class="small">Claude Code auto-loads <code>CLAUDE.md</code> at project root into every session. It says "Always follow docs/&lt;APP&gt;-Coding-Standards.md before any code write." Catches even direct user prompts that forgot the boilerplate.</p>
+  </div>
+  <div class="panel">
+    <h4>3. <code>.editorconfig</code> + verifier greps</h4>
+    <p class="small">Machine-checkable rules go in <code>.editorconfig</code> (Roslyn enforces in the IDE / build). Non-checkable rules (a/v prefixes, test-name underscores) become grep patterns the verifier runs in the verify pass.</p>
+  </div>
+</div>
+
+<p>The grep patterns belong inside <code>docs/&lt;APP&gt;-Coding-Standards.md</code> under an "Enforcement" section. Sample grep block (already in §11.3 template):</p>
+
+<pre><code class="lang-bash"># Forbidden field forms
+grep -rE "private(\s+readonly)?\s+\w+\s+_[a-z]" src/    # underscore prefix
+# Instance field must start with `obj` (not bare PascalCase, not _underscore)
+grep -rE "private(\s+readonly)?\s+\w+\s+(?!obj)[A-Z]\w+\s*[;=]" src/ | grep -v "static\|const"
+
+# Forbidden test-method form
+grep -rE "public\s+(async\s+)?Task\s+\w+_\w+\s*\(" tests/
+
+# Parameter without a-prefix (heuristic; grep catches "(string Foo" but not all cases)
+grep -rE "\(\s*\w+\s+[A-Z]\w+\s*[,)]" src/</code></pre>
+
+<!-- ============================================================ -->
+<h2 id="wsl-runtime">11. MAUI builds &amp; runs from WSL<span class="anchor-link"><a href="#wsl-runtime">#</a></span></h2>
+
+<pre><code class="lang-bash">cd /mnt/c/path/to/maui-project
+winrun "dotnet build -c Release"
+winrun "dotnet test"
+winrun "dotnet build -t:Run -f net9.0-windows10.0.19041.0"</code></pre>
+
+<p>For verifier on a MAUI <strong>Windows</strong> app: <em>"This is a MAUI Windows app. Build/run/test via `winrun`. UI automation: FlaUI or Appium-Windows-driver Windows-side, NOT Playwright. Output evidence the same as Blazor projects."</em></p>
+
+<h3>Mobile &amp; Mac-desktop heads — runtime-observe over Appium</h3>
+<p>The §4a data-render and §4b visual-truth gates reach the MAUI <strong>Android / iOS / Mac Catalyst</strong> heads through an <strong>Appium</strong> WebDriver endpoint — the native analogue of Playwright (same screenshot + element-tree evidence, so the gates run unchanged). One-time host setup is <a href="#device-bootstrap">§0b</a>; the per-head driver map lives in <code>build-invocation-ladder.md §D</code>. <strong>Builds don't change</strong> — Android still builds via <code>cmd.exe</code> (ladder rung #4), iOS/Catalyst on the paired Mac; this is purely how the verifier reaches the <em>running</em> UI after a green build.</p>
+<table>
+  <thead><tr><th>Head</th><th>Where it runs</th><th>Appium driver</th><th>WSL reaches it via</th></tr></thead>
+  <tbody>
+    <tr><td>MAUI Android</td><td>emulator on the Windows host (Android SDK)</td><td><code>uiautomator2</code></td><td><code>http://localhost:4723</code> (mirrored networking); verifier boots emulator + Appium itself</td></tr>
+    <tr><td>MAUI iOS</td><td>Simulator on a LAN Mac</td><td><code>xcuitest</code></td><td><code>http://&lt;mac-ip&gt;:4723</code>; Mac must be up or head is <code>⚠ STATIC-ONLY</code></td></tr>
+    <tr><td>MAUI Mac Catalyst</td><td>the same LAN Mac (desktop .app)</td><td><code>mac2</code></td><td><code>http://&lt;mac-ip&gt;:4723</code></td></tr>
+    <tr><td>MAUI Windows</td><td>Windows side</td><td>FlaUI / Appium-Windows (unchanged)</td><td><code>winrun</code> / <code>cmd.exe</code></td></tr>
+  </tbody>
+</table>
+<p>Selectors target each control's <code>AutomationId</code> (a coding standard, §10). A head with no registered endpoint in <code>core-config.yaml → runtimeVerification.appium</code>, or an unreachable host, is stamped <code>⚠ STATIC-ONLY</code> for that head — never a faked <code>Verified</code>.</p>
+
+<!-- ============================================================ -->
+<h2 id="permissions">12. Permissions (yolo-except-git)<span class="anchor-link"><a href="#permissions">#</a></span></h2>
+
+<div class="panel warn">
+  <strong>TechieFlow's <code>*yolo</code> vs Claude Code permissions:</strong> <code>*yolo</code> is an AGENT mode (don't ask elicitation questions). Claude Code's tool-permission layer is separate. The fix is <code>.claude/settings.json</code>, dropped by the scaffold scripts.
+</div>
+
+<p>The pre-built config <strong>auto-allows</strong> Read/Glob/Grep/Edit/Write/MultiEdit and <strong>all Bash</strong> (bare <code>"Bash"</code>) — so create/update/<strong>move</strong> run with zero prompts. <strong>Asks</strong> for <strong>deletes</strong> (<code>Bash(rm *)</code>, <code>Bash(rmdir *)</code>) and for <code>Bash(git *)</code>, <code>Bash(gh *)</code>, <code>Bash(sudo *)</code>. <strong>Denies</strong> catastrophic <code>rm -rf</code> root/home paths. Permission precedence is <code>deny → ask → allow</code>, so the delete/git/sudo <em>ask</em> rules still fire even though everything is allowed. <em>(Cross-project tip: to let a session work in another app's folder without per-path prompts, add that root to <code>permissions.additionalDirectories</code> in this project's settings.json — keep those machine-specific paths out of any shared template.)</em></p>
+
+<div class="panel warn">
+  <strong>Why bare <code>"Bash"</code> and NOT a per-command list:</strong> a <code>Bash(prefix *)</code> rule is a literal prefix match. On WSL the agent can't call plain <code>dotnet</code> (not in PATH) — it calls <code>~/.dotnet/dotnet build</code>, <code>cmd.exe /c "dotnet build"</code>, <code>dotnet dev-certs</code>, or compound <code>cd … &amp;&amp; …</code>, none of which match an enumerated <code>Bash(dotnet *)</code>. The old list-everything config prompted ~100× in a single UI phase. Allowing all Bash and asking only on git is immune to command-path variants.
+</div>
+
+<details>
+  <summary>Config (canonical version in scaffold-brownfield.sh / scaffold-greenfield.sh)</summary>
+<pre><code class="lang-json">{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash",
+      "Edit", "Write", "MultiEdit", "NotebookEdit",
+      "Read", "Glob", "Grep", "TodoWrite", "WebFetch", "WebSearch", "Task"
+    ],
+    "ask": [ "Bash(rm *)", "Bash(rmdir *)", "Bash(git *)", "Bash(gh *)", "Bash(sudo *)" ],
+    "deny": [ "Bash(rm -rf /)", "Bash(rm -rf /*)", "Bash(rm -rf ~)", "Bash(rm -rf ~/*)" ]
+  }
+}</code></pre>
+</details>
+
+<div class="panel">
+  <strong>Existing project still prompting?</strong> Just run the normal framework update — <code>update-framework.sh</code> now <strong>refreshes <code>settings.json</code> to this config by default</strong>, so every app stays in sync without any special flag:
+  <pre><code class="lang-bash">/mnt/c/3AIGenCode/TechieFlow/update-framework.sh /path/to/app</code></pre>
+  It's idempotent (skips the write when already current), backs up any differing old file to <code>settings.json.bak</code>, and never touches <code>settings.local.json</code>. Restart Claude Code afterward. To opt out for a deliberately locked-down project, add <code>--keep-permissions</code>.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="agents">13. Agent cheat sheet<span class="anchor-link"><a href="#agents">#</a></span></h2>
+
+<div class="panel">
+  <strong>These six are the COMPLETE agent roster.</strong> The stock TechieFlow story-flow agents (<code>dev</code>, <code>pm</code>, <code>po</code>, <code>qa</code>, <code>sm</code>, <code>ux-expert</code>) and their story tasks/templates/workflows were trimmed from the scaffold on 2026-06-12 — the compressed flow never used them, and several behaved wrongly in it (wrong stack assumptions, dated <code>docs/qa</code> outputs). They are no longer included; obtain a full story-by-story agent set separately if you ever need that classic flow.
+  <br><br>
+  <strong>Which agent when:</strong>
+  <ul class="tight">
+    <li>Starting or re-documenting a project → <code>/analyst</code> (day-1 tasks, mockups, split-brd).</li>
+    <li>Writing code → <code>/flow-master *build-phase</code> (the ONE unified build — it calls <code>/trblazeui</code> and <code>/techierag</code> as sub-agents; you don't invoke them directly).</li>
+    <li>Proving it works → <code>/verifier</code> (<code>*verify ui|functional|all</code> — filters the one checklist; data + visual gates).</li>
+    <li>Verifier passed but the running UI is broken → <code>/flow-master *fix-issues</code> (drop screenshots; it triages + routes the fix).</li>
+    <li>Developer code-map (screen → control → service → proc) → <code>/flow-master *devguide</code>.</li>
+    <li>End-user how-to manual (what each screen is for + how to do things) → <code>/flow-master *productguide</code>.</li>
+    <li>Docs/HTML/status/handoff chores → <code>/flow-master</code>.</li>
+    <li>Architecture deep-dive beyond what day-1 produced → <code>/architect</code> (optional).</li>
+  </ul>
+</div>
+
+<table>
+  <tr><th>Command</th><th>Role</th><th>Best for</th><th>Writes</th></tr>
+  <tr><td><code>/analyst</code></td><td>Chanakya, business analyst</td><td>Reverse-doc; BRD; Architecture; Coding Standards; <strong>mockups</strong> (<code>*mockups</code>, greenfield); the one Checklist (<code>*split-brd</code>); status init; .editorconfig; CLAUDE.md</td><td><code>&lt;APP&gt;-BRD.md</code>, <code>&lt;APP&gt;-Architecture.md</code>, <code>&lt;APP&gt;-Coding-Standards.md</code>, <code>&lt;APP&gt;-UIDesign.md</code> + <code>docs/mockups/*.html</code>, <code>&lt;APP&gt;-Checklist.md</code>, <code>PROJECT-STATUS.md</code>, <code>CLAUDE.md</code>, <code>.editorconfig</code></td></tr>
+  <tr><td><code>/trblazeui</code></td><td>Blazor + TrBlazeUI <strong>(library agent — called as a sub-agent by <code>*build-phase</code> / <code>*fix-issues</code>)</strong></td><td>REQ-UI-* per the mockups; reads coding standards</td><td><code>src/</code> (Razor), <code>&lt;APP&gt;-TrBlazeUI-Feedback.md</code></td></tr>
+  <tr><td><code>/techierag</code></td><td>TechieRag RAG/LLM <strong>(library agent — called as a sub-agent by <code>*build-phase</code> / <code>*fix-issues</code>)</strong></td><td>REQ-RAG-* items; reads coding standards</td><td><code>src/</code> (RAG services), <code>&lt;APP&gt;-TechieRag-Feedback.md</code></td></tr>
+  <tr><td><code>/flow-master</code></td><td>Madhav, master &amp; orchestrator</td><td>The single super-agent. Runs the <strong>unified <code>*build-phase</code></strong> (clusters all open REQs, calls <code>/trblazeui</code> + <code>/techierag</code> as sub-agents, builds REQ-FN-*/REQ-NFR-* itself, self-smokes data+visual, chains the verifier); the <strong><code>*fix-issues</code></strong> bug-fix front door (triages screenshots → routes the fix); HTML renders, status refresh, consolidation, handoff doc; the screen-by-screen Developer Guide (<code>*devguide</code>) and the end-user Product Guide (<code>*productguide</code>)</td><td><code>src/</code>, <code>tests/unit/</code>, <code>&lt;APP&gt;-BRD.html</code>, <code>&lt;APP&gt;-Architecture.html</code>, <code>PROJECT-STATUS.md/html</code>, <code>&lt;APP&gt;-UsageGuide.md</code>, <code>&lt;APP&gt;-DevGuide.md/html</code>, <code>&lt;APP&gt;-ProductGuide.md/html</code>, <code>&lt;APP&gt;-Checklist.md</code> (verdicts), <code>&lt;APP&gt;-&lt;Library&gt;-Feedback.md</code> (per-library consolidation)</td></tr>
+  <tr><td><code>/verifier</code></td><td>Vidur, autonomous test runner</td><td>Verifying any scope + standards grep checks + the <strong>render gate (§4a)</strong> (every control listed in the DevGuide renders its data) AND the <strong>visual-truth gate (§4b)</strong> (no overlap, every control in-viewport and non-zero-size at desktop + mobile, screenshot inspected, diffed against the mockup when one exists). A REQ is <code>Verified</code> only if acceptance passes AND data renders AND the screen looks right. <code>Done (pre-existing)</code> gets the full sweep — stays Done only if it runtime-renders + looks right, else <code>Needs re-verify</code>. After each run Vidur writes verdicts to the one checklist AND refreshes the DevGuide's observed render/visual tags.</td><td><code>&lt;APP&gt;-Checklist.md</code> Requirements Status table (verdicts), DevGuide observed render/visual tags, <code>tests/playwright/*</code>, <code>&lt;APP&gt;-&lt;Library&gt;-Feedback.md</code> (on library bugs — the owning library's file)</td></tr>
+  <tr><td><code>/architect</code></td><td>Solutions architect</td><td>Optional deep arch dive; <code>/analyst</code> does basic architecture by default</td><td><code>&lt;APP&gt;-Architecture.md</code> (delegated by analyst, optional)</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="quickref">14. Quick command reference<span class="anchor-link"><a href="#quickref">#</a></span></h2>
+
+<div class="panel warn">
+  <strong>Slash-command syntax — Claude Code vs OpenCode:</strong>
+  Claude Code registers TechieFlow-native agents under the path-derived namespace <code>TechieFlow:agents:&lt;name&gt;</code>. The short <code>/&lt;agent&gt;</code> form does NOT always resolve. If you see <em>"Unknown command: /flow-master"</em>, use the full <code>/TechieFlow:agents:flow-master</code> instead. The table below shows the Claude Code form. OpenCode users substitute the form from their <code>opencode.jsonc</code> (e.g. <code>/flow-master</code>, <code>/flow-analyst</code>, <code>/flow-architect</code>, <code>/flow-verifier</code>).
+</div>
+
+<table>
+  <tr><th>Goal</th><th>Command (Claude Code form)</th></tr>
+  <tr><td>Scaffold (brownfield)</td><td><code>./scaffold-brownfield.sh /path/to/existing-app</code> (or run from the template repo)</td></tr>
+  <tr><td>Scaffold (greenfield)</td><td><code>./scaffold-greenfield.sh /path/to/new-app</code> (or run from the template repo)</td></tr>
+  <tr><td>Update framework in existing project (<a href="#update-framework">§3</a>)</td><td><code>/mnt/c/3AIGenCode/TechieFlow/update-framework.sh /path/to/app</code> (add <code>--dry-run</code> to preview; restart Claude Code after)</td></tr>
+  <tr><td>Render any MD → HTML (ad-hoc)</td><td><code>/generate-html @docs/File.md</code> (multiple <code>@paths</code> ok; <code>@dir/</code> = top-level *.md, non-recursive; day-1 auto-renders its own docs — this is for re-renders after edits)</td></tr>
+  <tr><td>Day-1 brownfield (6 deliverables + UsageGuide + DevGuide)</td><td><code>/TechieFlow:agents:analyst *day1-brownfield {AppName}</code></td></tr>
+  <tr><td>Day-1 greenfield (6 deliverables)</td><td><code>/TechieFlow:agents:analyst *day1-greenfield {AppName}</code></td></tr>
+  <tr><td>Re-render BRD/Architecture/Status trio (day-1 renders these automatically)</td><td><code>/TechieFlow:agents:flow-master *render-workflow-docs {AppName}</code></td></tr>
+  <tr><td>Greenfield UI mockups (<a href="#mockups">§7.10</a>)</td><td><code>/TechieFlow:agents:analyst *mockups {AppName}</code> — per-screen UIDesign spec + TrBlazeUI-styled <code>docs/mockups/*.html</code>; auto-run at greenfield day-1; <code>--update</code> refreshes changed screens. The visual contract the build matches and the verifier diffs against.</td></tr>
+  <tr><td>Split BRD → the one Checklist</td><td><code>/TechieFlow:agents:analyst *split-brd {AppName}</code> — writes <code>docs/{AppName}-Checklist.md</code> (all REQ-UI/FN/RAG/NFR-* in one Requirements Status table).</td></tr>
+  <tr><td><strong>Amend docs as the project evolves</strong> (<a href="#evolving-docs">§7.9</a>)</td><td><code>/TechieFlow:agents:analyst *amend-docs {AppName} "&lt;what changed&gt;"</code> (or <code>/flow-master</code>) — surgically updates BRD + Architecture in place (append-only IDs), ripples to PROJECT-STATUS / BRD §4 / the checklist, re-renders. Incremental alternative to re-running day-1.</td></tr>
+  <tr><td><strong>Build — ONE unified phase</strong> (chains self-smoke + verifier)</td><td><code>/TechieFlow:agents:flow-master *build-phase {AppName}</code> (OpenCode: <code>/flow-master *build-phase {AppName}</code>) — clusters all open REQs, calls <code>/trblazeui</code> (REQ-UI-*, from the mockups) and <code>/techierag</code> (REQ-RAG-*) as sub-agents, builds REQ-FN-*/REQ-NFR-* itself, self-smokes (data + visual), then chains the verifier. Re-run for FIX mode on flagged REQs. (The old separate UI / RAG / functional build commands are dissolved into this one.)</td></tr>
+  <tr><td><strong>Fix issues found by running the app</strong> (<a href="#fix-issues">§7.11</a>)</td><td><code>/TechieFlow:agents:flow-master *fix-issues {AppName} {folder}</code> — drop a folder of screenshots (+ optional <code>bugs.md</code>); flow-master reproduces each with Playwright, triages (layout/data/logic/RAG), fans the fix to the right builder (trblazeui / its subagents / techierag), re-smokes + re-verifies, updates DevGuide + checklist + PROJECT-STATUS. The answer to "verifier passed but the UI is broken."</td></tr>
+  <tr><td>Verify + standards greps + data &amp; visual gates</td><td><code>/TechieFlow:agents:verifier *verify &lt;scope&gt;</code> — scope is <code>ui</code> | <code>functional</code> | <code>all</code> | explicit REQ IDs; <strong>filters the one checklist by REQ prefix</strong> (no separate file). Runs standards-compliance greps, acceptance tests, the <strong>render gate</strong> (verify-phase §4a: every control renders its data) AND the <strong>visual-truth gate</strong> (§4b: no overlap, every control in-viewport and non-zero-size at desktop + mobile, screenshot inspected, mockup-diffed where one exists). A REQ is <code>Verified</code> only if acceptance passes AND data renders AND the screen looks right. <code>Done (pre-existing)</code> gets the full sweep. Verdicts land in the checklist; Vidur also refreshes the DevGuide's observed render/visual tags.</td></tr>
+  <tr><td>End-of-session</td><td><code>/TechieFlow:agents:flow-master Update PROJECT-STATUS.md (phase, next, log); regenerate PROJECT-STATUS.html.</code></td></tr>
+  <tr><td>Final handoff (incl. DevGuide)</td><td><code>/TechieFlow:agents:flow-master *handoff-phase {AppName}</code></td></tr>
+  <tr><td>Generate / refresh Developer Guide</td><td><code>/TechieFlow:agents:flow-master *devguide {AppName}</code> — generates <code>docs/{AppName}-DevGuide.md</code> + <code>.html</code> (split per role for large apps) via the 3-pass MAP → OBSERVE → RECONCILE model (§6). Add <code>--update</code> to refresh only changed screens. Stamped <code>⚠ STATIC-ONLY</code> if the app cannot be booted. Auto-run at handoff; re-runnable anytime. The DevGuide is the verifier's per-control test map — see §6.</td></tr>
+  <tr><td>Generate / refresh end-user Product Guide (<a href="#docs">§6</a>)</td><td><code>/TechieFlow:agents:flow-master *productguide {AppName} [scope] [--update]</code> — the screenshot-illustrated, task-oriented how-to manual for EXTERNAL users (what each screen is for + how to do things). Reuses the DevGuide's screen inventory + the screenshots under <code>docs/screenshots/&lt;APP&gt;/</code> (re-shoots any missing via the verifier render sweep); fans out per role, splitting large apps into <code>docs/productguides/</code>. <strong>Always emits MD + HTML.</strong> On-demand; <code>--update</code> refreshes only changed screens. The user-facing sibling of the DevGuide.</td></tr>
+  <tr><td>Token efficiency guide</td><td><code>.tfcore/TOKEN-GUIDE.md</code> — ships with every project. Explains where AI tokens go and the levers to keep usage low (don't load whole docs/repos; checklists markdown-only; fan out to subagents; incremental updates via <code>*amend-docs</code> / <code>*devguide --update</code>; recover with <code>*refresh-status</code> instead of re-running).</td></tr>
+  <tr><td><strong>Recover broken session</strong> (status stale/wrong)</td><td><code>/TechieFlow:agents:flow-master *refresh-status {AppName}</code> — rebuilds PROJECT-STATUS from ground truth (checklist tables + working-tree files &amp; mtimes + fresh build; no git — git is manual) when a phase died before its status gate ran. Add <code>verify</code> to re-verify ambiguous REQs. Never edits source. See §8a.</td></tr>
+  <tr><td>MAUI from WSL</td><td><code>winrun "dotnet build &amp;&amp; dotnet test"</code></td></tr>
+  <tr><td>Resume cold project (status trustworthy)</td><td>Open <code>PROJECT-STATUS.html</code> + <code>&lt;APP&gt;-BRD.html</code> + <code>&lt;APP&gt;-Architecture.html</code> → <code>git status &amp;&amp; dotnet build</code> → <code>/TechieFlow:agents:verifier</code> re-verify → execute "Next command". If the last session was cut off mid-phase, run <code>*refresh-status</code> first (row above).</td></tr>
+</table>
+
+<p><small>The trblazeui and techierag personas are NuGet-deployed to <code>.claude/&lt;name&gt;.md</code> and <code>.opencode/command/&lt;name&gt;.md</code>. Claude Code only scans <code>.claude/commands/</code>, so the scaffold/update scripts copy them to <code>.claude/commands/&lt;name&gt;.md</code> (the short <code>/trblazeui</code> <code>/techierag</code> forms then work). If the short form is missing: <code>dotnet build</code>, then re-run <code>update-framework.sh</code>.</small></p>
+
+<!-- ============================================================ -->
+<h2 id="faq">15. FAQ &amp; gotchas<span class="anchor-link"><a href="#faq">#</a></span></h2>
+
+<details>
+  <summary>What if the agent ignores the coding standards mid-implementation?</summary>
+  <p>The verifier's standards-compliance grep checks (§10, item 3) catch the most common violations and produce coverage misses. When you see a miss like <code>STANDARDS: underscore-field in src/Foo.cs:42</code> flagged in the checklist's Requirements Status table, tell the implementing agent: <em>"Fix the standards violations flagged in the Requirements Status table of docs/&lt;APP&gt;-Checklist.md per docs/&lt;APP&gt;-Coding-Standards.md."</em> Loop until clean.</p>
+</details>
+
+<details>
+  <summary>What if existing brownfield code doesn't use the <code>obj</code> field prefix?</summary>
+  <p>First: the prefix only applies if THIS project chose <code>obj</code> — the field prefix is a per-project day-1 decision recorded in <code>docs/&lt;APP&gt;-Coding-Standards.md</code> (e.g. AstroLyfe uses bare PascalCase, no prefix). If it did, the analyst flags it as standards drift in the day-1 output summary. You then either: (a) let the standards-compliance grep checks in the verify pass catch them and fold the fixes into the regular build loop (the implementing agent renames as it touches the file), or (b) explicitly ask flow-master for a one-shot rename pass: <em>"Rename every non-obj-prefixed instance field in src/ to use the obj prefix per docs/&lt;APP&gt;-Coding-Standards.md, in one commit per file."</em> Option (a) is lower-risk; option (b) is faster if you want a clean baseline.</p>
+</details>
+
+<details>
+  <summary>I want to change the coding standards mid-project. Will the agents pick it up?</summary>
+  <p>Yes — they read <code>docs/&lt;APP&gt;-Coding-Standards.md</code> on every invocation. Update the file, then in the next implementation prompt include <em>"NOTE: the coding standards file was updated; conform new code to it and flag any existing non-conforming areas in your output summary."</em></p>
+</details>
+
+<details>
+  <summary>Should the architecture document be updated as the code changes?</summary>
+  <p>Yes. For a deliberate change to scope/structure (new module, new flow, stack tweak), run <code>*amend-docs &lt;APP&gt; "&lt;what changed&gt;"</code> (<a href="#evolving-docs">§7.9</a>) — it amends Architecture.md (and the BRD) in place and re-renders. For incidental "as-built" drift discovered during implementation, the implementing agent notes it and <code>/flow-master</code> reconciles at handoff ("update Architecture.md to reflect 'as-built', then regenerate the HTML").</p>
+</details>
+
+<details>
+  <summary><code>scaffold-brownfield.sh</code> / <code>scaffold-greenfield.sh</code> re-run wiped my work?</summary>
+  <p>No for your work product — framework files copy with <code>rsync --ignore-existing</code>. EXCEPTION: the harness agent mirrors under <code>.claude/commands/TechieFlow/agents/</code> and <code>.opencode/command/TechieFlow/agents/</code> are force-synced from <code>.tfcore/agents/</code> on every run — edit agents only in <code>.tfcore/agents/</code>.</p>
+</details>
+
+<details>
+  <summary><code>*yolo</code> doesn't stop Bash prompts.</summary>
+  <p>Right — <code>*yolo</code> is agent-side (elicitation skipping). Tool permissions are <code>.claude/settings.json</code> (already in place from scaffold).</p>
+</details>
+
+<details>
+  <summary>Mermaid not rendering in BRD.html / Architecture.html.</summary>
+  <p>(1) Offline + CDN script blocked — inline mermaid.min.js instead. (2) Missing <code>mermaid.initialize</code> — check end of HTML. (3) Malformed code fence — confirm <code>```mermaid</code> on its own line and valid Mermaid syntax.</p>
+</details>
+
+<details>
+  <summary>Verifier says "Playwright not installed".</summary>
+  <p>Vidur self-heals browser binaries. If install fails: did you run §0?</p>
+</details>
+
+<details>
+  <summary>Agent implemented things <em>not</em> in the requirements doc.</summary>
+  <p><em>"Revert anything not tied to a REQ-* ID."</em> Add new REQ first if you actually want it.</p>
+</details>
+
+<details>
+  <summary>Slash command <code>/trblazeui</code> shows "no skill".</summary>
+  <p>Run <code>dotnet build</code> once to fire the TrBlazeUI NuGet deploy target. If still missing: <code>dotnet build -t:TrBlazeUIRedeployAgentFiles</code>. Restart Claude Code so it rescans skills.</p>
+</details>
+
+<details>
+  <summary>Should I commit the HTML files?</summary>
+  <p>Yes for all of <code>PROJECT-STATUS.html</code>, <code>&lt;APP&gt;-BRD.html</code>, <code>&lt;APP&gt;-Architecture.html</code>, <code>&lt;APP&gt;-&lt;Library&gt;-Feedback.md</code>. Browseable on GitHub without cloning, and they're the human-facing artifacts.</p>
+</details>
+
+<details>
+  <summary>Standard TechieFlow story-by-story flow — ever?</summary>
+  <p>Only with a second person. For solo + Claude Max, the compressed flow is strictly faster. The stock story-flow agents and tasks no longer ship with this scaffold (trimmed 2026-06-12) — obtain a full story-by-story agent set separately if that day comes.</p>
+</details>
+
+<details>
+  <summary>How do I keep token usage down?</summary>
+  <p>Read <code>.tfcore/TOKEN-GUIDE.md</code> (ships with every project). Key levers: don't load whole docs or repo trees into context; checklists stay markdown-only (never rendered to HTML — HTML adds weight with no AI benefit); fan work out to subagents instead of loading everything in one session; use <code>*amend-docs</code> and <code>*devguide --update</code> for incremental refreshes instead of re-running phases from scratch; use <code>*refresh-status</code> to recover a broken session instead of re-running the whole phase.</p>
+</details>
+
+<details>
+  <summary>A screen passed verification but was rendering blank OR was visually broken — how is it prevented now?</summary>
+  <p>Before the gates, verification only checked acceptance-test pass/fail (HTTP 200, no exception, element present). A screen could pass while its data table showed zero rows, or while every control rendered its data but the controls <strong>overlapped / sat off-screen / were clipped</strong> so the running app was unusable. Two gates close both holes:</p>
+  <ul class="tight">
+    <li><strong>Render gate (verify-phase §4a):</strong> the verifier asserts every control listed in the DevGuide actually renders its data — no blank table, no count-over-zero-rows, no empty chart.</li>
+    <li><strong>Visual-truth gate (§4b):</strong> it then asserts the screen LOOKS right — no control overlap, every control in-viewport and non-zero-size, checked at desktop + mobile widths, the screenshot inspected, and diffed against the mockup when one exists.</li>
+  </ul>
+  <p>A REQ is <code>Verified</code> only if acceptance passes AND data renders AND the screen looks right; otherwise it drops to <code>Needs re-verify</code> / <code>FAIL</code>. <code>Done (pre-existing)</code> is treated as an unverified migrated claim and gets the same sweep. The DevGuide's observed render/visual tags are refreshed each run, keeping DevGuide ⇄ Checklist ⇄ Verifier runtime-true.</p>
+</details>
+
+<details>
+  <summary>The verifier passed but the running UI is broken — who do I call?</summary>
+  <p><code>/TechieFlow:agents:flow-master *fix-issues {AppName} {folder}</code> (§7.11). Drop a folder of screenshots of the broken screens (optionally a <code>bugs.md</code> naming what's wrong on each). Flow-master reads them (vision), reproduces each issue live with Playwright, triages it (layout / data / logic / RAG), and <strong>fans the fix out to the right builder</strong> — <code>/trblazeui</code> for layout, its own subagents for data/logic, <code>/techierag</code> for RAG. You never invoke a builder agent yourself. It then re-smokes (data + visual), re-verifies the affected REQs, and updates the DevGuide + checklist + PROJECT-STATUS.</p>
+</details>
+
+<details>
+  <summary>How does a developer understand or verify the AI-generated code?</summary>
+  <p>Run <code>/TechieFlow:agents:flow-master *devguide {AppName}</code> (also auto-run at handoff). It produces <code>docs/{AppName}-DevGuide.md</code> + a styled <code>.html</code>: every screen grouped by user role, each with a flowchart tracing the full stack (Razor page → service → data-access → stored procedure/query), a Controls table (with observed render-status from the OBSERVE pass), and a Data-lineage table. Use it to find the right service method for a bug, confirm the correct stored procedure is called, or check that a control is bound to the right DTO property. Re-run with <code>--update</code> after implementing changes to refresh only the affected screens. See <a href="#docs">§6</a> for the full schema and the 3-pass generation model.</p>
+</details>
+
+<h2 id="platforms">16. Running on macOS / native Windows / Linux<span class="anchor-link"><a href="#platforms">#</a></span></h2>
+
+<p>This framework was built on the owner's <strong>WSL-on-Windows</strong> machine, so §0/§11 and the build-invocation ladder describe that setup. But the framework itself is <strong>portable</strong> — the agents, tasks, templates, and slash-commands are plain Markdown and run identically under Claude Code or OpenCode on <strong>macOS, native Windows, or native Linux</strong>. Only two things are environment-specific: how <code>dotnet</code> is invoked, and the runtime-verification bridges (headless Playwright for Blazor; the §0b Appium endpoints for MAUI Android/iOS/Mac-Catalyst; FlaUI/Appium-Windows for the MAUI Windows head). Here is what changes per platform.</p>
+
+<div class="panel">
+  <strong>What is the SAME everywhere:</strong> the <code>scaffold-*.sh</code> / <code>update-framework.sh</code> scripts (bash), all <code>/TechieFlow:*</code> slash commands, the day-1 → split → build → verify → handoff flow, every doc template, and the <code>.claude/settings.json</code> permission model. The scaffold scripts need <code>bash</code> + <code>rsync</code> + <code>realpath</code> (preinstalled on macOS 12.3+ and Linux; on native Windows run them from <strong>WSL or Git Bash</strong>).
+</div>
+
+<table>
+  <tr><th>Concern</th><th>WSL-on-Windows (reference)</th><th>macOS</th><th>native Windows</th><th>native Linux</th></tr>
+  <tr><td><code>dotnet</code> invocation</td><td>ladder §B: <code>~/.dotnet/dotnet</code>, <code>cmd.exe /c</code>, <code>winrun</code></td><td><strong>ladder §A: <code>dotnet build</code></strong> (in PATH)</td><td><strong>ladder §C: <code>dotnet build</code></strong> (in PATH)</td><td><strong>ladder §A: <code>dotnet build</code></strong> (in PATH)</td></tr>
+  <tr><td>MAUI iOS / Mac Catalyst</td><td>Windows side via <code>cmd.exe</code> (needs paired Mac for iOS)</td><td><strong>native</strong> — needs Xcode + <code>dotnet workload install maui</code></td><td>needs a paired Mac build host</td><td>not supported (no Apple toolchain)</td></tr>
+  <tr><td>MAUI Android</td><td>Windows side via <code>cmd.exe</code></td><td>native — Android SDK + JDK</td><td>native — Android SDK + JDK</td><td>native — Android SDK + JDK</td></tr>
+  <tr><td>MAUI Windows head</td><td>Windows side via <code>cmd.exe</code></td><td>not supported</td><td>native</td><td>not supported</td></tr>
+  <tr><td>Browser verification (verifier)</td><td>headless Playwright CLI (§0 bootstrap)</td><td>Playwright with system Chromium</td><td>Playwright with system browser</td><td>headless Playwright CLI</td></tr>
+  <tr><td>Native UI verification (Android/iOS/Catalyst)</td><td><strong>Appium endpoints (§0b)</strong>: Android on Windows host, iOS/Catalyst on a LAN Mac</td><td>local Appium (Android emulator + iOS Sim + Catalyst, all native)</td><td>local Appium (Android emulator + Catalyst); iOS via the paired Mac's Appium</td><td>local Appium (Android only)</td></tr>
+  <tr><td>Scaffold scripts</td><td>run in WSL</td><td>run in Terminal (zsh/bash)</td><td>run in WSL or Git Bash</td><td>run in shell</td></tr>
+</table>
+
+<p>The agents resolve this automatically: the build-invocation ladder (<code>.tfcore/templates/v4custom/build-invocation-ladder.md</code>) now starts with a <strong>platform-detection probe</strong> (<code>uname -a</code> → <code>Darwin</code> = macOS, <code>…microsoft…</code> = WSL, plain <code>Linux</code> = native Linux, absent = native Windows) and picks ladder §A / §B / §C accordingly. On macOS/Windows/Linux there is a single rung — <code>dotnet build</code> — and a missing MAUI workload is fixed once with <code>dotnet workload install maui</code>, never logged as a project blocker.</p>
+
+<div class="panel ok"><strong>macOS quick start (Claude Code on Mac):</strong>
+<ol>
+  <li>Install .NET SDK (<code>brew install dotnet-sdk</code> or the official installer) — confirm <code>dotnet --info</code>.</li>
+  <li>For MAUI: <code>dotnet workload install maui</code>; install <strong>Xcode</strong> (iOS/Mac Catalyst) and/or the Android SDK + a JDK.</li>
+  <li>Scaffold as usual: <code>/path/to/TechieFlow/scaffold-brownfield.sh /path/to/your-app</code> (or <code>scaffold-greenfield.sh</code>).</li>
+  <li>Start Claude Code in the app folder and run <code>/TechieFlow:agents:analyst *day1-brownfield &lt;AppName&gt;</code> — identical to WSL.</li>
+</ol>
+The <code>winrun</code> bridge and <code>cmd.exe</code> rungs simply don't apply on Mac; the agents won't reach for them once <code>uname</code> reports <code>Darwin</code>.</div>
+
+<div class="panel"><strong>native Windows quick start (Claude Code / OpenCode on Windows, not WSL):</strong>
+<ol>
+  <li>Install the .NET SDK (winget / official installer); confirm <code>dotnet --info</code>.</li>
+  <li>For MAUI: <code>dotnet workload install maui</code>. Windows + Android heads build natively; <strong>iOS / Mac Catalyst need a paired Mac build host</strong>.</li>
+  <li>Run the scaffold scripts from <strong>WSL or Git Bash</strong> (they're bash). Then drive the framework from Claude Code on Windows normally — the ladder uses §C (<code>dotnet build</code>).</li>
+</ol></div>
+
+<div class="panel"><strong>native Linux quick start:</strong>
+<ol>
+  <li>Install the .NET SDK via your distro or the official script; confirm <code>dotnet --info</code>.</li>
+  <li>MAUI on Linux supports the <strong>Android</strong> head only (<code>net9.0-android</code>) — iOS / Mac Catalyst / Windows heads can't build without their toolchains (a genuine platform limit, not a wrong-rung error).</li>
+  <li>Scaffold and run exactly as on macOS (ladder §A).</li>
+</ol></div>
+
+<p><strong>Notes.</strong> The framework never <em>requires</em> MAUI — many apps are Blazor-only and build with plain <code>dotnet build</code> everywhere. The full per-platform <code>dotnet</code> invocation detail lives in <code>.tfcore/templates/v4custom/build-invocation-ladder.md</code> (what the agents read); this section is the human-facing summary.</p>
+
+<hr>
+<p class="small">Last revised 2026-06-26. Edit freely. When the workflow changes, update <code>~/.claude/projects/-mnt-c-3AIGenCode-TechieFlow/memory/MEMORY.md</code> and <code>WorkFlow-Context.md</code> (the AI-agent context doc) too.</p>
+
+</main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script>
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose', flowchart: { useMaxWidth: true, htmlLabels: true } });
+  }
+</script>
+<script>
+  document.querySelectorAll('.tabs').forEach(group => {
+    const buttons = group.querySelectorAll('button');
+    const panels = group.parentElement.querySelectorAll('.tabpanel');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+  });
+  document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.className = 'copy';
+    btn.textContent = 'copy';
+    btn.addEventListener('click', () => {
+      const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'copied';
+        setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+      });
+    });
+    pre.appendChild(btn);
+  });
+</script>
+</body>
+</html>

@@ -56,11 +56,17 @@ public class AgentLoopRunner
     /// </summary>
     /// <param name="messages">Initial conversation messages.</param>
     /// <param name="options">LLM completion options (tools are added automatically).</param>
+    /// <param name="progress">
+    /// Optional sink that receives an <see cref="AgentStep"/> for each tool-call request,
+    /// each individual tool execution, and the final answer — letting callers render an
+    /// execution trace of what the agent did. Pass null to ignore step reporting.
+    /// </param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The final LLM response after all tool calls are resolved.</returns>
     public async Task<LlmResponse> RunAsync(
         List<ChatMessage> messages,
         LlmCompletionOptions? options = null,
+        IProgress<AgentStep>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(messages);
@@ -90,8 +96,21 @@ public class AgentLoopRunner
             if (!response.HasToolCalls)
             {
                 logger.LogDebug("Agent loop completed after {Iterations} iteration(s)", iteration + 1);
+                progress?.Report(new AgentStep
+                {
+                    Iteration = iteration + 1,
+                    Kind = AgentStepKind.FinalAnswer,
+                    Content = response.Content
+                });
                 return response;
             }
+
+            progress?.Report(new AgentStep
+            {
+                Iteration = iteration + 1,
+                Kind = AgentStepKind.ToolCallRequested,
+                ToolName = string.Join(", ", response.ToolCalls!.Select(c => c.Name))
+            });
 
             // Add assistant message with tool calls to history
             messages.Add(response.ToChatMessage());
@@ -109,6 +128,17 @@ public class AgentLoopRunner
                 {
                     logger.LogWarning("Tool {ToolName} failed: {Error}", toolCall.Name, result.ErrorMessage);
                 }
+
+                progress?.Report(new AgentStep
+                {
+                    Iteration = iteration + 1,
+                    Kind = AgentStepKind.ToolExecuted,
+                    ToolName = toolCall.Name,
+                    ToolArgumentsJson = toolCall.ArgumentsJson,
+                    Content = result.Content,
+                    IsSuccess = result.IsSuccess,
+                    ErrorMessage = result.ErrorMessage
+                });
             }
         }
 
@@ -122,6 +152,13 @@ public class AgentLoopRunner
             SystemPrompt = options.SystemPrompt
         };
 
-        return await llmProvider.ChatAsync(messages, finalOptions, cancellationToken).ConfigureAwait(false);
+        var finalResponse = await llmProvider.ChatAsync(messages, finalOptions, cancellationToken).ConfigureAwait(false);
+        progress?.Report(new AgentStep
+        {
+            Iteration = maxIterations,
+            Kind = AgentStepKind.MaxIterationsReached,
+            Content = finalResponse.Content
+        });
+        return finalResponse;
     }
 }
