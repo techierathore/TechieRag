@@ -18,3 +18,11 @@ html, body {
 h1:focus {
     outline: none;
 }
+
+/* TR-003 workaround: TrBlazeUI SidebarInset renders <main> as a flex item without
+   min-width:0, so over-wide content (tables, pagination bars) stretches the whole
+   shell — including the header — past the viewport on narrow screens. Capping it
+   lets wide content scroll inside the content region instead. */
+main {
+    min-width: 0;
+}

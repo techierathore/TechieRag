@@ -5,7 +5,6 @@
 @inject ITechieRag Rag
 @inject ToastService ToastService
 @inject ILogger<Ingestion> Logger
-@rendermode InteractiveServer
 
 <PageTitle>Document Ingestion - TechieRag</PageTitle>
 
@@ -90,6 +89,7 @@
                 </div>
             </CardHeader>
             <CardContent>
+                <div class="relative overflow-x-auto">
                 <DataTable TData="IngestionResult" Data="@ingestionResults" ShowToolbar="false">
                     <Columns>
                         <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.FileName)" Header="File" />
@@ -97,6 +97,7 @@
                         <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? r.DocumentId ?? "" : r.ErrorMessage ?? "")" Header="ID / Error" />
                     </Columns>
                 </DataTable>
+                </div>
             </CardContent>
         </Card>
     }
@@ -105,7 +106,7 @@
     <div class="grid gap-6 lg:grid-cols-2">
         @if (stats != null)
         {
-            <Card>
+            <Card Class="min-w-0">
                 <CardHeader>
                     <CardTitle>Vector Store Statistics</CardTitle>
                 </CardHeader>
@@ -132,7 +133,7 @@
             </Card>
         }
 
-        <Card>
+        <Card Class="min-w-0">
             <CardHeader>
                 <CardTitle>Ingested Documents</CardTitle>
             </CardHeader>
@@ -143,12 +144,14 @@
                 }
                 else
                 {
+                    <div class="relative overflow-x-auto">
                     <DataTable TData="Document" Data="@documents" ShowToolbar="false">
                         <Columns>
                             <DataTableColumn TData="Document" TValue="string" Property="@(d => d.Name)" Header="Name" />
                             <DataTableColumn TData="Document" TValue="int" Property="@(d => d.ChunkCount)" Header="Chunks" />
                         </Columns>
                     </DataTable>
+                    </div>
                 }
             </CardContent>
         </Card>

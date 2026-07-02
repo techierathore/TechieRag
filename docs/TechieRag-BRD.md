@@ -79,7 +79,7 @@ As of this snapshot the library is **~96% complete**: the v1.1 core (config, vec
 
 <!-- Feature-level SNAPSHOT. Live per-REQ status: PROJECT-STATUS.md + the checklist Requirements Status tables. -->
 
-**Snapshot as of 2026-06-25.** Live, per-requirement status: see `PROJECT-STATUS.md` and the **Requirements Status** table in `docs/TechieRag-Checklist.md`. All feature work below is migrated from `docs/trrag-refactoring-roadmap.md` (v1.1, completed 2025-12-30) and `docs/techierag-v2-llm-implementation-spec.md` (v2, completed 2026-02-18).
+**Snapshot as of 2026-07-02.** Live, per-requirement status: see `PROJECT-STATUS.md` and the **Requirements Status** table in `docs/TechieRag-Checklist.md`. All feature work below is migrated from `docs/trrag-refactoring-roadmap.md` (v1.1, completed 2025-12-30) and `docs/techierag-v2-llm-implementation-spec.md` (v2, completed 2026-02-18).
 
 | Feature (F-code) | Phase | Status | % | Notes |
 |------------------|-------|--------|---|-------|
@@ -95,14 +95,14 @@ As of this snapshot the library is **~96% complete**: the v1.1 core (config, vec
 | F-AGENT: Tool calling & agent loop | v2 | Done | 100 | AgentLoopRunner + ToolRegistry, max-iter guard |
 | F-MEM: Conversation memory | v2 | Done | 100 | InMemory, token-budget trimming |
 | F-TOKEN: Token tracking & budgets | v2 | Done | 100 | Per-model usage, cost, alerts, blocking |
-| F-RESIL: Resilience & retry | v2 | Done | 100 | Backoff, 429 handling, circuit breaker, timeout |
+| F-RESIL: Resilience & retry | v2 | Done | 100 | Backoff, 429, circuit breaker ✓; `Retry-After` now parsed (delta + HTTP-date, capped) via `LlmHttpGuard` in all 6 providers + 4 unit tests (REQ-RAG-012 Verified, 2026-07-02) |
 | F-FALLBACK: Fallback LLM provider | v2 | Done | 100 | Primary→fallback failover decorator |
 | F-PROMPT: Prompt templates | v2 | Done | 100 | Default engine + custom IPromptTemplate |
 | F-AUTODIST: AI-agent autodistribution | v1.1 | Done | 100 | MSBuild targets deploy skill files to consumers |
-| F-PKG: NuGet packaging & publishing | v1.1 | Done | 100 | GitHub Actions; GitHub Packages + NuGet.org |
+| F-PKG: NuGet packaging & publishing | v1.1 | Done | 100 | GitHub Packages ✓; NuGet.org job un-commented + secret-gated (`v*` tag, `NUGET_API_KEY`); CI test step now a blocking gate (REQ-FN-003 Verified static, 2026-07-02) |
 | F-WEB: TechieRagWeb sample application | v1.1 + v2 | Done | 100 | 10 pages; v2 added 4 AI pages + TrBlazeUI migration |
-| F-QDRANT: Qdrant database administration | v1.1 | Done | 100 | Docker lifecycle + collection/vector CRUD UI |
-| (quality) Formal automated test suite | v2 Phase 7 | Planned | 0 | Validated manually; formal xUnit suite deferred |
+| F-QDRANT: Qdrant database administration | v1.1 | Done | 100 | Collection/vector CRUD live-verified 2026-07-02; container-row mobile overflow @390 fixed (inline scroll-wrapper; live `scrollWidth`==390 with a running container) — REQ-UI-011 Verified |
+| (quality) Formal automated test suite | v2 Phase 7 | Partial | 40 | 11 xUnit tests (RetryHandler resilience/Retry-After + LmStudio provider tool-calling) + Playwright verify suite; broader coverage deferred |
 | (quality) OpenTelemetry exporters | Deferred | Planned | 0 | Metrics/tracing for Prometheus/Grafana/Jaeger |
 
 **Legend:** **Done** = shipped & working · **In progress** = actively being built · **Partial** = some sub-features done · **Planned** = not started.

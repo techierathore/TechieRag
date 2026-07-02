@@ -24,6 +24,10 @@
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="TechieRag.Tests" />
+  </ItemGroup>
+
   <!-- AI Agent Files: Distributed to consumer projects via NuGet -->
   <!-- TechieRag.targets auto-deploys these to the consumer project on every build -->
   <!-- Content files are packed under BOTH build\ and buildTransitive\ so that -->
@@ -45,6 +49,11 @@
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="Markdig" Version="0.45.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.3" />
+    <!-- Pin the native SQLite binary past GHSA-2m69-gcr7-jv3q (transitive 2.1.11 via Microsoft.Data.Sqlite
+         is High-severity). lib.e_sqlite3 ships only the native e_sqlite3 binary; the SQLite C ABI is stable,
+         so the 2.1.11 managed core/provider load the 3.50.3 native lib fine. Flows to Embedded + tests via
+         the project references. Remove when Microsoft.Data.Sqlite bumps its SQLitePCLRaw floor past the fix. -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />

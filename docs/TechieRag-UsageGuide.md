@@ -113,8 +113,9 @@ flowchart LR
 ## Test (automated)
 ```bash
 /home/srkra/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj
+npx playwright test
 ```
-The formal test suite is currently minimal (validated manually); see PROJECT-STATUS "Deferred / future".
+xUnit: 11 tests (RetryHandler resilience + `Retry-After`, LmStudio provider tool-calling). Playwright: the `tests/verify/` UI/RAG specs (need the sample booted on `:5099`). Broader coverage is deferred — see PROJECT-STATUS "Deferred / future".
 
 ## Smoke checklist (quick capability pass)
 - [ ] Configure Ollama embedding + SqliteVec at `/settings`; Initialize succeeds.
@@ -127,7 +128,11 @@ The formal test suite is currently minimal (validated manually); see PROJECT-STA
 - [ ] Create a Qdrant collection at `/qdrant-admin`; ingest + search isolated.
 
 ## Known limitations
-- Sample build blocked without the TrBlazeUI GitHub Packages token (401) — see PROJECT-STATUS Known blockers.
+- Sample requires a TrBlazeUI GitHub Packages PAT (`read:packages`) in `nuget.config` to restore/build (see Prerequisites). Note: the committed PAT should be untracked + revoked before publishing the repo.
+- Streaming RAG chat can't return sources via the library API and bypasses the configured prompt engine — the sample works around it (TR-RAG-001, open for the TechieRag team).
+- Some providers report 0 token usage on streamed completions; the sample estimates to compensate (TR-RAG-002).
+- Estimated Cost reads $0.0000 for any model absent from the hard-coded pricing table (tokens are still counted).
+- Qdrant Admin: DataTable action buttons rely on a wrapper scroll on narrow (390px) viewports (TR-003/TR-004 — app-side inline workaround applied).
 - Tool calling / structured output reliability depends on the loaded model (cloud most reliable).
 - SQLite database locking with multiple processes — use single-instance or a server-backed store.
 - Token counts are ±10% estimates for providers that don't expose tokenizer detail.

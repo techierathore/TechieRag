@@ -15,15 +15,18 @@
 
   <!-- Direct references to ensure all required DLLs are copied -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" />
     <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
-    <PackageReference Include="Google.Protobuf" Version="3.33.5" />
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
     <!-- Qdrant Management -->
     <PackageReference Include="Docker.DotNet" Version="3.125.15" />
-    <PackageReference Include="Qdrant.Client" Version="1.16.1" />
+    <PackageReference Include="Qdrant.Client" Version="1.18.1" />
     <!-- TrBlazeUI Component Library -->
-    <PackageReference Include="TrBlazeUI.Components" Version="1.0.3" />
-    <PackageReference Include="TrBlazeUI.Icons.Lucide" Version="1.0.3" />
+    <PackageReference Include="TrBlazeUI.Components" Version="1.0.7" />
+    <PackageReference Include="TrBlazeUI.Icons.Lucide" Version="1.0.7" />
+    <!-- Serilog: structured console + rolling-file logging for the demo (logs/) -->
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
   <!-- Copy ONNX Runtime native DLLs to output root for reliable loading -->

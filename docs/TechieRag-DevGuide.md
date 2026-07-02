@@ -1,6 +1,8 @@
 # TechieRag — Developer Guide (Screen-by-Screen Code Map)
 
-> ⚠ **STATIC-ONLY (2026-06-30 — incremental `--update`)** — built from code reading; **NOT yet runtime-verified**. Render-status is unconfirmed until `*verify` runs against the running app. A boot was re-attempted on 2026-06-30: the `TechieRagWeb` sample still cannot be restored because the `TrBlazeUI.Components` / `TrBlazeUI.Icons.Lucide` packages on GitHub Packages return **401 (Unauthorized)** without an authenticated PAT in `nuget.config` — a credential gap, not a code defect. The core library (`src/TechieRag`) **re-built clean (0 errors)**. Every control below is tagged `static-only (unconfirmed)`, except where reading the code itself proves a defect (those are called out and logged to the checklists). This refresh re-mapped only the **Tool Calling Demo** screen (the one screen whose source changed since 2026-06-25: `ToolDemo.razor`, `AgentLoopRunner.cs`, new `AgentStep.cs`); all other screens are preserved verbatim.
+> ✅ **Runtime-verified 2026-07-02 as Anonymous (verifier `*verify all` — all 10 screens exercised live)** — live boot on `http://localhost:5099`, LM Studio `qwen2.5-coder-32b-instruct` at `192.168.1.13:1234`, Qdrant 1.15.5 live in Docker. Each screen in §4 now carries its own dated **Runtime-verified 2026-07-02** blockquote recording exactly what was exercised (including live LLM, ingest write-path, and Qdrant CRUD data-paths); those blockquotes supersede the 2026-07-01 sweep note below.
+
+> ✅ **RUNTIME-VERIFIED (2026-07-01 — verifier `*verify ui`)** — the `TechieRagWeb` sample now restores + boots (TrBlazeUI PAT refreshed → GitHub Packages 200) and was driven live on `http://localhost:5099` with headless Playwright. All 11 screens passed the **§4a render gate + §4b visual-truth gate** at 1280×800 and 390×844: every control renders and every screen looks right (no overlap/clip/off-canvas, no `#blazor-error-ui`). Full-page screenshots under `test-results/screens/`. Live data observed: Ingestion/Text-Ingestion stats (2 docs / 151 chunks / 768 KB), Tool Demo Available-Tools table (4 tools), Qdrant Admin live status (Docker Available / Qdrant Disconnected / Version N/A). Backend note: the running instance has **no LLM provider configured (Source=None)** and **Qdrant is down**, so LLM data-paths (Chat streamed tokens, Playground completion/typed-parse, Tool Demo execution trace) and Qdrant collection/vector CRUD were NOT exercised this run — those keep their prior status. The prior STATIC-ONLY caveat is superseded for the screens below; controls still tagged `static-only` are ones not re-swept.
 
 > **Purpose — this is the document a HUMAN developer uses to trace any screen, control, or number on the page all the way down to its data source, so they can find and fix a bug, or verify that AI-generated code is actually correct.** The BRD explains *what* the app does; the Architecture explains *how the system is shaped*. Neither tells a developer "the Chat footer's token count comes from `Chat.razor`'s `HandleAutoRag()` → `TechieRagManager.AskAsync()` → `TechieRagClient.AskAsync()` → `response.Usage`." This guide does exactly that, per screen, down to the provider call.
 >
@@ -73,6 +75,8 @@ The sample app has **no authentication, no login, and no roles** (confirmed: zer
 
 ### Anonymous · Home
 
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. All six navigation cards render and their links navigate correctly.
+
 - **Route:** `@page "/"` (`samples/TechieRagWeb/Components/Pages/Home.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/Home.razor`
 - **Reached via:** General → Home; **Log in as:** no auth (single anonymous user). This is the default landing route `/`.
@@ -118,6 +122,8 @@ flowchart TD
 ---
 
 ### Anonymous · Settings
+
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. The form loads the REAL saved config (SqliteVec `techieragex.db`, Embedded BGE-M3). Save / Reset / Initialize write-actions were NOT re-driven (they mutate the live config); the known static issues below stand unchanged (Reset never calls `ReconfigureAsync`; `EnableTelemetry` persisted but unread).
 
 - **Route:** `@page "/settings"` (`samples/TechieRagWeb/Components/Pages/Settings.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/Settings.razor`
@@ -188,6 +194,8 @@ flowchart TD
 ---
 
 ### Anonymous · LlmSettings
+
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: "Test LLM Connection" succeeded in **912 ms** against LM Studio (`qwen2.5-coder-32b-instruct` at `192.168.1.13:1234`) — inline success alert + toast + Serilog log entry all observed. Save / Reset were not re-driven.
 
 - **Route:** `@page "/llm-settings"` (`samples/TechieRagWeb/Components/Pages/LlmSettings.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/LlmSettings.razor`
@@ -271,6 +279,8 @@ flowchart TD
 
 ### Anonymous · Ingestion (File Ingestion)
 
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE DATA: the Vector Store Statistics card showed correct counts before/after a real ingest (Documents 2 → 3 → 2). Note @390: the DataTable pagination buttons live inside the local `relative overflow-x-auto` wrapper (the accepted TR-004 containment pattern — reachable by scrolling the wrapper, not a defect).
+
 - **Route:** `@page "/ingestion"` (`samples/TechieRagWeb/Components/Pages/Ingestion.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/Ingestion.razor`
 - **Reached via:** Data → File Ingestion; **Log in as:** no auth (single anonymous user)
@@ -341,6 +351,8 @@ flowchart TD
 
 ### Anonymous · TextIngestion (Text Ingestion)
 
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE WRITE PATH: ingested a temp doc `verify-datapath-tmp` → success toast + document id, sidebar Documents count 2 → 3; the per-row trash delete removed it → back to 2. The chunk → BGE-M3 embed → SQLite-vec cycle is proven end-to-end.
+
 - **Route:** `@page "/text-ingestion"` (`samples/TechieRagWeb/Components/Pages/TextIngestion.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/TextIngestion.razor`
 - **Reached via:** Data → Text Ingestion; **Log in as:** no auth (single anonymous user)
@@ -409,6 +421,8 @@ flowchart TD
 ---
 
 ### Anonymous · RAG Chat
+
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, LM Studio `qwen2.5-coder-32b-instruct`): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: Auto-RAG with streaming ON returned a streamed answer, the "Sources Used (N)" panel rendered with % relevance scores, and the session footer moved off zero. Direct-LLM streaming was also re-confirmed.
 
 - **Route:** `@page "/chat"` (`samples/TechieRagWeb/Components/Pages/Chat.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/Chat.razor`
@@ -479,6 +493,8 @@ flowchart TD
 
 ### Anonymous · LLM Playground
 
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, LM Studio `qwen2.5-coder-32b-instruct`): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: a completion returned text plus real token counts; Structured Output deserialized to the typed object (SentimentAnalysis fields rendered).
+
 - **Route:** `@page "/llm-playground"` (`samples/TechieRagWeb/Components/Pages/LlmPlayground.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/LlmPlayground.razor`
 - **Reached via:** AI Features → LLM Playground; **Log in as:** no auth (single anonymous user)
@@ -547,6 +563,8 @@ flowchart TD
 
 ### Anonymous · Tool Calling Demo
 
+> **Runtime-verified 2026-07-02** (verifier `*verify REQ-UI-007`; **re-confirmed same day by `*verify all`**, live boot :5099, LM Studio qwen2.5-coder-32b): the live agent loop made REAL `get_weather` **and** `calculate_math` tool calls end-to-end and the **Execution Trace rendered each live step** (requested → executed + result → final answer). All controls render ✓; looks-right ✓ @1280 **and** @390 (the earlier mobile overflow was fixed same day — `main{min-width:0}` TR-003 workaround + `relative overflow-x-auto` DataTable wrapper TR-004 + wrapping rows; `document.scrollWidth=390` at 390px).
+
 - **Route:** `@page "/tool-demo"` (`samples/TechieRagWeb/Components/Pages/ToolDemo.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/ToolDemo.razor`
 - **Reached via:** AI Features → Tool Demo; **Log in as:** no auth (single anonymous user)
@@ -593,20 +611,23 @@ flowchart TD
 | search_documents tool body | ToolDemo.razor:200 | none — injects `ITechieRag TechieRag` directly (ToolDemo.razor:7) | `ITechieRag.SearchAsync` (ITechieRag.cs) → `TechieRagClient.SearchAsync` (TechieRagClient.cs:330) → embed + vector search | Embedding + vector store | static-only. Only invoked if the LLM chooses this tool |
 | Add Tool | ToolDemo.razor:219 `AddCustomTool` | n/a | `ToolRegistry.Register` (ToolRegistry.cs:61) with constant mock response | in-memory registry | static-only. Schema passed verbatim, no validation |
 | Run Agent Loop | ToolDemo.razor:242 `RunAgentLoop` | none — `ITechieRag.GetLlmProvider()` (ITechieRag.cs:186) → `TechieRagClient.GetLlmProvider()` (TechieRagClient.cs:540) | `new AgentLoopRunner(provider, toolRegistry, maxIterations: 5)` (ToolDemo.razor:261) → `AgentLoopRunner.RunAsync(messages, progress)` (AgentLoopRunner.cs:66) → loop of `ILlmProvider.ChatAsync` (AgentLoopRunner.cs:94,155) + `ToolRegistry.ExecuteToolAsync` (ToolRegistry.cs:70) | LLM provider HTTP + tool handlers | static-only. Final `LlmResponse.Content` → `finalAnswer` (ToolDemo.razor:279); stats = ms + input+output tokens (ToolDemo.razor:280) |
-| Execution Trace render | ToolDemo.razor:93-111 (markup) ← `Progress<AgentStep>` (ToolDemo.razor:269) | `ToExecutionStep` (ToolDemo.razor:297) | `AgentLoopRunner.RunAsync` `progress.Report(new AgentStep{…})` per tool-call request (AgentLoopRunner.cs:108), each tool execution (cs:132), final answer (cs:99) and max-iterations (cs:156) | n/a (in-memory step list) | static-only — runner reports `IProgress<AgentStep>` (param at AgentLoopRunner.cs:69); the page appends each step live via `InvokeAsync(StateHasChanged)` (ToolDemo.razor:272). `AgentStep`/`AgentStepKind` defined in `src/TechieRag/Models/AgentStep.cs` — confirm at runtime |
+| Execution Trace render | ToolDemo.razor:93-111 (markup) ← `Progress<AgentStep>` (ToolDemo.razor:269) | `ToExecutionStep` (ToolDemo.razor:297) | `AgentLoopRunner.RunAsync` `progress.Report(new AgentStep{…})` per tool-call request (AgentLoopRunner.cs:108), each tool execution (cs:132), final answer (cs:99) and max-iterations (cs:156) | n/a (in-memory step list) | **renders ✓ (runtime-confirmed 2026-07-02)** — live agent loop rendered "Step 1: LLM requested tool(s): get_weather" → "Step 2: Executed get_weather({"city":"Tokyo"})" + result `32°C, Partly Cloudy…` → final-answer step; fallback branch (ToolDemo.razor:283) not hit. Runner reports `IProgress<AgentStep>` (AgentLoopRunner.cs:69); page appends live via `InvokeAsync(StateHasChanged)` (ToolDemo.razor:272) |
 
 **Business rules / calculations on this screen**
 - Demo tools registered once in `OnInitialized` (ToolDemo.razor:145-149). `AddCustomTool` requires non-empty name + description (221-231). Math tool evaluates via `System.Data.DataTable().Compute` (184).
 - Provider gate: missing LLM → toast error, abort (244-249). Agent loop capped at `maxIterations: 5` (named arg, correctly skipping the optional `logger` — AgentLoopRunner.cs:39-43).
 
 **Known issues / gotchas**
-- ✅ **FIXED 2026-06-25 — Execution Trace now shows real steps.** `AgentLoopRunner.RunAsync` gained an optional `IProgress<AgentStep>` parameter (new `src/TechieRag/Models/AgentStep.cs` + `AgentStepKind`) and reports a step for each tool-call request, each individual tool execution (name/args/result/success), and the final answer. `ToolDemo.razor:269` passes a `Progress<AgentStep>` that maps each `AgentStep.Kind` (`ToolCallRequested`/`ToolExecuted`/`FinalAnswer`/`MaxIterationsReached`, AgentStep.cs:4-17) via `ToExecutionStep` (ToolDemo.razor:297) and re-renders live (`InvokeAsync(StateHasChanged)`, ToolDemo.razor:272). The old hardcoded single-step fallback (ToolDemo.razor:282-285) remains only as a safety net. Core library **re-built clean (0 errors, 2026-06-30)**; REQ-UI-007 stays `Needs re-verify` until the sample is booted to confirm the trace renders (boot still PAT-gated — see header banner). *(REQ-UI-007 / REQ-RAG-009)*
+- ✅ **FIXED 2026-06-25 — Execution Trace now shows real steps.** `AgentLoopRunner.RunAsync` gained an optional `IProgress<AgentStep>` parameter (new `src/TechieRag/Models/AgentStep.cs` + `AgentStepKind`) and reports a step for each tool-call request, each individual tool execution (name/args/result/success), and the final answer. `ToolDemo.razor:269` passes a `Progress<AgentStep>` that maps each `AgentStep.Kind` (`ToolCallRequested`/`ToolExecuted`/`FinalAnswer`/`MaxIterationsReached`, AgentStep.cs:4-17) via `ToExecutionStep` (ToolDemo.razor:297) and re-renders live (`InvokeAsync(StateHasChanged)`, ToolDemo.razor:272). The old hardcoded single-step fallback (ToolDemo.razor:282-285) remains only as a safety net. Core library **re-built clean (0 errors, 2026-06-30)**. ⚠ **RUNTIME 2026-07-01 (verifier, live LM Studio) — the trace does NOT show real tool steps:** the agent loop made no tool call (the model answered/hallucinated), so `IProgress<AgentStep>` fired **0 times** and the page fell through to its `executionSteps.Count == 0` fallback (`ToolDemo.razor:283`) → the trace showed only "Step 1: LLM generated final answer". The endpoint DOES tool-call when tools are sent directly (raw `finish_reason:tool_calls`), so the gap is in the agent-loop/provider path — logged **TR-RAG-006**. ✅✅ **RESOLVED AT RUNTIME 2026-07-02 (verifier):** after the TR-RAG-006 fix (`LmStudioLlmProvider` tools/tool_calls) the live UI trace shows the real steps — requested tool(s) → `Executed get_weather({"city":"Tokyo"})` with result block → final answer using the tool result; two consecutive runs consistent (test `tests/verify/req-ui-007.spec.ts`, screenshot `test-results/screens/req-ui-007-trace-desktop.png`). *(REQ-UI-007 / REQ-RAG-009)*
+- ✅ **RESOLVED 2026-07-02 — mobile (390px) overflow fixed same day.** Three compounding causes: TrBlazeUI `SidebarInset` `<main>` lacks `min-width:0` (**TR-003** — app workaround `main{min-width:0}` in `wwwroot/styles/base.css`); the DataTable pagination's `sr-only` absolutely-positioned spans escape scroll containers to the `relative` `<main>` and widen the document (**TR-004** — fixed by wrapping DataTables in `relative overflow-x-auto`, shadcn pattern); non-wrapping header/input rows (ToolDemo.razor:20 `flex-wrap`, :84 `flex-col sm:flex-row`). Verified: `/tool-demo` and `/ingestion` both measure `scrollWidth == 390` at a 390px viewport; visual gate PASS @1280 + @390 (screenshots `req-ui-007-trace-{desktop,mobile}.png`, `ingestion-fixed-{desktop,mobile}.png`). *(REQ-UI-007; REQ-UI-004)*
 - The custom-tool JSON Schema textarea accepts arbitrary text passed verbatim to `Register` with no validation (ToolDemo.razor:231).
 - `agentStats` token count comes from the final response only; intermediate tool-call round-trip tokens are not summed.
 
 ---
 
 ### Anonymous · Token Usage
+
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE DATA (upgrades the earlier zeros-only observation): after this run's live LLM operations the dashboard showed **non-zero Total Tokens / Operations** and a populated Usage-by-Model row for `qwen2.5-coder-32b-instruct`. Known issue stands: Estimated Cost reads $0.0000 for models absent from the hard-coded pricing table; the budget alert was not exercised (no budget configured).
 
 - **Route:** `@page "/token-usage"` (`samples/TechieRagWeb/Components/Pages/TokenUsage.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/TokenUsage.razor`
@@ -668,6 +689,8 @@ flowchart TD
 ---
 
 ### Anonymous · Qdrant Admin
+
+> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, Qdrant 1.15.5 in Docker): renders ✓ @1280 **and** @390; looks-right ✓ @1280 BUT **visual-broken @390 (DEFECT 2026-07-02)** — with a RUNNING container, the Container-Management row's Stop + logs icon buttons sit off-canvas (x ≈ 666–765 vs the 390px page), reachable only by panning the whole shell `<main>`; TR-003 class, needs flex-wrap/local containment; only manifests when a container is running. LIVE otherwise: Connect with API key → Docker Available, Qdrant Connected, **Version 1.15.5 (real server)**; collections table populated; created + deleted collection `verify_crud_tmp` via the UI; browsed `techierag_chunks` (1,043 points) with working pager Next/Previous; the vector detail dialog opened non-empty. Bulk delete + container lifecycle buttons were not exercised (real owner data/infrastructure).
 
 - **Route:** `@page "/qdrant-admin"` (`samples/TechieRagWeb/Components/Pages/QdrantAdmin.razor:1`)
 - **Razor file:** `samples/TechieRagWeb/Components/Pages/QdrantAdmin.razor`
@@ -754,9 +777,10 @@ flowchart TD
 - Payload field extraction tries multiple key aliases (`Text/ChunkText/text`, `DocumentName/DocumentId/SourceFile`) (cs:447-448). "New Collection" disabled unless Connected (file:213); "Create Container" hidden unless Docker available (file:121).
 
 **Known issues / gotchas**
-- **Hard-coded version**: `GetClusterInfoAsync` always returns `Version: "1.12.x"` regardless of the actual server (QdrantAdminService.cs:318); the "Version" card is cosmetic/misleading. *(logged to REQ-UI-012)*
-- **Collections grid "Vectors" column is meaningless**: `VectorCount` and `PointCount` are both `info.PointsCount` (cs:344-345); the two columns (file:275,276) always show identical numbers. *(logged to REQ-UI-012)*
-- **Scroll pagination is fragile**: offset is encoded as a numeric `PointId.Num` cursor (cs:437) rather than Qdrant's `next_page_offset`; Next/Previous beyond page 1 can return wrong/empty results for UUID or non-contiguous IDs. This is core to REQ-UI-013 (paginated browse). *(logged to REQ-UI-013)*
+- ✅ **Mobile (390px) overflow when a container is RUNNING — RESOLVED 2026-07-02** (flow-master `*build-phase`, REQ-UI-011): the Container-Management row's Stop + logs icon buttons rendered off-canvas (x ≈ 666–765 vs the 390px page). Root cause ran deeper than "add a scroll wrapper": the `.overflow-x-auto` Tailwind utility is **purged from the shipped TrBlazeUI CSS**, so the existing `<div class="relative overflow-x-auto">` DataTable wrappers were INERT (computed `overflow-x: visible`) and the 6-column containers table (~488px) escaped its 374px wrapper → `document.scrollWidth=496` @390. A `base.css` revival of the utility also failed to deliver (`MapStaticAssets` served 0-byte CSS to `br/gzip` clients). **Fix:** inline `style="overflow-x:auto;max-width:100%"` on the three QdrantAdmin DataTable wrappers (QdrantAdmin.razor:175/273/348) — immune to Tailwind purge + the static-asset pipeline. Live-verified with a running container: `document.scrollWidth` 496→**390** @390, table scrolls inside its local wrapper, desktop 1280 no regression (`tests/verify/req-ui-011-mobile-fix.spec.ts`, both cases PASS). Correction logged to TrBlazeUI feedback **TR-004** (the `overflow-x-auto` wrapper pattern noted elsewhere in this guide is inert in this app — inline style is the reliable mechanism).
+- ✅ **Hard-coded version — RESOLVED 2026-07-01** (REQ-UI-012 Verified): `GetClusterInfoAsync` now reads `client.HealthAsync().Version` (falls back to "Unknown", never a fabricated number); live-verified showing real "1.15.5". *(the "1.12.x" description below is historical.)*
+- ✅ **Collections grid "Vectors" column — RESOLVED 2026-07-01** (REQ-UI-012 Verified): `ListCollectionsAsync` now binds Vectors→`IndexedVectorsCount` (distinct from Points→`PointsCount`); no longer duplicated. *(SDK note TR-RAG-003.)*
+- ✅ **Scroll pagination — RESOLVED 2026-07-01** (REQ-UI-013 Verified): `BrowseVectorsAsync` now threads Qdrant's opaque `ScrollResponse.NextPageOffset` cursor (not a numeric `PointId.Num`); page1/page2 non-overlapping + Previous replay live-verified. *(SDK note TR-RAG-004.)*
 - Dead/unused helper `ShowCreateCollectionModal()` (file:642) never runs (the dialog uses a `DialogTrigger`), so re-opening retains prior field values. Destructive Delete actions have no confirmation. `UseContainer` fire-and-forget swallows errors (file:568).
 - `{unresolved — TODO}`: whether TrBlazeUI `DataTable` *requires* a `Pagination` object could not be confirmed (component source is PAT-gated); given `ShowPagination="false"` it is almost certainly opt-in, so likely not a defect.
 
@@ -819,4 +843,4 @@ Lineage: `TechieRagClient.cs:330` (SearchAsync) / `:415` (AskAsync) / `:443` (As
 6. After fixing, re-run the screen's walkthrough in `docs/TechieRag-UsageGuide.md`, then re-generate this guide (`*devguide TechieRag`) if the code path changed — and run `*verify` with the app booted to upgrade the render-status from static to runtime-confirmed.
 
 ---
-_Generated 2026-06-25 · refreshed 2026-06-30 (`--update`: Tool Calling Demo re-mapped) · reflects code as built · ⚠ STATIC-ONLY (not runtime-verified — TrBlazeUI restore is PAT-gated). Regenerate with `*devguide TechieRag` after code changes._
+_Generated 2026-06-25 · refreshed 2026-06-30 (`--update`: Tool Calling Demo re-mapped) · **runtime-verified 2026-07-01 (verifier `*verify ui` — all 11 screens render+visual-confirmed as Anonymous; LLM/Qdrant data-paths not exercised — no provider/no Qdrant this run)** · **Tool Demo data-path runtime-verified 2026-07-02 as Anonymous (verifier `*verify REQ-UI-007` — live agent-loop tool call + Execution Trace confirmed; 390px overflow found AND fixed same day on /tool-demo + /ingestion, TR-003/TR-004 workarounds)** · **Runtime-verified 2026-07-02 as Anonymous (verifier `*verify all` — all 10 screens exercised live: LLM, ingest write-path, Auto-RAG streaming, token dashboard, Qdrant CRUD; one new @390 defect on /qdrant-admin)** · reflects code as built. Regenerate with `*devguide TechieRag` after code changes._

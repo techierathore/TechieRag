@@ -11,7 +11,9 @@ namespace TechieRag.Services;
 /// </summary>
 /// <remarks>
 /// <para><b>Purpose:</b> Provides resilience for LLM API calls. Implements exponential backoff,
-/// rate-limit detection (HTTP 429), and circuit breaker pattern.</para>
+/// rate-limit detection (HTTP 429) honoring the server's <c>Retry-After</c> header via
+/// <see cref="LlmRateLimitException.RetryAfter"/> (capped at <see cref="ResilienceConfig.MaxRetryDelayMs"/>),
+/// and circuit breaker pattern.</para>
 /// <para><b>Code Flow:</b> Wraps the actual ILlmProvider as a decorator.
 /// All calls are delegated to the inner provider with retry logic around them.</para>
 /// </remarks>
@@ -22,6 +24,13 @@ public class RetryHandler : ILlmProvider
     private readonly ILogger<RetryHandler> logger;
     private int consecutiveFailures;
     private DateTime circuitOpenedAt = DateTime.MinValue;
+
+    /// <summary>
+    /// Test seam: performs the wait between retry attempts. Defaults to <see cref="Task.Delay(TimeSpan, CancellationToken)"/>;
+    /// tests replace it to capture requested delays without real sleeping.
+    /// </summary>
+    internal Func<TimeSpan, CancellationToken, Task> DelayAsync { get; set; } =
+        static (delay, cancellationToken) => Task.Delay(delay, cancellationToken);
 
     /// <inheritdoc/>
     public string Name => inner.Name;
@@ -117,7 +126,18 @@ public class RetryHandler : ILlmProvider
             {
                 RecordFailure();
 
-                if (config.HandleRateLimiting && ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                var wait = TimeSpan.FromMilliseconds(delay);
+
+                if (config.HandleRateLimiting && ex is LlmRateLimitException { RetryAfter: not null } rateLimit)
+                {
+                    // Honor the server's Retry-After hint (delta-seconds or HTTP-date), capped at the max backoff.
+                    wait = TimeSpan.FromMilliseconds(
+                        Math.Min(rateLimit.RetryAfter.Value.TotalMilliseconds, config.MaxRetryDelayMs));
+
+                    logger.LogWarning("Rate limited ({StatusCode}). Honoring Retry-After: waiting {Delay}ms before retry {Attempt}/{MaxRetries}",
+                        (int?)ex.StatusCode, (int)wait.TotalMilliseconds, attempt + 1, config.MaxRetries);
+                }
+                else if (config.HandleRateLimiting && ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 {
                     logger.LogWarning("Rate limited (429). Waiting {Delay}ms before retry {Attempt}/{MaxRetries}",
                         delay, attempt + 1, config.MaxRetries);
@@ -128,7 +148,7 @@ public class RetryHandler : ILlmProvider
                         attempt + 1, config.MaxRetries, delay);
                 }
 
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                await DelayAsync(wait, cancellationToken).ConfigureAwait(false);
                 delay = Math.Min((int)(delay * config.BackoffMultiplier), config.MaxRetryDelayMs);
             }
             catch (TaskCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -141,7 +161,7 @@ public class RetryHandler : ILlmProvider
                 logger.LogWarning(ex, "LLM request timed out (attempt {Attempt}/{MaxRetries}). Retrying in {Delay}ms",
                     attempt + 1, config.MaxRetries, delay);
 
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                await DelayAsync(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
                 delay = Math.Min((int)(delay * config.BackoffMultiplier), config.MaxRetryDelayMs);
             }
             catch (Exception)

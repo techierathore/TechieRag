@@ -96,7 +96,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await httpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<GeminiResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -140,7 +140,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);

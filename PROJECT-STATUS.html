@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TechieRag — Status — TechieRag Status</title>
+<title>TechieRag — Status — TechieRag Project Status</title>
 <script>
 /* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
    pick by time of day — light 07:00–19:00 local, softened dark at night. */
@@ -106,97 +106,77 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-06-30</div>
+    <div class="sub">Last rendered: 2026-07-02</div>
     <div class="group">Contents</div>
     <ol>
       <li><a href="#where-i-am">Where I am</a></li>
-      <li><a href="#next-command-to-run">Next command to run</a></li>
+      <li><a href="#next-command">Next command</a></li>
       <li><a href="#open-requirements">Open requirements</a></li>
       <li><a href="#known-blockers">Known blockers</a></li>
+      <li><a href="#library-feedback">Library feedback</a></li>
+      <li><a href="#standards-compliance">Standards compliance</a></li>
       <li><a href="#verification-log">Verification log</a></li>
-      <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-      <li><a href="#standards-compliance-last-verifier-check">Standards compliance (last verifier check)</a></li>
-      <li><a href="#deferred--future">Deferred / future</a></li>
-      <li><a href="#framework-migration-note-2026-06-27">Framework migration note (2026-06-27)</a></li>
+      <li><a href="#deferred-future">Deferred / future</a></li>
     </ol>
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Project status · last updated 2026-06-27</div>
-<blockquote><p>Migrated to the single-checklist framework (2026-06-27); prior Verified/Done verdicts predate the new visual-truth gate and have not been visually confirmed.</p></blockquote>
+    <div class="subtitle">Project status snapshot</div>
+<p>Configurable .NET 10 RAG library (NuGet), ~96% complete. All v1.1 + v2 features shipped and migrated into the single checklist as <code>Done (pre-existing)</code>. <strong>This file is the dashboard only</strong> — per-REQ evidence lives in <code>docs/TechieRag-Checklist.md</code> (Requirements Status table); library defects in the per-library feedback files.</p>
 <div class="toc-inline">
   <div>Contents</div>
   <ol>
     <li><a href="#where-i-am">Where I am</a></li>
-    <li><a href="#next-command-to-run">Next command to run</a></li>
+    <li><a href="#next-command">Next command</a></li>
     <li><a href="#open-requirements">Open requirements</a></li>
     <li><a href="#known-blockers">Known blockers</a></li>
+    <li><a href="#library-feedback">Library feedback</a></li>
+    <li><a href="#standards-compliance">Standards compliance</a></li>
     <li><a href="#verification-log">Verification log</a></li>
-    <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-    <li><a href="#standards-compliance-last-verifier-check">Standards compliance (last verifier check)</a></li>
-    <li><a href="#deferred--future">Deferred / future</a></li>
-    <li><a href="#framework-migration-note-2026-06-27">Framework migration note (2026-06-27)</a></li>
+    <li><a href="#deferred-future">Deferred / future</a></li>
   </ol>
 </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>TechieRag is a configurable .NET 10 RAG library (NuGet), ~96% complete. Day-1 docs were reverse-engineered on 2026-06-25 from the codebase plus the v1.1 refactoring roadmap (completed 2025-12-30) and the v2 LLM implementation spec (completed 2026-02-18). The v1.1 core (config/builder, 3 vector stores, 9 document processors, 6 embedding providers, semantic search, the <code>TechieRagWeb</code> sample, and Qdrant admin) and the entire v2 LLM layer (6 LLM providers, auto-RAG generation, agent/tool loop, conversation memory, token tracking, resilience, fallback, prompt templates, and 4 new sample pages) are all shipped and were validated by manual/integration testing (21 documented scenarios). The roadmap + spec were migrated this session into the UI + Functional checklists — every requirement is marked <code>Done (pre-existing)</code>. The two library packages and the test project build green; the sample is blocked from restoring only by a missing TrBlazeUI GitHub Packages credential. Remaining work is a formal automated test suite and optional OpenTelemetry exporters (both deferred — not BRD requirements).</p>
-<p>DevGuide generated 2026-06-25, refreshed 2026-06-30 (<code>--update</code>: Tool Calling Demo re-mapped to as-built agent-loop anchors; core lib re-built clean, 0 errors; 0 new defects): docs/TechieRag-DevGuide.md (single doc — 1 role/anonymous, 11 screens) + .html. ⚠ STATIC-ONLY (sample can't boot without the TrBlazeUI PAT). 11 code-confirmed defects logged to the UI checklist; 6 REQs flagged <code>Needs re-verify</code> (REQ-UI-003/005/006/007/012/013).</p>
-<h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag      (OpenCode: /flow-master *build-phase TechieRag)</code></pre>
-<p>Adds the remaining tests to the open REQ tail in docs/TechieRag-Checklist.md (Done items not rebuilt). Live UI verify of samples/TechieRagWeb still needs the TrBlazeUI GitHub Packages token (externally blocked).</p>
+<p><strong>Handoff — all 36 REQs <code>Verified</code> / <code>Done (pre-existing)</code>; awaiting manual UAT per the Usage Guide.</strong> The last 3 open rows were closed in the 2026-07-02 <code>*build-phase</code> (REQ-UI-011 mobile layout, REQ-RAG-012 Retry-After, REQ-FN-003 CI gates — see the Verification log + <code>docs/TechieRag-Checklist.md</code>). Handoff artifacts are finalized: Usage Guide (test plan + runbook + smoke checklist), DevGuide, BRD §4 rollup (F-RESIL / F-PKG / F-QDRANT now Done), and both per-library feedback files consolidated.</p>
+<h2 id="next-command">Next command<a class="anchor-link" href="#next-command">#</a></h2>
+<pre><code class="language-none">Manual UAT per docs/TechieRag-UsageGuide.md smoke checklist.</code></pre>
+<p>Then hand each per-library feedback file to its team, and after UAT set <code>current_phase: Released</code>.</p>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <ul>
-<li>6 UI requirements flagged <code>Needs re-verify</code> by the 2026-06-25 DevGuide (static code-confirmed defects): REQ-UI-003 (LLM Settings Reset is a no-op), REQ-UI-005 (Chat streaming footer never counts tokens/cost + double retrieval), REQ-UI-006 (Playground Temperature/MaxTokens no-op + Structured output not parsed), REQ-UI-007 (Tool Demo execution trace unwired — library <code>AgentLoopRunner</code> has no step callback), REQ-UI-012 (Qdrant version hard-coded, Vectors col duplicates Points), REQ-UI-013 (vector pagination cursor bug).</li>
-<li>All other <code>REQ-UI-*</code>, 3 <code>REQ-FN-*</code>, 14 <code>REQ-RAG-*</code>, and 7 <code>REQ-NFR-*</code> remain <code>Done (pre-existing)</code>. See the <strong>Requirements Status</strong> table in docs/TechieRag-Checklist.md.</li>
+<li><strong>None.</strong> All 36 REQs are <code>Verified</code> / <code>Done (pre-existing)</code> (terminal). See <code>docs/TechieRag-Checklist.md#requirements-status</code>.</li>
+<li>Deferred (not BRD REQs): broader xUnit coverage beyond the resilience/provider suite; OpenTelemetry exporters.</li>
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li><strong>Sample restore needs a credential (not a code defect):</strong> <code>samples/TechieRagWeb</code> references <code>TrBlazeUI.Components</code> and <code>TrBlazeUI.Icons.Lucide</code> from GitHub Packages (<code>nuget.pkg.github.com/techierathore</code>), which return <strong>401 Unauthorized</strong> without an authenticated <code>nuget.config</code> token. The two shipped library packages restore from nuget.org alone. Add a GitHub PAT with <code>read:packages</code> to <code>nuget.config</code> to build the sample.</li>
-<li><strong>Dependency advisory (NU1903):</strong> <code>SQLitePCLRaw.lib.e_sqlite3</code> 2.1.11 (transitive via the SQLite-vec store / test project) has a known high-severity advisory — bump when an updated version is available.</li>
+<li>None open. RAG retrieval no longer depends on the external <code>localhost:7997</code> embedding server — the bundled BGE-M3 model in the sample's bin output serves the Embedded source offline.</li>
+<li>⚠ <strong>Security:</strong> the TrBlazeUI PAT is committed in plaintext in <code>nuget.config</code> (now gitignored but still tracked and in history) — untrack + revoke recommended.</li>
 </ul>
+<h2 id="library-feedback">Library feedback<a class="anchor-link" href="#library-feedback">#</a></h2>
+<ul>
+<li><strong>TrBlazeUI:</strong> 0 major, 2 open minor (TR-003 SidebarInset min-width; TR-004 DataTable scroll wrapper — now known to be <em>inert</em> because <code>.overflow-x-auto</code> is purged from the shipped CSS, fixed app-side with inline style), 1 nice-to-have (TR-002 css 404) — <code>docs/TechieRag-TrBlazeUI-Feedback.md</code></li>
+<li><strong>TechieRag:</strong> 1 major open (TR-RAG-001 streaming RAG sources); TR-RAG-005 + TR-RAG-006 fixed; 3 minor — <code>docs/TechieRag-TechieRag-Feedback.md</code></li>
+</ul>
+<h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
+<p>0 new underscore-field violations (new code is bare camelCase). Pre-existing <code>_lock</code>/<code>_currentInstance</code> in <code>TechieRagManager</code> left as-is (out of scope for this fix).</p>
 <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
 <table>
 <thead>
-<tr>
-<th>Date</th>
-<th>Phase</th>
-<th>Result</th>
-<th>Status table</th>
-</tr>
+<tr><th>Date</th><th>Phase</th><th>Result</th></tr>
 </thead>
 <tbody>
-<tr>
-<td>2026-06-25</td>
-<td>Discovery (day-1 brownfield)</td>
-<td>Docs generated; roadmap+spec migrated; build PASS (rung #2, 3 non-sample projects)</td>
-<td>docs/TechieRag-Checklist.md#requirements-status</td>
-</tr>
+<tr><td>2026-06-25</td><td>Discovery (day-1 brownfield)</td><td>Docs generated; roadmap+spec migrated; build PASS</td></tr>
+<tr><td>2026-07-01</td><td>Build+Verify (<code>*build-phase</code> + follow-ups)</td><td>PAT unblocked → sample builds + boots; 6 UI fixes; overlay/SQLite/logging fixes; <code>*verify ui</code> → 12/13 UI Verified; REQ-UI-007 open (TR-RAG-005/006 logged)</td></tr>
+<tr><td>2026-07-01</td><td>Build (<code>*build-phase</code>, TR-RAG-005/006)</td><td>LmStudio tool calling + async accessors fixed; core + test + sample build PASS; 3 new xUnit tests pass; <strong>live agent-loop smoke PASS</strong> (real <code>get_weather</code> tool call, AgentSteps fired). REQ-UI-007 → Implemented, pending verifier UI render</td></tr>
+<tr><td>2026-07-02</td><td>Verify + fix (<code>*verify REQ-UI-007</code> → mobile-overflow fix → re-verify)</td><td><strong>Execution Trace VERIFIED LIVE in the UI</strong> (real tool steps, bundled BGE-M3, no download); 390px overflow found on /tool-demo + /ingestion, root-caused (TR-003 SidebarInset min-width + TR-004 DataTable sr-only escape) and FIXED same day; all routes <code>scrollWidth==390</code> @390; <strong>REQ-UI-007 + REQ-UI-004 → Verified 100%</strong> — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
+<tr><td>2026-07-02</td><td>Full verify (<code>*verify all</code>, 36 REQs, live LM Studio + live Qdrant 1.15.5)</td><td>Builds 0-err ×3, xUnit 3/3, Playwright 37/37 after gate/selector fixes. LIVE-proven: ingest write cycle, Auto-RAG streaming + sources, token dashboard non-zero, LLM connection test 912ms, Qdrant collection create/delete + 1,043-pt browse/detail. Opened: <strong>REQ-UI-011 ⚠ visual @390</strong> (container row off-canvas), <strong>REQ-RAG-012 PARTIAL</strong> (Retry-After never parsed), <strong>REQ-FN-003 PARTIAL</strong> (NuGet.org job commented out; CI tests non-blocking) — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
+<tr><td>2026-07-02</td><td>Build+fix (<code>*build-phase</code> FIX, last 3 rows)</td><td>Builds 0-err ×3 (+ sample), <strong>xUnit 11/11</strong>. <strong>REQ-RAG-012 → Verified</strong> (Retry-After parsed via new <code>LlmHttpGuard</code>+<code>LlmRateLimitException</code> in all 6 providers; 4 Retry-After unit tests). <strong>REQ-UI-011 → Verified</strong> (mobile @390 off-canvas fixed — root cause: <code>.overflow-x-auto</code> purged/inert + <code>MapStaticAssets</code> 0-byte CSS to br clients; real fix = inline style on QdrantAdmin DataTable wrappers; live <code>scrollWidth</code> 496→390 with running container). <strong>REQ-FN-003 → Verified (static)</strong> (publish-nuget.yml: test-gate now blocking, NuGet.org job un-commented + secret-gated). <strong>All 36 REQs Verified/terminal → Handoff</strong> — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
+<tr><td>2026-07-02</td><td>Handoff (<code>*handoff-phase</code>)</td><td><strong>Ship-ready for UAT.</strong> All 36 REQs Verified/terminal; build PASS ×3 + sample; xUnit 11/11. Finalized: Usage Guide (test plan + runbook + smoke), DevGuide, BRD §4 rollup (F-RESIL/F-PKG/F-QDRANT → Done; test-suite → Partial 40%), both feedback files consolidated (open: TR-RAG-001; TR-002/003/004 minor). HTMLs re-rendered. Open for library teams: TrBlazeUI TR-003/TR-004, TechieRag TR-RAG-001 — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
 </tbody>
 </table>
-<h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
+<h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
-<li>TrBlazeUI: 0 major, 0 minor — docs/TechieRag-TrBlazeUI-Feedback.md</li>
-<li>TechieRag: 0 major, 0 minor — docs/TechieRag-TechieRag-Feedback.md</li>
-</ul>
-<h2 id="standards-compliance-last-verifier-check">Standards compliance (last verifier check)<a class="anchor-link" href="#standards-compliance-last-verifier-check">#</a></h2>
-<ul>
-<li>Underscore fields: 0 violations (grep over src/ + tests/, 2026-06-25)</li>
-<li>Test method underscores: 0 violations (grep over tests/, 2026-06-25)</li>
-<li>Mis-prefixed fields: N/A — no-prefix project (camelCase convention; no obj-prefix grep applies)</li>
-</ul>
-<h2 id="deferred--future">Deferred / future<a class="anchor-link" href="#deferred--future">#</a></h2>
-<ul>
-<li>Formal automated xUnit test suite (v2 Phase 7 — validated manually only).</li>
-<li>OpenTelemetry metrics (<code>TechieRagMetrics</code>) + distributed tracing (<code>TechieRagActivitySource</code>) for Prometheus/Grafana/Jaeger.</li>
-<li>Resolve the SQLitePCLRaw advisory (NU1903) by upgrading the transitive package.</li>
-</ul>
-<h2 id="framework-migration-note-2026-06-27">Framework migration note (2026-06-27)<a class="anchor-link" href="#framework-migration-note-2026-06-27">#</a></h2>
-<ul>
-<li>The two checklists merged into ONE <code>docs/TechieRag-Checklist.md</code> (all REQ-UI/FN/RAG/NFR-* in one Requirements Status table; originals archived to docs/OldDocs/, every verdict verbatim).</li>
-<li>The build commands <code>*build-ui-phase</code>/<code>*build-rag-phase</code>/<code>*build-functional-phase</code> were dissolved into ONE <code>*build-phase TechieRag</code> (flow-master; it calls /trblazeui + /techierag as sub-agents).</li>
-<li>New VISUAL-TRUTH gate: the verifier now also checks each screen LOOKS right (no overlap/clip/off-viewport), not just that controls have data — every prior Verified/Done verdict predates this and is not yet visually confirmed.</li>
-<li>New <code>*fix-issues TechieRag {folder}</code> (flow-master): drop screenshots of broken screens in a folder → it triages + fixes + re-verifies.</li>
-<li>RESTART any open Claude Code / OpenCode session against this project to load the new task/agent defs.</li>
+<li>Formal automated xUnit suite (now partial — LmStudio provider tool tests added this session).</li>
+<li>OpenTelemetry metrics + distributed tracing exporters.</li>
 </ul>
   </main>
 </div>

@@ -101,7 +101,7 @@ public class AnthropicLlmProvider : ILlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await httpClient.PostAsync("/v1/messages", content, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -144,7 +144,7 @@ public class AnthropicLlmProvider : ILlmProvider
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/v1/messages") { Content = content };
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);

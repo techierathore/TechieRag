@@ -101,7 +101,7 @@ public class OllamaLlmProvider : ILlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await httpClient.PostAsync("/api/chat", content, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var ollamaResponse = JsonSerializer.Deserialize<OllamaChatResponse>(responseJson, JsonOptions)
@@ -143,7 +143,7 @@ public class OllamaLlmProvider : ILlmProvider
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/chat") { Content = content };
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
