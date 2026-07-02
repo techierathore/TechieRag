@@ -1,8 +1,7 @@
 @page "/chat"
-@rendermode InteractiveServer
 @using TechieRag.Abstractions
 @using TechieRag.Models
-@inject ITechieRag TechieRag
+@inject TechieRagWeb.Services.TechieRagManager TechieRag
 @inject ToastService ToastService
 @inject ILogger<Chat> Logger
 
@@ -249,7 +248,7 @@
 
     private async Task HandleDirectLlm(string question)
     {
-        var provider = TechieRag.GetLlmProvider();
+        var provider = await TechieRag.GetLlmProviderAsync();
         if (provider is null)
         {
             messages.Add(new ChatDisplayMessage("assistant", "No LLM provider configured. Go to LLM Settings to configure one."));
@@ -258,17 +257,23 @@
 
         if (useStreaming)
         {
+            var tracker = await TechieRag.GetTokenTrackerAsync();
+            var before = tracker.GetSessionUsage();
+
             await foreach (var token in provider.CompleteStreamAsync(question))
             {
                 streamingContent += token;
                 StateHasChanged();
             }
+
+            await AccountStreamedUsage(provider, question, streamingContent, before);
             messages.Add(new ChatDisplayMessage("assistant", streamingContent));
         }
         else
         {
             var response = await provider.CompleteAsync(question);
             totalTokens += response.Usage.InputTokens + response.Usage.OutputTokens;
+            totalCost += response.Usage.EstimatedCostUsd;
             messages.Add(new ChatDisplayMessage("assistant", response.Content ?? ""));
         }
     }
@@ -277,14 +282,36 @@
     {
         if (useStreaming)
         {
+            // Single vector search per question (REQ-UI-005 / TR-RAG-001):
+            // TechieRag.AskStreamAsync runs its OWN internal SearchAsync and discards the sources
+            // it retrieved, so calling it in addition to a SearchAsync here would issue TWO vector
+            // searches per question. Instead we retrieve ONCE (for the sources panel) and stream the
+            // answer directly from the LLM provider using those same results. Trade-off: this bypasses
+            // the library's configured PromptTemplateEngine (IPromptTemplate is not injectable), so the
+            // configured system prompt / context template are not applied. Logged as TR-RAG-001.
             var searchResults = await TechieRag.SearchAsync(question, topK, documentFilter);
             var sources = searchResults.Select(r => new SourceInfo(r.Chunk.DocumentId, r.Score)).ToList();
 
-            await foreach (var token in TechieRag.AskStreamAsync(question, topK, null, documentFilter))
+            var provider = await TechieRag.GetLlmProviderAsync();
+            if (provider is null)
+            {
+                messages.Add(new ChatDisplayMessage("assistant", "No LLM provider configured. Go to LLM Settings to configure one."));
+                return;
+            }
+
+            var promptMessages = BuildRagMessages(question, searchResults);
+            var promptText = string.Join("\n", promptMessages.Select(m => m.Content));
+
+            var tracker = await TechieRag.GetTokenTrackerAsync();
+            var before = tracker.GetSessionUsage();
+
+            await foreach (var token in provider.ChatStreamAsync(promptMessages))
             {
                 streamingContent += token;
                 StateHasChanged();
             }
+
+            await AccountStreamedUsage(provider, promptText, streamingContent, before);
             messages.Add(new ChatDisplayMessage("assistant", streamingContent) { Sources = sources });
         }
         else
@@ -296,6 +323,59 @@
             var sources = response.Sources.Select(s => new SourceInfo(s.Chunk.DocumentId, s.Score)).ToList();
             messages.Add(new ChatDisplayMessage("assistant", response.Answer) { Sources = sources });
         }
+    }
+
+    /// <summary>
+    /// Builds a single-search RAG prompt (system context + user question) from already-retrieved
+    /// results, so the answer can be streamed via the provider without a second vector search.
+    /// </summary>
+    private static List<ChatMessage> BuildRagMessages(string question, IReadOnlyList<SearchResult> searchResults)
+    {
+        var contextText = string.Join("\n\n", searchResults.Select((r, i) =>
+            $"[{i + 1}] ({r.Score:P0} match) {r.Chunk.Text}"));
+
+        var systemPrompt = string.IsNullOrEmpty(contextText)
+            ? "You are a helpful assistant. Answer the user's question."
+            : $"You are a helpful assistant. Answer the user's question using only the retrieved context below. If the answer is not contained in the context, say you don't know.\n\n--- Retrieved Context ---\n{contextText}\n--- End Context ---";
+
+        return new List<ChatMessage>
+        {
+            ChatMessage.System(systemPrompt),
+            ChatMessage.User(question)
+        };
+    }
+
+    /// <summary>
+    /// Accounts a streamed completion's tokens/cost into the session footer. Prefers the real usage
+    /// recorded into the ITokenTracker by the provider's completion event (same source as the Token
+    /// Usage dashboard); if the provider reported zero streamed usage (TR-RAG-002), falls back to the
+    /// provider's own token estimator and records that estimate so the footer moves off zero.
+    /// </summary>
+    private async Task AccountStreamedUsage(ILlmProvider provider, string promptText, string answerText, TokenUsageSummary before)
+    {
+        var tracker = await TechieRag.GetTokenTrackerAsync();
+        var after = tracker.GetSessionUsage();
+        var streamedTokens = after.TotalTokens - before.TotalTokens;
+        var streamedCost = after.TotalEstimatedCostUsd - before.TotalEstimatedCostUsd;
+
+        if (streamedTokens <= 0)
+        {
+            Logger.LogWarning("Streaming provider {Provider} reported no token usage; estimating from text (TR-RAG-002).", provider.Name);
+
+            var estimated = new TechieRag.Models.TokenUsage
+            {
+                InputTokens = provider.EstimateTokenCount(promptText),
+                OutputTokens = provider.EstimateTokenCount(answerText),
+                ModelName = provider.ModelName,
+                ProviderName = provider.Name
+            };
+            tracker.RecordUsage(estimated);
+            streamedTokens = estimated.TotalTokens;
+            streamedCost = estimated.EstimatedCostUsd;
+        }
+
+        totalTokens += (int)streamedTokens;
+        totalCost += streamedCost;
     }
 
     private void ClearChat()

@@ -30,7 +30,7 @@ public class LmStudioLlmProvider : ILlmProvider
     public string ModelName { get; }
 
     /// <inheritdoc/>
-    public bool SupportsToolCalling => false;
+    public bool SupportsToolCalling => true;
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
@@ -55,6 +55,22 @@ public class LmStudioLlmProvider : ILlmProvider
             BaseAddress = new Uri(endpoint.TrimEnd('/')),
             Timeout = TimeSpan.FromSeconds(120)
         };
+    }
+
+    /// <summary>
+    /// Creates a new LM Studio LLM provider instance using a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Model name (optional, LM Studio auto-selects loaded model).</param>
+    /// <param name="logger">Logger instance.</param>
+    internal LmStudioLlmProvider(HttpClient httpClient, string model = "default", ILogger<LmStudioLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+
+        ModelName = model;
+        this.logger = logger ?? NullLogger<LmStudioLlmProvider>.Instance;
+        this.httpClient = httpClient;
     }
 
     /// <inheritdoc/>
@@ -91,7 +107,7 @@ public class LmStudioLlmProvider : ILlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await httpClient.PostAsync("/v1/chat/completions", content, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<OpenAIChatResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -102,10 +118,12 @@ public class LmStudioLlmProvider : ILlmProvider
         var choice = result.Choices?.FirstOrDefault();
         var inputTokens = result.Usage?.PromptTokens ?? 0;
         var outputTokens = result.Usage?.CompletionTokens ?? 0;
+        var toolCalls = ParseToolCalls(choice?.Message?.ToolCalls);
 
         var llmResponse = new LlmResponse
         {
             Content = choice?.Message?.Content,
+            ToolCalls = toolCalls,
             Usage = new TokenUsage
             {
                 InputTokens = inputTokens,
@@ -117,7 +135,7 @@ public class LmStudioLlmProvider : ILlmProvider
             ModelName = result.Model ?? ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, false);
+        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls);
         return llmResponse;
     }
 
@@ -131,7 +149,7 @@ public class LmStudioLlmProvider : ILlmProvider
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/v1/chat/completions") { Content = content };
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        LlmHttpGuard.EnsureSuccess(response);
 
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
@@ -189,10 +207,27 @@ public class LmStudioLlmProvider : ILlmProvider
 
     private object BuildOpenAIRequest(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options, bool stream)
     {
+        var apiMessages = messages.Select(m =>
+        {
+            var msg = new Dictionary<string, object> { ["role"] = m.Role };
+            if (m.Content is not null) msg["content"] = m.Content;
+            if (m.ToolCallId is not null) msg["tool_call_id"] = m.ToolCallId;
+            if (m.ToolCalls is { Count: > 0 })
+            {
+                msg["tool_calls"] = m.ToolCalls.Select(tc => new
+                {
+                    id = tc.Id,
+                    type = "function",
+                    function = new { name = tc.Name, arguments = tc.ArgumentsJson }
+                }).ToList();
+            }
+            return msg;
+        }).ToList();
+
         var request = new Dictionary<string, object>
         {
             ["model"] = ModelName,
-            ["messages"] = messages.Select(m => new { role = m.Role, content = m.Content ?? string.Empty }).ToList(),
+            ["messages"] = apiMessages,
             ["stream"] = stream
         };
 
@@ -200,7 +235,36 @@ public class LmStudioLlmProvider : ILlmProvider
         if (options?.MaxTokens is not null) request["max_tokens"] = options.MaxTokens.Value;
         if (options?.TopP is not null) request["top_p"] = options.TopP.Value;
 
+        if (options?.Tools is { Count: > 0 })
+        {
+            request["tools"] = options.Tools.Select(t => new
+            {
+                type = "function",
+                function = new
+                {
+                    name = t.Name,
+                    description = t.Description,
+                    parameters = JsonSerializer.Deserialize<JsonElement>(t.ParametersSchema)
+                }
+            }).ToList();
+
+            if (options.ToolChoice is not null)
+                request["tool_choice"] = options.ToolChoice;
+        }
+
         return request;
+    }
+
+    private static List<ToolCall>? ParseToolCalls(List<OpenAIToolCall>? apiToolCalls)
+    {
+        if (apiToolCalls is not { Count: > 0 }) return null;
+
+        return apiToolCalls.Select(tc => new ToolCall
+        {
+            Id = tc.Id ?? Guid.NewGuid().ToString(),
+            Name = tc.Function?.Name ?? string.Empty,
+            ArgumentsJson = tc.Function?.Arguments ?? "{}"
+        }).ToList();
     }
 
     private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)

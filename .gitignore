@@ -24,9 +24,20 @@ src/TechieRag.Embedded/Models/
 # Logs
 *.log
 
+# Secrets — nuget.config holds a GitHub Packages PAT in plaintext; keep it out of the repo.
+# NOTE: this only stops FUTURE commits. The file is already tracked and the token is already in
+# history — you must also untrack it (git rm --cached nuget.config) AND revoke/rotate the exposed PAT.
+nuget.config
+
 # Claude/AI tooling
-.bmad-core/
+.tfcore/
 .claude/
 CLAUDE.md
 /_bmad
 /.opencode
+/node_modules
+/.verify
+/WORKFLOW.html
+*.json
+/test-results/qdrant-crud-Qdrant-Admin-C-abb04--real-server-version-1-15-5
+/nuget.config

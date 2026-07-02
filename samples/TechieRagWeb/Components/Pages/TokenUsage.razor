@@ -1,8 +1,7 @@
 @page "/token-usage"
-@rendermode InteractiveServer
 @using TechieRag.Abstractions
 @using TechieRag.Models
-@inject ITechieRag TechieRag
+@inject TechieRagWeb.Services.TechieRagManager TechieRag
 @inject ToastService ToastService
 @implements IDisposable
 
@@ -137,9 +136,9 @@
     private List<ModelUsageRow> modelUsage = new();
     private Timer? refreshTimer;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        tracker = TechieRag.GetTokenTracker();
+        tracker = await TechieRag.GetTokenTrackerAsync();
         RefreshData();
         refreshTimer = new Timer(_ => InvokeAsync(() => { RefreshData(); StateHasChanged(); }), null, 5000, 5000);
     }

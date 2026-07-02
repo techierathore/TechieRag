@@ -31,7 +31,13 @@ public record CollectionDetailInfo(
 /// <summary>
 /// A page of vectors for browsing.
 /// </summary>
-public record VectorPage(IReadOnlyList<VectorSummary> Vectors, long TotalCount, int Offset, int Limit);
+/// <remarks>
+/// Qdrant scroll pagination is cursor-based and forward-only. <paramref name="NextPageOffset"/>
+/// carries the opaque cursor (serialized <see cref="Qdrant.Client.Grpc.PointId"/>) that the caller
+/// must feed back to retrieve the following page; it is <c>null</c> when the last page was reached.
+/// <paramref name="Offset"/> is a display-only running count of vectors preceding this page.
+/// </remarks>
+public record VectorPage(IReadOnlyList<VectorSummary> Vectors, long TotalCount, int Offset, int Limit, string? NextPageOffset);
 
 /// <summary>
 /// Summary of a vector for list display.
@@ -140,9 +146,16 @@ public interface IQdrantAdminService
     Task<bool> CollectionExistsAsync(string collectionName);
 
     /// <summary>
-    /// Browses vectors with pagination.
+    /// Browses vectors with cursor-based pagination.
     /// </summary>
-    Task<VectorPage> BrowseVectorsAsync(string collectionName, int offset = 0, int limit = 20);
+    /// <param name="collectionName">The collection to scroll.</param>
+    /// <param name="cursor">
+    /// Opaque next-page cursor (serialized <see cref="Qdrant.Client.Grpc.PointId"/>) returned by the
+    /// previous page's <see cref="VectorPage.NextPageOffset"/>; pass <c>null</c> for the first page.
+    /// </param>
+    /// <param name="displayOffset">Running count of vectors preceding this page, for display only.</param>
+    /// <param name="limit">Page size.</param>
+    Task<VectorPage> BrowseVectorsAsync(string collectionName, string? cursor = null, int displayOffset = 0, int limit = 20);
 
     /// <summary>
     /// Gets a vector by its ID.
@@ -314,8 +327,27 @@ public class QdrantAdminService : IQdrantAdminService
             using var client = CreateClient();
             var collections = await client.ListCollectionsAsync();
 
+            // Read the real server version from the gRPC health check rather than hard-coding it.
+            var version = "Unknown";
+            try
+            {
+                var health = await client.HealthAsync();
+                if (!string.IsNullOrWhiteSpace(health.Version))
+                {
+                    version = health.Version;
+                }
+                else
+                {
+                    logger.LogWarning("Qdrant HealthAsync returned an empty version string");
+                }
+            }
+            catch (Exception healthEx)
+            {
+                logger.LogWarning(healthEx, "Failed to read Qdrant server version via HealthAsync; reporting 'Unknown'");
+            }
+
             return new QdrantClusterInfo(
-                Version: "1.12.x",
+                Version: version,
                 TotalCollections: collections.Count,
                 Status: "Connected"
             );
@@ -339,9 +371,13 @@ public class QdrantAdminService : IQdrantAdminService
             try
             {
                 var info = await client.GetCollectionInfoAsync(name);
+                // "Vectors" must be distinct from "Points". Qdrant's CollectionInfo exposes no total
+                // vectors count (VectorsCount lives on the per-point Vector/VectorOutput messages), so the
+                // closest meaningful distinct figure is IndexedVectorsCount — the number of HNSW-indexed
+                // vectors, which differs from PointsCount while indexing is in progress. See TR-RAG-003.
                 result.Add(new CollectionInfo(
                     Name: name,
-                    VectorCount: (long)info.PointsCount,
+                    VectorCount: (long)info.IndexedVectorsCount,
                     PointCount: (long)info.PointsCount
                 ));
             }
@@ -425,7 +461,7 @@ public class QdrantAdminService : IQdrantAdminService
     }
 
     /// <inheritdoc/>
-    public async Task<VectorPage> BrowseVectorsAsync(string collectionName, int offset = 0, int limit = 20)
+    public async Task<VectorPage> BrowseVectorsAsync(string collectionName, string? cursor = null, int displayOffset = 0, int limit = 20)
     {
         using var client = CreateClient();
 
@@ -433,8 +469,9 @@ public class QdrantAdminService : IQdrantAdminService
         var info = await client.GetCollectionInfoAsync(collectionName);
         var totalCount = (long)info.PointsCount;
 
-        // Scroll through points
-        PointId? offsetId = offset > 0 ? new PointId { Num = (ulong)offset } : null;
+        // Qdrant scroll pagination is cursor-based, NOT numeric-offset based: the previous page's
+        // opaque NextPageOffset PointId (which may be a UUID) is fed back as the scroll offset.
+        PointId? offsetId = DeserializePointId(cursor);
         var scrollResult = await client.ScrollAsync(
             collectionName,
             limit: (uint)limit,
@@ -449,7 +486,10 @@ public class QdrantAdminService : IQdrantAdminService
             Score: null
         )).ToList();
 
-        return new VectorPage(vectors, totalCount, offset, limit);
+        // NextPageOffset is null once the final page has been returned.
+        var nextCursor = SerializePointId(scrollResult.NextPageOffset);
+
+        return new VectorPage(vectors, totalCount, displayOffset, limit, nextCursor);
     }
 
     /// <inheritdoc/>
@@ -585,6 +625,37 @@ public class QdrantAdminService : IQdrantAdminService
     }
 
     #region Helper Methods
+
+    /// <summary>
+    /// Serializes a scroll next-page <see cref="PointId"/> cursor to an opaque string
+    /// (<c>num:{n}</c> or <c>uuid:{g}</c>), or <c>null</c> when there is no further page.
+    /// </summary>
+    private static string? SerializePointId(PointId? pointId)
+    {
+        if (pointId == null) return null;
+        return pointId.HasNum ? $"num:{pointId.Num}" : $"uuid:{pointId.Uuid}";
+    }
+
+    /// <summary>
+    /// Reconstructs a <see cref="PointId"/> from an opaque cursor produced by <see cref="SerializePointId"/>.
+    /// Mirrors <c>GetVectorByIdAsync</c> robustness by falling back to num-vs-uuid detection.
+    /// </summary>
+    private static PointId? DeserializePointId(string? cursor)
+    {
+        if (string.IsNullOrEmpty(cursor)) return null;
+        if (cursor.StartsWith("num:", StringComparison.Ordinal) && ulong.TryParse(cursor.AsSpan(4), out var num))
+        {
+            return new PointId { Num = num };
+        }
+        if (cursor.StartsWith("uuid:", StringComparison.Ordinal))
+        {
+            return new PointId { Uuid = cursor[5..] };
+        }
+        // Fallback for a bare id: detect numeric vs UUID like GetVectorByIdAsync does.
+        return ulong.TryParse(cursor, out var numId)
+            ? new PointId { Num = numId }
+            : new PointId { Uuid = cursor };
+    }
 
     private static string? GetPayloadString(IDictionary<string, Value>? payload, params string[] keys)
     {

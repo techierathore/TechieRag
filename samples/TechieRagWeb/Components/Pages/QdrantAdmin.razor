@@ -5,7 +5,6 @@
 @inject ToastService ToastService
 @inject ILogger<QdrantAdmin> Logger
 @inject IJSRuntime JS
-@rendermode InteractiveServer
 
 <PageTitle>Qdrant Admin</PageTitle>
 
@@ -173,6 +172,7 @@
             }
             else
             {
+                <div class="relative overflow-x-auto" style="overflow-x:auto;max-width:100%">@* inline style: the Tailwind .overflow-x-auto utility is purged from the shipped TrBlazeUI CSS, so the class alone is inert (see docs/TechieRag-TrBlazeUI-Feedback.md TR-004) — inline guarantees wide DataTables clip on narrow viewports *@
                 <DataTable TData="QdrantContainerInfo" Data="@qdrantContainers" ShowPagination="false" ShowToolbar="false">
                     <Columns>
                         <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.ContainerName)" Header="Container" />
@@ -199,6 +199,7 @@
                         </DataTableColumn>
                     </Columns>
                 </DataTable>
+                </div>
             }
         </CardContent>
     </Card>
@@ -269,6 +270,7 @@
             }
             else
             {
+                <div class="relative overflow-x-auto" style="overflow-x:auto;max-width:100%">@* inline style: the Tailwind .overflow-x-auto utility is purged from the shipped TrBlazeUI CSS, so the class alone is inert (see docs/TechieRag-TrBlazeUI-Feedback.md TR-004) — inline guarantees wide DataTables clip on narrow viewports *@
                 <DataTable TData="CollectionInfo" Data="@collections" ShowPagination="false" ShowToolbar="false">
                     <Columns>
                         <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.Name)" Header="Name" />
@@ -284,6 +286,7 @@
                         </DataTableColumn>
                     </Columns>
                 </DataTable>
+                </div>
             }
         </CardContent>
     </Card>
@@ -342,6 +345,7 @@
                     <TypographyH4>Vectors</TypographyH4>
                     @if (currentVectorPage != null && currentVectorPage.Vectors.Count > 0)
                     {
+                        <div class="relative overflow-x-auto" style="overflow-x:auto;max-width:100%">@* inline style: the Tailwind .overflow-x-auto utility is purged from the shipped TrBlazeUI CSS, so the class alone is inert (see docs/TechieRag-TrBlazeUI-Feedback.md TR-004) — inline guarantees wide DataTables clip on narrow viewports *@
                         <DataTable TData="VectorSummary" Data="@currentVectorPage.Vectors" ShowPagination="false" ShowToolbar="false">
                             <Columns>
                                 <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => TruncateId(v.Id))" Header="ID" />
@@ -357,18 +361,19 @@
                                 </DataTableColumn>
                             </Columns>
                         </DataTable>
+                        </div>
 
-                        <div class="flex justify-between items-center mt-4 pt-4 border-t">
+                        <div class="flex flex-wrap justify-between items-center gap-2 mt-4 pt-4 border-t">
                             <TypographyMuted>
                                 Showing @(currentVectorPage.Offset + 1)-@(currentVectorPage.Offset + currentVectorPage.Vectors.Count)
                                 of @currentVectorPage.TotalCount.ToString("N0") vectors
                             </TypographyMuted>
                             <div class="flex gap-2">
-                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PreviousPage" Disabled="@(currentVectorPage.Offset == 0)">
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PreviousPage" Disabled="@(currentPageIndex == 0)">
                                     Previous
                                 </Button>
                                 <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="NextPage"
-                                        Disabled="@(currentVectorPage.Offset + currentVectorPage.Limit >= currentVectorPage.TotalCount)">
+                                        Disabled="@(currentVectorPage.NextPageOffset == null)">
                                     Next
                                 </Button>
                             </div>
@@ -470,11 +475,17 @@
     }
 
     // Collection browsing
+    private const int PageSize = 20;
     private string? selectedCollection;
     private CollectionDetailInfo? selectedCollectionDetail;
     private VectorPage? currentVectorPage;
     private VectorDetail? selectedVector;
     private bool showVectorDetailDialog;
+
+    // Qdrant scroll is forward-only, so Previous is served from a history of the opaque
+    // cursors used to LOAD each visited page (pageCursors[i] loads page i; [0] is null).
+    private readonly List<string?> pageCursors = new();
+    private int currentPageIndex;
 
     // Modals
     private bool showCreateCollectionModal;
@@ -687,7 +698,10 @@
         {
             selectedCollection = name;
             selectedCollectionDetail = await QdrantService.GetCollectionInfoAsync(name);
-            currentVectorPage = await QdrantService.BrowseVectorsAsync(name, 0, 20);
+            pageCursors.Clear();
+            pageCursors.Add(null); // first page has no cursor
+            currentPageIndex = 0;
+            currentVectorPage = await QdrantService.BrowseVectorsAsync(name, cursor: null, displayOffset: 0, limit: PageSize);
         }
         catch (Exception ex)
         {
@@ -697,22 +711,38 @@
 
     private async Task PreviousPage()
     {
-        if (selectedCollection != null && currentVectorPage != null && currentVectorPage.Offset > 0)
+        if (selectedCollection != null && currentPageIndex > 0)
         {
-            var newOffset = Math.Max(0, currentVectorPage.Offset - currentVectorPage.Limit);
-            currentVectorPage = await QdrantService.BrowseVectorsAsync(selectedCollection, newOffset, 20);
+            currentPageIndex--;
+            currentVectorPage = await QdrantService.BrowseVectorsAsync(
+                selectedCollection,
+                cursor: pageCursors[currentPageIndex],
+                displayOffset: currentPageIndex * PageSize,
+                limit: PageSize);
         }
     }
 
     private async Task NextPage()
     {
-        if (selectedCollection != null && currentVectorPage != null)
+        // Advance only while the SDK reports a real next-page cursor (forward-only scroll).
+        if (selectedCollection != null && currentVectorPage?.NextPageOffset != null)
         {
-            var newOffset = currentVectorPage.Offset + currentVectorPage.Limit;
-            if (newOffset < currentVectorPage.TotalCount)
+            var nextCursor = currentVectorPage.NextPageOffset;
+            currentPageIndex++;
+            if (currentPageIndex < pageCursors.Count)
             {
-                currentVectorPage = await QdrantService.BrowseVectorsAsync(selectedCollection, newOffset, 20);
+                pageCursors[currentPageIndex] = nextCursor;
             }
+            else
+            {
+                pageCursors.Add(nextCursor);
+            }
+
+            currentVectorPage = await QdrantService.BrowseVectorsAsync(
+                selectedCollection,
+                cursor: nextCursor,
+                displayOffset: currentPageIndex * PageSize,
+                limit: PageSize);
         }
     }
 
@@ -734,7 +764,13 @@
                 await QdrantService.DeleteVectorAsync(selectedCollection, id);
                 selectedVector = null;
                 showVectorDetailDialog = false;
-                currentVectorPage = await QdrantService.BrowseVectorsAsync(selectedCollection, currentVectorPage?.Offset ?? 0, 20);
+                // Reload the current page using its own cursor (the start id of this page).
+                var reloadCursor = currentPageIndex < pageCursors.Count ? pageCursors[currentPageIndex] : null;
+                currentVectorPage = await QdrantService.BrowseVectorsAsync(
+                    selectedCollection,
+                    cursor: reloadCursor,
+                    displayOffset: currentPageIndex * PageSize,
+                    limit: PageSize);
                 ToastService.Success("Vector deleted!", "Deleted");
             }
             catch (Exception ex)

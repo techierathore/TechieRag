@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Architecture — TechieRag</title>
+<script>
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* call-to-action box (PROJECT-STATUS next command) */
+.cta{background:var(--cta-bg);border:1px solid var(--accent);border-radius:8px;padding:12px 16px;margin:14px 0}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+<nav class="side"><h1>TechieRag — Architecture</h1><div class="sub">Last rendered: 2026-06-25</div><div class="group">Contents</div><ol><li><a href="#tech-stack">1. Tech stack</a></li><li><a href="#component-map">2. Component map</a></li><li><a href="#data-flow-primary-path">3. Data flow — primary path</a></li><li><a href="#module-responsibilities">4. Module responsibilities</a></li><li class="h3"><a href="#secondary-flow-embedded-onnx-model-load-techierag-embedded">Secondary flow — embedded ONNX model load (`TechieRag.Embedded`)</a></li><li class="h3"><a href="#secondary-flow-agent-tool-loop">Secondary flow — agent/tool loop</a></li><li class="h3"><a href="#secondary-flow-llm-resilience-decorators">Secondary flow — LLM resilience decorators</a></li><li><a href="#cross-cutting-concerns">5. Cross-cutting concerns</a></li><li><a href="#deployment-architecture">6. Deployment architecture</a></li><li><a href="#architectural-decisions-adr-style-log">7. Architectural decisions (ADR-style log)</a></li><li><a href="#target-architecture">8. Target architecture</a></li><li><a href="#open-questions-risks">9. Open questions / risks</a></li><li><a href="#sources-harvested">10. Sources harvested</a></li></ol></nav>
+<main>
+<h1>TechieRag — Architecture</h1>
+
+<div class="toc-inline"><div>Contents</div><ol><li><a href="#tech-stack">1. Tech stack</a></li><li><a href="#component-map">2. Component map</a></li><li><a href="#data-flow-primary-path">3. Data flow — primary path</a></li><li><a href="#module-responsibilities">4. Module responsibilities</a></li><li class="h3"><a href="#secondary-flow-embedded-onnx-model-load-techierag-embedded">Secondary flow — embedded ONNX model load (`TechieRag.Embedded`)</a></li><li class="h3"><a href="#secondary-flow-agent-tool-loop">Secondary flow — agent/tool loop</a></li><li class="h3"><a href="#secondary-flow-llm-resilience-decorators">Secondary flow — LLM resilience decorators</a></li><li><a href="#cross-cutting-concerns">5. Cross-cutting concerns</a></li><li><a href="#deployment-architecture">6. Deployment architecture</a></li><li><a href="#architectural-decisions-adr-style-log">7. Architectural decisions (ADR-style log)</a></li><li><a href="#target-architecture">8. Target architecture</a></li><li><a href="#open-questions-risks">9. Open questions / risks</a></li><li><a href="#sources-harvested">10. Sources harvested</a></li></ol></div>
+<p><strong>Last updated:</strong> 2026-06-25 <strong>Status:</strong> Current (brownfield)</p>
+<blockquote><strong>Depth mandate:</strong> this is a HUMAN document, read as rendered HTML. Module rows in §4 with non-trivial behavior get a prose paragraph beneath the table, and every significant runtime flow beyond §3's primary path (embedded-model load, agent/tool loop, resilience, NuGet autodistribution) gets its own diagram.</blockquote>
+<blockquote><strong>Mermaid mandate.</strong> Every diagram quotes all node/edge/subgraph labels and never uses <code>end</code> as a node id (see <code>.tfcore/templates/v4custom/html-render-shell.md §5.5</code>).</blockquote>
+<h2 id="tech-stack">1. Tech stack<a class="anchor-link" href="#tech-stack">#</a></h2>
+<p>TechieRag is a <strong>configurable RAG (Retrieval-Augmented Generation) library for .NET</strong>, shipped as two NuGet packages (<code>TechieRag</code>, <code>TechieRag.Embedded</code>) plus a Blazor Server sample (<code>TechieRagWeb</code>) and an xUnit test project. It is a class-library SDK, not a hosted application — consumers reference it and wire it into their own apps via a fluent builder or DI.</p>
+<table><thead><tr><th>Layer</th><th>Choice</th><th>Version</th><th>Notes</th></tr></thead><tbody><tr><td>Runtime</td><td>.NET</td><td>net10.0</td><td>All projects target <code>net10.0</code>; nullable + implicit usings enabled</td></tr><tr><td>Package type</td><td>NuGet class library</td><td>1.0.0</td><td><code>TechieRag</code> + <code>TechieRag.Embedded</code>; semantic versioning, version overridden at CI pack time</td></tr><tr><td>Document parsing</td><td>PdfPig, DocumentFormat.OpenXml, HtmlAgilityPack, Markdig, Tomlyn</td><td>0.1.13 / 3.4.1 / 1.12.4 / 0.45.0 / 0.20.0</td><td>One library per format processor</td></tr><tr><td>Vector stores</td><td>Microsoft.Data.Sqlite + sqlite-vec, Npgsql + Pgvector, Qdrant.Client</td><td>10.0.3 / 10.0.1 + 0.3.2 / 1.16.1</td><td>Pluggable; SQLite-vec is the zero-config default</td></tr><tr><td>Data access</td><td>Dapper</td><td>2.1.66</td><td>Used by the SQL-based vector stores</td></tr><tr><td>Cloud embedding</td><td>Azure.AI.OpenAI</td><td>2.1.0</td><td>Azure OpenAI embedding provider</td></tr><tr><td>Embedded embedding</td><td>Microsoft.ML.OnnxRuntime (+ Managed), Microsoft.ML.Tokenizers</td><td>1.24.1 / 2.0.0</td><td><code>TechieRag.Embedded</code> only — BGE-M3 ONNX inference</td></tr><tr><td>DI / config</td><td>Microsoft.Extensions.{DependencyInjection,Configuration,Logging,Options}.Abstractions</td><td>10.0.3</td><td>Abstractions only — no framework lock-in</td></tr><tr><td>Sample UI</td><td>Blazor Server + TrBlazeUI.Components + TrBlazeUI.Icons.Lucide</td><td>1.0.3</td><td><code>samples/TechieRagWeb</code> only (from GitHub Packages)</td></tr><tr><td>Test</td><td>xUnit</td><td>—</td><td><code>tests/TechieRag.Tests</code></td></tr></tbody></table>
+<p><strong>LLM providers</strong> are implemented with raw <code>HttpClient</code> + <code>System.Text.Json</code> (no heavy vendor SDKs) so the core package stays dependency-light: Ollama, LM Studio, OpenAI-compatible, Azure AI Foundry, Google Gemini, Anthropic Claude.</p>
+<h2 id="component-map">2. Component map<a class="anchor-link" href="#component-map">#</a></h2>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart TB
+  subgraph Src["src — shipped packages"]
+    Core["TechieRag (core library)"]
+    Embed["TechieRag.Embedded (ONNX BGE-M3)"]
+  end
+  subgraph Samples["samples"]
+    Web["TechieRagWeb (Blazor Server demo)"]
+  end
+  subgraph Tests["tests"]
+    UT["TechieRag.Tests (xUnit)"]
+  end
+  Embed --&gt;|"ProjectReference"| Core
+  Web --&gt;|"ProjectReference"| Core
+  Web --&gt;|"ProjectReference"| Embed
+  UT --&gt;|"ProjectReference"| Core</pre></div>
+<p><strong>Inside <code>src/TechieRag</code> — module folders:</strong></p>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart TB
+  subgraph Surface["Public surface (namespace root)"]
+    ITR["ITechieRag (interface)"]
+    Client["TechieRagClient (impl)"]
+    Builder["TechieRagBuilder (fluent)"]
+    Cfg["TechieRagConfig (+ sub-configs)"]
+  end
+  subgraph Abs["Abstractions — provider contracts"]
+    IEmb["IEmbeddingProvider"]
+    IVec["IVectorStore"]
+    IDoc["IDocumentProcessor"]
+    ILlm["ILlmProvider"]
+    IPrompt["IPromptTemplate"]
+    ITool["IToolHandler"]
+    IMem["IConversationMemory"]
+    ITok["ITokenTracker"]
+  end
+  subgraph Impl["Implementations"]
+    Emb["Embedding — Ollama / LmStudio / Onnx / AzureOpenAI / Http"]
+    Llm["Llm — Ollama / LmStudio / OpenAICompatible / AzureAIFoundry / Gemini / Anthropic"]
+    Proc["Processors — Pdf / Docx / Markdown / Html / Json / Toml / Code / Text / Generic + TextChunker"]
+    Vec["VectorStores — SqliteVec / PgVector / Qdrant"]
+    Svc["Services — Retry / Fallback / Memory / PromptEngine / TokenTracker / ToolRegistry / AgentLoop"]
+  end
+  Builder --&gt; Client
+  Client --&gt; Abs
+  Abs --&gt; Impl
+  Cfg --&gt; Builder
+  DI["DependencyInjection — ServiceCollectionExtensions"] --&gt; Builder
+  Build["build — TechieRag.targets + AI skill files"]</pre></div>
+<h2 id="data-flow-primary-path">3. Data flow — primary path<a class="anchor-link" href="#data-flow-primary-path">#</a></h2>
+<p>The core flow is <strong>ingest → embed → store</strong>, then <strong>query → embed → search → (optionally) generate</strong>.</p>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">sequenceDiagram
+  actor Dev as "Consumer code"
+  participant Client as "TechieRagClient"
+  participant Proc as "IDocumentProcessor"
+  participant Emb as "IEmbeddingProvider"
+  participant Vec as "IVectorStore"
+  participant Llm as "ILlmProvider"
+  Note over Dev,Vec: Ingestion
+  Dev-&gt;&gt;Client: IngestAsync(filePath)
+  Client-&gt;&gt;Proc: ProcessAsync(stream) -&gt; chunks
+  Client-&gt;&gt;Emb: EmbedBatchAsync(chunk texts)
+  Client-&gt;&gt;Vec: UpsertBatchAsync(chunks + vectors)
+  Note over Dev,Llm: Ask (RAG + generation)
+  Dev-&gt;&gt;Client: AskAsync(question)
+  Client-&gt;&gt;Emb: EmbedAsync(question)
+  Client-&gt;&gt;Vec: SearchAsync(queryVector, topK)
+  Vec--&gt;&gt;Client: ranked SearchResult list
+  Client-&gt;&gt;Llm: ChatAsync(prompt with context)
+  Llm--&gt;&gt;Client: answer + token usage
+  Client--&gt;&gt;Dev: RagResponse(answer, sources, usage)</pre></div>
+<p>For <code>SearchAsync</code> (retrieval only, v1 behaviour) the LLM leg is skipped and the ranked <code>SearchResult</code> list is returned directly. <code>AskStreamAsync</code> / <code>ChatWithRagStreamAsync</code> replace the single <code>ChatAsync</code> call with <code>ChatStreamAsync</code>, yielding tokens through an <code>IAsyncEnumerable&lt;string&gt;</code>.</p>
+<h2 id="module-responsibilities">4. Module responsibilities<a class="anchor-link" href="#module-responsibilities">#</a></h2>
+<table><thead><tr><th>Module</th><th>Key types</th><th>Responsibility</th><th>Depends on</th></tr></thead><tbody><tr><td>(root)</td><td><code>ITechieRag</code>, <code>TechieRagClient</code>, <code>TechieRagBuilder</code>, <code>TechieRagConfig</code></td><td>Public SDK surface — orchestration + fluent configuration</td><td>Abstractions</td></tr><tr><td><code>Abstractions</code></td><td><code>IEmbeddingProvider</code>, <code>IVectorStore</code>, <code>IDocumentProcessor</code>, <code>ILlmProvider</code>, <code>IPromptTemplate</code>, <code>IToolHandler</code>, <code>IConversationMemory</code>, <code>ITokenTracker</code></td><td>Provider contracts that make every backend pluggable</td><td>(none)</td></tr><tr><td><code>Embedding</code></td><td><code>OllamaEmbeddingProvider</code>, <code>LmStudioEmbeddingProvider</code>, <code>OnnxEmbeddingProvider</code>, <code>AzureOpenAIEmbeddingProvider</code>, <code>HttpEmbeddingProvider</code></td><td>Turn text into vectors across local + cloud services</td><td>Abstractions</td></tr><tr><td><code>Llm</code></td><td><code>OllamaLlmProvider</code>, <code>LmStudioLlmProvider</code>, <code>OpenAICompatibleLlmProvider</code>, <code>AzureAIFoundryLlmProvider</code>, <code>GoogleGeminiLlmProvider</code>, <code>AnthropicLlmProvider</code></td><td>Chat / completion / streaming / tool-calling across 6 LLM backends</td><td>Abstractions, Models</td></tr><tr><td><code>Processors</code></td><td><code>Pdf/Docx/Text/Markdown/Html/Json/Toml/Code/GenericTextProcessor</code>, <code>TextChunker</code></td><td>Extract text from 9 formats and split into overlapping chunks</td><td>format libraries</td></tr><tr><td><code>VectorStores</code></td><td><code>SqliteVecStore</code>, <code>PgVectorStore</code>, <code>QdrantStore</code></td><td>Persist + similarity-search embeddings</td><td>Dapper, Npgsql, Qdrant.Client</td></tr><tr><td><code>Services</code></td><td><code>RetryHandler</code>, <code>FallbackLlmHandler</code>, <code>InMemoryConversationMemory</code>, <code>PromptTemplateEngine</code>, <code>TokenUsageTracker</code>, <code>ToolRegistry</code>, <code>AgentLoopRunner</code></td><td>Resilience, prompt building, token accounting, multi-turn memory, agent loop</td><td>Abstractions, Models</td></tr><tr><td><code>Models</code></td><td><code>TextChunk</code>, <code>SearchResult</code>, <code>Document</code>, <code>RagResponse</code>, <code>LlmResponse</code>, <code>ChatMessage</code>, <code>ToolDefinition/Call/Result</code>, <code>TokenUsage</code>, <code>IngestionStats</code></td><td>Immutable DTOs across the pipeline</td><td>(none)</td></tr><tr><td><code>Telemetry</code></td><td><code>EmbeddingCompletedEventArgs</code>, <code>LlmCompletionEventArgs</code></td><td>Event payloads carrying model, duration, token counts</td><td>Models</td></tr><tr><td><code>DependencyInjection</code></td><td><code>ServiceCollectionExtensions</code></td><td><code>AddTechieRag(...)</code> registration (builder + <code>IConfiguration</code> overloads)</td><td>builder</td></tr><tr><td><code>build</code></td><td><code>TechieRag.targets</code>, AI skill markdown</td><td>Post-build autodistribution of AI-agent skill files into consumer repos</td><td>MSBuild</td></tr></tbody></table>
+<p><strong>Provider abstractions (<code>Abstractions</code>).</strong> Every backend choice — embedding source, vector store, document format, LLM, prompt template, tool handler, conversation memory, token tracker — sits behind an interface. This is the architectural keystone: <code>TechieRagClient</code> depends only on the interfaces, so switching Ollama → OpenAI or SQLite-vec → Qdrant is a configuration change, never a code change.</p>
+<p><strong><code>TechieRagClient</code> (orchestrator).</strong> The single concrete implementation of <code>ITechieRag</code>. It selects the right <code>IDocumentProcessor</code> by file extension, drives the embed→store ingestion pipeline, and on query composes embedding + vector search + prompt building + LLM completion. v2 added the auto-RAG methods (<code>AskAsync</code>, <code>AskStreamAsync</code>, <code>ChatWithRagAsync</code>, <code>ChatWithRagStreamAsync</code>) on top of the v1 retrieval surface without breaking it.</p>
+<p><strong><code>Services</code> (cross-cutting behaviours).</strong> <code>RetryHandler</code> and <code>FallbackLlmHandler</code> are decorators over <code>ILlmProvider</code> (exponential backoff, HTTP-429 handling, circuit breaker, primary→fallback failover). <code>AgentLoopRunner</code> drives the tool-calling loop; <code>ToolRegistry</code> lets callers register tools as delegates. <code>TokenUsageTracker</code> subscribes to provider completion events and enforces budgets. <code>InMemoryConversationMemory</code> holds per-conversation history with token-budget trimming.</p>
+<h3 id="secondary-flow-embedded-onnx-model-load-techierag-embedded">Secondary flow — embedded ONNX model load (<code>TechieRag.Embedded</code>)<a class="anchor-link" href="#secondary-flow-embedded-onnx-model-load-techierag-embedded">#</a></h3>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">sequenceDiagram
+  participant Dev as "Consumer code"
+  participant Prov as "EmbeddedEmbeddingProvider"
+  participant DL as "ModelDownloadService"
+  participant HF as "Hugging Face"
+  participant Cache as "Local model cache"
+  Dev-&gt;&gt;Prov: first EmbedAsync(...)
+  Prov-&gt;&gt;DL: ensure model present
+  alt model missing
+    DL-&gt;&gt;HF: download BGE-M3 ONNX (~2.3GB)
+    DL-&gt;&gt;Cache: write files (one-time)
+    DL--&gt;&gt;Prov: ProgressChanged events
+  end
+  DL--&gt;&gt;Prov: cached model path
+  Prov-&gt;&gt;Prov: init ONNX session + tokenizer (lazy)
+  Prov--&gt;&gt;Dev: embeddings (offline thereafter)</pre></div>
+<p><code>TechieRag.Embedded</code> adds <code>.UseEmbedded()</code> to the builder. The BGE-M3 model (1024-dim, multilingual) is <strong>not</strong> packed into the NuGet (size) — it is fetched once to a platform cache (<code>%LOCALAPPDATA%\TechieRag\Models</code> / <code>~/.local/share/TechieRag/Models</code>), after which the provider runs fully offline. <code>ModelDownloadService</code> is a singleton exposing a <code>ProgressChanged</code> event for download UX.</p>
+<h3 id="secondary-flow-agent-tool-loop">Secondary flow — agent/tool loop<a class="anchor-link" href="#secondary-flow-agent-tool-loop">#</a></h3>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart LR
+  A["AskAsync with tools"] --&gt; B["LLM call"]
+  B --&gt; C{"tool_calls returned?"}
+  C --&gt;|"yes"| D["execute each tool via IToolHandler"]
+  D --&gt; E["append tool results to messages"]
+  E --&gt; B
+  C --&gt;|"no (text answer)"| F["return RagResponse"]
+  B --&gt; G{"max iterations (default 10)?"}
+  G --&gt;|"exceeded"| F</pre></div>
+<h3 id="secondary-flow-llm-resilience-decorators">Secondary flow — LLM resilience decorators<a class="anchor-link" href="#secondary-flow-llm-resilience-decorators">#</a></h3>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart LR
+  Call["ChatAsync"] --&gt; Retry["RetryHandler"]
+  Retry --&gt;|"success"| Done["response"]
+  Retry --&gt;|"HTTP 429 / transient"| Backoff["exponential backoff + Retry-After"]
+  Backoff --&gt; Retry
+  Retry --&gt;|"5 consecutive failures"| CB["circuit open 30s"]
+  Retry --&gt;|"exhausted"| FB["FallbackLlmHandler -&gt; secondary provider"]
+  FB --&gt; Done</pre></div>
+<h2 id="cross-cutting-concerns">5. Cross-cutting concerns<a class="anchor-link" href="#cross-cutting-concerns">#</a></h2>
+<ul><li><strong>Logging</strong> — <code>Microsoft.Extensions.Logging.Abstractions</code> (<code>ILogger&lt;T&gt;</code>) injected throughout; <code>NullLogger</code> fallback when no <code>ILoggerFactory</code> is supplied via <code>.WithLogging(...)</code>. Serilog-compatible (the consumer owns the sink).</li><li><strong>Configuration / options</strong> — <code>TechieRagConfig</code> is the root, with nested <code>EmbeddingConfig</code>, <code>VectorStoreConfig</code>, <code>ProcessingConfig</code>, <code>LlmConfig</code>, <code>LlmFallbackConfig</code>, <code>UsageTrackingConfig</code>, <code>PromptConfig</code>, <code>ResilienceConfig</code>. Bindable from <code>appsettings.json</code> (<code>TechieRag</code> section) or built fluently. Four equivalent configuration paths: fluent builder, <code>appsettings.json</code>, DI extension, or a hand-built <code>TechieRagConfig</code> object.</li><li><strong>Dependency injection</strong> — <code>ServiceCollectionExtensions.AddTechieRag(...)</code> registers <code>ITechieRag</code> and conditionally registers <code>ILlmProvider</code>, <code>ITokenTracker</code>, <code>IConversationMemory</code>, <code>IPromptTemplate</code>, <code>IToolHandler</code>, <code>AgentLoopRunner</code> based on what was configured; LLM completion events are auto-wired to the token tracker.</li><li><strong>Telemetry</strong> — event-based: <code>IEmbeddingProvider.OnEmbeddingCompleted</code> and <code>ILlmProvider.OnCompletionCompleted</code> carry model name, duration, and token counts. <code>TokenUsageTracker</code> aggregates per-model usage and cost, fires <code>OnBudgetAlert</code> at a configurable threshold (default 80%), and can block on budget exceed. (OpenTelemetry counters / distributed tracing are explicitly deferred — see §9.)</li><li><strong>Resilience</strong> — retry with exponential backoff (1s→30s, ×2), HTTP-429 <code>Retry-After</code> handling, circuit breaker (open after 5 failures, 30s recovery), 120s default timeout, and optional fallback provider — all applied automatically to LLM calls via decorators.</li><li><strong>Error handling</strong> — argument null-checks at the public surface; structured exceptions with descriptive messages; resilience decorators absorb transient failures.</li></ul>
+<p><strong>Pluggable provider matrix:</strong></p>
+<table><thead><tr><th>Category</th><th>Implementations</th></tr></thead><tbody><tr><td>Embedding</td><td>Ollama · LM Studio · ONNX (local) · Azure OpenAI · generic HTTP · embedded BGE-M3 · custom</td></tr><tr><td>Vector store</td><td>SQLite-vec (default) · PostgreSQL/pgvector · Qdrant</td></tr><tr><td>LLM</td><td>Ollama · LM Studio · OpenAI-compatible · Azure AI Foundry · Google Gemini · Anthropic Claude · custom</td></tr><tr><td>Document processor</td><td>PDF · DOCX · Markdown · HTML · JSON · TOML · Code · Text · Generic</td></tr><tr><td>Prompt template</td><td><code>PromptTemplateEngine</code> (default) · custom <code>IPromptTemplate</code></td></tr><tr><td>Conversation memory</td><td><code>InMemoryConversationMemory</code> · custom</td></tr></tbody></table>
+<h2 id="deployment-architecture">6. Deployment architecture<a class="anchor-link" href="#deployment-architecture">#</a></h2>
+<p>TechieRag is published as NuGet packages, not deployed as a service.</p>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart LR
+  Dev["Dev push / tag v*"] --&gt; CI["GitHub Actions — publish-nuget.yml"]
+  CI --&gt; Restore["restore + build (Release)"]
+  Restore --&gt; Test["xUnit tests (continue-on-error)"]
+  Test --&gt; Pack["dotnet pack (version from tag / run number)"]
+  Pack --&gt; GHP["GitHub Packages (always)"]
+  Pack --&gt; NORG["NuGet.org (manual — needs NUGET_API_KEY)"]</pre></div>
+<ul><li><strong>CI</strong> — <code>.github/workflows/publish-nuget.yml</code> on <code>net10.0</code>. Version is taken from a <code>v*</code> tag, else <code>1.0.0-preview.{run_number}</code>. Packages publish to GitHub Packages automatically; NuGet.org push is present but gated on a secret.</li><li><strong>NuGet feeds</strong> — <code>nuget.config</code> adds nuget.org plus a <code>TrBlazeUI</code> GitHub Packages source (<code>nuget.pkg.github.com/techierathore</code>) for the sample's UI dependency.</li><li><strong>AI-agent autodistribution</strong> — <code>src/TechieRag/build/TechieRag.targets</code> runs post-build in any consumer project and copies the AI skill files (<code>.techierag/TechieRag-AI-Reference.md</code>, <code>.claude/commands/techierag.md</code>, <code>.opencode/command/techierag.md</code>) into the consuming repo, so <code>/techierag</code> is available with zero manual setup.</li></ul>
+<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart LR
+  Install["consumer: dotnet add package TechieRag"] --&gt; Build["consumer: dotnet build"]
+  Build --&gt; Targets["TechieRag.targets fires (After Build)"]
+  Targets --&gt; F1[".techierag/TechieRag-AI-Reference.md"]
+  Targets --&gt; F2[".claude/commands/techierag.md"]
+  Targets --&gt; F3[".opencode/command/techierag.md"]</pre></div>
+<h2 id="architectural-decisions-adr-style-log">7. Architectural decisions (ADR-style log)<a class="anchor-link" href="#architectural-decisions-adr-style-log">#</a></h2>
+<ul><li><strong>ADR-001 — Current stack as-is (reverse-doc baseline).</strong> net10.0 class libraries; the architecture documented here is the shipped state at 2026-06-25.</li><li><strong>ADR-002 — Everything behind a provider interface.</strong> Embedding, vector store, document processor, and LLM are all abstractions so backends swap by configuration, not code. This is the library's core value proposition.</li><li><strong>ADR-003 — Raw HttpClient + System.Text.Json for LLM providers.</strong> Avoids heavy vendor SDK dependencies, keeps the core package light, and gives uniform behaviour across all 6 LLM backends.</li><li><strong>ADR-004 — Embedded model downloaded on first use, not packed.</strong> The ~2.3GB BGE-M3 ONNX model is fetched from Hugging Face to a local cache instead of bloating the NuGet; offline after first run.</li><li><strong>ADR-005 — Additive v2 (LLM/RAG generation).</strong> All v2 methods are additive; <code>LlmSource.None</code> preserves identical v1 (retrieval-only) behaviour — guaranteed backward compatibility.</li><li><strong>ADR-006 — MSBuild autodistribution of AI skills.</strong> Skill files ship inside the package and self-install into consumer repos via <code>buildTransitive</code> targets.</li></ul>
+<h2 id="target-architecture">8. Target architecture<a class="anchor-link" href="#target-architecture">#</a></h2>
+<p>No structural change is in flight — the shipped architecture above is current and stable. The only known forward-looking deltas are <strong>additive, deferred enhancements</strong> (not restructures), tracked in §9 and the BRD §4:</p>
+<ul><li>Optional OpenTelemetry metrics (<code>TechieRagMetrics</code>) and distributed tracing (<code>TechieRagActivitySource</code>) for Prometheus/Grafana/Jaeger consumers.</li><li>A formal automated test suite to complement the current manual/integration validation.</li></ul>
+<p>These bolt onto existing seams (telemetry events, the test project) without changing module boundaries.</p>
+<h2 id="open-questions-risks">9. Open questions / risks<a class="anchor-link" href="#open-questions-risks">#</a></h2>
+<ul><li><strong>Field-naming convention (resolved):</strong> the codebase uses <strong>bare camelCase, no prefix, no underscores</strong> for instance fields/params/locals (~95%+ dominance — standard Microsoft style, e.g. <code>private readonly ILlmProvider llmProvider;</code>). Recorded as the project convention in Coding-Standards §"Fields, Parameters, Locals". The TechieFlow default <code>obj</code>/<code>a</code>/<code>v</code> prefixes are <strong>not</strong> adopted for this established library; new code follows the codebase's camelCase convention. No drift remediation required.</li><li><strong>Formal automated tests:</strong> the <code>tests/TechieRag.Tests</code> project exists but the suite is minimal — v2 was validated by manual/integration testing (21 documented scenarios, all passed). Formal unit tests are deferred (v2 Phase 7). This is the single largest gap for long-term maintainability.</li><li><strong>Observability depth:</strong> event-based telemetry exists; OpenTelemetry exporters are deferred (enterprise feature).</li><li><strong>Sample build dependency:</strong> <code>samples/TechieRagWeb</code> pulls <code>TrBlazeUI.*</code> from GitHub Packages, which needs an authenticated <code>nuget.config</code> token. A clean restore of the <strong>sample</strong> requires that credential; the two shipped library packages have no such dependency and restore from nuget.org alone.</li><li><strong>SQLite concurrency:</strong> documented limitation — multiple processes against one <code>.db</code> file can lock; single-instance or a server-backed store (PgVector/Qdrant) for multi-user.</li></ul>
+<h2 id="sources-harvested">10. Sources harvested<a class="anchor-link" href="#sources-harvested">#</a></h2>
+<p>This architecture was reverse-documented from the codebase and the following source docs:</p>
+<ul><li><code>docs/techierag-v2-llm-implementation-spec.md</code> — v2 LLM/RAG component design and phase status</li><li><code>docs/trrag-refactoring-roadmap.md</code> — v1.1 phased build plan and module inventory</li><li><code>docs/TechieRag-AI-Reference.md</code>, <code>docs/TechieRag-UserGuide.md</code>, <code>docs/TechieRag.Embedded-UserGuide.md</code> — API surface and behaviour</li><li><code>docs/ai-agent-autodistribution-guide.md</code> — MSBuild skill-file distribution</li><li><code>docs/SETUP-AND-TESTING-GUIDE.md</code>, <code>docs/integration-testing-guide.md</code>, <code>docs/NUGET-PUBLISHING-GUIDE.md</code>, <code>docs/EMBEDDED-PACKAGE-GUIDE.md</code> — runbook, test plan, packaging</li><li><code>README.md</code>, <code>docs/brainstorming-session-results.md</code> — project intent</li><li>Code scan of <code>src/TechieRag</code>, <code>src/TechieRag.Embedded</code>, <code>samples/TechieRagWeb</code>, <code>tests/TechieRag.Tests</code></li></ul>
+<hr>
+<p>Last updated: 2026-06-25</p>
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);
+}</script>
+</body>
+</html>

@@ -362,23 +362,59 @@ public class TechieRagManager : ITechieRag, IDisposable
         }
     }
 
-    public ILlmProvider? GetLlmProvider()
+    /// <summary>
+    /// Asynchronously resolves the configured LLM provider from the current instance, awaiting a
+    /// cold-start build if needed. Use this instead of the sync <see cref="ITechieRag.GetLlmProvider"/>:
+    /// on a cold instance the sync path blocked the Blazor circuit thread inside the instance lock and
+    /// deadlocked the whole app (TR-RAG-005).
+    /// </summary>
+    public async Task<ILlmProvider?> GetLlmProviderAsync()
     {
-        var instance = GetInstanceAsync().GetAwaiter().GetResult();
+        var instance = await GetInstanceAsync();
         return instance.GetLlmProvider();
     }
 
-    public ITokenTracker GetTokenTracker()
+    /// <summary>
+    /// Asynchronously resolves the token tracker from the current instance, awaiting a cold-start
+    /// build if needed. Use this instead of the sync <see cref="ITechieRag.GetTokenTracker"/> to avoid
+    /// the cold-start deadlock (TR-RAG-005).
+    /// </summary>
+    public async Task<ITokenTracker> GetTokenTrackerAsync()
     {
-        var instance = GetInstanceAsync().GetAwaiter().GetResult();
+        var instance = await GetInstanceAsync();
         return instance.GetTokenTracker();
     }
 
-    public IConversationMemory? GetConversationMemory()
+    /// <summary>
+    /// Asynchronously resolves the conversation memory from the current instance, awaiting a
+    /// cold-start build if needed. Use this instead of the sync
+    /// <see cref="ITechieRag.GetConversationMemory"/> to avoid the cold-start deadlock (TR-RAG-005).
+    /// </summary>
+    public async Task<IConversationMemory?> GetConversationMemoryAsync()
     {
-        var instance = GetInstanceAsync().GetAwaiter().GetResult();
+        var instance = await GetInstanceAsync();
         return instance.GetConversationMemory();
     }
+
+    // The ITechieRag contract (core library, cannot be changed here) mandates these SYNCHRONOUS
+    // accessors. They are implemented EXPLICITLY so consumers holding a TechieRagManager reference are
+    // steered to the async accessors above; and they NEVER sync-over-async (the TR-RAG-005 deadlock) —
+    // they read the already-built instance only, degrading gracefully when the instance is still cold.
+
+    /// <inheritdoc />
+    ILlmProvider? ITechieRag.GetLlmProvider()
+        => _currentInstance?.GetLlmProvider();
+
+    /// <inheritdoc />
+    ITokenTracker ITechieRag.GetTokenTracker()
+        => _currentInstance?.GetTokenTracker()
+           ?? throw new InvalidOperationException(
+               "TechieRag instance is not initialized yet. Await a TechieRag operation " +
+               "(or GetTokenTrackerAsync) before requesting the token tracker synchronously.");
+
+    /// <inheritdoc />
+    IConversationMemory? ITechieRag.GetConversationMemory()
+        => _currentInstance?.GetConversationMemory();
 
     #endregion
 

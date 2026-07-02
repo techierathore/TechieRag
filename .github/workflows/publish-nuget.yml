@@ -76,13 +76,10 @@ jobs:
           dotnet build src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Run tests
-        run: |
-          if [ -d "tests" ]; then
-            dotnet test tests/**/*.csproj --configuration Release --no-build --verbosity normal
-          else
-            echo "No tests directory found, skipping tests"
-          fi
-        continue-on-error: true
+        # Blocking gate: test failures fail the build and prevent publish.
+        # Only the library test project is built/tested — the sample (samples/TechieRagWeb)
+        # cannot restore in CI (private TrBlazeUI feed), so never test the .slnx or globs.
+        run: dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release --verbosity normal
 
       - name: Pack NuGet packages
         run: |
@@ -137,27 +134,37 @@ jobs:
             dotnet nuget push "$package" --source "github" --skip-duplicate --api-key ${{ secrets.GITHUB_TOKEN }}
           done
 
-  # Optional: Publish to NuGet.org when a release tag is pushed
-  # Uncomment and add NUGET_API_KEY secret to enable
-  # publish-nuget-org:
-  #   needs: build
-  #   runs-on: ubuntu-latest
-  #   if: startsWith(github.ref, 'refs/tags/v')
-  #
-  #   steps:
-  #     - name: Setup .NET
-  #       uses: actions/setup-dotnet@v4
-  #       with:
-  #         dotnet-version: '10.0.x'
-  #
-  #     - name: Download NuGet packages
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: nuget-packages
-  #         path: ./nupkgs
-  #
-  #     - name: Publish to NuGet.org
-  #       run: |
-  #         for package in ./nupkgs/*.nupkg; do
-  #           dotnet nuget push "$package" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
-  #         done
+  # Publish to NuGet.org when a release tag is pushed, gated on the NUGET_API_KEY secret.
+  # GitHub Actions does not allow the `secrets` context in a job-level `if`, so the secret
+  # is mapped into job-level env and the push step is gated on it being non-empty.
+  publish-nuget-org:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./nupkgs
+
+      - name: Publish to NuGet.org
+        if: env.NUGET_API_KEY != ''
+        run: |
+          for package in ./nupkgs/*.nupkg; do
+            echo "Publishing $package to NuGet.org..."
+            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
+
+      - name: NuGet.org publish skipped (no NUGET_API_KEY secret)
+        if: env.NUGET_API_KEY == ''
+        run: echo "NUGET_API_KEY secret is not configured - skipping NuGet.org publish."

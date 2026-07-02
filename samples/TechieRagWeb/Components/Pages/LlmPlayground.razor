@@ -1,8 +1,8 @@
 @page "/llm-playground"
-@rendermode InteractiveServer
+@using System.Globalization
 @using TechieRag.Abstractions
 @using TechieRag.Models
-@inject ITechieRag TechieRag
+@inject TechieRagWeb.Services.TechieRagManager TechieRag
 @inject ToastService ToastService
 
 <PageTitle>LLM Playground</PageTitle>
@@ -193,9 +193,9 @@
     private string? temperatureString = "0.7";
     private string? maxTokensString = "2048";
 
-    private ILlmProvider? GetProvider()
+    private async Task<ILlmProvider?> GetProviderAsync()
     {
-        var provider = TechieRag.GetLlmProvider();
+        var provider = await TechieRag.GetLlmProviderAsync();
         if (provider is null)
             ToastService.Error("No LLM provider configured. Go to LLM Settings.", "Error");
         return provider;
@@ -203,7 +203,7 @@
 
     private async Task GenerateCompletion()
     {
-        var provider = GetProvider();
+        var provider = await GetProviderAsync();
         if (provider is null || string.IsNullOrWhiteSpace(userPrompt)) return;
 
         isGenerating = true;
@@ -214,11 +214,12 @@
         try
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
+            var options = BuildCompletionOptions();
 
             if (useStreaming)
             {
                 var prompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
-                await foreach (var token in provider.CompleteStreamAsync(prompt))
+                await foreach (var token in provider.CompleteStreamAsync(prompt, options))
                 {
                     completionResponse += token;
                     StateHasChanged();
@@ -229,7 +230,7 @@
             else
             {
                 var prompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
-                var response = await provider.CompleteAsync(prompt);
+                var response = await provider.CompleteAsync(prompt, options);
                 sw.Stop();
                 completionResponse = response.Content ?? "";
                 completionStats = $"{sw.ElapsedMilliseconds}ms | Input: {response.Usage.InputTokens} | Output: {response.Usage.OutputTokens}";
@@ -247,30 +248,65 @@
 
     private async Task GenerateStructured()
     {
-        var provider = GetProvider();
+        var provider = await GetProviderAsync();
         if (provider is null || string.IsNullOrWhiteSpace(structuredPrompt)) return;
 
         isGenerating = true;
         structuredResponse = null;
         StateHasChanged();
 
+        var options = new LlmCompletionOptions { JsonMode = true };
+
         try
         {
-            var jsonPrompt = structuredType switch
+            switch (structuredType)
             {
-                "sentiment" => $"Analyze the sentiment and respond with JSON: {{\"sentiment\": \"positive|negative|neutral\", \"confidence\": 0.0-1.0, \"explanation\": \"...\"}}\n\n{structuredPrompt}",
-                "weather" => $"Create a weather forecast and respond with JSON: {{\"city\": \"...\", \"temperature\": 0, \"condition\": \"...\", \"humidity\": 0}}\n\n{structuredPrompt}",
-                "book" => $"Summarize the book and respond with JSON: {{\"title\": \"...\", \"author\": \"...\", \"summary\": \"...\", \"rating\": 0.0-5.0}}\n\n{structuredPrompt}",
-                _ => structuredPrompt
-            };
-
-            var options = new LlmCompletionOptions { JsonMode = true };
-            var response = await provider.CompleteAsync(jsonPrompt, options);
-            structuredResponse = response.Content;
+                case "sentiment":
+                    {
+                        var prompt = $"Analyze the sentiment and respond with JSON: {{\"sentiment\": \"positive|negative|neutral\", \"confidence\": 0.0-1.0, \"explanation\": \"...\"}}\n\n{structuredPrompt}";
+                        var result = await provider.CompleteAsync<SentimentAnalysis>(prompt, options);
+                        structuredResponse =
+                            $"SentimentAnalysis (typed)\n"
+                            + $"Sentiment:   {result.Sentiment}\n"
+                            + $"Confidence:  {result.Confidence.ToString("0.00", CultureInfo.InvariantCulture)}\n"
+                            + $"Explanation: {result.Explanation}";
+                        break;
+                    }
+                case "weather":
+                    {
+                        var prompt = $"Create a weather forecast and respond with JSON: {{\"city\": \"...\", \"temperature\": 0, \"condition\": \"...\", \"humidity\": 0}}\n\n{structuredPrompt}";
+                        var result = await provider.CompleteAsync<WeatherForecast>(prompt, options);
+                        structuredResponse =
+                            $"WeatherForecast (typed)\n"
+                            + $"City:        {result.City}\n"
+                            + $"Temperature: {result.Temperature}\n"
+                            + $"Condition:   {result.Condition}\n"
+                            + $"Humidity:    {result.Humidity}";
+                        break;
+                    }
+                case "book":
+                    {
+                        var prompt = $"Summarize the book and respond with JSON: {{\"title\": \"...\", \"author\": \"...\", \"summary\": \"...\", \"rating\": 0.0-5.0}}\n\n{structuredPrompt}";
+                        var result = await provider.CompleteAsync<BookSummary>(prompt, options);
+                        structuredResponse =
+                            $"BookSummary (typed)\n"
+                            + $"Title:   {result.Title}\n"
+                            + $"Author:  {result.Author}\n"
+                            + $"Rating:  {result.Rating.ToString("0.0", CultureInfo.InvariantCulture)}\n"
+                            + $"Summary: {result.Summary}";
+                        break;
+                    }
+                default:
+                    {
+                        var response = await provider.CompleteAsync(structuredPrompt!, options);
+                        structuredResponse = response.Content;
+                        break;
+                    }
+            }
         }
         catch (Exception ex)
         {
-            structuredResponse = $"Error: {ex.Message}";
+            structuredResponse = $"Parse error: {ex.Message}";
         }
         finally
         {
@@ -280,7 +316,7 @@
 
     private async Task SendDirectChat()
     {
-        var provider = GetProvider();
+        var provider = await GetProviderAsync();
         if (provider is null || string.IsNullOrWhiteSpace(directChatInput)) return;
 
         var input = directChatInput!.Trim();
@@ -328,5 +364,31 @@
         directChatMessages.Clear();
     }
 
+    private LlmCompletionOptions? BuildCompletionOptions()
+    {
+        var options = new LlmCompletionOptions();
+        var hasValue = false;
+
+        if (float.TryParse(temperatureString, NumberStyles.Float, CultureInfo.InvariantCulture, out var temperature))
+        {
+            options.Temperature = temperature;
+            hasValue = true;
+        }
+
+        if (int.TryParse(maxTokensString, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxTokens))
+        {
+            options.MaxTokens = maxTokens;
+            hasValue = true;
+        }
+
+        return hasValue ? options : null;
+    }
+
     private record ChatMsg(string Role, string Content);
+
+    private record SentimentAnalysis(string Sentiment, double Confidence, string Explanation);
+
+    private record WeatherForecast(string City, int Temperature, string Condition, int Humidity);
+
+    private record BookSummary(string Title, string Author, string Summary, double Rating);
 }
