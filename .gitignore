@@ -41,3 +41,7 @@ CLAUDE.md
 *.json
 /test-results/qdrant-crud-Qdrant-Admin-C-abb04--real-server-version-1-15-5
 /nuget.config
+
+# TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)
+/opencode.jsonc
+/.tf-scaffold-note.txt

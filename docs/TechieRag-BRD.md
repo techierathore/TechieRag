@@ -1,11 +1,5 @@
 # TechieRag — Business Requirements
 
-> Stable IDs: every requirement has a BRD-{N} ID. IDs are append-only across revisions.
-
-> **Depth mandate.** This is a HUMAN document, read as rendered HTML. One-line entries belong ONLY in §10's ledger. §9 Feature catalog is the heart of the document. This BRD was reverse-engineered from a ~96%-complete codebase and its v1.1 roadmap + v2 LLM spec — it is an information-preserving superset of those source docs.
-
-> **Mermaid mandate.** Every diagram quotes all node/edge/subgraph labels and never uses `end` as a node id.
-
 ## Table of Contents
 
 1. [Executive summary](#executive-summary)

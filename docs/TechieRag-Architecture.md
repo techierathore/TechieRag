@@ -3,10 +3,6 @@
 **Last updated:** 2026-06-25
 **Status:** Current (brownfield)
 
-> **Depth mandate:** this is a HUMAN document, read as rendered HTML. Module rows in §4 with non-trivial behavior get a prose paragraph beneath the table, and every significant runtime flow beyond §3's primary path (embedded-model load, agent/tool loop, resilience, NuGet autodistribution) gets its own diagram.
-
-> **Mermaid mandate.** Every diagram quotes all node/edge/subgraph labels and never uses `end` as a node id (see `.tfcore/templates/v4custom/html-render-shell.md §5.5`).
-
 ## Table of Contents
 
 1. [Tech stack](#tech-stack)
