@@ -28,7 +28,7 @@
    - [F-PROMPT: Prompt templates](#f-prompt-prompt-templates)
    - [F-AUTODIST: AI-agent autodistribution](#f-autodist-ai-agent-autodistribution)
    - [F-PKG: NuGet packaging & publishing](#f-pkg-nuget-packaging-publishing)
-   - [F-WEB: TechieRagWeb sample application](#f-web-techieragweb-sample-application)
+   - [F-WEB: TechieDesk application](#f-web-techiedesk-application)
    - [F-QDRANT: Qdrant database administration](#f-qdrant-qdrant-database-administration)
 10. [Functional requirements (BRD ledger)](#functional-requirements-brd-ledger)
 11. [Non-functional requirements](#non-functional-requirements)
@@ -41,9 +41,9 @@
 
 **TechieRag** is a configurable Retrieval-Augmented Generation (RAG) library for .NET, shipped as NuGet packages. It lets a .NET developer add document search, retrieval, and LLM-powered question-answering to an application with a few lines of fluent configuration — and switch embedding providers, vector stores, document formats, and LLM backends **by configuration, not code**. The library abstracts six embedding providers, three vector stores, nine document formats, and six LLM providers behind a single `ITechieRag` surface.
 
-The product exists to eliminate the repetitive, tightly-coupled RAG plumbing that every .NET team rebuilds, and to offer a genuinely **offline** option (`TechieRag.Embedded`) using a bundled BGE-M3 ONNX model so data never has to leave the machine. A companion `TechieRagWeb` Blazor Server sample demonstrates every capability end-to-end, and an MSBuild "autodistribution" mechanism ships AI-agent skill files into any consuming repo so tools like Claude Code and OpenCode gain a `/techierag` assistant automatically.
+The product exists to eliminate the repetitive, tightly-coupled RAG plumbing that every .NET team rebuilds, and to offer a genuinely **offline** option (`TechieRag.Embedded`) using a bundled BGE-M3 ONNX model so data never has to leave the machine. A companion Blazor Server application — **TechieDesk** (formerly `TechieRagWeb`; renamed 2026-07-17 per BRD-82 / REQ-UI-014) — showcases every capability end-to-end and is being productized as a self-hostable AnythingLLM alternative (BRD-81), and an MSBuild "autodistribution" mechanism ships AI-agent skill files into any consuming repo so tools like Claude Code and OpenCode gain a `/techierag` assistant automatically.
 
-As of this snapshot the library is **~96% complete**: the v1.1 core (config, vector stores, processors, embeddings, sample app, Qdrant admin) and the v2 LLM layer (6 providers, auto-RAG, agent loop, token tracking, resilience, memory, 7 new sample pages) are all shipped and validated by manual/integration testing. The remaining work is a formal automated test suite and optional OpenTelemetry exporters.
+As of this snapshot the library is **~96% complete**: the v1.1 core (config, vector stores, processors, embeddings, sample app, Qdrant admin) and the v2 LLM layer (6 providers, auto-RAG, agent loop, token tracking, resilience, memory, 7 new sample pages) are all shipped and validated by manual/integration testing. The remaining work is a formal automated test suite and optional OpenTelemetry exporters. **Repositioned 2026-07-17:** the companion app is now **TechieDesk**, a productized, self-hostable AnythingLLM alternative powered by the TechieRag library; the competitive roadmap lives in `docs/TechieRag-CompetitorAnalysis.md` (GAP-LIB-*/GAP-APP-* register), with phase-wise BRD-Ns appended as each phase is scheduled.
 
 ## 2. Business objectives
 
@@ -59,15 +59,18 @@ As of this snapshot the library is **~96% complete**: the v1.1 core (config, vec
 **In scope:**
 - The `TechieRag` core library: ingestion, processing/chunking, embedding, vector storage, semantic search, and (v2) LLM generation, agent loop, memory, token tracking, resilience.
 - The `TechieRag.Embedded` package: offline BGE-M3 ONNX embedding.
-- The `TechieRagWeb` Blazor Server sample application demonstrating all features, including Qdrant administration.
+- The **TechieDesk** Blazor Server application (formerly `TechieRagWeb`) — demonstrates all library features (incl. Qdrant administration) and is being productized as a self-hostable AnythingLLM alternative (BRD-81/BRD-82; roadmap in `docs/TechieRag-CompetitorAnalysis.md`).
 - NuGet packaging/publishing and AI-agent skill autodistribution.
 
-**Out of scope (explicit, per v2 spec §1.4):**
+**Out of scope (explicit, per v2 spec §1.4; revised 2026-07-17 per CompetitorAnalysis):**
 - Model fine-tuning / training.
-- Image, audio, or video generation.
-- Multi-agent orchestration frameworks.
+- Image / video generation.
 - Formal RAG-evaluation tooling (precision/recall harnesses).
 - Model hosting / inference-server provisioning (TechieRag consumes providers, it does not host them).
+
+**Formerly out of scope — moved to the roadmap 2026-07-17** (`docs/TechieRag-CompetitorAnalysis.md`, Phases 5–6):
+- Multi-agent orchestration (graphs / handoffs / guardrails — GAP-LIB-13).
+- Audio: TTS/STT abstractions and audio-file transcription ingestion (GAP-LIB-10/16).
 
 ## 4. Development status
 
@@ -94,7 +97,9 @@ As of this snapshot the library is **~96% complete**: the v1.1 core (config, vec
 | F-PROMPT: Prompt templates | v2 | Done | 100 | Default engine + custom IPromptTemplate |
 | F-AUTODIST: AI-agent autodistribution | v1.1 | Done | 100 | MSBuild targets deploy skill files to consumers |
 | F-PKG: NuGet packaging & publishing | v1.1 | Done | 100 | GitHub Packages ✓; NuGet.org job un-commented + secret-gated (`v*` tag, `NUGET_API_KEY`); CI test step now a blocking gate (REQ-FN-003 Verified static, 2026-07-02) |
-| F-WEB: TechieRagWeb sample application | v1.1 + v2 | Done | 100 | 10 pages; v2 added 4 AI pages + TrBlazeUI migration |
+| F-WEB: TechieDesk application (formerly TechieRagWeb) | v1.1 + v2 | Done | 100 | 10 pages; v2 added 4 AI pages + TrBlazeUI migration |
+| F-WEB: TechieDesk rename (BRD-82) | v3 | Done | 100 | App renamed `TechieRagWeb` → TechieDesk: folder → `apps/TechieDesk`, csproj/RootNamespace/AssemblyName, slnx, namespaces, branding, log naming, Playwright refs. Build 0-err; boots as TechieDesk; render+visual 10/10 (REQ-UI-014 Verified, 2026-07-17) |
+| F-WEB: TechieDesk product repositioning (BRD-81) | v3 | Planned | 0 | Productize as self-hostable AnythingLLM alternative; phased GAP-LIB-*/GAP-APP-* roadmap per `docs/TechieRag-CompetitorAnalysis.md` (umbrella — per-phase REQs added via `*amend-docs`) |
 | F-QDRANT: Qdrant database administration | v1.1 | Done | 100 | Collection/vector CRUD live-verified 2026-07-02; container-row mobile overflow @390 fixed (inline scroll-wrapper; live `scrollWidth`==390 with a running container) — REQ-UI-011 Verified |
 | (quality) Formal automated test suite | v2 Phase 7 | Partial | 40 | 11 xUnit tests (RetryHandler resilience/Retry-After + LmStudio provider tool-calling) + Playwright verify suite; broader coverage deferred |
 | (quality) OpenTelemetry exporters | Deferred | Planned | 0 | Metrics/tracing for Prometheus/Grafana/Jaeger |
@@ -151,7 +156,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-  App["Consumer app / TechieRagWeb"] --> ITR["ITechieRag"]
+  App["Consumer app / TechieDesk"] --> ITR["ITechieRag"]
   ITR --> Proc["Document processors (9)"]
   ITR --> Emb["Embedding providers (6)"]
   ITR --> Vec[("Vector stores (3)")]
@@ -382,11 +387,11 @@ Both packages are built and published through GitHub Actions (`publish-nuget.yml
 
 **Requirements:** BRD-59, BRD-60, BRD-61 (see §10)
 
-### F-WEB: TechieRagWeb sample application
+### F-WEB: TechieDesk application
 
-**Personas:** new user, reference-implementation seeker · **Phase:** v1.1 + v2
+**Personas:** new user, reference-implementation seeker, self-hosting end user · **Phase:** v1.1 + v2 (repositioned v3, 2026-07-17)
 
-A Blazor Server application demonstrating every TechieRag capability, built with TrBlazeUI components and Lucide icons. Ten routed pages cover configuration, ingestion, RAG chat, direct LLM playground, tool demo, token dashboard, and Qdrant admin.
+**TechieDesk** (formerly `TechieRagWeb`; renamed 2026-07-17 per BRD-82 / REQ-UI-014) is a Blazor Server application built with TrBlazeUI components and Lucide icons. Originally the capability-demonstration sample, it is now positioned as a **productized, self-hostable AnythingLLM alternative** powered by the TechieRag library (BRD-81) — the competitive roadmap (workspaces, multi-user, persistent history, connectors, developer API, agents) is tracked as the GAP-APP-*/GAP-LIB-* register in `docs/TechieRag-CompetitorAnalysis.md`. Ten routed pages cover configuration, ingestion, RAG chat, direct LLM playground, tool demo, token dashboard, and Qdrant admin.
 
 | Screen | Route | Description |
 |--------|-------|-------------|
@@ -401,13 +406,13 @@ A Blazor Server application demonstrating every TechieRag capability, built with
 | Token Usage | `/token-usage` | Usage dashboard, budget status, per-model breakdown |
 | Qdrant Admin | `/qdrant-admin` | Collection + vector management (see F-QDRANT) |
 
-**Requirements:** BRD-62, BRD-63, BRD-64, BRD-65, BRD-66, BRD-67, BRD-68, BRD-69, BRD-70 (see §10)
+**Requirements:** BRD-62, BRD-63, BRD-64, BRD-65, BRD-66, BRD-67, BRD-68, BRD-69, BRD-70, BRD-81, BRD-82 (see §10)
 
 ### F-QDRANT: Qdrant database administration
 
 **Personas:** DevOps, vector-DB operator · **Phase:** v1.1
 
-In the sample, programmatic Docker container lifecycle management plus a Qdrant admin UI: connection status, create/start/stop/remove container, collection CRUD, paginated vector browsing/search, vector detail (payload + chunk + source), bulk delete, and cluster info.
+In TechieDesk, programmatic Docker container lifecycle management plus a Qdrant admin UI: connection status, create/start/stop/remove container, collection CRUD, paginated vector browsing/search, vector detail (payload + chunk + source), bulk delete, and cluster info.
 
 **Requirements:** BRD-71, BRD-72, BRD-73 (see §10)
 
@@ -508,7 +513,7 @@ In the sample, programmatic Docker container lifecycle management plus a Qdrant 
 - **BRD-60** — The system shall publish to GitHub Packages automatically and to NuGet.org when a secret is present *(F-PKG)*
 - **BRD-61** — The system shall version packages semantically, overridden at pack time from tag/run number *(F-PKG)*
 
-**F-WEB — TechieRagWeb sample application (Phase v1.1 + v2)**
+**F-WEB — TechieDesk application (Phase v1.1 + v2; repositioned v3, 2026-07-17)**
 - **BRD-62** — A user can configure the embedding source and vector store on the Settings page *(F-WEB)*
 - **BRD-63** — A user can configure LLM provider, fallback, usage, resilience, and prompts on the LLM Settings page *(F-WEB)*
 - **BRD-64** — A user can upload and manage documents on the Ingestion page and ingest raw text on the Text Ingestion page *(F-WEB)*
@@ -517,7 +522,9 @@ In the sample, programmatic Docker container lifecycle management plus a Qdrant 
 - **BRD-67** — A user can exercise the agent loop with built-in and custom tools on the Tool Demo page *(F-WEB)*
 - **BRD-68** — A user can view token usage, budget status, and per-model breakdown on the Token Usage page *(F-WEB)*
 - **BRD-69** — A user can test the LLM connection before running queries *(F-WEB)*
-- **BRD-70** — The sample shall render all pages with TrBlazeUI components and Lucide icons *(F-WEB)*
+- **BRD-70** — The app shall render all pages with TrBlazeUI components and Lucide icons *(F-WEB)*
+- **BRD-81** — TechieDesk product mandate: the companion app shall be a productized, self-hostable AnythingLLM-alternative application powered by the TechieRag library; the competitive roadmap is the GAP-LIB-*/GAP-APP-* register in `docs/TechieRag-CompetitorAnalysis.md`, with phase-wise BRD-Ns appended (append-only) as each phase is scheduled *(F-WEB; added 2026-07-17)*
+- **BRD-82** — The application shall be renamed `TechieRagWeb` → `TechieDesk`: project folder `samples/TechieRagWeb` → `apps/TechieDesk`, csproj / RootNamespace / AssemblyName, `TechieRag.slnx` entry, namespaces and `@using`s, in-app branding (page titles, Home page), config/log file naming, and Playwright/verify references *(F-WEB; added 2026-07-17)*
 
 **F-QDRANT — Qdrant database administration (Phase v1.1)**
 - **BRD-71** — A user can detect Docker status and create/start/stop/remove a Qdrant container from the admin page *(F-QDRANT)*
@@ -548,7 +555,7 @@ In the sample, programmatic Docker container lifecycle management plus a Qdrant 
 - Target runtime is `net10.0`; consumers must target a compatible framework.
 - Local providers (Ollama, LM Studio) and external stores (PostgreSQL, Qdrant) must be reachable when selected; cloud providers require the consumer's own API keys.
 - The embedded model requires a one-time ~2.3GB download and sufficient local disk + CPU/GPU for ONNX inference.
-- The `TechieRagWeb` sample depends on `TrBlazeUI.*` from GitHub Packages, which requires an authenticated `nuget.config` token to restore.
+- The TechieDesk app (folder `apps/TechieDesk`, renamed per BRD-82) depends on `TrBlazeUI.*` from GitHub Packages, which requires an authenticated `nuget.config` token to restore.
 - The codebase uses standard Microsoft camelCase naming (no `obj`/`a`/`v` prefixes, no underscores) — recorded in Coding-Standards.
 
 ## 13. Success metrics
@@ -564,7 +571,7 @@ In the sample, programmatic Docker container lifecycle management plus a Qdrant 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
 | No formal automated test suite | High | Medium | Manual/integration validation done (21 scenarios); add xUnit suite (v2 Phase 7) |
-| Sample build blocked on TrBlazeUI GitHub Packages auth | Medium | Low | Document the token requirement; library packages restore from nuget.org alone |
+| TechieDesk build blocked on TrBlazeUI GitHub Packages auth | Medium | Low | Document the token requirement; library packages restore from nuget.org alone |
 | Provider API drift (LLM vendors change endpoints) | Medium | Medium | Raw HttpClient providers are small and isolated; update per provider |
 | Token-count estimates ±10% for providers without tokenizer detail | Medium | Low | Documented; exact counts where the provider returns them |
 | SQLite multi-process locking | Low | Medium | Documented; recommend single-instance or server-backed store for multi-user |
@@ -575,15 +582,16 @@ In the sample, programmatic Docker container lifecycle management plus a Qdrant 
 - **RAG** — Retrieval-Augmented Generation: retrieve relevant context, then generate an answer with an LLM.
 - **TechieRag** — this library; the core NuGet package.
 - **TechieRag.Embedded** — the offline variant bundling a BGE-M3 ONNX embedding model.
-- **TechieRagWeb** — the Blazor Server sample application.
-- **TrBlazeUI** — the Blazor UI component library used by the sample.
+- **TechieDesk** — the Blazor Server application (formerly `TechieRagWeb`): TechieRag's showcase, being productized as a self-hostable AnythingLLM alternative (BRD-81/82).
+- **TrBlazeUI** — the Blazor UI component library used by TechieDesk.
 - **Embedding** — a vector representation of text used for similarity search.
 - **Vector store** — a database that indexes and similarity-searches embeddings (SQLite-vec / pgvector / Qdrant).
 - **REQ-UI-/REQ-FN-/REQ-RAG-/REQ-NFR-** — implementation requirement IDs derived from BRD-N in the split checklists.
 
 ---
 Last updated: 2026-06-25
-Highest BRD ID: BRD-80
+Last amended: 2026-07-17 — TechieDesk repositioning: app renamed TechieRagWeb → TechieDesk (BRD-82) and productized as an AnythingLLM alternative (BRD-81); multi-agent orchestration + audio moved from out-of-scope to the roadmap (docs/TechieRag-CompetitorAnalysis.md)
+Highest BRD ID: BRD-82
 Sources harvested: docs/techierag-v2-llm-implementation-spec.md, docs/trrag-refactoring-roadmap.md, docs/TechieRag-AI-Reference.md, docs/TechieRag-UserGuide.md, docs/TechieRag.Embedded-UserGuide.md, docs/ai-agent-autodistribution-guide.md, docs/brainstorming-session-results.md, docs/SETUP-AND-TESTING-GUIDE.md, docs/integration-testing-guide.md, docs/NUGET-PUBLISHING-GUIDE.md, docs/EMBEDDED-PACKAGE-GUIDE.md, docs/Coding-Standards.md, README.md
 Custom instructions applied: none
 Drafted from reverse-doc — review and edit. New BRDs may be added (append-only); do not renumber.

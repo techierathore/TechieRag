@@ -154,6 +154,10 @@ public class LmStudioLlmProvider : ILlmProvider
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
+        var totalInputTokens = 0;
+        var totalOutputTokens = 0;
+        var outputText = new StringBuilder();
+
         while (!reader.EndOfStream)
         {
             var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
@@ -163,15 +167,31 @@ public class LmStudioLlmProvider : ILlmProvider
             if (data == "[DONE]") break;
 
             var chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (chunk?.Usage is not null)
+            {
+                totalInputTokens = chunk.Usage.PromptTokens;
+                totalOutputTokens = chunk.Usage.CompletionTokens;
+            }
+
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
             if (!string.IsNullOrEmpty(delta))
             {
+                outputText.Append(delta);
                 yield return delta;
             }
         }
 
         sw.Stop();
-        RaiseCompletionEvent(0, 0, sw.Elapsed, true, false);
+
+        // Fallback: estimate when the server sent no usage chunk
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
+        RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
     /// <inheritdoc/>
@@ -226,10 +246,16 @@ public class LmStudioLlmProvider : ILlmProvider
 
         var request = new Dictionary<string, object>
         {
-            ["model"] = ModelName,
+            ["model"] = options?.Model ?? ModelName,
             ["messages"] = apiMessages,
             ["stream"] = stream
         };
+
+        if (stream)
+        {
+            // Ask the server to append a final usage chunk to the stream (TR-RAG-002)
+            request["stream_options"] = new Dictionary<string, object> { ["include_usage"] = true };
+        }
 
         if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
         if (options?.MaxTokens is not null) request["max_tokens"] = options.MaxTokens.Value;
@@ -359,6 +385,9 @@ internal class OpenAIStreamChunk
 {
     [JsonPropertyName("choices")]
     public List<OpenAIStreamChoice>? Choices { get; set; }
+
+    [JsonPropertyName("usage")]
+    public OpenAIUsage? Usage { get; set; }
 }
 
 internal class OpenAIStreamChoice

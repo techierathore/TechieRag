@@ -1,8 +1,10 @@
 # TechieRag — Developer Guide (Screen-by-Screen Code Map)
 
+> 🔁 **App renamed 2026-07-17 (REQ-UI-014 / BRD-82): `TechieRagWeb` → TechieDesk.** All screen file paths below are now under **`apps/TechieDesk/`** (was `samples/TechieRagWeb/`); the project/assembly/namespace root is **TechieDesk**. Code, lineage, and controls per screen are unchanged by the rename — only the folder and identity moved. Re-verified live at handoff: build 0-err, app boots on `:5099` as TechieDesk, Playwright render+visual sweep 10/10 PASS @1280/390 (all screens regression-clean).
+
 > ✅ **Runtime-verified 2026-07-02 as Anonymous (verifier `*verify all` — all 10 screens exercised live)** — live boot on `http://localhost:5099`, LM Studio `qwen2.5-coder-32b-instruct` at `192.168.1.13:1234`, Qdrant 1.15.5 live in Docker. Each screen in §4 now carries its own dated **Runtime-verified 2026-07-02** blockquote recording exactly what was exercised (including live LLM, ingest write-path, and Qdrant CRUD data-paths); those blockquotes supersede the 2026-07-01 sweep note below.
 
-> ✅ **RUNTIME-VERIFIED (2026-07-01 — verifier `*verify ui`)** — the `TechieRagWeb` sample now restores + boots (TrBlazeUI PAT refreshed → GitHub Packages 200) and was driven live on `http://localhost:5099` with headless Playwright. All 11 screens passed the **§4a render gate + §4b visual-truth gate** at 1280×800 and 390×844: every control renders and every screen looks right (no overlap/clip/off-canvas, no `#blazor-error-ui`). Full-page screenshots under `test-results/screens/`. Live data observed: Ingestion/Text-Ingestion stats (2 docs / 151 chunks / 768 KB), Tool Demo Available-Tools table (4 tools), Qdrant Admin live status (Docker Available / Qdrant Disconnected / Version N/A). Backend note: the running instance has **no LLM provider configured (Source=None)** and **Qdrant is down**, so LLM data-paths (Chat streamed tokens, Playground completion/typed-parse, Tool Demo execution trace) and Qdrant collection/vector CRUD were NOT exercised this run — those keep their prior status. The prior STATIC-ONLY caveat is superseded for the screens below; controls still tagged `static-only` are ones not re-swept.
+> ✅ **RUNTIME-VERIFIED (2026-07-01 — verifier `*verify ui`)** — the **TechieDesk** app (formerly `TechieRagWeb`) now restores + boots (TrBlazeUI PAT refreshed → GitHub Packages 200) and was driven live on `http://localhost:5099` with headless Playwright. All 11 screens passed the **§4a render gate + §4b visual-truth gate** at 1280×800 and 390×844: every control renders and every screen looks right (no overlap/clip/off-canvas, no `#blazor-error-ui`). Full-page screenshots under `test-results/screens/`. Live data observed: Ingestion/Text-Ingestion stats (2 docs / 151 chunks / 768 KB), Tool Demo Available-Tools table (4 tools), Qdrant Admin live status (Docker Available / Qdrant Disconnected / Version N/A). Backend note: the running instance has **no LLM provider configured (Source=None)** and **Qdrant is down**, so LLM data-paths (Chat streamed tokens, Playground completion/typed-parse, Tool Demo execution trace) and Qdrant collection/vector CRUD were NOT exercised this run — those keep their prior status. The prior STATIC-ONLY caveat is superseded for the screens below; controls still tagged `static-only` are ones not re-swept.
 
 > **Purpose — this is the document a HUMAN developer uses to trace any screen, control, or number on the page all the way down to its data source, so they can find and fix a bug, or verify that AI-generated code is actually correct.** The BRD explains *what* the app does; the Architecture explains *how the system is shaped*. Neither tells a developer "the Chat footer's token count comes from `Chat.razor`'s `HandleAutoRag()` → `TechieRagManager.AskAsync()` → `TechieRagClient.AskAsync()` → `response.Usage`." This guide does exactly that, per screen, down to the provider call.
 >
@@ -34,8 +36,8 @@ Brief — just enough to navigate the code. (Full detail in `docs/TechieRag-Arch
 
 | Layer | Project / folder | What lives here | Example types |
 |-------|------------------|-----------------|---------------|
-| UI (Blazor Server) | `samples/TechieRagWeb/Components/Pages` | The 11 routed Razor pages + layout/sidebar | `Chat.razor`, `Settings.razor`, `MainLayout.razor` |
-| Sample services | `samples/TechieRagWeb/Services` | Builds/holds the live `ITechieRag`; config persistence; Qdrant/Docker admin | `TechieRagManager`, `TechieRagConfigService`, `QdrantAdminService`, `DockerContainerService` |
+| UI (Blazor Server) | `apps/TechieDesk/Components/Pages` | The 11 routed Razor pages + layout/sidebar | `Chat.razor`, `Settings.razor`, `MainLayout.razor` |
+| Sample services | `apps/TechieDesk/Services` | Builds/holds the live `ITechieRag`; config persistence; Qdrant/Docker admin | `TechieRagManager`, `TechieRagConfigService`, `QdrantAdminService`, `DockerContainerService` |
 | Library (orchestrator) | `src/TechieRag` | The RAG engine consumed via `ITechieRag` | `TechieRagClient`, `AgentLoopRunner`, `ToolRegistry`, `TokenUsageTracker` |
 | Provider abstractions | `src/TechieRag/Abstractions` | Pluggable backend contracts (the keystone) | `IEmbeddingProvider`, `IVectorStore`, `ILlmProvider`, `ITokenTracker` |
 | Embedding (offline) | `src/TechieRag.Embedded` | BGE-M3 ONNX provider + model download | `EmbeddedEmbeddingProvider`, `ModelDownloadService` |
@@ -47,7 +49,7 @@ Brief — just enough to navigate the code. (Full detail in `docs/TechieRag-Arch
 
 ## Roles and menu map
 
-The sample app has **no authentication, no login, and no roles** (confirmed: zero `[Authorize]` / `AddAuthentication` / `AddAuthorization` in `samples/TechieRagWeb`; `docs/TechieRag-UsageGuide.md` test-users table records "none — no auth"). It is a single-user, config-driven demo.
+The sample app has **no authentication, no login, and no roles** (confirmed: zero `[Authorize]` / `AddAuthentication` / `AddAuthorization` in `apps/TechieDesk`; `docs/TechieRag-UsageGuide.md` test-users table records "none — no auth"). It is a single-user, config-driven demo.
 
 | Role | Test user | Authorization | Menus this role sees | Detail |
 |------|-----------|---------------|----------------------|--------|
@@ -77,8 +79,8 @@ The sample app has **no authentication, no login, and no roles** (confirmed: zer
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. All six navigation cards render and their links navigate correctly.
 
-- **Route:** `@page "/"` (`samples/TechieRagWeb/Components/Pages/Home.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/Home.razor`
+- **Route:** `@page "/"` (`apps/TechieDesk/Components/Pages/Home.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/Home.razor`
 - **Reached via:** General → Home; **Log in as:** no auth (single anonymous user). This is the default landing route `/`.
 - **What this screen does:** Static landing dashboard. Renders six navigation cards (Document Ingestion, RAG Chat, LLM Playground, Tool Calling Demo, Token Usage, Configuration) that link to other pages. No data access, no `@code` block, no service injection.
 
@@ -125,8 +127,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. The form loads the REAL saved config (SqliteVec `techieragex.db`, Embedded BGE-M3). Save / Reset / Initialize write-actions were NOT re-driven (they mutate the live config); the known static issues below stand unchanged (Reset never calls `ReconfigureAsync`; `EnableTelemetry` persisted but unread).
 
-- **Route:** `@page "/settings"` (`samples/TechieRagWeb/Components/Pages/Settings.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/Settings.razor`
+- **Route:** `@page "/settings"` (`apps/TechieDesk/Components/Pages/Settings.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/Settings.razor`
 - **Reached via:** Configuration → Settings; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Edits embedding provider, vector store, document-processing, and telemetry config. Loads from `techierag-config.json` (fallback `appsettings.json` / defaults), saves back to that JSON file, then rebuilds the live `ITechieRag` instance via `ReconfigureAsync`.
 
@@ -197,8 +199,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: "Test LLM Connection" succeeded in **912 ms** against LM Studio (`qwen2.5-coder-32b-instruct` at `192.168.1.13:1234`) — inline success alert + toast + Serilog log entry all observed. Save / Reset were not re-driven.
 
-- **Route:** `@page "/llm-settings"` (`samples/TechieRagWeb/Components/Pages/LlmSettings.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/LlmSettings.razor`
+- **Route:** `@page "/llm-settings"` (`apps/TechieDesk/Components/Pages/LlmSettings.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/LlmSettings.razor`
 - **Reached via:** Configuration → LLM Settings; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Tabbed editor (Provider / Fallback / Usage / Prompts) for LLM provider config plus a live "Test LLM Connection" button. Loads/saves the same `techierag-config.json` and applies via `ReconfigureAsync`; the test calls the configured provider's `CompleteAsync` over HTTP.
 
@@ -281,8 +283,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE DATA: the Vector Store Statistics card showed correct counts before/after a real ingest (Documents 2 → 3 → 2). Note @390: the DataTable pagination buttons live inside the local `relative overflow-x-auto` wrapper (the accepted TR-004 containment pattern — reachable by scrolling the wrapper, not a defect).
 
-- **Route:** `@page "/ingestion"` (`samples/TechieRagWeb/Components/Pages/Ingestion.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/Ingestion.razor`
+- **Route:** `@page "/ingestion"` (`apps/TechieDesk/Components/Pages/Ingestion.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/Ingestion.razor`
 - **Reached via:** Data → File Ingestion; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Scans a server-side folder for files matching a pattern and ingests each one into the vector store (read → chunk → embed → upsert), showing per-file results, vector-store stats, and the document list.
 
@@ -353,8 +355,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE WRITE PATH: ingested a temp doc `verify-datapath-tmp` → success toast + document id, sidebar Documents count 2 → 3; the per-row trash delete removed it → back to 2. The chunk → BGE-M3 embed → SQLite-vec cycle is proven end-to-end.
 
-- **Route:** `@page "/text-ingestion"` (`samples/TechieRagWeb/Components/Pages/TextIngestion.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/TextIngestion.razor`
+- **Route:** `@page "/text-ingestion"` (`apps/TechieDesk/Components/Pages/TextIngestion.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/TextIngestion.razor`
 - **Reached via:** Data → Text Ingestion; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Lets the user paste raw text with a name and optional source, then ingests it directly (chunk → embed → upsert) into the vector store; sidebar shows stats and a deletable document list.
 
@@ -424,8 +426,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, LM Studio `qwen2.5-coder-32b-instruct`): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: Auto-RAG with streaming ON returned a streamed answer, the "Sources Used (N)" panel rendered with % relevance scores, and the session footer moved off zero. Direct-LLM streaming was also re-confirmed.
 
-- **Route:** `@page "/chat"` (`samples/TechieRagWeb/Components/Pages/Chat.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/Chat.razor`
+- **Route:** `@page "/chat"` (`apps/TechieDesk/Components/Pages/Chat.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/Chat.razor`
 - **Reached via:** AI Features → RAG Chat; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Conversational RAG UI. User asks a question; depending on the selected mode it does retrieval-only search, a direct LLM completion, or full Auto-RAG (retrieve + generate). Shows sources, a token/cost footer, and optional token-by-token streaming.
 
@@ -495,8 +497,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, LM Studio `qwen2.5-coder-32b-instruct`): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: a completion returned text plus real token counts; Structured Output deserialized to the typed object (SentimentAnalysis fields rendered).
 
-- **Route:** `@page "/llm-playground"` (`samples/TechieRagWeb/Components/Pages/LlmPlayground.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/LlmPlayground.razor`
+- **Route:** `@page "/llm-playground"` (`apps/TechieDesk/Components/Pages/LlmPlayground.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/LlmPlayground.razor`
 - **Reached via:** AI Features → LLM Playground; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Direct LLM testbench with three tabs — Completion (single prompt, optional streaming), Structured Output (JSON-mode responses), and Chat (multi-turn direct LLM chat). Bypasses retrieval entirely; talks straight to the configured LLM provider.
 
@@ -565,8 +567,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify REQ-UI-007`; **re-confirmed same day by `*verify all`**, live boot :5099, LM Studio qwen2.5-coder-32b): the live agent loop made REAL `get_weather` **and** `calculate_math` tool calls end-to-end and the **Execution Trace rendered each live step** (requested → executed + result → final answer). All controls render ✓; looks-right ✓ @1280 **and** @390 (the earlier mobile overflow was fixed same day — `main{min-width:0}` TR-003 workaround + `relative overflow-x-auto` DataTable wrapper TR-004 + wrapping rows; `document.scrollWidth=390` at 390px).
 
-- **Route:** `@page "/tool-demo"` (`samples/TechieRagWeb/Components/Pages/ToolDemo.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/ToolDemo.razor`
+- **Route:** `@page "/tool-demo"` (`apps/TechieDesk/Components/Pages/ToolDemo.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/ToolDemo.razor`
 - **Reached via:** AI Features → Tool Demo; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Demonstrates the agent tool-calling loop. Registers four demo tools (weather, math, document search, current time) plus user-defined mock tools, then runs a multi-iteration agent loop where the LLM decides which tools to call.
 
@@ -629,8 +631,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE DATA (upgrades the earlier zeros-only observation): after this run's live LLM operations the dashboard showed **non-zero Total Tokens / Operations** and a populated Usage-by-Model row for `qwen2.5-coder-32b-instruct`. Known issue stands: Estimated Cost reads $0.0000 for models absent from the hard-coded pricing table; the budget alert was not exercised (no budget configured).
 
-- **Route:** `@page "/token-usage"` (`samples/TechieRagWeb/Components/Pages/TokenUsage.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/TokenUsage.razor`
+- **Route:** `@page "/token-usage"` (`apps/TechieDesk/Components/Pages/TokenUsage.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/TokenUsage.razor`
 - **Reached via:** Monitoring → Token Usage; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Read-only dashboard that polls the library's in-memory token tracker every 5s and shows session totals, cost, budget utilization, and a per-model usage grid; one action resets the session.
 
@@ -692,8 +694,8 @@ flowchart TD
 
 > **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, Qdrant 1.15.5 in Docker): renders ✓ @1280 **and** @390; looks-right ✓ @1280 BUT **visual-broken @390 (DEFECT 2026-07-02)** — with a RUNNING container, the Container-Management row's Stop + logs icon buttons sit off-canvas (x ≈ 666–765 vs the 390px page), reachable only by panning the whole shell `<main>`; TR-003 class, needs flex-wrap/local containment; only manifests when a container is running. LIVE otherwise: Connect with API key → Docker Available, Qdrant Connected, **Version 1.15.5 (real server)**; collections table populated; created + deleted collection `verify_crud_tmp` via the UI; browsed `techierag_chunks` (1,043 points) with working pager Next/Previous; the vector detail dialog opened non-empty. Bulk delete + container lifecycle buttons were not exercised (real owner data/infrastructure).
 
-- **Route:** `@page "/qdrant-admin"` (`samples/TechieRagWeb/Components/Pages/QdrantAdmin.razor:1`)
-- **Razor file:** `samples/TechieRagWeb/Components/Pages/QdrantAdmin.razor`
+- **Route:** `@page "/qdrant-admin"` (`apps/TechieDesk/Components/Pages/QdrantAdmin.razor:1`)
+- **Razor file:** `apps/TechieDesk/Components/Pages/QdrantAdmin.razor`
 - **Reached via:** Admin → Qdrant Admin; **Log in as:** no auth (single anonymous user)
 - **What this screen does:** Operator console for the Qdrant vector DB — detects Docker, lists/creates/starts/stops Qdrant containers via the Docker API, tests the gRPC connection, and performs CRUD on collections and individual vectors via `Qdrant.Client`.
 

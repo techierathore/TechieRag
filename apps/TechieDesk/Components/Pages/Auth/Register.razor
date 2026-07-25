@@ -1,0 +1,222 @@
+@page "/register"
+@layout AuthLayout
+@inject IAppManagerClient AppManager
+@inject TechieDeskAuthenticationStateProvider AuthProvider
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject NavigationManager Nav
+@inject ILogger<Register> Logger
+
+<PageTitle>TechieDesk — Create account</PageTitle>
+
+<Card Class="rounded-2xl p-2 shadow-lg">
+    <CardHeader>
+        <h1 class="text-2xl font-semibold leading-none tracking-tight">Create your account</h1>
+        <CardDescription>Get started with your TechieDesk instance</CardDescription>
+    </CardHeader>
+    <CardContent Class="space-y-4">
+        @if (errorMessage is not null)
+        {
+            <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                <AlertDescription>@errorMessage</AlertDescription>
+            </Alert>
+        }
+
+        <div class="td-grid-2">
+            <Field IsInvalid="@(firstNameError is not null)">
+                <FieldLabel>First name</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="firstName" Placeholder="Ravi" AriaInvalid="@(firstNameError is not null)" />
+                    @if (firstNameError is not null)
+                    {
+                        <FieldError>@firstNameError</FieldError>
+                    }
+                </FieldContent>
+            </Field>
+            <Field IsInvalid="@(lastNameError is not null)">
+                <FieldLabel>Last name</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="lastName" Placeholder="Kumar" AriaInvalid="@(lastNameError is not null)" />
+                    @if (lastNameError is not null)
+                    {
+                        <FieldError>@lastNameError</FieldError>
+                    }
+                </FieldContent>
+            </Field>
+        </div>
+
+        <Field IsInvalid="@(emailError is not null)">
+            <FieldLabel>Email</FieldLabel>
+            <FieldContent>
+                <Input Type="InputType.Email" @bind-Value="email" Placeholder="you@company.com" AriaInvalid="@(emailError is not null)" />
+                @if (emailError is not null)
+                {
+                    <FieldError>@emailError</FieldError>
+                }
+            </FieldContent>
+        </Field>
+
+        <Field>
+            <FieldLabel>Mobile number (optional)</FieldLabel>
+            <FieldContent>
+                <Input Type="InputType.Tel" @bind-Value="mobile" Placeholder="+91 98765 43210" />
+            </FieldContent>
+        </Field>
+
+        <Field IsInvalid="@(passwordError is not null)">
+            <FieldLabel>Password</FieldLabel>
+            <FieldContent>
+                <Input Type="InputType.Password" @bind-Value="password" Placeholder="••••••••" AriaInvalid="@(passwordError is not null)" />
+                @if (passwordError is not null)
+                {
+                    <FieldError>@passwordError</FieldError>
+                }
+                else
+                {
+                    <FieldDescription>Min 8 chars, 1 uppercase, 1 number, 1 special character</FieldDescription>
+                }
+            </FieldContent>
+        </Field>
+
+        <Field IsInvalid="@(confirmError is not null)">
+            <FieldLabel>Confirm password</FieldLabel>
+            <FieldContent>
+                <Input Type="InputType.Password" @bind-Value="confirmPassword" Placeholder="••••••••" AriaInvalid="@(confirmError is not null)" />
+                @if (confirmError is not null)
+                {
+                    <FieldError>@confirmError</FieldError>
+                }
+            </FieldContent>
+        </Field>
+
+        <Button Class="w-full" OnClick="CreateAccountAsync" Disabled="isBusy" Type="ButtonType.Submit">
+            @if (isBusy)
+            {
+                <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                <span>Creating account…</span>
+            }
+            else
+            {
+                <span>Create account</span>
+            }
+        </Button>
+
+        <div class="text-center text-sm text-muted-foreground">
+            Already have an account? <a href="/login" class="font-semibold text-primary hover:underline">Sign in</a>
+        </div>
+    </CardContent>
+</Card>
+
+@code {
+    private string firstName = string.Empty;
+    private string lastName = string.Empty;
+    private string email = string.Empty;
+    private string? mobile;
+    private string password = string.Empty;
+    private string confirmPassword = string.Empty;
+
+    private string? firstNameError;
+    private string? lastNameError;
+    private string? emailError;
+    private string? passwordError;
+    private string? confirmError;
+    private string? errorMessage;
+    private bool isBusy;
+
+    private async Task CreateAccountAsync()
+    {
+        if (!Validate())
+        {
+            return;
+        }
+
+        if (!AuthMode.IsAppManagerEnabled)
+        {
+            errorMessage = "This instance runs in offline single-user mode — registration is managed by AppManager and is not available.";
+            return;
+        }
+
+        isBusy = true;
+        try
+        {
+            var request = new RegisterRequest
+            {
+                Email = email.Trim(),
+                FirstName = firstName.Trim(),
+                LastName = lastName.Trim(),
+                MobileNumber = string.IsNullOrWhiteSpace(mobile) ? null : mobile.Trim()
+            };
+
+            var auth = await AppManager.RegisterAsync(request, password);
+            AuthProvider.SignIn(auth);
+            Logger.LogInformation("Registration succeeded for {Email}", request.Email);
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+        catch (AppManagerException ex)
+        {
+            Logger.LogWarning("Registration failed for {Email} ({ErrorCode})", email.Trim(), ex.ErrorCode);
+            MapError(ex);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unexpected error during registration for {Email}", email.Trim());
+            errorMessage = "Something went wrong while creating your account. Please try again.";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private bool Validate()
+    {
+        firstNameError = lastNameError = emailError = passwordError = confirmError = errorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(firstName))
+        {
+            firstNameError = "First name is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(lastName))
+        {
+            lastNameError = "Last name is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
+        {
+            emailError = "A valid email is required.";
+        }
+
+        if (!PasswordPolicy.IsValid(password))
+        {
+            passwordError = "Min 8 chars, 1 uppercase, 1 number, 1 special character.";
+        }
+
+        if (confirmPassword != password)
+        {
+            confirmError = "Passwords do not match.";
+        }
+
+        return firstNameError is null && lastNameError is null && emailError is null
+            && passwordError is null && confirmError is null;
+    }
+
+    private void MapError(AppManagerException ex)
+    {
+        switch (ex.Error)
+        {
+            case AppManagerError.EmailExists:
+                emailError = "An account with this email already exists.";
+                break;
+            case AppManagerError.InvalidPassword:
+                passwordError = "Password does not meet the complexity requirements.";
+                break;
+            case AppManagerError.ValidationError:
+                errorMessage = "Please check your details and try again.";
+                break;
+            default:
+                errorMessage = "Unable to create your account right now. Please try again later.";
+                break;
+        }
+    }
+}

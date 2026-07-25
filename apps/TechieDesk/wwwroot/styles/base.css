@@ -1,0 +1,207 @@
+/* Base styles for TechieDesk - works with TrBlazeUI + Tailwind */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    border-color: var(--border);
+}
+
+h1:focus {
+    outline: none;
+}
+
+/* TR-003 workaround: TrBlazeUI SidebarInset renders <main> as a flex item without
+   min-width:0, so over-wide content (tables, pagination bars) stretches the whole
+   shell — including the header — past the viewport on narrow screens. Capping it
+   lets wide content scroll inside the content region instead. */
+main {
+    min-width: 0;
+}
+
+/* The app ships TrBlazeUI's prebuilt CSS but has no Tailwind JIT of its own, so
+   grid-template-column utilities (grid-cols-2, lg:grid-cols-2) are not emitted. These
+   helpers give the auth/profile screens their mockup column layouts and stay responsive:
+   two-up rows for paired fields, and a 2-column card grid that collapses on narrow viewports. */
+.td-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.td-grid-2col {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .td-grid-2col {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Wave 3 workspace-chat layout (REQ-UI-016/017): a fixed threads rail + a flexible chat
+   column on wide viewports, collapsing to a single stacked column at ≤767px so nothing
+   overflows horizontally at 390px (REQ-NFR-006). */
+.td-chat-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (min-width: 768px) {
+    .td-chat-grid {
+        grid-template-columns: 264px minmax(0, 1fr);
+    }
+}
+
+/* REQ-UI-022 first-run wizard stepper (Setup.razor). Its 5 step cells use `flex flex-1`
+   inside a `flex justify-between gap-1.5` row, but flex items default to min-width:auto and
+   so refuse to shrink below their label content — at 390px the row grew to 446px and
+   overflowed the viewport by 56px (step 5 "Workspace" clipped). Letting the cells shrink to
+   0 lets flex distribute the width evenly, and letting the long single-word labels
+   ("AppManager", "Workspace") break keeps every label within its cell. The @1280 layout,
+   which has ample room and never overflows, is unchanged — matching
+   docs/mockups/setup-wizard.html. The app ships TrBlazeUI's prebuilt CSS with no Tailwind
+   JIT (min-w-0 / break utilities aren't emitted), so these rules are scoped here to the
+   stepper's existing markup (the `justify-between gap-1.5` row + its `text-[11px]` labels,
+   both unique to this wizard). */
+.flex.justify-between.gap-1\.5 > .flex-1 {
+    min-width: 0;
+}
+
+.text-\[11px\] {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+}
+
+/* A plain 0..1 range input styled as the workspace-settings similarity slider fallback,
+   used where a numeric threshold reads clearer than the TrBlazeUI Slider. */
+.td-range {
+    width: 100%;
+    accent-color: hsl(var(--primary));
+}
+
+/* REQ-RAG-011 / REQ-RAG-033 FileUpload dropzone hint (DocumentLibrary.razor). TrBlazeUI's
+   FileUpload renders the whole Accept filter as one "Accepted: .pdf,.docx,.xlsx,..." line
+   inside a `flex flex-col items-center gap-2 pointer-events-none` column. A long comma list
+   has no break opportunity that the browser will take by default, and the centred column
+   never constrains it, so at 390px the line rendered from -152px to 542px — bleeding off
+   BOTH viewport edges. Adding XLSX/PPTX to the filter lengthened the string, so this is
+   pinned down here. Constraining the column and letting the list break anywhere keeps the
+   hint inside the card; the @1280 layout has ample room and is visually unchanged. Same
+   rationale as the wizard-stepper rules above: no Tailwind JIT, so scope to the markup. */
+.pointer-events-none.flex.flex-col.items-center.gap-2 {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.pointer-events-none.flex.flex-col.items-center.gap-2 > p,
+.pointer-events-none.flex.flex-col.items-center.gap-2 > .text-center {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* ---------------------------------------------------------------------------
+   REQ-NFR-005 (BRD-96) — Accessibility
+   --------------------------------------------------------------------------- */
+
+/* WCAG 2.1 AA 2.4.7 "Focus Visible". The TrBlazeUI markup asks for a focus ring with
+   Tailwind's `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+   utilities, but this app ships the library's PREBUILT css and has no Tailwind JIT of its
+   own — so `focus-visible:outline-none` IS emitted (it lives in the prebuilt bundle) while
+   the `--tw-ring-color` that would paint the replacement ring is never set. The measured
+   result on every sidebar nav link, the sidebar toggle and the user-menu button was
+   `outline-style: none` + a fully transparent `rgba(0,0,0,0)` ring: keyboard focus was
+   completely invisible while `:focus-visible` matched. axe cannot detect this (it does not
+   evaluate focus appearance), so it was caught by tabbing the shell and reading the
+   computed style.
+
+   The utility that hides the outline is a class selector (specificity 0,2,0), so a plain
+   element rule (0,1,1) would lose even though base.css is loaded last. Repeating
+   `:focus-visible` lifts these to 0,2,1 so they win on specificity rather than by
+   `!important`, which would also override any genuinely intentional per-component ring. */
+a:focus-visible:focus-visible,
+button:focus-visible:focus-visible,
+input:focus-visible:focus-visible,
+select:focus-visible:focus-visible,
+textarea:focus-visible:focus-visible,
+summary:focus-visible:focus-visible,
+[tabindex="0"]:focus-visible:focus-visible,
+[role="button"]:focus-visible:focus-visible,
+[role="tab"]:focus-visible:focus-visible,
+[role="menuitem"]:focus-visible:focus-visible,
+[role="option"]:focus-visible:focus-visible,
+[role="slider"]:focus-visible:focus-visible,
+[role="combobox"]:focus-visible:focus-visible,
+[role="switch"]:focus-visible:focus-visible,
+[role="checkbox"]:focus-visible:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Programmatic-focus targets must NOT paint that ring. Routes.razor uses
+   <FocusOnNavigate Selector="h1" />, which focuses the page's h1 (tabindex="-1") on every
+   navigation, and the skip link focuses #td-main-content the same way — in both cases the
+   focus move is a screen-reader/keyboard affordance, not a "you are here" indicator, and a
+   box drawn around the whole page title on every load is a visual regression. The file
+   already carried `h1:focus { outline: none }` for exactly this reason; these selectors
+   restate it at the doubled specificity used above so it still wins. This is why the rule
+   above is scoped to [tabindex="0"] (real custom widgets) rather than any [tabindex]. */
+h1:focus:focus-visible,
+h1[tabindex="-1"]:focus:focus-visible,
+#td-main-content:focus:focus-visible {
+    outline: none;
+}
+
+/* The screen-reader-only utility is referenced by the skip link below. Tailwind's `sr-only`
+   is NOT present in the prebuilt bundle (verified by enumerating document.styleSheets), so
+   it is defined here rather than assumed. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* WCAG 2.4.1 "Bypass Blocks": the shell renders ~20 sidebar links before the page content,
+   so a keyboard user otherwise tabs through the whole nav on every route. The link is
+   visually hidden until focused, then pinned to the top-left of the viewport. */
+.td-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+}
+
+.td-skip-link:focus {
+    left: 0.5rem;
+    top: 0.5rem;
+    width: auto;
+    height: auto;
+    padding: 0.5rem 0.875rem;
+    border-radius: calc(var(--radius) - 2px);
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+}

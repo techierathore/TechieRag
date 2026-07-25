@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk — Business Requirements — TechieDesk</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieDesk — Business Requirements</h1>
+    <div class="sub">Last rendered: 2026-07-17</div>
+    <div class="group">Contents</div>
+    <ol>
+      <li><a href="#executive-summary">Executive summary</a></li>
+      <li><a href="#business-objectives">Business objectives</a></li>
+      <li><a href="#scope">Scope</a></li>
+      <li><a href="#development-status">Development status</a></li>
+      <li><a href="#stakeholders-users">Stakeholders / users</a></li>
+      <li><a href="#context-diagram">Context diagram</a></li>
+      <li><a href="#user-journey-primary-use-case">User journey — primary use case</a></li>
+      <li><a href="#component-sketch">Component sketch</a></li>
+      <li><a href="#feature-catalog">Feature catalog</a></li>
+      <li class="h3"><a href="#f-shell-app-shell-branding-navigation">F-SHELL: Shell &amp; navigation</a></li>
+      <li class="h3"><a href="#f-chat-chat-direct-llm-auto-rag-streaming">F-CHAT: Chat</a></li>
+      <li class="h3"><a href="#f-ingest-folder-text-ingestion-console-style">F-INGEST: Folder/text ingestion</a></li>
+      <li class="h3"><a href="#f-playground-f-qadmin-f-settings-f-tokens-f-tools-existing-differentiators">Existing differentiators</a></li>
+      <li class="h3"><a href="#f-auth-appmanager-authentication-session">F-AUTH: AppManager auth</a></li>
+      <li class="h3"><a href="#f-roles-roles-access-control">F-ROLES: Access control</a></li>
+      <li class="h3"><a href="#f-ws-workspaces-threads">F-WS: Workspaces &amp; threads</a></li>
+      <li class="h3"><a href="#f-hist-persistent-chat-history">F-HIST: Chat history</a></li>
+      <li class="h3"><a href="#f-cite-native-streaming-citations">F-CITE: Streaming citations</a></li>
+      <li class="h3"><a href="#f-doclib-document-library">F-DOCLIB: Document library</a></li>
+      <li class="h3"><a href="#f-retrieve-retrieval-tuning">F-RETRIEVE: Retrieval tuning</a></li>
+      <li class="h3"><a href="#f-lic-licensing-feature-gating-core">F-LIC: Licensing core</a></li>
+      <li class="h3"><a href="#f-onboard-first-run-onboarding-wizard">F-ONBOARD: First-run wizard</a></li>
+      <li class="h3"><a href="#f-deploy-docker-distribution">F-DEPLOY: Docker</a></li>
+      <li class="h3"><a href="#f-sec-security-hygiene">F-SEC: Security hygiene</a></li>
+      <li class="h3"><a href="#f-connect-data-connectors">F-CONNECT: Connectors</a></li>
+      <li class="h3"><a href="#f-api-developer-rest-api">F-API: REST API</a></li>
+      <li class="h3"><a href="#f-widget-embeddable-chat-widget">F-WIDGET: Embed widget</a></li>
+      <li class="h3"><a href="#f-admin-admin-console">F-ADMIN: Admin console</a></li>
+      <li class="h3"><a href="#f-billing-subscriptions-invoices-promos">F-BILLING: Billing</a></li>
+      <li class="h3"><a href="#f-support-in-app-support-desk">F-SUPPORT: Support desk</a></li>
+      <li class="h3"><a href="#f-agent-agent-experience">F-AGENT: Agents</a></li>
+      <li class="h3"><a href="#f-speech-tts-stt-in-chat">F-SPEECH: TTS/STT</a></li>
+      <li class="h3"><a href="#f-brand-white-labeling-appearance">F-BRAND: White-labeling</a></li>
+      <li class="h3"><a href="#f-i18n-localization">F-I18N: Localization</a></li>
+      <li class="h3"><a href="#f-flows-no-code-agent-flow-builder-f-sched-scheduled-tasks">F-FLOWS / F-SCHED</a></li>
+      <li class="h3"><a href="#f-data-data-access-migrations-dapper-dbup">F-DATA: Dapper + DbUp</a></li>
+      <li class="h3"><a href="#f-lib-techierag-library-gap-closure-managed-here">F-LIB: Library gap closure</a></li>
+      <li><a href="#functional-requirements-brd-ledger">Functional requirements (BRD ledger)</a></li>
+      <li><a href="#non-functional-requirements">Non-functional requirements</a></li>
+      <li><a href="#constraints-assumptions">Constraints &amp; assumptions</a></li>
+      <li><a href="#success-metrics">Success metrics</a></li>
+      <li><a href="#risks">Risks</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieDesk — Business Requirements</h1>
+    <div class="subtitle">Product BRD · self-hostable AnythingLLM alternative powered by the TechieRag library · Last updated 2026-07-17 · Highest BRD ID: BRD-127</div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#executive-summary">Executive summary</a></li>
+        <li><a href="#business-objectives">Business objectives</a></li>
+        <li><a href="#scope">Scope</a></li>
+        <li><a href="#development-status">Development status</a></li>
+        <li><a href="#stakeholders-users">Stakeholders / users</a></li>
+        <li><a href="#context-diagram">Context diagram</a></li>
+        <li><a href="#user-journey-primary-use-case">User journey — primary use case</a></li>
+        <li><a href="#component-sketch">Component sketch</a></li>
+        <li><a href="#feature-catalog">Feature catalog</a></li>
+        <li><a href="#functional-requirements-brd-ledger">Functional requirements (BRD ledger)</a></li>
+        <li><a href="#non-functional-requirements">Non-functional requirements</a></li>
+        <li><a href="#constraints-assumptions">Constraints &amp; assumptions</a></li>
+        <li><a href="#success-metrics">Success metrics</a></li>
+        <li><a href="#risks">Risks</a></li>
+        <li><a href="#glossary">Glossary</a></li>
+      </ol>
+    </div>
+
+    <h2 id="executive-summary">1. Executive summary<a class="anchor-link" href="#executive-summary">#</a></h2>
+    <p><strong>TechieDesk</strong> is a self-hostable, workspace-based RAG chat product built on .NET 10 / Blazor Server with the TrBlazeUI component kit, powered by the <strong>TechieRag</strong> library (the reusable RAG core published on NuGet). Its mandate — confirmed by the product owner and recorded in <code>docs/TechieRag-CompetitorAnalysis.md</code> — is to become a <strong>full productized AnythingLLM alternative</strong>: workspace-based chat over private documents with any LLM/embedder/vector store, plus agents, a developer API, and an embeddable widget — re-imagined for the .NET ecosystem, where every product capability is also reusable by any .NET app via the underlying library.</p>
+    <p>As of 2026-07-17 the application has been separated from its sample-app origins: renamed from <code>TechieRagWeb</code> to <strong>TechieDesk</strong>, moved to <code>apps/TechieDesk</code>, fully re-branded and regression-verified (REQ-UI-014 / library BRD-82). What exists today is a strong <strong>single-user operator console</strong> — chat with Auto-RAG and citations, document/folder/text ingestion, an LLM playground, runtime provider settings, a unique Qdrant admin console with Docker lifecycle management, and a token/cost dashboard. What is missing is the <strong>product layer</strong>: users/auth/roles, workspaces and threads, persistent chat history, a document library UI, data connectors, a developer REST API, an embeddable widget, agent UX, white-labeling, i18n, and Docker distribution.</p>
+    <p>Four strategic decisions shape this BRD:</p>
+    <ol>
+      <li><strong>User management is NOT built in-app.</strong> TechieDesk integrates with the owner's <strong>AppManager</strong> platform (<code>docs/AppManager-api-usage-guide.md</code>, API v1.4) as a child application. Authentication, registration, password lifecycle, profiles, roles, <strong>licensing/feature gating, payments/subscriptions, and support tickets</strong> all come from AppManager's AuthSvc / UserSvc / LicenseSvc / FeatureSvc / PaymentSvc / IssueSvc. This replaces the competitor analysis' GAP-APP-01 (ASP.NET Core Identity) approach and — as a bonus AnythingLLM cannot match in its open-source tier — gives TechieDesk a <strong>monetizable license/tier model and in-app support desk from day one</strong>.</li>
+      <li><strong>Everything else follows the competitor benchmark.</strong> Feature depth for workspaces, document library, connectors, developer API, widget, agents, branding, and i18n is taken from AnythingLLM (application benchmark); library-side capabilities they depend on are the GAP-LIB-* items — now ledgered <strong>in this BRD</strong> (F-LIB) so one checklist drives both codebases.</li>
+      <li><strong>One checklist governs the combined effort.</strong> All open TechieRag library gaps (GAP-LIB-01…23 — verified unimplemented as of 2026-07-17), the open library feedback items (TR-RAG-001, TR-RAG-002; TrBlazeUI TR-002/003/004), and any <strong>future</strong> feedback are developed and tracked in the <strong>TechieDesk Checklist</strong> (<code>docs/TechieDesk-Checklist.md</code>, produced by <code>*split-brd TechieDesk</code>). The TechieRag BRD/checklist remain as historical record of the shipped v1.1/v2 scope; no new work is scheduled there.</li>
+      <li><strong>Data access is Dapper, not EF Core.</strong> All TechieDesk data access uses Dapper — parameterized SQL for SQLite, stored procedures/queries for PostgreSQL (pgvector) — with schema migrations owned by a dedicated <strong>TechieDeskDb</strong> console project built on <strong>DbUp</strong>. All logging is <strong>Serilog</strong> (the standing TechieFlow NFR, BRD-100).</li>
+    </ol>
+
+    <h2 id="business-objectives">2. Business objectives<a class="anchor-link" href="#business-objectives">#</a></h2>
+    <ul>
+      <li><strong>O1 — Product, not demo:</strong> a stranger can <code>docker compose up</code>, register, create a workspace, drag in PDFs, and get streamed, cited answers — the competitor analysis Phase-2 exit criterion — within the MVP timeline (~12–16 weeks per <code>TechieRag-CompetitorAnalysis.md</code> §6).</li>
+      <li><strong>O2 — .NET-native differentiation:</strong> remain the only offering that is simultaneously a self-hostable RAG product <strong>and</strong> an embeddable .NET library; protect the §4.3 differentiators (offline BGE-M3, Qdrant admin console, token/cost governance, LLM playground).</li>
+      <li><strong>O3 — Monetization-ready:</strong> every install can run free/offline, but license tiers, feature gating, subscriptions, and payments are wired through AppManager so paid tiers can be switched on without re-architecture.</li>
+      <li><strong>O4 — Zero-config first run:</strong> out-of-the-box operation with no external services (Embedded BGE-M3 + SqliteVec + optional local Ollama), matching AnythingLLM's "works immediately" bar.</li>
+      <li><strong>O5 — Operational trust:</strong> all user documents, chats, and vectors remain on the self-hosted instance; only LLM-provider and AppManager calls leave the box; no product telemetry.</li>
+    </ul>
+
+    <h2 id="scope">3. Scope<a class="anchor-link" href="#scope">#</a></h2>
+    <p><strong>In scope (this BRD):</strong></p>
+    <ul>
+      <li>The TechieDesk application (<code>apps/TechieDesk</code>): product shell, AppManager integration (auth/roles/licensing/billing/support), workspaces &amp; threads, persistent chat history, document library, streaming citations UX, retrieval tuning, data connectors UI, developer REST API + keys + Swagger, embeddable chat widget, admin console, agent UX, TTS/STT (browser-first), white-labeling, i18n, Docker distribution, onboarding wizard, and security hygiene.</li>
+      <li>App-observable outcomes that require library work (e.g. native streaming citations, reranking toggle, XLSX/PPTX ingestion, connectors, MCP) — the app requirement is stated here, <strong>and</strong> the library work itself is ledgered here too (F-LIB, BRD-105…127) so it is planned, built, and verified through the TechieDesk Checklist.</li>
+      <li><strong>The open TechieRag library gap register (GAP-LIB-01…23)</strong> — all 23 verified unimplemented as of 2026-07-17 — plus the open library feedback items (TR-RAG-001/002, TrBlazeUI TR-002/003/004). Future library feedback also lands as rows in the TechieDesk Checklist (single-checklist governance).</li>
+      <li><strong>TechieDesk data platform:</strong> Dapper-based data access and the TechieDeskDb migration console (DbUp) — see F-DATA.</li>
+    </ul>
+    <p><strong>Library-first boundary (standing rule):</strong> any capability that is reusable outside this app is implemented in the <strong>TechieRag library</strong> (as a GAP-LIB-* item) and only <em>surfaced</em> by TechieDesk. Concretely: the agent loop, agent skills/tools, MCP client, agent orchestration engine, data connectors and web crawlers, document processors, chunking, reranking, retrieval tuning primitives, workspace/collection primitives, persistent conversation memory, content-hash document dedupe, and TTS/STT abstractions are all <strong>library</strong> components. TechieDesk itself owns only what is inherently app-shaped: the Blazor UX, AppManager integration, the REST API + widget hosting, app metadata storage (user↔workspace assignments, thread metadata, API keys, event log, branding), and deployment packaging. Any new requirement that violates this boundary must be re-scoped into the library before implementation.</p>
+    <p><strong>Out of scope (explicit):</strong></p>
+    <ul>
+      <li><strong>In-app user/identity store</strong> — no ASP.NET Core Identity, no local password handling beyond RSA-encrypting for transit to AppManager (owner decision, supersedes GAP-APP-01's Identity approach).</li>
+      <li><strong>Payment processing UI beyond AppManager's API surface</strong> — checkout/purchase happens on AppManager's side; TechieDesk shows pricing, subscriptions, invoices, and promo validation only.</li>
+      <li><strong>Entity Framework Core</strong> — banned in the TechieDesk codebase (owner decision); all data access is Dapper (see F-DATA).</li>
+      <li>The TechieRag library's <strong>already-shipped</strong> v1.1/v2 scope — its historical record stays in <code>docs/TechieRag-BRD.md</code>; only the <em>open</em> gaps (F-LIB) are governed here.</li>
+      <li>Browser extension, mobile app, desktop (MAUI) heads (GAP-APP-19) — deferred until demand.</li>
+      <li>No-code agent flow builder and scheduled tasks are <strong>in catalog but last phase</strong> (Phase 5); realtime voice calls, fine-tuning UIs, image/video generation — not planned.</li>
+    </ul>
+
+    <h2 id="development-status">4. Development status<a class="anchor-link" href="#development-status">#</a></h2>
+    <p><strong>Snapshot as of 2026-07-18.</strong> Live, per-requirement status: see <code>PROJECT-STATUS.md</code> and the <strong>Requirements Status</strong> table in <code>docs/TechieDesk-Checklist.md</code>.</p>
+    <table>
+      <thead><tr><th>Feature (F-code)</th><th>Phase</th><th>Status</th><th>%</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>F-SHELL: App shell, branding &amp; navigation</td><td>0</td><td>Done</td><td>100</td><td>TechieDesk rename/rebrand verified 2026-07-17; runtime render-confirmed 2026-07-18 (9 console routes clean @1280/390)</td></tr>
+        <tr><td>F-CHAT: Chat (Direct-LLM + Auto-RAG, streaming)</td><td>0</td><td>Partial</td><td>75</td><td>RAG-024/029 (streaming sources + usage) Verified 2026-07-18; live LLM stream pending provider UAT</td></tr>
+        <tr><td>F-INGEST: Folder/text ingestion (console-style)</td><td>0</td><td>Done</td><td>100</td><td>Folder/pattern + paste-text; superseded by F-DOCLIB for product UX</td></tr>
+        <tr><td>F-PLAYGROUND: LLM playground</td><td>0</td><td>Done</td><td>100</td><td>Differentiator</td></tr>
+        <tr><td>F-QADMIN: Qdrant admin + Docker lifecycle</td><td>0</td><td>Done</td><td>100</td><td>Differentiator</td></tr>
+        <tr><td>F-SETTINGS: Provider settings + connection test</td><td>0</td><td>Done</td><td>100</td><td></td></tr>
+        <tr><td>F-TOKENS: Token/cost dashboard + budgets</td><td>0</td><td>Done</td><td>100</td><td>Differentiator</td></tr>
+        <tr><td>F-TOOLS: Agent/tool demo</td><td>0</td><td>Done</td><td>100</td><td>Dev-oriented; superseded by F-AGENT for product UX</td></tr>
+        <tr><td>F-AUTH: AppManager authentication &amp; session</td><td>1</td><td>In progress</td><td>60</td><td>FN-001/004 Verified 2026-07-18 (RSA/wire); UI-006…013 render+visual confirmed, live AppManager round-trip = UAT</td></tr>
+        <tr><td>F-ROLES: Roles &amp; access control</td><td>1</td><td>In progress</td><td>85</td><td>FN-005/006/007 Verified 2026-07-18 (role map, capability matrix, server-side authz); multi-user gating = UAT</td></tr>
+        <tr><td>F-WS: Workspaces &amp; threads</td><td>1</td><td>In progress</td><td>85</td><td>UI-014/015/016 driven live + FN-008/009 + RAG-007/028 Verified 2026-07-18; UI-017 resume pending</td></tr>
+        <tr><td>F-HIST: Persistent chat history</td><td>1</td><td>In progress</td><td>80</td><td>RAG-008/009/027 Verified 2026-07-18 (thread persisted live); resume-after-restart = pending</td></tr>
+        <tr><td>F-CITE: Native streaming citations</td><td>1</td><td>In progress</td><td>60</td><td>RAG-024 Verified; RAG-010 + UI-018 need live LLM (provider UAT)</td></tr>
+        <tr><td>F-DOCLIB: Document library</td><td>1</td><td>In progress</td><td>65</td><td>RAG-012 Verified; UI-019/020/021 + FN-012 render+visual confirmed; RAG-011/013 PARTIAL; live ingest = UAT</td></tr>
+        <tr><td>F-RETRIEVE: Retrieval tuning</td><td>1</td><td>In progress</td><td>90</td><td>RAG-014/015/025 Verified 2026-07-18 (threshold/topK/rerank, chat-vs-query)</td></tr>
+        <tr><td>F-LIC: Licensing &amp; feature gating (core)</td><td>1</td><td>Planned</td><td>0</td><td>New (AppManager LicenseSvc/FeatureSvc); FN-013/014/015 Not Started</td></tr>
+        <tr><td>F-ONBOARD: First-run onboarding wizard</td><td>1</td><td>In progress</td><td>55</td><td>⚠ visual: UI-022 /setup stepper overflows @390 (Needs re-verify); UI-023/FN-016 render OK</td></tr>
+        <tr><td>F-DEPLOY: Docker distribution</td><td>1</td><td>In progress</td><td>55</td><td>FN-017/018/019 Implemented; container boot + volume persistence = owner UAT (no Docker here)</td></tr>
+        <tr><td>F-SEC: Security hygiene</td><td>1</td><td>In progress</td><td>30</td><td>NFR-002 confirmed (empty secrets); NFR-001 Blocked (owner PAT); NU1902 AngleSharp advisory logged (NFR-004)</td></tr>
+        <tr><td>F-CONNECT: Data connectors</td><td>2</td><td>Planned</td><td>0</td><td>GAP-APP-06 · depends GAP-LIB-05/06</td></tr>
+        <tr><td>F-API: Developer REST API</td><td>3</td><td>Planned</td><td>0</td><td>GAP-APP-07</td></tr>
+        <tr><td>F-WIDGET: Embeddable chat widget</td><td>3</td><td>Planned</td><td>0</td><td>GAP-APP-08</td></tr>
+        <tr><td>F-ADMIN: Admin console</td><td>3</td><td>Planned</td><td>0</td><td>GAP-APP-16</td></tr>
+        <tr><td>F-BILLING: Subscriptions, invoices &amp; promos</td><td>3</td><td>Planned</td><td>0</td><td>New (AppManager PaymentSvc)</td></tr>
+        <tr><td>F-SUPPORT: In-app support desk</td><td>3</td><td>Planned</td><td>0</td><td>New (AppManager IssueSvc)</td></tr>
+        <tr><td>F-AGENT: Agent experience</td><td>4</td><td>Planned</td><td>0</td><td>GAP-APP-10 · depends GAP-LIB-12</td></tr>
+        <tr><td>F-SPEECH: TTS/STT in chat</td><td>4</td><td>Planned</td><td>0</td><td>GAP-APP-15</td></tr>
+        <tr><td>F-BRAND: White-labeling &amp; appearance</td><td>4</td><td>Planned</td><td>0</td><td>GAP-APP-13</td></tr>
+        <tr><td>F-I18N: Localization</td><td>4</td><td>Planned</td><td>0</td><td>GAP-APP-14</td></tr>
+        <tr><td>F-FLOWS: No-code agent flow builder</td><td>5</td><td>Planned</td><td>0</td><td>GAP-APP-11</td></tr>
+        <tr><td>F-SCHED: Scheduled tasks</td><td>5</td><td>Planned</td><td>0</td><td>GAP-APP-12</td></tr>
+        <tr><td>F-DATA: Dapper data access + TechieDeskDb migrations (DbUp)</td><td>1</td><td>In progress</td><td>85</td><td>FN-029 (0 EF refs) + FN-030 (live DbUp migrations) Verified 2026-07-18; FN-031 Postgres boot = UAT</td></tr>
+        <tr><td>F-LIB: TechieRag library gap closure (GAP-LIB-01…23)</td><td>1–5</td><td>In progress</td><td>30</td><td>7 of 23 gaps closed: RAG-024…030 Verified 2026-07-18 (53/53 lib tests); remainder Phase 2–5</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Legend:</strong> <strong>Done</strong> = shipped &amp; working · <strong>In progress</strong> = actively being built · <strong>Partial</strong> = some sub-features done, others pending · <strong>Planned</strong> = not started. (Maps to the checklist's <code>Done (pre-existing)</code> / <code>In Progress</code> / <code>PARTIAL</code> / <code>Not Started</code>.)</p>
+
+    <h2 id="stakeholders-users">5. Stakeholders / users<a class="anchor-link" href="#stakeholders-users">#</a></h2>
+    <p>TechieDesk maps AppManager's per-application role (<code>applicationRole</code>, returned app-scoped by <code>GET /UserSvc/profile</code> when called with the app's <code>X-Api-Key</code>) onto three product roles, mirroring AnythingLLM's proven model:</p>
+    <table>
+      <thead><tr><th>Product role</th><th>AppManager <code>applicationRoleCode</code></th><th>Responsibilities</th><th>Key screens</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Admin</strong></td><td><code>Admin</code></td><td>Instance settings, provider config, all workspaces, user–workspace assignment, API keys, branding, logs, Qdrant admin, MCP servers</td><td>Everything, incl. <code>/admin/*</code>, <code>/settings</code>, <code>/qdrant-admin</code></td></tr>
+        <tr><td><strong>Manager</strong></td><td><code>Manager</code></td><td>Create/manage workspaces, document library, connectors, retrieval tuning, assign users to their workspaces</td><td>Workspaces, documents, connectors</td></tr>
+        <tr><td><strong>User</strong></td><td><code>User</code> (default)</td><td>Chat in assigned workspaces, threads, own history/export, own profile/licenses/support tickets</td><td>Chat, threads, profile, billing, support</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Registration/onboarding path:</strong> visitor → <code>/register</code> (or invited by Admin) → AppManager <code>POST /AuthSvc/register</code> with the app's API key (role defaults to <code>User</code>) → auto-login → assigned workspaces appear. The <strong>first-run wizard</strong> bootstraps the first Admin.</p>
+    <p><strong>Proposed license &amp; feature matrix</strong> (via AppManager FeatureSvc feature codes — final tier composition is a pricing decision for the owner, structure is the requirement):</p>
+    <table>
+      <thead><tr><th>Feature code</th><th>Type</th><th>Free</th><th>Professional</th><th>Enterprise</th></tr></thead>
+      <tbody>
+        <tr><td><code>WORKSPACES</code></td><td>Level</td><td>2</td><td>10</td><td>Unlimited</td></tr>
+        <tr><td><code>SEATS</code></td><td>Level</td><td>1</td><td>5</td><td>Unlimited</td></tr>
+        <tr><td><code>API_REQUESTS</code></td><td>Level</td><td>—</td><td>10k/mo</td><td>Unlimited</td></tr>
+        <tr><td><code>EMBED_WIDGET</code></td><td>Binary</td><td>✗</td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>AGENTS</code></td><td>Binary</td><td>✗</td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>CONNECTORS</code></td><td>Binary</td><td>✗</td><td>✓</td><td>✓</td></tr>
+        <tr><td><code>WHITE_LABEL</code></td><td>Binary</td><td>✗</td><td>✗</td><td>✓</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="context-diagram">6. Context diagram<a class="anchor-link" href="#context-diagram">#</a></h2>
+    <div class="diagram">
+      <div class="dt">
+        <button data-zout title="Zoom out">−</button>
+        <span class="zlabel">100%</span>
+        <button data-zin title="Zoom in">+</button>
+        <button data-fit title="Fit to width">Fit</button>
+        <button data-one title="Actual size">1:1</button>
+        <button data-fs title="Fullscreen">⛶</button>
+        <button data-pop title="Open in new tab">↗</button>
+      </div>
+      <pre class="mermaid">flowchart LR
+  Visitor(["Visitor / User / Admin"]) --> App["TechieDesk (Blazor Server)"]
+  Widget(["Embedded widget on customer site"]) --> API["TechieDesk REST API"]
+  DevClient(["Developer / API client"]) --> API
+  API --> App
+  App --> AM[/"AppManager API (AuthSvc, UserSvc, LicenseSvc, FeatureSvc, PaymentSvc, IssueSvc)"/]
+  App --> DB[("App DB — Dapper (SQLite default / PostgreSQL + pgvector)")]
+  App --> Lib["TechieRag library (NuGet)"]
+  Lib --> Vec[("Vector store: SqliteVec / PgVector / Qdrant")]
+  Lib --> LLM[/"LLM providers: Ollama, LM Studio, OpenAI-compat, Azure Foundry, Gemini, Anthropic"/]
+  Lib --> Emb[/"Embeddings incl. offline BGE-M3 (TechieRag.Embedded)"/]</pre>
+    </div>
+
+    <h2 id="user-journey-primary-use-case">7. User journey — primary use case<a class="anchor-link" href="#user-journey-primary-use-case">#</a></h2>
+    <p>New user's first cited answer (the Phase-1 exit journey):</p>
+    <div class="diagram">
+      <div class="dt">
+        <button data-zout title="Zoom out">−</button>
+        <span class="zlabel">100%</span>
+        <button data-zin title="Zoom in">+</button>
+        <button data-fit title="Fit to width">Fit</button>
+        <button data-one title="Actual size">1:1</button>
+        <button data-fs title="Fullscreen">⛶</button>
+        <button data-pop title="Open in new tab">↗</button>
+      </div>
+      <pre class="mermaid">sequenceDiagram
+  actor U as User
+  participant W as "TechieDesk UI"
+  participant AM as "AppManager API"
+  participant L as "TechieRag library"
+  participant V as "Vector store"
+  U->>W: Open app → /login
+  W->>AM: GET /AuthSvc/public-key (cached)
+  U->>W: email + password
+  W->>AM: POST /AuthSvc/login (encryptedPassword, X-Api-Key)
+  AM-->>W: JWT + refresh + role + activeLicense
+  U->>W: Create workspace "Contracts"
+  U->>W: Drag-drop PDFs into workspace library
+  W->>L: Ingest → chunk → embed → upsert
+  L->>V: Store vectors (workspace-scoped)
+  U->>W: Ask question in new thread
+  W->>L: Auto-RAG query (workspace scope, threshold, topK)
+  V-->>L: Relevant chunks
+  L-->>W: Streamed answer + source citations
+  W-->>U: Streaming reply with expandable citations
+  W->>W: Persist messages to App DB (thread history)</pre>
+    </div>
+
+    <h2 id="component-sketch">8. Component sketch<a class="anchor-link" href="#component-sketch">#</a></h2>
+    <div class="diagram">
+      <div class="dt">
+        <button data-zout title="Zoom out">−</button>
+        <span class="zlabel">100%</span>
+        <button data-zin title="Zoom in">+</button>
+        <button data-fit title="Fit to width">Fit</button>
+        <button data-one title="Actual size">1:1</button>
+        <button data-fs title="Fullscreen">⛶</button>
+        <button data-pop title="Open in new tab">↗</button>
+      </div>
+      <pre class="mermaid">flowchart TB
+  subgraph Heads["Delivery heads"]
+    UI["Blazor Server UI — TrBlazeUI"]
+    REST["REST API + Swagger (API-key auth)"]
+    WID["Embed widget JS (served static)"]
+  end
+  UI --> AppSvc["App services: WorkspaceService, ChatHistoryService, DocumentLibraryService, ConnectorService, AgentService, TechieRagManager, QdrantAdminService, DockerContainerService"]
+  REST --> AppSvc
+  WID --> REST
+  UI --> AMC["AppManagerClient: AuthSvc / UserSvc / LicenseSvc / FeatureSvc / PaymentSvc / IssueSvc"]
+  AppSvc --> DAL["Dapper data access (parameterized SQL / stored procedures)"]
+  DAL --> DB[("App DB: workspaces, threads, messages, documents, api-keys, event log")]
+  Mig["TechieDeskDb console — DbUp migrations"] --> DB
+  AppSvc --> Rag["TechieRag library"]
+  Rag --> Vec[("Vector store")]
+  Rag --> LLM[/"LLM / embedding providers"/]</pre>
+    </div>
+
+    <h2 id="feature-catalog">9. Feature catalog<a class="anchor-link" href="#feature-catalog">#</a></h2>
+
+    <h3 id="f-shell-app-shell-branding-navigation">F-SHELL: App shell, branding &amp; navigation<a class="anchor-link" href="#f-shell-app-shell-branding-navigation">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 0 (done)</p>
+    <p>TrBlazeUI sidebar shell with 10 routes, TechieDesk branding, responsive at 1280 px and 390 px (Playwright-verified). Post-Phase-1 the navigation reorganizes around workspaces (workspace switcher in sidebar), with operator screens (Qdrant admin, settings, playground) moving under an Admin section.</p>
+    <table>
+      <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Home</td><td><code>/</code></td><td>Dashboard, status cards</td></tr>
+        <tr><td>All current pages</td><td><code>/chat</code>, <code>/ingestion</code>, <code>/text-ingestion</code>, <code>/llm-playground</code>, <code>/llm-settings</code>, <code>/qdrant-admin</code>, <code>/settings</code>, <code>/token-usage</code>, <code>/tool-demo</code></td><td>Existing console screens</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Requirements:</strong> BRD-1, BRD-2</p>
+
+    <h3 id="f-chat-chat-direct-llm-auto-rag-streaming">F-CHAT: Chat (Direct-LLM + Auto-RAG, streaming)<a class="anchor-link" href="#f-chat-chat-direct-llm-auto-rag-streaming">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 0 (done, partial) → evolves through F-WS/F-HIST/F-CITE</p>
+    <p>Streaming chat with a Direct-LLM vs Auto-RAG toggle; Auto-RAG retrieves from the vector store and shows source citations (currently via an app-side workaround while streaming — TR-RAG-001). In Phase 1 chat becomes workspace/thread-scoped with persistent history and native streaming citations.</p>
+    <p><strong>Requirements:</strong> BRD-3, BRD-4</p>
+
+    <h3 id="f-ingest-folder-text-ingestion-console-style">F-INGEST: Folder/text ingestion (console-style)<a class="anchor-link" href="#f-ingest-folder-text-ingestion-console-style">#</a></h3>
+    <p><strong>Personas:</strong> Admin/Manager · <strong>Phase:</strong> 0 (done)</p>
+    <p>Folder-path + include-pattern ingestion and paste-text ingestion through the library's 9 processors (70+ code extensions). Remains as the operator-grade bulk path; the product-grade path is F-DOCLIB.</p>
+    <p><strong>Requirements:</strong> BRD-5, BRD-6</p>
+
+    <h3 id="f-playground-f-qadmin-f-settings-f-tokens-f-tools-existing-differentiators">F-PLAYGROUND / F-QADMIN / F-SETTINGS / F-TOKENS / F-TOOLS (existing differentiators)<a class="anchor-link" href="#f-playground-f-qadmin-f-settings-f-tokens-f-tools-existing-differentiators">#</a></h3>
+    <p><strong>Personas:</strong> Admin (QADMIN/SETTINGS), all (others) · <strong>Phase:</strong> 0 (done)</p>
+    <ul>
+      <li><strong>F-PLAYGROUND:</strong> completion / structured-output / chat playground — no competitor equivalent.</li>
+      <li><strong>F-QADMIN:</strong> Qdrant collection browse/CRUD, point inspection, Docker container lifecycle — unique operator tooling.</li>
+      <li><strong>F-SETTINGS:</strong> runtime LLM/embedding/vector-store provider settings with connection test.</li>
+      <li><strong>F-TOKENS:</strong> token/cost dashboard with budget alerts and block-on-exceed.</li>
+      <li><strong>F-TOOLS:</strong> tool/agent demo with live execution trace (dev-oriented; product agent UX = F-AGENT).</li>
+    </ul>
+    <p>After Phase 1 these screens are role-gated: QADMIN + SETTINGS → Admin; TOKENS → Admin (instance-wide) with per-user view.</p>
+    <p><strong>Requirements:</strong> BRD-7, BRD-8, BRD-9, BRD-10, BRD-11</p>
+
+    <h3 id="f-auth-appmanager-authentication-session">F-AUTH: AppManager authentication &amp; session<a class="anchor-link" href="#f-auth-appmanager-authentication-session">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-01 (re-scoped per owner decision)</p>
+    <p>All identity flows delegate to AppManager (API v1.4). TechieDesk registers as a child application and identifies itself with <code>X-Api-Key</code> / <code>X-Api-Secret</code> on every call. Passwords are <strong>never sent or stored in plaintext</strong>: the app fetches and caches the RSA public key (<code>GET /AuthSvc/public-key</code>) and encrypts all password fields with RSA-OAEP-SHA256. Sessions are server-side (Blazor circuit + protected session storage); access tokens auto-refresh via <code>POST /AuthSvc/refresh</code>.</p>
+    <table>
+      <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Login</td><td><code>/login</code></td><td>Email + password; forgot-password link; deep-link return</td></tr>
+        <tr><td>Register</td><td><code>/register</code></td><td>Email, name, mobile (optional), password (complexity per AppManager rules)</td></tr>
+        <tr><td>Forgot / Reset password</td><td><code>/forgot-password</code>, <code>/reset-password</code></td><td>Token-based reset via AppManager email</td></tr>
+        <tr><td>Profile</td><td><code>/profile</code></td><td>View/update profile, change password, GDPR export/delete, addresses</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Workflow (login):</strong></p>
+    <ol>
+      <li>App ensures cached RSA public key.</li>
+      <li>User submits credentials → password RSA-encrypted → <code>POST /AuthSvc/login</code> with <code>X-Api-Key</code>.</li>
+      <li>Response yields JWT, refresh token, app-scoped <code>applicationRole</code>, and <code>activeLicense</code> — all captured into the session.</li>
+      <li>On token expiry the app silently calls <code>/AuthSvc/refresh</code>; on refresh failure the user is returned to <code>/login</code> (original route preserved).</li>
+      <li>Errors map to friendly UI states: <code>INVALID_CREDENTIALS</code>, <code>ACCOUNT_LOCKED</code> (423), <code>ACCOUNT_DISABLED</code> (403), <code>DECRYPTION_FAILED</code> (stale key → refetch key and retry once).</li>
+    </ol>
+    <p><strong>Requirements:</strong> BRD-12 … BRD-22</p>
+
+    <h3 id="f-roles-roles-access-control">F-ROLES: Roles &amp; access control<a class="anchor-link" href="#f-roles-roles-access-control">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-01</p>
+    <p>The §5 role matrix, enforced <strong>server-side</strong> on every UI operation and API endpoint (never UI-hiding alone). Role comes from the app-scoped <code>applicationRole</code>; users with <code>NO_APP_ACCESS</code> get a "no access to this application" page. Workspace membership (which User sees which workspace) is stored in the local App DB and managed by Admin/Manager (AppManager has no workspace concept — it owns identity, TechieDesk owns authorization objects).</p>
+    <p><strong>Requirements:</strong> BRD-23 … BRD-26</p>
+
+    <h3 id="f-ws-workspaces-threads">F-WS: Workspaces &amp; threads<a class="anchor-link" href="#f-ws-workspaces-threads">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-02 · <strong>Depends:</strong> GAP-LIB-08</p>
+    <p>The core product concept (AnythingLLM parity): a workspace is an isolated container of documents + settings; threads are separate conversations within it. Retrieval in a workspace only sees that workspace's documents (workspace-scoped collections/filters via the library's workspace primitives).</p>
+    <table>
+      <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Workspace switcher</td><td>sidebar</td><td>List of workspaces the user can access; new-workspace button (role-gated)</td></tr>
+        <tr><td>Workspace chat</td><td><code>/workspace/{slug}</code></td><td>Threads list + active thread chat</td></tr>
+        <tr><td>Workspace settings</td><td><code>/workspace/{slug}/settings</code></td><td>Name, system prompt, LLM override, mode, retrieval tuning, members, danger zone</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Per-workspace settings:</strong> display name/slug, custom system prompt, optional LLM provider/model override, chat mode (<code>chat</code> = general + context vs <code>query</code> = context-only), retrieval settings (F-RETRIEVE), member assignment.</p>
+    <p><strong>Requirements:</strong> BRD-27 … BRD-32</p>
+
+    <h3 id="f-hist-persistent-chat-history">F-HIST: Persistent chat history<a class="anchor-link" href="#f-hist-persistent-chat-history">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-03 · <strong>Depends:</strong> GAP-LIB-07</p>
+    <p>Message persistence itself is a <strong>library</strong> capability — the DB-backed <code>IConversationMemory</code> with threads (GAP-LIB-07; SQLite by default, PostgreSQL option) — so any TechieRag consumer gets persistent conversations, not just TechieDesk. The app layer adds only the thread <em>metadata</em> UX (titles, ordering, ownership mapping to AppManager users) on top. History is per user, per workspace, per thread; survives restarts and logins; feeds the LLM context window with token-aware trimming.</p>
+    <p><strong>Workflow:</strong> open workspace → thread list (most recent first) → resume any thread with full context → export or delete.</p>
+    <p><strong>Requirements:</strong> BRD-33 … BRD-37</p>
+
+    <h3 id="f-cite-native-streaming-citations">F-CITE: Native streaming citations<a class="anchor-link" href="#f-cite-native-streaming-citations">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-05 · <strong>Depends:</strong> GAP-LIB-01 (TR-RAG-001 fix)</p>
+    <p>The flagship UX defect fix: streamed answers must carry sources natively (AnythingLLM does). Citations render as they arrive, expandable to show document name, snippet, and relevance score.</p>
+    <p><strong>Requirements:</strong> BRD-38, BRD-39</p>
+
+    <h3 id="f-doclib-document-library">F-DOCLIB: Document library<a class="anchor-link" href="#f-doclib-document-library">#</a></h3>
+    <p><strong>Personas:</strong> Admin/Manager (manage), User (view) · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-04 · <strong>Depends:</strong> GAP-LIB-08 (workspace primitives), GAP-LIB-11 (XLSX/PPTX)</p>
+    <p>Product-grade document management replacing folder-path ingestion for end users: drag-drop multi-file upload, per-workspace embed/unembed, pinning, live status, and dedupe (a file uploaded once is embedded once and reusable across workspaces — AnythingLLM's cost-saving pattern).</p>
+    <table>
+      <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Document library</td><td><code>/workspace/{slug}/documents</code> (+ instance-wide <code>/admin/documents</code>)</td><td>Upload, embed/unembed, pin, delete, metadata</td></tr>
+      </tbody>
+    </table>
+    <div class="diagram">
+      <div class="dt">
+        <button data-zout title="Zoom out">−</button>
+        <span class="zlabel">100%</span>
+        <button data-zin title="Zoom in">+</button>
+        <button data-fit title="Fit to width">Fit</button>
+        <button data-one title="Actual size">1:1</button>
+        <button data-fs title="Fullscreen">⛶</button>
+        <button data-pop title="Open in new tab">↗</button>
+      </div>
+      <pre class="mermaid">flowchart LR
+  A["Drag-drop / file picker"] --> B{"Type supported?"}
+  B -- "no" --> R["Reject with clear error"]
+  B -- "yes" --> C{"Content hash seen before?"}
+  C -- "yes" --> D["Reuse existing chunks/vectors"]
+  C -- "no" --> E["Process → chunk → embed"]
+  D --> F["Attach to workspace"]
+  E --> F
+  F --> G["Status: embedded · pinned? · chunk count"]</pre>
+    </div>
+    <p><strong>Requirements:</strong> BRD-40 … BRD-46</p>
+
+    <h3 id="f-retrieve-retrieval-tuning">F-RETRIEVE: Retrieval tuning<a class="anchor-link" href="#f-retrieve-retrieval-tuning">#</a></h3>
+    <p><strong>Personas:</strong> Admin/Manager · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-09 · <strong>Depends:</strong> GAP-LIB-02 (reranker), GAP-LIB-08 (threshold)</p>
+    <p>Per-workspace retrieval controls, AnythingLLM-parity: similarity threshold, snippet count (top-K), rerank toggle ("accuracy optimized"), and chat-vs-query mode.</p>
+    <p><strong>Requirements:</strong> BRD-47, BRD-48</p>
+
+    <h3 id="f-lic-licensing-feature-gating-core">F-LIC: Licensing &amp; feature gating (core)<a class="anchor-link" href="#f-lic-licensing-feature-gating-core">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 1 (core) · <strong>Source:</strong> new — AppManager LicenseSvc/FeatureSvc</p>
+    <p>License state arrives with login (<code>activeLicense</code>) and is re-validated via <code>POST /LicenseSvc/validate</code>. Feature access is resolved through <code>GET /FeatureSvc</code> (binary + level features per §5 matrix) and cached per session; gated features render an upgrade prompt instead of silently disappearing. If AppManager is unreachable, the app degrades gracefully: last-known-good license honored for a configurable grace period (self-hosted instances must not brick when the license server is down). Feature flags (<code>GET /FeatureSvc/flags/{code}</code>) support staged rollout of new TechieDesk features.</p>
+    <p><strong>Requirements:</strong> BRD-49 … BRD-51</p>
+
+    <h3 id="f-onboard-first-run-onboarding-wizard">F-ONBOARD: First-run onboarding wizard<a class="anchor-link" href="#f-onboard-first-run-onboarding-wizard">#</a></h3>
+    <p><strong>Personas:</strong> Admin (first run) · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-18</p>
+    <p>Zero-config first run mirroring AnythingLLM's out-of-the-box bar: on an empty instance the wizard (1) applies offline defaults — TechieRag.Embedded BGE-M3 + SqliteVec, (2) detects a local Ollama and offers it as the LLM, (3) captures AppManager connection settings (base URL, API key/secret) or lets the operator skip into <strong>offline single-user mode</strong>, (4) bootstraps the first Admin (register or login via AppManager), and (5) creates a default workspace.</p>
+    <p><strong>Requirements:</strong> BRD-52 … BRD-54</p>
+
+    <h3 id="f-deploy-docker-distribution">F-DEPLOY: Docker distribution<a class="anchor-link" href="#f-deploy-docker-distribution">#</a></h3>
+    <p><strong>Personas:</strong> operator · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-17</p>
+    <p><code>docker compose up</code> = running product: app container + Postgres/pgvector, optional Qdrant and Ollama profiles; all settings via environment variables; named volumes for DB, uploads, and the bundled ONNX model so upgrades are data-safe.</p>
+    <p><strong>Requirements:</strong> BRD-55 … BRD-57</p>
+
+    <h3 id="f-sec-security-hygiene">F-SEC: Security hygiene<a class="anchor-link" href="#f-sec-security-hygiene">#</a></h3>
+    <p><strong>Personas:</strong> owner · <strong>Phase:</strong> 1 · <strong>Source:</strong> GAP-APP-20</p>
+    <p>Pre-distribution blockers: revoke + untrack the TrBlazeUI PAT committed in <code>nuget.config</code>; all secrets (AppManager API key/secret, provider keys) load from environment/user-secrets and are never committed.</p>
+    <p><strong>Requirements:</strong> BRD-58, BRD-59</p>
+
+    <h3 id="f-connect-data-connectors">F-CONNECT: Data connectors<a class="anchor-link" href="#f-connect-data-connectors">#</a></h3>
+    <p><strong>Personas:</strong> Admin/Manager · <strong>Phase:</strong> 2 · <strong>Source:</strong> GAP-APP-06 · <strong>Depends:</strong> GAP-LIB-05/06</p>
+    <p>AnythingLLM-parity ingestion sources beyond file upload, run as background jobs with visible progress: single-URL scrape, site crawler (depth + max-links), YouTube transcripts, GitHub/GitLab repos, Confluence spaces.</p>
+    <table>
+      <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Connectors</td><td><code>/workspace/{slug}/connectors</code></td><td>Pick source type, configure, run, monitor job status</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Requirements:</strong> BRD-60 … BRD-65</p>
+
+    <h3 id="f-api-developer-rest-api">F-API: Developer REST API<a class="anchor-link" href="#f-api-developer-rest-api">#</a></h3>
+    <p><strong>Personas:</strong> developer · <strong>Phase:</strong> 3 · <strong>Source:</strong> GAP-APP-07</p>
+    <p>Key-authenticated REST API covering workspaces, documents, threads, and chat (incl. streaming/SSE), with Swagger UI at <code>/api/docs</code>. API keys are created/revoked by Admin. Usage can be metered against the AppManager <code>API_REQUESTS</code> level feature — turning the developer API into a monetizable tier (beyond AnythingLLM's story).</p>
+    <p><strong>Requirements:</strong> BRD-66 … BRD-69</p>
+
+    <h3 id="f-widget-embeddable-chat-widget">F-WIDGET: Embeddable chat widget<a class="anchor-link" href="#f-widget-embeddable-chat-widget">#</a></h3>
+    <p><strong>Personas:</strong> developer, end-customer visitors · <strong>Phase:</strong> 3 · <strong>Source:</strong> GAP-APP-08</p>
+    <p>A <code>&lt;script&gt;</code> snippet served by the instance embeds a workspace-scoped, API-key-authenticated chat bubble on any site, with configurable appearance (color, logo, welcome text). License-gated (<code>EMBED_WIDGET</code>).</p>
+    <p><strong>Requirements:</strong> BRD-70, BRD-71</p>
+
+    <h3 id="f-admin-admin-console">F-ADMIN: Admin console<a class="anchor-link" href="#f-admin-admin-console">#</a></h3>
+    <p><strong>Personas:</strong> Admin · <strong>Phase:</strong> 3 · <strong>Source:</strong> GAP-APP-16</p>
+    <p>In-product operations: user list (identity data read from AppManager; local workspace assignments editable), event log (auth events, ingestion runs, admin actions — sourced from the existing Serilog pipeline into a queryable store), chat logs across workspaces (compliance view), and instance defaults.</p>
+    <table>
+      <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Users</td><td><code>/admin/users</code></td><td>Users + roles (from AppManager), workspace assignment</td></tr>
+        <tr><td>Event log</td><td><code>/admin/events</code></td><td>Filterable event stream</td></tr>
+        <tr><td>Chat logs</td><td><code>/admin/chats</code></td><td>Cross-workspace chat inspection/export</td></tr>
+        <tr><td>Instance settings</td><td><code>/admin/settings</code></td><td>Defaults, branding entry point</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Requirements:</strong> BRD-72 … BRD-75</p>
+
+    <h3 id="f-billing-subscriptions-invoices-promos">F-BILLING: Subscriptions, invoices &amp; promos<a class="anchor-link" href="#f-billing-subscriptions-invoices-promos">#</a></h3>
+    <p><strong>Personas:</strong> User (own billing), Admin · <strong>Phase:</strong> 3 · <strong>Source:</strong> new — AppManager PaymentSvc/LicenseSvc</p>
+    <p>Self-service billing surface over AppManager: pricing page from <code>GET /LicenseSvc/types</code> (multi-currency), own licenses, subscriptions with cancel (immediate or period-end), transaction/invoice history with PDF download, and promo-code validation.</p>
+    <p><strong>Requirements:</strong> BRD-76 … BRD-79</p>
+
+    <h3 id="f-support-in-app-support-desk">F-SUPPORT: In-app support desk<a class="anchor-link" href="#f-support-in-app-support-desk">#</a></h3>
+    <p><strong>Personas:</strong> User · <strong>Phase:</strong> 3 · <strong>Source:</strong> new — AppManager IssueSvc</p>
+    <p>Users raise and track support issues without leaving the product: create issue (type/priority), list with status filters, comment thread, close. All app-scoped by AppManager.</p>
+    <p><strong>Requirements:</strong> BRD-80 … BRD-82</p>
+
+    <h3 id="f-agent-agent-experience">F-AGENT: Agent experience<a class="anchor-link" href="#f-agent-agent-experience">#</a></h3>
+    <p><strong>Personas:</strong> all (license-gated) · <strong>Phase:</strong> 4 · <strong>Source:</strong> GAP-APP-10 · <strong>Depends:</strong> GAP-LIB-12 (MCP)</p>
+    <p>Product-integrated agents, AnythingLLM-parity: invoke with <code>@agent</code> in any workspace chat; per-workspace skill toggles (RAG search, web search, web scrape, SQL query, chart generation, file operations); live execution trace (already proven in F-TOOLS); Admin-registered MCP tool servers exposing their tools to the agent loop. <strong>Boundary:</strong> the agent loop already lives in the library, and every skill is implemented as a library <code>ITool</code> (reusable by any TechieRag consumer), as is the MCP client (GAP-LIB-12); TechieDesk contributes only the <code>@agent</code> chat UX, the per-workspace toggle persistence, and the trace rendering.</p>
+    <p><strong>Requirements:</strong> BRD-83 … BRD-86</p>
+
+    <h3 id="f-speech-tts-stt-in-chat">F-SPEECH: TTS/STT in chat<a class="anchor-link" href="#f-speech-tts-stt-in-chat">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 4 · <strong>Source:</strong> GAP-APP-15 · <strong>Depends:</strong> GAP-LIB-16 (provider TTS/STT, later)</p>
+    <p>Browser-first: microphone dictation via the Web Speech API, and read-aloud playback of responses via browser speech synthesis. Provider-backed voices (Whisper/ElevenLabs-class) follow when the library abstractions land.</p>
+    <p><strong>Requirements:</strong> BRD-87, BRD-88</p>
+
+    <h3 id="f-brand-white-labeling-appearance">F-BRAND: White-labeling &amp; appearance<a class="anchor-link" href="#f-brand-white-labeling-appearance">#</a></h3>
+    <p><strong>Personas:</strong> Admin · <strong>Phase:</strong> 4 · <strong>Source:</strong> GAP-APP-13</p>
+    <p>License-gated (<code>WHITE_LABEL</code>): custom logo, application display name, login/welcome messages, footer links; light/dark theme with TrBlazeUI theming and custom accent color.</p>
+    <p><strong>Requirements:</strong> BRD-89, BRD-90</p>
+
+    <h3 id="f-i18n-localization">F-I18N: Localization<a class="anchor-link" href="#f-i18n-localization">#</a></h3>
+    <p><strong>Personas:</strong> all · <strong>Phase:</strong> 4 · <strong>Source:</strong> GAP-APP-14</p>
+    <p>Resource-based localization (.resx) of all UI strings; ship <code>en</code> + 2 additional locales initially; per-user language picker; RTL deferred.</p>
+    <p><strong>Requirements:</strong> BRD-91</p>
+
+    <h3 id="f-flows-no-code-agent-flow-builder-f-sched-scheduled-tasks">F-FLOWS: No-code agent flow builder · F-SCHED: Scheduled tasks<a class="anchor-link" href="#f-flows-no-code-agent-flow-builder-f-sched-scheduled-tasks">#</a></h3>
+    <p><strong>Personas:</strong> Admin/Manager · <strong>Phase:</strong> 5 · <strong>Source:</strong> GAP-APP-11/12</p>
+    <p>Visual multi-step agent flow builder and cron-scheduled agent/ingestion jobs — the last AnythingLLM parity items; deliberately deferred behind everything above. <strong>Boundary:</strong> the flow <em>execution engine</em> (graphs, handoffs, guardrails) is the library's orchestration framework (GAP-LIB-13); TechieDesk contributes the visual builder UI and the cron scheduling host.</p>
+    <p><strong>Requirements:</strong> BRD-92, BRD-93</p>
+
+    <h3 id="f-data-data-access-migrations-dapper-dbup">F-DATA: Data access &amp; migrations (Dapper + DbUp)<a class="anchor-link" href="#f-data-data-access-migrations-dapper-dbup">#</a></h3>
+    <p><strong>Personas:</strong> developer/operator · <strong>Phase:</strong> 1 · <strong>Source:</strong> owner decision (2026-07-17)</p>
+    <p><strong>EF Core is banned in the TechieDesk codebase.</strong> All app data access goes through <strong>Dapper</strong>: parameterized SQL for the SQLite default, stored procedures/functions (or parameterized queries) for the PostgreSQL + pgvector option — SQLite has no stored-procedure support, so the SQLite path is script-based by necessity. Schema lifecycle is owned by a dedicated <strong>TechieDeskDb console application</strong> (a new project beside the app) that applies versioned, idempotent migration scripts via <strong>DbUp</strong>, with per-provider script sets producing equivalent schemas. The console runs standalone (operator-invoked) and at container start-up (F-DEPLOY) so <code>docker compose up</code> always boots against a current schema.</p>
+    <p><strong>Workflow (migration):</strong></p>
+    <ol>
+      <li>Developer adds a versioned script pair (SQLite + PostgreSQL) to TechieDeskDb.</li>
+      <li>TechieDeskDb (console or startup hook) connects, reads the DbUp journal, applies only pending scripts in order.</li>
+      <li>Outcome logged via Serilog; non-zero exit code on failure blocks app start.</li>
+    </ol>
+    <p><strong>Requirements:</strong> BRD-102 … BRD-104</p>
+
+    <h3 id="f-lib-techierag-library-gap-closure-managed-here">F-LIB: TechieRag library gap closure (managed here)<a class="anchor-link" href="#f-lib-techierag-library-gap-closure-managed-here">#</a></h3>
+    <p><strong>Personas:</strong> developer (library consumers benefit) · <strong>Phase:</strong> 1–5 (per item) · <strong>Source:</strong> GAP-LIB-01…23, <code>docs/TechieRag-CompetitorAnalysis.md</code> §5.1</p>
+    <p><strong>Governance decision (2026-07-17):</strong> all 23 library gaps are verified unimplemented, and the TechieRag BRD carries them only as the BRD-81 umbrella — no per-item requirement existed anywhere. From now on the open library work is ledgered <strong>here</strong> (BRD-105…127) and driven by the <strong>TechieDesk Checklist</strong>, alongside the open feedback items it absorbs (TR-RAG-001 → BRD-105, TR-RAG-002 → BRD-110; TrBlazeUI TR-002/003/004 tracked as checklist feedback rows). Future library feedback lands in the TechieDesk Checklist too. The library-first boundary (§3) is unchanged — this is <em>where the work is tracked</em>, not where the code lives: every one of these items is implemented inside <code>src/TechieRag*</code> and published via the library packages.</p>
+    <p>Phase alignment: each item below is tagged with the TechieDesk phase that needs it; P-numbers are the register's priorities.</p>
+    <p><strong>Requirements:</strong> BRD-105 … BRD-127</p>
+
+    <h2 id="functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)<a class="anchor-link" href="#functional-requirements-brd-ledger">#</a></h2>
+
+    <h3 id="phase-0-existing-console-pre-existing-done">Phase 0 — existing console (pre-existing, done)<a class="anchor-link" href="#phase-0-existing-console-pre-existing-done">#</a></h3>
+    <ul>
+      <li><strong>BRD-1</strong> — User can navigate all product screens via the TrBlazeUI sidebar shell, responsive at 1280 px and 390 px <em>(F-SHELL)</em></li>
+      <li><strong>BRD-2</strong> — User can see a Home dashboard with instance status cards <em>(F-SHELL)</em></li>
+      <li><strong>BRD-3</strong> — User can chat with the configured LLM directly (no RAG) with streamed responses <em>(F-CHAT)</em></li>
+      <li><strong>BRD-4</strong> — User can chat in Auto-RAG mode and see source citations for retrieved context <em>(F-CHAT)</em></li>
+      <li><strong>BRD-5</strong> — Admin can ingest documents from a folder path with include patterns through the library's 9 processors <em>(F-INGEST)</em></li>
+      <li><strong>BRD-6</strong> — Admin can ingest pasted text as a document <em>(F-INGEST)</em></li>
+      <li><strong>BRD-7</strong> — User can exercise completion, structured-output, and chat modes in the LLM playground <em>(F-PLAYGROUND)</em></li>
+      <li><strong>BRD-8</strong> — Admin can browse/create/delete Qdrant collections, inspect points, and manage the Qdrant Docker container lifecycle <em>(F-QADMIN)</em></li>
+      <li><strong>BRD-9</strong> — Admin can configure LLM/embedding/vector-store providers at runtime and run a connection test <em>(F-SETTINGS)</em></li>
+      <li><strong>BRD-10</strong> — User can view token/cost usage on a dashboard with budget alerts and block-on-exceed <em>(F-TOKENS)</em></li>
+      <li><strong>BRD-11</strong> — User can run tool-calling demos and see the live agent execution trace <em>(F-TOOLS)</em></li>
+    </ul>
+
+    <h3 id="f-auth-appmanager-authentication-session-phase-1">F-AUTH — AppManager authentication &amp; session (Phase 1)<a class="anchor-link" href="#f-auth-appmanager-authentication-session-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-12</strong> — Visitor can register an account (email, first/last name, optional mobile, password meeting AppManager complexity rules) via AppManager <code>POST /AuthSvc/register</code> under this application <em>(F-AUTH)</em></li>
+      <li><strong>BRD-13</strong> — User can log in with email + password via AppManager <code>POST /AuthSvc/login</code> and receives an app-scoped role and active license with the session <em>(F-AUTH)</em></li>
+      <li><strong>BRD-14</strong> — System shall RSA-encrypt (OAEP-SHA256) every password field using the cached <code>GET /AuthSvc/public-key</code> key and shall never transmit or store a plaintext password; on <code>DECRYPTION_FAILED</code> it refetches the key and retries once <em>(F-AUTH)</em></li>
+      <li><strong>BRD-15</strong> — System shall silently refresh the access token via <code>POST /AuthSvc/refresh</code> before expiry; on refresh failure the user is redirected to login with their original route preserved <em>(F-AUTH)</em></li>
+      <li><strong>BRD-16</strong> — User can log out of the current session, or of all devices, via <code>POST /AuthSvc/logout</code> <em>(F-AUTH)</em></li>
+      <li><strong>BRD-17</strong> — User can request a password reset (<code>/AuthSvc/forgot-password</code>) and set a new password with the emailed token (<code>/AuthSvc/reset-password</code>) <em>(F-AUTH)</em></li>
+      <li><strong>BRD-18</strong> — Logged-in user can change their password (both current and new RSA-encrypted) via <code>POST /UserSvc/change-password</code> with field-level error feedback <em>(F-AUTH)</em></li>
+      <li><strong>BRD-19</strong> — User can view and update their profile (name, mobile, avatar URL) via UserSvc <em>(F-AUTH)</em></li>
+      <li><strong>BRD-20</strong> — System shall require authentication on every product route; unauthenticated visitors are redirected to <code>/login</code> and returned to their requested route after login <em>(F-AUTH)</em></li>
+      <li><strong>BRD-21</strong> — System shall identify itself to AppManager with <code>X-Api-Key</code>/<code>X-Api-Secret</code> headers on every call, loading the credentials from environment/secret configuration <em>(F-AUTH)</em></li>
+      <li><strong>BRD-22</strong> — User can submit GDPR data-export and account-deletion requests from their profile via UserSvc <em>(F-AUTH)</em></li>
+    </ul>
+
+    <h3 id="f-roles-roles-access-control-phase-1">F-ROLES — Roles &amp; access control (Phase 1)<a class="anchor-link" href="#f-roles-roles-access-control-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-23</strong> — System shall map the AppManager app-scoped <code>applicationRole</code> to product roles Admin / Manager / User per the §5 matrix <em>(F-ROLES)</em></li>
+      <li><strong>BRD-24</strong> — System shall restrict capabilities by role: Admin = instance settings + all workspaces + admin console; Manager = workspace/document/connector management; User = chat in assigned workspaces + own data <em>(F-ROLES)</em></li>
+      <li><strong>BRD-25</strong> — System shall enforce every role check server-side (UI hiding alone is not sufficient) <em>(F-ROLES)</em></li>
+      <li><strong>BRD-26</strong> — System shall present friendly, distinct states for <code>NO_APP_ACCESS</code>, <code>ACCOUNT_DISABLED</code>, and <code>ACCOUNT_LOCKED</code> responses from AppManager <em>(F-ROLES)</em></li>
+    </ul>
+
+    <h3 id="f-ws-workspaces-threads-phase-1">F-WS — Workspaces &amp; threads (Phase 1)<a class="anchor-link" href="#f-ws-workspaces-threads-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-27</strong> — Manager/Admin can create, rename, and delete workspaces <em>(F-WS)</em></li>
+      <li><strong>BRD-28</strong> — Manager/Admin can configure per-workspace settings: system prompt, optional LLM provider/model override, and chat-vs-query mode <em>(F-WS)</em></li>
+      <li><strong>BRD-29</strong> — Manager/Admin can assign users to workspaces; a User sees only their assigned workspaces <em>(F-WS)</em></li>
+      <li><strong>BRD-30</strong> — User can create, rename, and delete conversation threads within a workspace <em>(F-WS)</em></li>
+      <li><strong>BRD-31</strong> — System shall auto-create a default workspace on first run <em>(F-WS)</em></li>
+      <li><strong>BRD-32</strong> — System shall scope retrieval strictly to the active workspace's documents <em>(F-WS)</em></li>
+    </ul>
+
+    <h3 id="f-hist-persistent-chat-history-phase-1">F-HIST — Persistent chat history (Phase 1)<a class="anchor-link" href="#f-hist-persistent-chat-history-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-33</strong> — System shall persist every chat message (user + assistant + citations) per user/workspace/thread, surviving restarts, via the library's DB-backed conversation memory <em>(F-HIST — depends GAP-LIB-07)</em></li>
+      <li><strong>BRD-34</strong> — User can browse past threads and resume any thread with its full context after re-login <em>(F-HIST)</em></li>
+      <li><strong>BRD-35</strong> — User can export a thread as Markdown or JSON <em>(F-HIST)</em></li>
+      <li><strong>BRD-36</strong> — User can delete a thread, or their entire chat history, permanently <em>(F-HIST)</em></li>
+      <li><strong>BRD-37</strong> — System shall build the LLM context from persisted history with token-aware trimming <em>(F-HIST — depends GAP-LIB-07)</em></li>
+    </ul>
+
+    <h3 id="f-cite-native-streaming-citations-phase-1">F-CITE — Native streaming citations (Phase 1)<a class="anchor-link" href="#f-cite-native-streaming-citations-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-38</strong> — Streamed RAG answers shall display their source citations natively as the stream arrives, with no post-hoc workaround <em>(F-CITE — depends GAP-LIB-01)</em></li>
+      <li><strong>BRD-39</strong> — User can expand any citation to see document name, matching snippet, and relevance score <em>(F-CITE)</em></li>
+    </ul>
+
+    <h3 id="f-doclib-document-library-phase-1">F-DOCLIB — Document library (Phase 1)<a class="anchor-link" href="#f-doclib-document-library-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-40</strong> — Manager/Admin can upload documents by drag-drop or file picker, multiple files at once, into a workspace library <em>(F-DOCLIB)</em></li>
+      <li><strong>BRD-41</strong> — System shall accept all library-supported types (9 processors + XLSX/PPTX once GAP-LIB-11 lands) and reject unsupported files with a clear per-file error <em>(F-DOCLIB)</em></li>
+      <li><strong>BRD-42</strong> — Manager/Admin can embed/unembed a document per workspace and see live status (pending / embedding / embedded / failed) <em>(F-DOCLIB)</em></li>
+      <li><strong>BRD-43</strong> — System shall deduplicate by content: a document uploaded once is embedded once and reusable across workspaces without re-embedding (content-hash dedupe as a library ingestion capability) <em>(F-DOCLIB — depends GAP-LIB-08)</em></li>
+      <li><strong>BRD-44</strong> — Manager/Admin can pin a document so it is always included in the workspace's context (pinning is a library workspace primitive) <em>(F-DOCLIB — depends GAP-LIB-08)</em></li>
+      <li><strong>BRD-45</strong> — Manager/Admin can delete a document, which removes its vectors from every workspace using it (with confirmation) <em>(F-DOCLIB)</em></li>
+      <li><strong>BRD-46</strong> — Document library shall list per-document metadata: name, type, size, chunk count, upload date, and workspaces using it <em>(F-DOCLIB)</em></li>
+    </ul>
+
+    <h3 id="f-retrieve-retrieval-tuning-phase-1">F-RETRIEVE — Retrieval tuning (Phase 1)<a class="anchor-link" href="#f-retrieve-retrieval-tuning-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-47</strong> — Manager/Admin can tune retrieval per workspace: similarity threshold, snippet count (top-K), and rerank toggle <em>(F-RETRIEVE — depends GAP-LIB-02/08)</em></li>
+      <li><strong>BRD-48</strong> — Manager/Admin can set a workspace to chat mode (general knowledge + context) or query mode (context-only, with an honest "not in my documents" answer) <em>(F-RETRIEVE)</em></li>
+    </ul>
+
+    <h3 id="f-lic-licensing-feature-gating-core-phase-1">F-LIC — Licensing &amp; feature gating, core (Phase 1)<a class="anchor-link" href="#f-lic-licensing-feature-gating-core-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-49</strong> — System shall validate the user's license at login and periodically (<code>POST /LicenseSvc/validate</code>), showing license name/status/expiry in the UI <em>(F-LIC)</em></li>
+      <li><strong>BRD-50</strong> — System shall gate license-tier features via FeatureSvc codes (binary + level per §5 matrix); gated features render an upgrade prompt, not a silent absence <em>(F-LIC)</em></li>
+      <li><strong>BRD-51</strong> — System shall degrade gracefully when AppManager is unreachable: last-known-good license honored for a configurable grace period; clear banner shown <em>(F-LIC)</em></li>
+    </ul>
+
+    <h3 id="f-onboard-first-run-wizard-phase-1">F-ONBOARD — First-run wizard (Phase 1)<a class="anchor-link" href="#f-onboard-first-run-wizard-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-52</strong> — On an empty instance, the first-run wizard shall configure offline defaults (TechieRag.Embedded BGE-M3 + SqliteVec) with zero external services <em>(F-ONBOARD)</em></li>
+      <li><strong>BRD-53</strong> — Wizard shall detect a local Ollama instance and offer discovered models as the LLM provider <em>(F-ONBOARD)</em></li>
+      <li><strong>BRD-54</strong> — Wizard shall capture AppManager connection settings and bootstrap the first Admin (register/login) — or let the operator choose offline single-user mode explicitly <em>(F-ONBOARD)</em></li>
+    </ul>
+
+    <h3 id="f-deploy-docker-distribution-phase-1">F-DEPLOY — Docker distribution (Phase 1)<a class="anchor-link" href="#f-deploy-docker-distribution-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-55</strong> — Operator can self-host the full product with one command via Dockerfile + docker-compose (app + Postgres/pgvector; optional Qdrant and Ollama profiles) <em>(F-DEPLOY)</em></li>
+      <li><strong>BRD-56</strong> — System shall read all deployment configuration from environment variables (12-factor) <em>(F-DEPLOY)</em></li>
+      <li><strong>BRD-57</strong> — Compose shall define persistent volumes for the App DB, uploaded documents, and the bundled ONNX model so upgrades preserve data <em>(F-DEPLOY)</em></li>
+    </ul>
+
+    <h3 id="f-sec-security-hygiene-phase-1">F-SEC — Security hygiene (Phase 1)<a class="anchor-link" href="#f-sec-security-hygiene-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-58</strong> — The committed TrBlazeUI PAT shall be revoked and removed from git tracking before any public distribution <em>(F-SEC)</em></li>
+      <li><strong>BRD-59</strong> — System shall load all secrets (AppManager key/secret, provider API keys) from environment/user-secrets; no secret shall be committed to the repository <em>(F-SEC)</em></li>
+    </ul>
+
+    <h3 id="f-connect-data-connectors-phase-2">F-CONNECT — Data connectors (Phase 2)<a class="anchor-link" href="#f-connect-data-connectors-phase-2">#</a></h3>
+    <ul>
+      <li><strong>BRD-60</strong> — Manager/Admin can ingest a single URL into a workspace (scrape → clean text → embed) <em>(F-CONNECT — depends GAP-LIB-05)</em></li>
+      <li><strong>BRD-61</strong> — Manager/Admin can crawl a website with depth and max-links limits <em>(F-CONNECT — depends GAP-LIB-05)</em></li>
+      <li><strong>BRD-62</strong> — Manager/Admin can ingest YouTube video transcripts by URL <em>(F-CONNECT — depends GAP-LIB-05)</em></li>
+      <li><strong>BRD-63</strong> — Manager/Admin can connect a GitHub/GitLab repository and ingest its files (branch + glob filters) <em>(F-CONNECT — depends GAP-LIB-06)</em></li>
+      <li><strong>BRD-64</strong> — Manager/Admin can connect a Confluence space and ingest its pages <em>(F-CONNECT — depends GAP-LIB-06)</em></li>
+      <li><strong>BRD-65</strong> — Connector runs shall execute as background jobs with visible progress, per-item results, and per-item failure reasons <em>(F-CONNECT)</em></li>
+    </ul>
+
+    <h3 id="f-api-developer-rest-api-phase-3">F-API — Developer REST API (Phase 3)<a class="anchor-link" href="#f-api-developer-rest-api-phase-3">#</a></h3>
+    <ul>
+      <li><strong>BRD-66</strong> — Developer can drive workspaces, documents, threads, and chat (including streamed responses) through a REST API <em>(F-API)</em></li>
+      <li><strong>BRD-67</strong> — Admin can create, label, and revoke API keys; every API call authenticates by key <em>(F-API)</em></li>
+      <li><strong>BRD-68</strong> — Developer can explore the API via Swagger/OpenAPI UI at <code>/api/docs</code> <em>(F-API)</em></li>
+      <li><strong>BRD-69</strong> — System shall meter API usage and (when licensing is active) enforce the <code>API_REQUESTS</code> level from the user's license <em>(F-API)</em></li>
+    </ul>
+
+    <h3 id="f-widget-embeddable-chat-widget-phase-3">F-WIDGET — Embeddable chat widget (Phase 3)<a class="anchor-link" href="#f-widget-embeddable-chat-widget-phase-3">#</a></h3>
+    <ul>
+      <li><strong>BRD-70</strong> — Site owner can embed a workspace-scoped, API-key-authenticated chat widget on any website via a script snippet served by the instance <em>(F-WIDGET)</em></li>
+      <li><strong>BRD-71</strong> — Admin can configure widget appearance: color, logo, welcome message, position <em>(F-WIDGET)</em></li>
+    </ul>
+
+    <h3 id="f-admin-admin-console-phase-3">F-ADMIN — Admin console (Phase 3)<a class="anchor-link" href="#f-admin-admin-console-phase-3">#</a></h3>
+    <ul>
+      <li><strong>BRD-72</strong> — Admin can view all users of this application (identity from AppManager) and manage their workspace assignments <em>(F-ADMIN)</em></li>
+      <li><strong>BRD-73</strong> — Admin can view a filterable event log (auth events, ingestion runs, admin actions) in-product <em>(F-ADMIN)</em></li>
+      <li><strong>BRD-74</strong> — Admin can inspect and export chat logs across workspaces <em>(F-ADMIN)</em></li>
+      <li><strong>BRD-75</strong> — Admin can manage instance defaults (default LLM/embedding/vector-store, upload limits) from the admin console <em>(F-ADMIN)</em></li>
+    </ul>
+
+    <h3 id="f-billing-subscriptions-invoices-promos-phase-3">F-BILLING — Subscriptions, invoices &amp; promos (Phase 3)<a class="anchor-link" href="#f-billing-subscriptions-invoices-promos-phase-3">#</a></h3>
+    <ul>
+      <li><strong>BRD-76</strong> — User can view available license types with multi-currency pricing (<code>GET /LicenseSvc/types</code>) on a pricing page <em>(F-BILLING)</em></li>
+      <li><strong>BRD-77</strong> — User can view their subscriptions and cancel one (immediately or at period end) via PaymentSvc <em>(F-BILLING)</em></li>
+      <li><strong>BRD-78</strong> — User can view transaction and invoice history and download invoice PDFs <em>(F-BILLING)</em></li>
+      <li><strong>BRD-79</strong> — User can validate a promo code against this application before purchase <em>(F-BILLING)</em></li>
+    </ul>
+
+    <h3 id="f-support-in-app-support-desk-phase-3">F-SUPPORT — In-app support desk (Phase 3)<a class="anchor-link" href="#f-support-in-app-support-desk-phase-3">#</a></h3>
+    <ul>
+      <li><strong>BRD-80</strong> — User can create a support issue (title, description, type, priority) via IssueSvc without leaving the product <em>(F-SUPPORT)</em></li>
+      <li><strong>BRD-81</strong> — User can list their issues with status filters and read/add comments <em>(F-SUPPORT)</em></li>
+      <li><strong>BRD-82</strong> — User can close their own resolved issues <em>(F-SUPPORT)</em></li>
+    </ul>
+
+    <h3 id="f-agent-agent-experience-phase-4">F-AGENT — Agent experience (Phase 4)<a class="anchor-link" href="#f-agent-agent-experience-phase-4">#</a></h3>
+    <ul>
+      <li><strong>BRD-83</strong> — User can invoke the agent in any workspace chat with <code>@agent</code> <em>(F-AGENT)</em></li>
+      <li><strong>BRD-84</strong> — Manager/Admin can toggle agent skills per workspace: RAG search, web search, web scrape, SQL query, chart generation, file operations — each skill implemented as a reusable library tool, not app code <em>(F-AGENT — depends GAP-LIB-12/13 skill surface)</em></li>
+      <li><strong>BRD-85</strong> — Agent responses shall show a live execution trace of tool calls and results in the product chat <em>(F-AGENT)</em></li>
+      <li><strong>BRD-86</strong> — Admin can register MCP tool servers whose tools become available to the agent <em>(F-AGENT — depends GAP-LIB-12)</em></li>
+    </ul>
+
+    <h3 id="f-speech-tts-stt-phase-4">F-SPEECH — TTS/STT (Phase 4)<a class="anchor-link" href="#f-speech-tts-stt-phase-4">#</a></h3>
+    <ul>
+      <li><strong>BRD-87</strong> — User can dictate a chat message via microphone (browser speech recognition) <em>(F-SPEECH)</em></li>
+      <li><strong>BRD-88</strong> — User can play back an assistant response as speech (browser speech synthesis first; provider voices later) <em>(F-SPEECH)</em></li>
+    </ul>
+
+    <h3 id="f-brand-white-labeling-phase-4">F-BRAND — White-labeling (Phase 4)<a class="anchor-link" href="#f-brand-white-labeling-phase-4">#</a></h3>
+    <ul>
+      <li><strong>BRD-89</strong> — Admin can set custom logo, application display name, login/welcome messages, and footer links (license-gated <code>WHITE_LABEL</code>) <em>(F-BRAND)</em></li>
+      <li><strong>BRD-90</strong> — User can switch light/dark theme; Admin can set a custom accent color <em>(F-BRAND)</em></li>
+    </ul>
+
+    <h3 id="f-i18n-localization-phase-4">F-I18N — Localization (Phase 4)<a class="anchor-link" href="#f-i18n-localization-phase-4">#</a></h3>
+    <ul>
+      <li><strong>BRD-91</strong> — All UI strings shall be resource-localized; the product ships <code>en</code> plus at least 2 locales with a per-user language picker <em>(F-I18N)</em></li>
+    </ul>
+
+    <h3 id="f-flows-f-sched-phase-5">F-FLOWS / F-SCHED (Phase 5)<a class="anchor-link" href="#f-flows-f-sched-phase-5">#</a></h3>
+    <ul>
+      <li><strong>BRD-92</strong> — Manager/Admin can compose multi-step agent flows in a no-code visual builder and run them from chat; the execution engine is the library's orchestration framework <em>(F-FLOWS — depends GAP-LIB-13)</em></li>
+      <li><strong>BRD-93</strong> — Manager/Admin can schedule recurring agent or ingestion jobs (cron) with run history <em>(F-SCHED)</em></li>
+    </ul>
+
+    <h3 id="f-data-data-access-migrations-phase-1">F-DATA — Data access &amp; migrations (Phase 1)<a class="anchor-link" href="#f-data-data-access-migrations-phase-1">#</a></h3>
+    <ul>
+      <li><strong>BRD-102</strong> — All TechieDesk data access shall use Dapper with parameterized SQL (SQLite) or stored procedures/parameterized queries (PostgreSQL + pgvector); EF Core shall not be referenced by any TechieDesk project <em>(F-DATA)</em></li>
+      <li><strong>BRD-103</strong> — A TechieDeskDb console application shall apply versioned, idempotent schema migrations via DbUp (journaled, ordered, re-runnable), runnable standalone and at container start-up, exiting non-zero on failure <em>(F-DATA)</em></li>
+      <li><strong>BRD-104</strong> — Migration scripts shall be maintained per provider (SQLite and PostgreSQL) and produce equivalent schemas, verified by booting the app against each <em>(F-DATA)</em></li>
+    </ul>
+
+    <h3 id="f-lib-techierag-library-gap-closure-phases-1-5-built-in-src-techierag-tracked-here">F-LIB — TechieRag library gap closure (Phases 1–5, built in <code>src/TechieRag*</code>, tracked here)<a class="anchor-link" href="#f-lib-techierag-library-gap-closure-phases-1-5-built-in-src-techierag-tracked-here">#</a></h3>
+    <p><em>Phase 1 (unblocks the product shell):</em></p>
+    <ul>
+      <li><strong>BRD-105</strong> — Library: streaming RAG shall return source citations and honor the PromptTemplateEngine (closes TR-RAG-001) <em>(F-LIB — GAP-LIB-01, P0; unblocks BRD-38)</em></li>
+      <li><strong>BRD-106</strong> — Library: reranking stage — <code>IReranker</code> abstraction with a local ONNX cross-encoder option and at least one API reranker <em>(F-LIB — GAP-LIB-02, P0; unblocks BRD-47)</em></li>
+      <li><strong>BRD-107</strong> — Library: pluggable <code>IChunker</code> with recursive, token-based, markdown/code-aware, and sentence strategies <em>(F-LIB — GAP-LIB-03, P0)</em></li>
+      <li><strong>BRD-108</strong> — Library: persistent DB-backed conversation memory (<code>IConversationMemory</code>, SQLite/Postgres) with threads <em>(F-LIB — GAP-LIB-07, P0; unblocks BRD-33)</em></li>
+      <li><strong>BRD-109</strong> — Library: workspace/collection concept — isolated docs + settings, doc pinning, similarity threshold, query-vs-chat mode <em>(F-LIB — GAP-LIB-08, P0; unblocks BRD-27…32/43/44)</em></li>
+      <li><strong>BRD-110</strong> — Library: cost table externalized to configuration and streamed-token usage reported correctly on all providers (closes TR-RAG-002) <em>(F-LIB — GAP-LIB-19, P1)</em></li>
+      <li><strong>BRD-111</strong> — Library: unit-test coverage for processors, providers, agent loop, memory, and cost math — continuous, grows with every phase <em>(F-LIB — GAP-LIB-22, P0)</em></li>
+    </ul>
+    <p><em>Phase 2 (ingestion breadth + providers):</em></p>
+    <ul>
+      <li><strong>BRD-112</strong> — Library: web ingestion — URL scraper, site crawler (depth/maxLinks), YouTube transcripts <em>(F-LIB — GAP-LIB-05, P1; unblocks BRD-60…62)</em></li>
+      <li><strong>BRD-113</strong> — Library: <code>IDataConnector</code> framework with GitHub/GitLab and Confluence connectors <em>(F-LIB — GAP-LIB-06, P1; unblocks BRD-63/64)</em></li>
+      <li><strong>BRD-114</strong> — Library: XLSX/PPTX/CSV document processors <em>(F-LIB — GAP-LIB-11, P1; unblocks BRD-41)</em></li>
+      <li><strong>BRD-115</strong> — Library: provider expansion + model-name→provider routing (Bedrock, Groq, Mistral, Cohere, DeepSeek, xAI, OpenRouter, Together, Perplexity, …) <em>(F-LIB — GAP-LIB-04, P1)</em></li>
+      <li><strong>BRD-116</strong> — Library: additional embedding providers (Cohere, Voyage, Mistral, Gemini) <em>(F-LIB — GAP-LIB-15, P2)</em></li>
+    </ul>
+    <p><em>Phase 3 (developer platform):</em></p>
+    <ul>
+      <li><strong>BRD-117</strong> — Library: OpenTelemetry exporters (metrics + tracing) <em>(F-LIB — GAP-LIB-18, P2)</em></li>
+      <li><strong>BRD-118</strong> — Library: broaden TFMs — add net8.0 (netstandard2.0 if feasible) <em>(F-LIB — GAP-LIB-21, P2)</em></li>
+    </ul>
+    <p><em>Phase 4 (agents &amp; multimodal):</em></p>
+    <ul>
+      <li><strong>BRD-119</strong> — Library: MCP client — consume MCP tool servers in the agent loop <em>(F-LIB — GAP-LIB-12, P1; unblocks BRD-86)</em></li>
+      <li><strong>BRD-120</strong> — Library: multimodal chat input — vision first, then audio/docs-as-attachment <em>(F-LIB — GAP-LIB-09, P1)</em></li>
+      <li><strong>BRD-121</strong> — Library: audio-transcription ingestion processor (Whisper local ONNX or API) <em>(F-LIB — GAP-LIB-10, P2)</em></li>
+      <li><strong>BRD-122</strong> — Library: <code>ITextToSpeech</code> / <code>ISpeechToText</code> provider abstractions <em>(F-LIB — GAP-LIB-16, P2; extends BRD-87/88)</em></li>
+    </ul>
+    <p><em>Phase 5 (orchestration):</em></p>
+    <ul>
+      <li><strong>BRD-123</strong> — Library: agent orchestration — multi-step graphs, handoffs, guardrails, agent-as-tool <em>(F-LIB — GAP-LIB-13, P2; unblocks BRD-92)</em></li>
+      <li><strong>BRD-124</strong> — Library: prompt-caching passthrough (Anthropic/Gemini) <em>(F-LIB — GAP-LIB-17, P3)</em></li>
+    </ul>
+    <p><em>Deferred (pull forward on demand):</em></p>
+    <ul>
+      <li><strong>BRD-125</strong> — Library: additional vector stores (Chroma, Milvus, Pinecone, Weaviate or LanceDB) behind <code>IVectorStore</code> <em>(F-LIB — GAP-LIB-14, P2, deferred)</em></li>
+      <li><strong>BRD-126</strong> — Library: Microsoft.Extensions.AI interop package <em>(F-LIB — GAP-LIB-20, P3, deferred)</em></li>
+      <li><strong>BRD-127</strong> — Library: image generation / realtime audio / batch / fine-tuning / moderation / OCR endpoints <em>(F-LIB — GAP-LIB-23, P3, deferred; re-scope per demand)</em></li>
+    </ul>
+
+    <h2 id="non-functional-requirements">11. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
+    <ul>
+      <li><strong>BRD-94</strong> — Performance targets <em>(NFR)</em>:
+        <table>
+          <thead><tr><th>Metric</th><th>Target</th></tr></thead>
+          <tbody>
+            <tr><td>First streamed token after send (excluding model inference)</td><td>&lt; 2 s overhead</td></tr>
+            <tr><td>UI interaction latency (navigation, toggles)</td><td>&lt; 200 ms</td></tr>
+            <tr><td>Document upload → embedded (10-page PDF, local BGE-M3)</td><td>&lt; 60 s</td></tr>
+            <tr><td>Concurrent active chat users per instance (reference hardware)</td><td>≥ 25</td></tr>
+          </tbody>
+        </table>
+      </li>
+      <li><strong>BRD-95</strong> — Security: TLS for all AppManager/provider traffic; JWT + refresh tokens held server-side (never in browser-readable storage); every authorization check server-side; OWASP Top-10 hygiene on all inputs; API keys stored hashed <em>(NFR)</em></li>
+      <li><strong>BRD-96</strong> — Accessibility: keyboard navigability, focus states, ARIA labels, and WCAG 2.1 AA contrast on all product screens <em>(NFR)</em></li>
+      <li><strong>BRD-97</strong> — Responsiveness: every screen usable at 1280 px and 390 px with no horizontal overflow (Playwright-gated, existing standard) <em>(NFR)</em></li>
+      <li><strong>BRD-98</strong> — Browser support: current Chrome, Edge, Firefox, Safari (evergreen) <em>(NFR)</em></li>
+      <li><strong>BRD-99</strong> — Privacy/data locality: documents, chats, and vectors never leave the instance except to the configured LLM/embedding provider; no product telemetry is collected <em>(NFR)</em></li>
+      <li><strong>BRD-100</strong> — Observability: Serilog rolling-file logging under <code>logs/</code> in every executable head, wired at startup, unhandled exceptions logged (TechieFlow standing requirement; see Coding Standards §Logging) <em>(NFR)</em></li>
+      <li><strong>BRD-101</strong> — Resilience: AppManager outage does not interrupt active sessions (license grace per BRD-51); LLM-provider failures surface the library's retry/fallback behavior with user-visible status; app restart loses no persisted data <em>(NFR)</em></li>
+    </ul>
+
+    <h2 id="constraints-assumptions">12. Constraints &amp; assumptions<a class="anchor-link" href="#constraints-assumptions">#</a></h2>
+    <ul>
+      <li><strong>AppManager dependency:</strong> TechieDesk is registered as a child application in AppManager; API credentials (X-Api-Key/X-Api-Secret) are provisioned there. Integration targets <strong>API v1.4</strong> (<code>a</code>-prefixed URL parameters; DTO JSON names unchanged). Checkout/purchase UX lives on AppManager's side.</li>
+      <li><strong>Library dependency:</strong> product features requiring core capabilities depend on the corresponding F-LIB items landing first (streaming citations ← BRD-105, reranking ← BRD-106, persistent memory ← BRD-108, workspace primitives ← BRD-109, XLSX/PPTX ← BRD-114, web/connectors ← BRD-112/113, MCP ← BRD-119). The library work is scheduled inside the same phases as the app features it unblocks.</li>
+      <li><strong>Single-checklist governance:</strong> the TechieDesk Checklist is the only live work tracker for app <strong>and</strong> library items (F-LIB) <strong>and</strong> feedback (existing TR-RAG-001/002, TrBlazeUI TR-002/003/004, and all future feedback). The TechieRag BRD/checklist are frozen historical records of the shipped v1.1/v2 scope.</li>
+      <li><strong>UI system:</strong> TrBlazeUI throughout (known open issues TR-002/TR-003/TR-004 in <code>docs/TechieRag-TrBlazeUI-Feedback.md</code>; now tracked via the TechieDesk Checklist).</li>
+      <li><strong>Stack:</strong> .NET 10, Blazor Server; <strong>data access via Dapper only</strong> — parameterized SQL (SQLite) / stored procedures or queries (PostgreSQL + pgvector); schema migrations via the TechieDeskDb console (DbUp); <strong>all logging via Serilog</strong> (BRD-100); solo AI-assisted development under the TechieFlow workflow; effort model in <code>TechieRag-CompetitorAnalysis.md</code> §6. Note: SQLite has no stored-procedure support, hence the script-based SQLite path.</li>
+      <li><strong>Assumption:</strong> offline single-user mode (no AppManager configured) remains supported for evaluation installs; product features that inherently need identity (multi-user, API keys tied to users, billing, support) are unavailable in that mode.</li>
+    </ul>
+
+    <h2 id="success-metrics">13. Success metrics<a class="anchor-link" href="#success-metrics">#</a></h2>
+    <ul>
+      <li><strong>M1:</strong> Phase-1 exit — fresh <code>docker compose up</code> to first cited streamed answer in under 15 minutes by an uncoached user.</li>
+      <li><strong>M2:</strong> 100% of §10 Phase-1 requirements Verified by the TechieFlow verifier (build + Playwright + live smoke gates).</li>
+      <li><strong>M3:</strong> Zero plaintext-credential findings and zero committed secrets (BRD-58/59) at every phase handoff.</li>
+      <li><strong>M4:</strong> MVP (Phases 1–2 app scope + library Phase-1 deps) within the ~12–16-week competitor-analysis estimate.</li>
+      <li><strong>M5:</strong> First paid license activated end-to-end through AppManager (register → license → gated feature unlock) in a staging environment before Phase-3 exit.</li>
+    </ul>
+
+    <h2 id="risks">14. Risks<a class="anchor-link" href="#risks">#</a></h2>
+    <table>
+      <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>Library dependencies (GAP-LIB-01/02/07/08) slip and block Phase 1 app work</td><td>Medium</td><td>High</td><td>Sequence library Phase 1 first (per competitor analysis §6); app work on F-AUTH/F-DEPLOY/F-ONBOARD is library-independent and can proceed in parallel</td></tr>
+        <tr><td>AppManager API availability/latency couples product login to an external service</td><td>Medium</td><td>High</td><td>BRD-51 grace period + offline single-user mode; cache public key and feature matrix per session</td></tr>
+        <tr><td>AppManager v1.4 breaking-change cadence (v1.2→v1.4 already renamed params twice)</td><td>Medium</td><td>Medium</td><td>Isolate all calls in one <code>AppManagerClient</code>; contract tests against the local dev instance</td></tr>
+        <tr><td>TrBlazeUI component gaps for new surfaces (drag-drop upload, flow builder)</td><td>Medium</td><td>Medium</td><td>Known-workaround pattern (TR-002/003/004); fall back to custom components; log feedback upstream</td></tr>
+        <tr><td>Committed PAT already in git history</td><td>High (exists)</td><td>High</td><td>BRD-58: revoke first (kills the credential), then untrack; history rewrite optional afterwards</td></tr>
+        <tr><td>Competitor drift (AnythingLLM ships weekly)</td><td>High</td><td>Medium</td><td>Monthly delta scan per competitor-analysis §8; append-only BRD additions via <code>*amend-docs</code></td></tr>
+        <tr><td>Solo-developer bandwidth vs 30+ feature surface (now incl. all open library gaps)</td><td>High</td><td>Medium</td><td>Strict phase gates; each phase ends shippable; defer Phase-5/deferred F-LIB items without guilt</td></tr>
+        <tr><td>Dual SQL dialect maintenance (SQLite scripts + PostgreSQL procedures) drifts</td><td>Medium</td><td>Medium</td><td>BRD-104 equivalence check (boot against both) in the verifier gates; shared schema docs in TechieDeskDb</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="glossary">15. Glossary<a class="anchor-link" href="#glossary">#</a></h2>
+    <ul>
+      <li><strong>TechieDesk</strong> — this product (formerly TechieRagWeb sample), <code>apps/TechieDesk</code>.</li>
+      <li><strong>TechieRag</strong> — the core .NET RAG library (NuGet) powering TechieDesk.</li>
+      <li><strong>TechieRag.Embedded</strong> — offline BGE-M3 ONNX embedding package.</li>
+      <li><strong>TrBlazeUI</strong> — the Blazor component kit used for all UI.</li>
+      <li><strong>AppManager</strong> — the owner's central platform for auth, users, licensing, features, payments, and support; consumed via <code>docs/AppManager-api-usage-guide.md</code> (v1.4).</li>
+      <li><strong>Workspace / Thread</strong> — isolated document+settings container / a conversation within it.</li>
+      <li><strong>Chat vs Query mode</strong> — general knowledge + context vs context-only answering.</li>
+      <li><strong>GAP-APP-* / GAP-LIB-*</strong> — stable gap-register IDs from <code>docs/TechieRag-CompetitorAnalysis.md</code> §5.</li>
+      <li><strong>AnythingLLM / LLMTornado</strong> — application / library benchmarks from the competitor analysis.</li>
+      <li><strong>Dapper</strong> — the micro-ORM used for ALL TechieDesk data access (EF Core is banned).</li>
+      <li><strong>TechieDeskDb</strong> — the console project owning schema migrations, built on <strong>DbUp</strong> (versioned, journaled SQL script runner).</li>
+      <li><strong>F-LIB</strong> — this BRD's feature that ledgers the open TechieRag library gaps (GAP-LIB-01…23) so the TechieDesk Checklist manages them.</li>
+      <li><strong>REQ-UI-* / REQ-FN-* / REQ-RAG-* / REQ-NFR-*</strong> — checklist requirement IDs produced by <code>*split-brd</code>.</li>
+    </ul>
+
+    <hr>
+    <p>Last updated: 2026-07-17<br>Highest BRD ID: BRD-127</p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

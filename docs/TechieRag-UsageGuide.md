@@ -4,11 +4,11 @@
 
 ## Test users (canonical — use THESE for all smoke / verify / UAT)
 
-**TechieRag is a library, and the `TechieRagWeb` sample has NO authentication / user accounts** — it is a single-user, config-driven demo with no login. There are therefore no user credentials to seed. What the test plan *does* require is **provider configuration** (local services + cloud API keys), captured below. No accounts are created in day-1.
+**TechieRag is a library, and the TechieDesk app (formerly `TechieRagWeb`) has NO authentication / user accounts** — it is a single-user, config-driven demo with no login. There are therefore no user credentials to seed. What the test plan *does* require is **provider configuration** (local services + cloud API keys), captured below. No accounts are created in day-1.
 
 | # | "Account" | Secret | Role / Purpose | Created? | Notes |
 |---|-----------|--------|----------------|----------|-------|
-| 1 | (none — no auth) | — | TechieRagWeb has no login | ✅ | Single-user demo; nothing to create |
+| 1 | (none — no auth) | — | TechieDesk has no login | ✅ | Single-user demo; nothing to create |
 
 ### Provider configuration the test plan uses (supply your own — never invent keys)
 
@@ -21,13 +21,13 @@
 | Google Gemini | `GOOGLE_API_KEY` | LLM (Priority 3) | {supply at /llm-settings} |
 | Anthropic | `ANTHROPIC_API_KEY` | LLM (Priority 3) | {supply at /llm-settings} |
 | Qdrant (optional) | `http://localhost:6333` (Docker) | Qdrant vector store + admin page | local — managed via /qdrant-admin |
-| TrBlazeUI packages | GitHub PAT (`read:packages`) in `nuget.config` | Restoring/running the sample app | {required to build TechieRagWeb} |
+| TrBlazeUI packages | GitHub PAT (`read:packages`) in `nuget.config` | Restoring/running the sample app | {required to build TechieDesk} |
 
 - Provider settings are entered at runtime on `/settings` and `/llm-settings`, and persisted to `techierag-config.json`. No secrets are hardcoded; supply them at the UI.
 
 ## How to test — screen by screen / menu by menu
 
-The sample (`samples/TechieRagWeb`) exposes ten pages. Walk them in this order; each names the config to use, the steps, the expected result, and the BRD/REQ it covers. (Reference: `docs/integration-testing-guide.md`, 21 scenarios S1–S21.)
+The sample (`apps/TechieDesk`) exposes ten pages. Walk them in this order; each names the config to use, the steps, the expected result, and the BRD/REQ it covers. (Reference: `docs/integration-testing-guide.md`, 21 scenarios S1–S21.)
 
 ```mermaid
 flowchart LR
@@ -106,8 +106,8 @@ flowchart LR
 1. `git clone <repo> && cd TechieRag`
 2. `ollama serve` (then `ollama pull bge-m3`)
 3. `dotnet restore src/TechieRag/TechieRag.csproj` (libraries restore from nuget.org)
-4. `/home/srkra/.dotnet/dotnet build src/TechieRag/TechieRag.csproj` (WSL rung #2 — see build-invocation-ladder.md)
-5. (sample) ensure `nuget.config` has a GitHub PAT, then `/home/srkra/.dotnet/dotnet run --project samples/TechieRagWeb/TechieRagWeb.csproj`
+4. `dotnet build src/TechieRag/TechieRag.csproj`
+5. (app) ensure `nuget.config` has a GitHub PAT, then `dotnet run --project apps/TechieDesk/TechieDesk.csproj`
 6. Open the URL shown in the console (e.g. `http://localhost:5000`); configure `/settings` then `/llm-settings`.
 
 ## Test (automated)

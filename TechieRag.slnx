@@ -26,11 +26,13 @@
     <File Path="docs/TrBlazeUI-AI-Reference.md" />
   </Folder>
 
-  <Folder Name="/samples/">
-    <Project Path="samples/TechieRagWeb/TechieRagWeb.csproj" />
+  <Folder Name="/apps/">
+    <Project Path="apps/TechieDesk/TechieDesk.csproj" />
+    <Project Path="apps/TechieDeskDb/TechieDeskDb.csproj" />
   </Folder>
 
   <Folder Name="/tests/">
     <Project Path="tests/TechieRag.Tests/TechieRag.Tests.csproj" />
+    <Project Path="tests/TechieDesk.Tests/TechieDesk.Tests.csproj" />
   </Folder>
 </Solution>

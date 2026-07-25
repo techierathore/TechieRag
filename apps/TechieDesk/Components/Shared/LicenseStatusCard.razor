@@ -1,0 +1,111 @@
+@* REQ-FN-013/BRD-49: license status card — name / status / expiry, with honest offline and
+   cached-license (REQ-FN-015) states. Reads from ILicenseService (POST /LicenseSvc/validate). *@
+@inject ILicenseService LicenseService
+
+<Card>
+    <CardHeader>
+        <CardTitle>License</CardTitle>
+        <CardDescription>Your current TechieDesk plan and its validation status</CardDescription>
+    </CardHeader>
+    <CardContent Class="space-y-3">
+        @if (status is null)
+        {
+            <Skeleton Class="h-6 w-40 rounded" />
+            <Skeleton Class="h-16 w-full rounded" />
+        }
+        else
+        {
+            <div class="flex items-center gap-2">
+                <Badge Variant="@BadgeVariantFor(status.Availability)">
+                    @(status.LicenseName ?? "Unknown") @if (!string.IsNullOrWhiteSpace(status.Status)) { <text>· @status.Status</text> }
+                </Badge>
+                @if (status.IsFromCache)
+                {
+                    <Badge Variant="BadgeVariant.Outline">
+                        <LucideIcon aria-hidden="true" Name="wifi-off" Size="12" Class="mr-1" /> Cached
+                    </Badge>
+                }
+                @if (status.Availability == LicenseAvailability.Offline)
+                {
+                    <Badge Variant="BadgeVariant.Outline">Offline</Badge>
+                }
+            </div>
+
+            @if (status.Availability == LicenseAvailability.Cached)
+            {
+                <Alert Variant="AlertVariant.Warning">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="wifi-off" Size="16" /></Alert.Icon>
+                    <AlertTitle>Running on cached license</AlertTitle>
+                    <AlertDescription>@status.Message</AlertDescription>
+                </Alert>
+            }
+            else if (status.Availability == LicenseAvailability.GraceExpired)
+            {
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                    <AlertTitle>License verification unavailable</AlertTitle>
+                    <AlertDescription>@status.Message</AlertDescription>
+                </Alert>
+            }
+            else if (status.Availability == LicenseAvailability.Invalid)
+            {
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                    <AlertDescription>@status.Message</AlertDescription>
+                </Alert>
+            }
+            else
+            {
+                <TypographyMuted>@status.Message</TypographyMuted>
+            }
+
+            <div class="space-y-1.5 text-sm">
+                @if (status.ExpiryDate is not null)
+                {
+                    <div class="flex justify-between border-b py-1">
+                        <span class="text-muted-foreground">Expires</span>
+                        <span class="font-medium">@status.ExpiryDate.Value.ToString("yyyy-MM-dd")</span>
+                    </div>
+                }
+                @if (status.DaysRemaining is not null)
+                {
+                    <div class="flex justify-between border-b py-1">
+                        <span class="text-muted-foreground">Days remaining</span>
+                        <span class="font-medium">@status.DaysRemaining</span>
+                    </div>
+                }
+                @if (status.ValidatedAt is not null)
+                {
+                    <div class="flex justify-between border-b py-1">
+                        <span class="text-muted-foreground">Last validated</span>
+                        <span class="font-medium">@status.ValidatedAt.Value.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                    </div>
+                }
+            </div>
+
+            <Button Href="/pricing" Variant="ButtonVariant.Outline" Size="ButtonSize.Small">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="sparkles" Size="14" /></Button.Icon>
+                View plans
+            </Button>
+        }
+    </CardContent>
+</Card>
+
+@code {
+    private LicenseStatus? status;
+
+    protected override async Task OnInitializedAsync()
+    {
+        status = await LicenseService.EnsureFreshAsync();
+    }
+
+    private static BadgeVariant BadgeVariantFor(LicenseAvailability availability) => availability switch
+    {
+        LicenseAvailability.Live => BadgeVariant.Default,
+        LicenseAvailability.Cached => BadgeVariant.Secondary,
+        LicenseAvailability.Offline => BadgeVariant.Secondary,
+        LicenseAvailability.GraceExpired => BadgeVariant.Destructive,
+        LicenseAvailability.Invalid => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline
+    };
+}

@@ -1,0 +1,447 @@
+@page "/profile"
+@inject IAppManagerClient AppManager
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject ITechieDeskUserContext UserContext
+@inject SessionTokenStore TokenStore
+@inject ITokenRefresher TokenRefresher
+@inject ToastService ToastService
+@inject ILogger<Profile> Logger
+
+<PageTitle>TechieDesk — Profile</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Profile</h1>
+            <TypographyMuted>Your details as shown across this instance</TypographyMuted>
+        </div>
+        <div class="ml-auto">
+            <Button OnClick="SaveProfileAsync" Disabled="isSavingProfile || !canManage">
+                @if (isSavingProfile)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                    <span>Saving…</span>
+                }
+                else
+                {
+                    <span>Save changes</span>
+                }
+            </Button>
+        </div>
+    </div>
+
+    @if (!canManage)
+    {
+        <Alert Variant="AlertVariant.Info">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+            <AlertTitle>Offline single-user mode</AlertTitle>
+            <AlertDescription>Accounts are managed by AppManager. Profile editing, password changes, and GDPR requests are unavailable while running offline.</AlertDescription>
+        </Alert>
+    }
+
+    <div class="td-grid-2col">
+        <div class="space-y-6">
+            <!-- Personal information -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Personal information</CardTitle>
+                    <CardDescription>Your details as shown across this instance</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <div class="flex items-center gap-4">
+                        <Avatar Size="AvatarSize.Large">
+                            @if (!string.IsNullOrWhiteSpace(profileImageUrl))
+                            {
+                                <AvatarImage Source="@profileImageUrl" Alt="@DisplayName" />
+                            }
+                            <AvatarFallback>@Initials</AvatarFallback>
+                        </Avatar>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => showAvatarInput = !showAvatarInput)" Disabled="!canManage">
+                            Change avatar URL
+                        </Button>
+                    </div>
+
+                    @if (showAvatarInput)
+                    {
+                        <Field>
+                            <FieldLabel>Avatar URL</FieldLabel>
+                            <FieldContent>
+                                <Input Type="InputType.Url" @bind-Value="profileImageUrl" Placeholder="https://…/avatar.png" Disabled="!canManage" />
+                            </FieldContent>
+                        </Field>
+                    }
+
+                    <div class="td-grid-2">
+                        <Field>
+                            <FieldLabel>First name</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="firstName" Disabled="!canManage" AriaLabel="First name" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>Last name</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="lastName" Disabled="!canManage" AriaLabel="Last name" />
+                            </FieldContent>
+                        </Field>
+                    </div>
+
+                    <Field>
+                        <FieldLabel>Email</FieldLabel>
+                        <FieldContent>
+                            <Input Type="InputType.Email" Value="@email" Disabled="true" AriaLabel="Email" />
+                            <FieldDescription>Managed by AppManager</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    <Field>
+                        <FieldLabel>Mobile</FieldLabel>
+                        <FieldContent>
+                            <Input Type="InputType.Tel" @bind-Value="mobile" Placeholder="+91 98765 43210" Disabled="!canManage" />
+                        </FieldContent>
+                    </Field>
+                </CardContent>
+            </Card>
+
+            <!-- Change password -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Change password</CardTitle>
+                    <CardDescription>Choose a strong password you don't use elsewhere</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <Field IsInvalid="@(currentPasswordError is not null)">
+                        <FieldLabel>Current password</FieldLabel>
+                        <FieldContent>
+                            <Input Type="InputType.Password" @bind-Value="currentPassword" Placeholder="••••••••" Disabled="!canManage" AriaInvalid="@(currentPasswordError is not null)" />
+                            @if (currentPasswordError is not null)
+                            {
+                                <FieldError>@currentPasswordError</FieldError>
+                            }
+                        </FieldContent>
+                    </Field>
+                    <Field IsInvalid="@(newPasswordError is not null)">
+                        <FieldLabel>New password</FieldLabel>
+                        <FieldContent>
+                            <Input Type="InputType.Password" @bind-Value="newPassword" Placeholder="••••••••" Disabled="!canManage" AriaInvalid="@(newPasswordError is not null)" />
+                            @if (newPasswordError is not null)
+                            {
+                                <FieldError>@newPasswordError</FieldError>
+                            }
+                            else
+                            {
+                                <FieldDescription>Min 8 chars, 1 uppercase, 1 number, 1 special character</FieldDescription>
+                            }
+                        </FieldContent>
+                    </Field>
+                    <Field IsInvalid="@(confirmPasswordError is not null)">
+                        <FieldLabel>Confirm new password</FieldLabel>
+                        <FieldContent>
+                            <Input Type="InputType.Password" @bind-Value="confirmPassword" Placeholder="••••••••" Disabled="!canManage" AriaInvalid="@(confirmPasswordError is not null)" />
+                            @if (confirmPasswordError is not null)
+                            {
+                                <FieldError>@confirmPasswordError</FieldError>
+                            }
+                        </FieldContent>
+                    </Field>
+                    <Button Variant="ButtonVariant.Outline" OnClick="ChangePasswordAsync" Disabled="isChangingPassword || !canManage">
+                        @if (isChangingPassword)
+                        {
+                            <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                            <span>Updating…</span>
+                        }
+                        else
+                        {
+                            <span>Update password</span>
+                        }
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
+
+        <div class="space-y-6">
+            <!-- License (REQ-FN-013/BRD-49): name/status/expiry via ILicenseService, with honest
+                 offline and cached-license states. -->
+            <LicenseStatusCard />
+
+            <!-- Privacy / GDPR -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>Privacy (GDPR)</CardTitle>
+                    <CardDescription>Your data, your rules.</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-3">
+                    @if (gdprMessage is not null)
+                    {
+                        <Alert Variant="AlertVariant.Success">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="check-circle" Size="16" /></Alert.Icon>
+                            <AlertDescription>@gdprMessage</AlertDescription>
+                        </Alert>
+                    }
+
+                    <Button Variant="ButtonVariant.Outline" OnClick="RequestExportAsync" Disabled="isExporting || !canManage">
+                        @if (isExporting)
+                        {
+                            <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        }
+                        <span>Request data export</span>
+                    </Button>
+                    <TypographyMuted>You'll receive an email when your export is ready.</TypographyMuted>
+
+                    <Separator />
+
+                    <Button Variant="ButtonVariant.Destructive" OnClick="RequestDeletionAsync" Disabled="isDeleting || !canManage">
+                        @if (isDeleting)
+                        {
+                            <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        }
+                        <span>Request account deletion</span>
+                    </Button>
+                    <Field IsInvalid="@(deleteError is not null)">
+                        <FieldContent>
+                            <Input @bind-Value="deleteConfirmEmail" Placeholder="Type your email to confirm" Disabled="!canManage" AriaInvalid="@(deleteError is not null)" />
+                            @if (deleteError is not null)
+                            {
+                                <FieldError>@deleteError</FieldError>
+                            }
+                            else
+                            {
+                                <FieldDescription>Deletion completes in ~7 days per AppManager policy.</FieldDescription>
+                            }
+                        </FieldContent>
+                    </Field>
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool canManage;
+
+    private string firstName = string.Empty;
+    private string lastName = string.Empty;
+    private string email = string.Empty;
+    private string? mobile;
+    private string? profileImageUrl;
+    private bool showAvatarInput;
+
+    private string currentPassword = string.Empty;
+    private string newPassword = string.Empty;
+    private string confirmPassword = string.Empty;
+    private string? currentPasswordError;
+    private string? newPasswordError;
+    private string? confirmPasswordError;
+
+    private string deleteConfirmEmail = string.Empty;
+    private string? deleteError;
+    private string? gdprMessage;
+
+    private bool isSavingProfile;
+    private bool isChangingPassword;
+    private bool isExporting;
+    private bool isDeleting;
+
+    private string DisplayName => $"{firstName} {lastName}".Trim();
+
+    private string Initials
+    {
+        get
+        {
+            var f = firstName.Length > 0 ? firstName[0] : ' ';
+            var l = lastName.Length > 0 ? lastName[0] : ' ';
+            var initials = $"{f}{l}".Trim();
+            return string.IsNullOrEmpty(initials) ? "?" : initials.ToUpperInvariant();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        canManage = AuthMode.IsAppManagerEnabled && TokenStore.HasSession;
+
+        if (canManage)
+        {
+            await LoadProfileAsync();
+        }
+        else
+        {
+            var user = UserContext.CurrentUser;
+            var parts = user.DisplayName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            firstName = parts.Length > 0 ? parts[0] : user.DisplayName;
+            lastName = parts.Length > 1 ? parts[1] : string.Empty;
+            email = user.Email;
+        }
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            var token = TokenStore.AccessToken!;
+            var profile = await AppManager.GetProfileAsync(token);
+            firstName = profile.FirstName;
+            lastName = profile.LastName;
+            email = profile.Email;
+            mobile = profile.MobileNumber;
+            profileImageUrl = profile.ProfileImageUrl;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load profile");
+            ToastService.Error("Could not load your profile. Please try again.", "Error");
+        }
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (!canManage)
+        {
+            return;
+        }
+
+        isSavingProfile = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.UpdateProfileAsync(TokenStore.AccessToken!, new UpdateProfileRequest
+            {
+                FirstName = firstName.Trim(),
+                LastName = lastName.Trim(),
+                MobileNumber = string.IsNullOrWhiteSpace(mobile) ? null : mobile.Trim(),
+                ProfileImageUrl = string.IsNullOrWhiteSpace(profileImageUrl) ? null : profileImageUrl.Trim()
+            });
+            Logger.LogInformation("Profile updated for {Email}", email);
+            ToastService.Success("Your profile has been saved.", "Saved");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save profile");
+            ToastService.Error("Could not save your profile. Please try again.", "Error");
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        currentPasswordError = newPasswordError = confirmPasswordError = null;
+
+        if (string.IsNullOrEmpty(currentPassword))
+        {
+            currentPasswordError = "Enter your current password.";
+        }
+
+        if (!PasswordPolicy.IsValid(newPassword))
+        {
+            newPasswordError = "Min 8 chars, 1 uppercase, 1 number, 1 special character.";
+        }
+
+        if (confirmPassword != newPassword)
+        {
+            confirmPasswordError = "Passwords do not match.";
+        }
+
+        if (currentPasswordError is not null || newPasswordError is not null || confirmPasswordError is not null || !canManage)
+        {
+            return;
+        }
+
+        isChangingPassword = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.ChangePasswordAsync(TokenStore.AccessToken!, currentPassword, newPassword);
+            Logger.LogInformation("Password changed for {Email}", email);
+            currentPassword = newPassword = confirmPassword = string.Empty;
+            ToastService.Success("Your password has been updated.", "Password changed");
+        }
+        catch (AppManagerException ex)
+        {
+            Logger.LogWarning("Password change failed ({ErrorCode})", ex.ErrorCode);
+            switch (ex.Error)
+            {
+                case AppManagerError.InvalidCurrentPassword:
+                    currentPasswordError = "Your current password is incorrect.";
+                    break;
+                case AppManagerError.InvalidPassword:
+                    newPasswordError = "Password does not meet the complexity requirements.";
+                    break;
+                default:
+                    ToastService.Error("Could not change your password. Please try again.", "Error");
+                    break;
+            }
+        }
+        finally
+        {
+            isChangingPassword = false;
+        }
+    }
+
+    private async Task RequestExportAsync()
+    {
+        if (!canManage)
+        {
+            return;
+        }
+
+        isExporting = true;
+        gdprMessage = null;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.RequestDataExportAsync(TokenStore.AccessToken!);
+            Logger.LogInformation("GDPR data export requested for {Email}", email);
+            gdprMessage = "Your data export request has been submitted. You'll receive an email when it's ready.";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Data export request failed");
+            ToastService.Error("Could not submit your export request. Please try again.", "Error");
+        }
+        finally
+        {
+            isExporting = false;
+        }
+    }
+
+    private async Task RequestDeletionAsync()
+    {
+        deleteError = null;
+        gdprMessage = null;
+
+        if (!string.Equals(deleteConfirmEmail.Trim(), email, StringComparison.OrdinalIgnoreCase))
+        {
+            deleteError = "Type your account email exactly to confirm.";
+            return;
+        }
+
+        if (!canManage)
+        {
+            return;
+        }
+
+        isDeleting = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.RequestAccountDeletionAsync(TokenStore.AccessToken!, deleteConfirmEmail.Trim());
+            Logger.LogInformation("GDPR account deletion requested for {Email}", email);
+            gdprMessage = "Your account deletion request has been submitted. It completes in ~7 days.";
+            deleteConfirmEmail = string.Empty;
+        }
+        catch (AppManagerException ex)
+        {
+            Logger.LogWarning("Account deletion request failed ({ErrorCode})", ex.ErrorCode);
+            deleteError = ex.Error == AppManagerError.EmailMismatch
+                ? "The email you entered doesn't match your account."
+                : "Could not submit your deletion request. Please try again.";
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+}

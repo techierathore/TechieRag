@@ -196,4 +196,102 @@ public interface ITechieRag
     /// </summary>
     /// <returns>The IConversationMemory instance, or null if not configured.</returns>
     IConversationMemory? GetConversationMemory();
+
+    // === NEW: Streaming envelope, reranking, persistence, and workspaces ===
+
+    /// <summary>
+    /// Performs a complete RAG operation with streaming response, exposing the retrieved
+    /// sources (citations) to the caller.
+    /// </summary>
+    /// <param name="question">The user's question.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="documentFilter">Optional document ID to restrict search scope.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A stream of <see cref="RagStreamEvent"/>: first the sources, then answer
+    /// tokens, and finally a completion event with the aggregated answer.</returns>
+    /// <remarks>
+    /// <para><b>Flow:</b> Retrieval and prompt construction are identical to
+    /// <see cref="AskAsync"/> — the prompt is built via the configured IPromptTemplate.</para>
+    /// <para><b>Default implementation:</b> Provided for backward compatibility with existing
+    /// ITechieRag implementers (ADR-005 additive-only); it composes SearchAsync and
+    /// AskStreamAsync. TechieRagClient overrides it with a single-retrieval implementation.</para>
+    /// </remarks>
+    async IAsyncEnumerable<RagStreamEvent> AskStreamWithSourcesAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var sources = await SearchAsync(question, topK, documentFilter, cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(sources);
+
+        var answer = new System.Text.StringBuilder();
+        await foreach (var token in AskStreamAsync(question, topK, systemPrompt, documentFilter, options, cancellationToken).ConfigureAwait(false))
+        {
+            answer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        yield return RagStreamEvent.FromCompleted(answer.ToString());
+    }
+
+    /// <summary>
+    /// Performs a RAG-powered chat operation with streaming response, exposing the retrieved
+    /// sources (citations) to the caller.
+    /// </summary>
+    /// <param name="userMessage">The latest user message.</param>
+    /// <param name="conversationHistory">Previous messages in the conversation.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A stream of <see cref="RagStreamEvent"/>: first the sources, then answer
+    /// tokens, and finally a completion event with the aggregated answer.</returns>
+    /// <remarks>
+    /// <para><b>Default implementation:</b> Provided for backward compatibility with existing
+    /// ITechieRag implementers (ADR-005 additive-only); it composes SearchAsync and
+    /// ChatWithRagStreamAsync. TechieRagClient overrides it with a single-retrieval implementation.</para>
+    /// </remarks>
+    async IAsyncEnumerable<RagStreamEvent> ChatWithRagStreamWithSourcesAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var sources = await SearchAsync(userMessage, topK, cancellationToken: cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(sources);
+
+        var answer = new System.Text.StringBuilder();
+        await foreach (var token in ChatWithRagStreamAsync(userMessage, conversationHistory, topK, systemPrompt, options, cancellationToken).ConfigureAwait(false))
+        {
+            answer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        yield return RagStreamEvent.FromCompleted(answer.ToString());
+    }
+
+    /// <summary>
+    /// Gets the configured reranker (if any).
+    /// </summary>
+    /// <returns>The IReranker instance, or null if reranking is not configured (default).</returns>
+    IReranker? GetReranker() => null;
+
+    /// <summary>
+    /// Gets the persistent conversation store (if configured via persistence).
+    /// </summary>
+    /// <returns>The IConversationStore instance, or null if persistence is not configured (default).</returns>
+    IConversationStore? GetConversationStore() => null;
+
+    /// <summary>
+    /// Gets the workspace manager (if configured via persistence).
+    /// </summary>
+    /// <returns>The WorkspaceManager instance, or null if persistence is not configured (default).</returns>
+    Services.WorkspaceManager? GetWorkspaceManager() => null;
 }

@@ -11,7 +11,7 @@
     <Version>1.0.0</Version>
     <Authors>Techie Rathor</Authors>
     <Company>TechieRathor</Company>
-    <Description>A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. Supports multiple embedding providers (Ollama, LM Studio, OpenAI, Azure OpenAI, ONNX, HTTP) and vector stores (SQLite-vec, PostgreSQL/pgvector, Qdrant). Built-in document processors for PDF, DOCX, HTML, Markdown, JSON, TOML, and code files.</Description>
+    <Description>A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. Supports multiple embedding providers (Ollama, LM Studio, OpenAI, Azure OpenAI, ONNX, HTTP) and vector stores (SQLite-vec, PostgreSQL/pgvector, Qdrant). Built-in document processors for PDF, DOCX, XLSX, PPTX, CSV, HTML, Markdown, JSON, TOML, and code files.</Description>
     <PackageTags>RAG;AI;Embeddings;VectorStore;LLM;OpenAI;Ollama;Qdrant;pgvector;SQLite;DocumentProcessing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>

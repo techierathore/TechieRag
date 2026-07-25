@@ -90,7 +90,8 @@ public class PdfProcessor : IDocumentProcessor
             var textChunks = TextChunker.ChunkText(
                 pageText,
                 options.MaxChunkSize,
-                options.ChunkOverlap);
+                options.ChunkOverlap,
+                options.Chunker);
 
             foreach (var chunkText in textChunks)
             {

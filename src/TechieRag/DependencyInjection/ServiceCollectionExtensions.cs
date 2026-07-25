@@ -163,9 +163,31 @@ public static class ServiceCollectionExtensions
             builder.WithChunkSize(
                 config.Processing.DefaultChunkSize,
                 config.Processing.DefaultChunkOverlap);
+            builder.WithChunking(config.Processing.ChunkingStrategy);
 
             // Configure telemetry
             builder.WithTelemetry(config.EnableTelemetry);
+
+            // Configure reranking (if specified)
+            if (config.Rerank.Enabled && config.Rerank.Source is RerankSource.Cohere or RerankSource.Jina)
+            {
+                builder.WithReranker(
+                    config.Rerank.Source,
+                    config.Rerank.ApiKey ?? string.Empty,
+                    config.Rerank.Model,
+                    config.Rerank.Endpoint,
+                    config.Rerank.TopN,
+                    config.Rerank.CandidateCount);
+            }
+
+            // Configure persistence (if specified)
+            if (config.Persistence.Provider != StoreProvider.None && config.Persistence.ConnectionString is not null)
+            {
+                builder.WithPersistence(
+                    config.Persistence.Provider,
+                    config.Persistence.ConnectionString,
+                    config.Persistence.DefaultUserId);
+            }
 
             // Configure LLM (if specified)
             if (config.Llm.Source != LlmSource.None)
@@ -202,6 +224,7 @@ public static class ServiceCollectionExtensions
                     tracking.MaxCostUsd = config.UsageTracking.MaxCostUsd;
                     tracking.AlertThreshold = config.UsageTracking.AlertThreshold;
                     tracking.BlockOnExceeded = config.UsageTracking.BlockOnExceeded;
+                    tracking.Pricing = config.UsageTracking.Pricing;
                 });
             }
 

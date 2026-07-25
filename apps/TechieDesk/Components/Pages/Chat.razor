@@ -1,0 +1,409 @@
+@page "/chat"
+@using TechieRag.Abstractions
+@using TechieRag.Models
+@inject TechieDesk.Services.TechieRagManager TechieRag
+@inject ToastService ToastService
+@inject ILogger<Chat> Logger
+
+<PageTitle>RAG Chat</PageTitle>
+
+<div class="flex flex-col h-[calc(100vh-8rem)]">
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">RAG Chat</h1>
+            <TypographyMuted>Ask questions and get AI-generated answers using your documents.</TypographyMuted>
+        </div>
+        <div class="flex gap-2">
+            <Button Variant="ButtonVariant.Outline" OnClick="ClearChat">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="trash-2" Size="16" /></Button.Icon>
+                Clear Chat
+            </Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="NewConversation">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                New Conversation
+            </Button>
+        </div>
+    </div>
+
+    <!-- Config Bar -->
+    <Collapsible @bind-Open="configOpen">
+        <Card Class="mb-4">
+            <CardHeader Class="py-2 cursor-pointer">
+                <CollapsibleTrigger Class="flex items-center gap-2 w-full">
+                    <LucideIcon aria-hidden="true" Name="settings-2" Size="16" />
+                    <span class="text-sm font-medium">Chat Configuration</span>
+                    <LucideIcon aria-hidden="true" Name="@(configOpen ? "chevron-up" : "chevron-down")" Size="16" Class="ml-auto" />
+                </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+                <CardContent Class="pt-0">
+                    <div class="grid grid-cols-4 gap-4">
+                        <Field>
+                            <FieldLabel>Mode</FieldLabel>
+                            <FieldContent>
+                                <Select @bind-Value="chatMode" TValue="string">
+                                    <SelectTrigger>
+                                        <SelectValue Placeholder="Mode" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem Value="@("auto-rag")" Text="Auto-RAG" TValue="string">Auto-RAG</SelectItem>
+                                        <SelectItem Value="@("direct-llm")" Text="Direct LLM" TValue="string">Direct LLM</SelectItem>
+                                        <SelectItem Value="@("search-only")" Text="Search Only" TValue="string">Search Only</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>Top K</FieldLabel>
+                            <FieldContent>
+                                <Select @bind-Value="topKString" TValue="string">
+                                    <SelectTrigger>
+                                        <SelectValue Placeholder="Top K" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem Value="@("3")" Text="3" TValue="string">3</SelectItem>
+                                        <SelectItem Value="@("5")" Text="5" TValue="string">5</SelectItem>
+                                        <SelectItem Value="@("10")" Text="10" TValue="string">10</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>Doc Filter</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="documentFilter" Placeholder="All Documents" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>Streaming</FieldLabel>
+                            <FieldContent>
+                                <div class="flex items-center space-x-2 pt-2">
+                                    <Switch @bind-Checked="useStreaming" Id="streaming" />
+                                    <Label For="streaming">@(useStreaming ? "On" : "Off")</Label>
+                                </div>
+                            </FieldContent>
+                        </Field>
+                    </div>
+                </CardContent>
+            </CollapsibleContent>
+        </Card>
+    </Collapsible>
+
+    <!-- Chat Messages -->
+    <Card Class="flex-1 overflow-hidden">
+        <CardContent Class="h-full overflow-y-auto p-4 space-y-4">
+            @if (messages.Count == 0)
+            {
+                <div class="flex items-center justify-center h-full">
+                    <div class="text-center space-y-2">
+                        <LucideIcon aria-hidden="true" Name="message-square" Size="48" Class="mx-auto text-muted-foreground" />
+                        <TypographyMuted>Start a conversation by typing a question below.</TypographyMuted>
+                    </div>
+                </div>
+            }
+
+            @foreach (var msg in messages)
+            {
+                <div class="@(msg.Role == "user" ? "flex justify-end" : "flex justify-start")">
+                    <div class="@(msg.Role == "user" ? "bg-primary text-primary-foreground" : "bg-muted") rounded-lg px-4 py-2 max-w-[80%]">
+                        <div class="whitespace-pre-wrap text-sm">@msg.Content</div>
+
+                        @if (msg.Role == "assistant" && msg.Sources?.Count > 0)
+                        {
+                            <Collapsible Class="mt-2">
+                                <CollapsibleTrigger Class="flex items-center gap-1 text-xs opacity-70">
+                                    <LucideIcon aria-hidden="true" Name="file-text" Size="12" />
+                                    <span>Sources Used (@msg.Sources.Count)</span>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                    <div class="mt-2 space-y-1 text-xs opacity-70">
+                                        @foreach (var source in msg.Sources)
+                                        {
+                                            <div class="flex gap-2">
+                                                <Badge Variant="BadgeVariant.Outline" Class="text-xs">@source.Score.ToString("P0")</Badge>
+                                                <span>@source.DocumentName</span>
+                                            </div>
+                                        }
+                                    </div>
+                                </CollapsibleContent>
+                            </Collapsible>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (isProcessing)
+            {
+                <div class="flex justify-start">
+                    <div class="bg-muted rounded-lg px-4 py-2">
+                        @if (!string.IsNullOrEmpty(streamingContent))
+                        {
+                            <div class="whitespace-pre-wrap text-sm">@streamingContent<span class="animate-pulse">|</span></div>
+                        }
+                        else
+                        {
+                            <div class="flex items-center gap-2">
+                                <Spinner Size="SpinnerSize.Small" />
+                                <span class="text-sm text-muted-foreground">Thinking...</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <!-- Input Area -->
+    <div class="mt-4 flex gap-2" @onkeydown="HandleKeyDown">
+        <Textarea @bind-Value="userInput" Placeholder="Ask a question..." Class="flex-1 min-h-[44px] max-h-[120px]" />
+        @* REQ-NFR-005: icon-only control — the paper-plane glyph is decorative, so the button
+           needs its own text alternative (axe button-name, critical). *@
+        <Button OnClick="SendMessage" Disabled="@(isProcessing || string.IsNullOrWhiteSpace(userInput))">
+            <LucideIcon aria-hidden="true" Name="send" Size="16" />
+            <span class="sr-only">Send message</span>
+        </Button>
+    </div>
+
+    <!-- Footer Stats -->
+    <div class="mt-2 flex justify-center gap-4">
+        <TypographyMuted>Session: @totalTokens.ToString("N0") tokens</TypographyMuted>
+        <TypographyMuted>$@totalCost.ToString("F4")</TypographyMuted>
+        <TypographyMuted>@messages.Count messages</TypographyMuted>
+    </div>
+</div>
+
+@code {
+    private List<ChatDisplayMessage> messages = new();
+    private string? userInput;
+    private string? documentFilter;
+    private string chatMode = "auto-rag";
+    private string topKString = "5";
+    private bool useStreaming = true;
+    private bool isProcessing;
+    private bool configOpen;
+    private string streamingContent = "";
+    private int totalTokens;
+    private decimal totalCost;
+
+    private int topK => int.TryParse(topKString, out var k) ? k : 5;
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput) || isProcessing)
+            return;
+
+        var question = userInput!.Trim();
+        userInput = "";
+        isProcessing = true;
+        streamingContent = "";
+        StateHasChanged();
+
+        messages.Add(new ChatDisplayMessage("user", question));
+
+        try
+        {
+            if (chatMode == "search-only")
+            {
+                await HandleSearchOnly(question);
+            }
+            else if (chatMode == "direct-llm")
+            {
+                await HandleDirectLlm(question);
+            }
+            else
+            {
+                await HandleAutoRag(question);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Chat error");
+            messages.Add(new ChatDisplayMessage("assistant", $"Error: {ex.Message}"));
+        }
+        finally
+        {
+            isProcessing = false;
+            streamingContent = "";
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSearchOnly(string question)
+    {
+        var results = await TechieRag.SearchAsync(question, topK, documentFilter);
+        var content = results.Count == 0
+            ? "No results found."
+            : string.Join("\n\n", results.Select((r, i) =>
+                $"Result {i + 1} ({r.Score:P0} match)\n{r.Chunk.Text}\nSource: {r.Chunk.DocumentId}"));
+
+        var sources = results.Select(r => new SourceInfo(r.Chunk.DocumentId, r.Score)).ToList();
+        messages.Add(new ChatDisplayMessage("assistant", content) { Sources = sources });
+    }
+
+    private async Task HandleDirectLlm(string question)
+    {
+        var provider = await TechieRag.GetLlmProviderAsync();
+        if (provider is null)
+        {
+            messages.Add(new ChatDisplayMessage("assistant", "No LLM provider configured. Go to LLM Settings to configure one."));
+            return;
+        }
+
+        if (useStreaming)
+        {
+            var tracker = await TechieRag.GetTokenTrackerAsync();
+            var before = tracker.GetSessionUsage();
+
+            await foreach (var token in provider.CompleteStreamAsync(question))
+            {
+                streamingContent += token;
+                StateHasChanged();
+            }
+
+            await AccountStreamedUsage(provider, question, streamingContent, before);
+            messages.Add(new ChatDisplayMessage("assistant", streamingContent));
+        }
+        else
+        {
+            var response = await provider.CompleteAsync(question);
+            totalTokens += response.Usage.InputTokens + response.Usage.OutputTokens;
+            totalCost += response.Usage.EstimatedCostUsd;
+            messages.Add(new ChatDisplayMessage("assistant", response.Content ?? ""));
+        }
+    }
+
+    private async Task HandleAutoRag(string question)
+    {
+        if (useStreaming)
+        {
+            // Single vector search per question (REQ-UI-005 / TR-RAG-001):
+            // TechieRag.AskStreamAsync runs its OWN internal SearchAsync and discards the sources
+            // it retrieved, so calling it in addition to a SearchAsync here would issue TWO vector
+            // searches per question. Instead we retrieve ONCE (for the sources panel) and stream the
+            // answer directly from the LLM provider using those same results. Trade-off: this bypasses
+            // the library's configured PromptTemplateEngine (IPromptTemplate is not injectable), so the
+            // configured system prompt / context template are not applied. Logged as TR-RAG-001.
+            var searchResults = await TechieRag.SearchAsync(question, topK, documentFilter);
+            var sources = searchResults.Select(r => new SourceInfo(r.Chunk.DocumentId, r.Score)).ToList();
+
+            var provider = await TechieRag.GetLlmProviderAsync();
+            if (provider is null)
+            {
+                messages.Add(new ChatDisplayMessage("assistant", "No LLM provider configured. Go to LLM Settings to configure one."));
+                return;
+            }
+
+            var promptMessages = BuildRagMessages(question, searchResults);
+            var promptText = string.Join("\n", promptMessages.Select(m => m.Content));
+
+            var tracker = await TechieRag.GetTokenTrackerAsync();
+            var before = tracker.GetSessionUsage();
+
+            await foreach (var token in provider.ChatStreamAsync(promptMessages))
+            {
+                streamingContent += token;
+                StateHasChanged();
+            }
+
+            await AccountStreamedUsage(provider, promptText, streamingContent, before);
+            messages.Add(new ChatDisplayMessage("assistant", streamingContent) { Sources = sources });
+        }
+        else
+        {
+            var response = await TechieRag.AskAsync(question, topK, null, documentFilter);
+            totalTokens += response.Usage.InputTokens + response.Usage.OutputTokens;
+            totalCost += response.Usage.EstimatedCostUsd;
+
+            var sources = response.Sources.Select(s => new SourceInfo(s.Chunk.DocumentId, s.Score)).ToList();
+            messages.Add(new ChatDisplayMessage("assistant", response.Answer) { Sources = sources });
+        }
+    }
+
+    /// <summary>
+    /// Builds a single-search RAG prompt (system context + user question) from already-retrieved
+    /// results, so the answer can be streamed via the provider without a second vector search.
+    /// </summary>
+    private static List<ChatMessage> BuildRagMessages(string question, IReadOnlyList<SearchResult> searchResults)
+    {
+        var contextText = string.Join("\n\n", searchResults.Select((r, i) =>
+            $"[{i + 1}] ({r.Score:P0} match) {r.Chunk.Text}"));
+
+        var systemPrompt = string.IsNullOrEmpty(contextText)
+            ? "You are a helpful assistant. Answer the user's question."
+            : $"You are a helpful assistant. Answer the user's question using only the retrieved context below. If the answer is not contained in the context, say you don't know.\n\n--- Retrieved Context ---\n{contextText}\n--- End Context ---";
+
+        return new List<ChatMessage>
+        {
+            ChatMessage.System(systemPrompt),
+            ChatMessage.User(question)
+        };
+    }
+
+    /// <summary>
+    /// Accounts a streamed completion's tokens/cost into the session footer. Prefers the real usage
+    /// recorded into the ITokenTracker by the provider's completion event (same source as the Token
+    /// Usage dashboard); if the provider reported zero streamed usage (TR-RAG-002), falls back to the
+    /// provider's own token estimator and records that estimate so the footer moves off zero.
+    /// </summary>
+    private async Task AccountStreamedUsage(ILlmProvider provider, string promptText, string answerText, TokenUsageSummary before)
+    {
+        var tracker = await TechieRag.GetTokenTrackerAsync();
+        var after = tracker.GetSessionUsage();
+        var streamedTokens = after.TotalTokens - before.TotalTokens;
+        var streamedCost = after.TotalEstimatedCostUsd - before.TotalEstimatedCostUsd;
+
+        if (streamedTokens <= 0)
+        {
+            Logger.LogWarning("Streaming provider {Provider} reported no token usage; estimating from text (TR-RAG-002).", provider.Name);
+
+            var estimated = new TechieRag.Models.TokenUsage
+            {
+                InputTokens = provider.EstimateTokenCount(promptText),
+                OutputTokens = provider.EstimateTokenCount(answerText),
+                ModelName = provider.ModelName,
+                ProviderName = provider.Name
+            };
+            tracker.RecordUsage(estimated);
+            streamedTokens = estimated.TotalTokens;
+            streamedCost = estimated.EstimatedCostUsd;
+        }
+
+        totalTokens += (int)streamedTokens;
+        totalCost += streamedCost;
+    }
+
+    private void ClearChat()
+    {
+        messages.Clear();
+        totalTokens = 0;
+        totalCost = 0;
+    }
+
+    private void NewConversation()
+    {
+        messages.Clear();
+        streamingContent = "";
+    }
+
+    private class ChatDisplayMessage
+    {
+        public string Role { get; set; }
+        public string Content { get; set; }
+        public List<SourceInfo>? Sources { get; set; }
+
+        public ChatDisplayMessage(string role, string content)
+        {
+            Role = role;
+            Content = content;
+        }
+    }
+
+    private record SourceInfo(string DocumentName, float Score);
+}

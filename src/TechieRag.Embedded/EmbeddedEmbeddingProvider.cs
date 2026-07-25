@@ -20,7 +20,35 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 {
     private const string EmbeddedModelName = "bge-m3";
     private const int EmbeddedModelDimensions = 1024;
-    private const string HuggingFaceBaseUrl = "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx";
+    private const string DefaultModelBaseUrl = "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx";
+
+    /// <summary>
+    /// Environment variable that redirects the one-time model download to an internal mirror.
+    /// </summary>
+    /// <remarks>
+    /// REQ-NFR-008 (data locality): the only outbound call this provider ever makes is the
+    /// first-run fetch of the BGE-M3 weights — no instance data is transmitted, and once the
+    /// model is cached the provider is fully offline. Air-gapped or policy-restricted
+    /// deployments can point this at an internal artifact store instead of huggingface.co, or
+    /// pre-seed the model directory so no download occurs at all.
+    /// </remarks>
+    public const string ModelBaseUrlEnvironmentVariable = "TECHIERAG_MODEL_BASE_URL";
+
+    /// <summary>
+    /// Gets the base URL the model weights are downloaded from — the configured mirror when
+    /// <see cref="ModelBaseUrlEnvironmentVariable"/> is set, otherwise the public Hugging Face
+    /// repository.
+    /// </summary>
+    public static string ModelBaseUrl
+    {
+        get
+        {
+            var configured = Environment.GetEnvironmentVariable(ModelBaseUrlEnvironmentVariable);
+            return string.IsNullOrWhiteSpace(configured)
+                ? DefaultModelBaseUrl
+                : configured.TrimEnd('/');
+        }
+    }
 
     private static readonly SemaphoreSlim DownloadSemaphore = new(1, 1);
     private static string? cachedModelDir;
@@ -255,7 +283,7 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
                 Console.WriteLine($"[TechieRag.Embedded] Downloading {filename} ({displaySize})...");
 
-                var url = $"{HuggingFaceBaseUrl}/{filename}";
+                var url = $"{ModelBaseUrl}/{filename}";
                 await DownloadFileWithProgressAsync(url, destPath, approxBytes, cancellationToken);
 
                 service.UpdateProgress(p => p.CompletedFiles = i + 1);

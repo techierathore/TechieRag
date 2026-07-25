@@ -32,6 +32,10 @@ public class TechieRagClient : ITechieRag
     private readonly ITokenTracker tokenTracker;
     private readonly IConversationMemory? conversationMemory;
     private readonly IPromptTemplate promptTemplate;
+    private readonly IReranker? reranker;
+    private readonly IChunker chunker;
+    private readonly IConversationStore? conversationStore;
+    private readonly WorkspaceManager? workspaceManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TechieRagClient"/> class.
@@ -55,7 +59,11 @@ public class TechieRagClient : ITechieRag
         ILlmProvider? llmProvider = null,
         ITokenTracker? tokenTracker = null,
         IConversationMemory? conversationMemory = null,
-        IPromptTemplate? promptTemplate = null)
+        IPromptTemplate? promptTemplate = null,
+        IReranker? reranker = null,
+        IChunker? chunker = null,
+        IConversationStore? conversationStore = null,
+        IWorkspaceStore? workspaceStore = null)
     {
         ArgumentNullException.ThrowIfNull(vectorStore);
         ArgumentNullException.ThrowIfNull(embeddingProvider);
@@ -72,6 +80,12 @@ public class TechieRagClient : ITechieRag
         this.tokenTracker = tokenTracker ?? new TokenUsageTracker();
         this.conversationMemory = conversationMemory;
         this.promptTemplate = promptTemplate ?? new PromptTemplateEngine(config.Prompt);
+        this.reranker = reranker;
+        this.chunker = chunker ?? Processors.Chunking.RecursiveChunker.Instance;
+        this.conversationStore = conversationStore;
+        workspaceManager = workspaceStore is not null
+            ? new WorkspaceManager(this, workspaceStore, this.promptTemplate)
+            : null;
     }
 
     /// <inheritdoc/>
@@ -83,6 +97,17 @@ public class TechieRagClient : ITechieRag
     {
         logger.LogInformation("Initializing TechieRag client");
         await vectorStore.InitializeAsync(cancellationToken);
+
+        if (conversationStore is not null)
+        {
+            await conversationStore.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (workspaceManager is not null)
+        {
+            await workspaceManager.GetStore().InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         logger.LogInformation("TechieRag client initialized successfully");
     }
 
@@ -134,7 +159,8 @@ public class TechieRagClient : ITechieRag
             new DocumentProcessingOptions
             {
                 MaxChunkSize = config.Processing.DefaultChunkSize,
-                ChunkOverlap = config.Processing.DefaultChunkOverlap
+                ChunkOverlap = config.Processing.DefaultChunkOverlap,
+                Chunker = chunker
             }, cancellationToken);
 
         if (chunks.Count == 0)
@@ -199,11 +225,12 @@ public class TechieRagClient : ITechieRag
 
         var documentId = Guid.NewGuid().ToString();
 
-        // Chunk the text
+        // Chunk the text using the configured chunking strategy
         var textChunks = TextChunker.ChunkText(
             text,
             config.Processing.DefaultChunkSize,
-            config.Processing.DefaultChunkOverlap);
+            config.Processing.DefaultChunkOverlap,
+            chunker);
 
         var chunkList = new List<TextChunk>();
         var chunkIndex = 0;
@@ -341,8 +368,19 @@ public class TechieRagClient : ITechieRag
         // Embed the query
         var queryVector = await embeddingProvider.EmbedAsync(query, cancellationToken);
 
+        var useReranker = reranker is not null && config.Rerank.Enabled;
+        var fetchCount = useReranker ? Math.Max(topK, config.Rerank.CandidateCount) : topK;
+
         // Search the vector store
-        var results = await vectorStore.SearchAsync(queryVector, topK, documentFilter, cancellationToken);
+        var results = await vectorStore.SearchAsync(queryVector, fetchCount, documentFilter, cancellationToken);
+
+        if (useReranker && results.Count > 0)
+        {
+            var topN = config.Rerank.TopN > 0 ? Math.Min(config.Rerank.TopN, topK) : topK;
+            logger.LogDebug("Reranking {CandidateCount} candidates to top {TopN} with {Reranker}",
+                results.Count, topN, reranker!.Name);
+            results = await reranker.RerankAsync(query, results, topN, cancellationToken).ConfigureAwait(false);
+        }
 
         logger.LogDebug("Search returned {ResultCount} results", results.Count);
         return results;
@@ -537,6 +575,71 @@ public class TechieRagClient : ITechieRag
     }
 
     /// <inheritdoc/>
+    public async IAsyncEnumerable<RagStreamEvent> AskStreamWithSourcesAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(question);
+
+        var searchResults = await SearchAsync(question, topK, documentFilter, cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(searchResults);
+
+        var messages = promptTemplate.BuildRagPrompt(question, searchResults, systemPrompt);
+        var fullAnswer = new StringBuilder();
+
+        await foreach (var token in llmProvider!.ChatStreamAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            fullAnswer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        yield return RagStreamEvent.FromCompleted(fullAnswer.ToString());
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<RagStreamEvent> ChatWithRagStreamWithSourcesAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(userMessage);
+
+        if (conversationHistory is null && conversationMemory is not null)
+        {
+            conversationHistory = await conversationMemory.GetHistoryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var searchResults = await SearchAsync(userMessage, topK, cancellationToken: cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(searchResults);
+
+        var messages = promptTemplate.BuildRagChatPrompt(userMessage, searchResults, conversationHistory, systemPrompt);
+        var fullAnswer = new StringBuilder();
+
+        await foreach (var token in llmProvider!.ChatStreamAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            fullAnswer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        if (conversationMemory is not null)
+        {
+            await conversationMemory.AddMessageAsync(ChatMessage.User(userMessage), cancellationToken).ConfigureAwait(false);
+            await conversationMemory.AddMessageAsync(ChatMessage.Assistant(fullAnswer.ToString()), cancellationToken).ConfigureAwait(false);
+        }
+
+        yield return RagStreamEvent.FromCompleted(fullAnswer.ToString());
+    }
+
+    /// <inheritdoc/>
     public ILlmProvider? GetLlmProvider() => llmProvider;
 
     /// <inheritdoc/>
@@ -544,6 +647,15 @@ public class TechieRagClient : ITechieRag
 
     /// <inheritdoc/>
     public IConversationMemory? GetConversationMemory() => conversationMemory;
+
+    /// <inheritdoc/>
+    public IReranker? GetReranker() => reranker;
+
+    /// <inheritdoc/>
+    public IConversationStore? GetConversationStore() => conversationStore;
+
+    /// <inheritdoc/>
+    public WorkspaceManager? GetWorkspaceManager() => workspaceManager;
 
     private void EnsureLlmConfigured()
     {

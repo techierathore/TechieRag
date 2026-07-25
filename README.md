@@ -312,7 +312,7 @@ Use cases:
 
 ## Sample Application
 
-The repository includes a Blazor Server sample application (`TechieRagWeb`) demonstrating:
+The repository includes a Blazor Server application (**TechieDesk**, formerly `TechieRagWeb`) demonstrating:
 - **File Ingestion UI** - Upload and process documents from local directories
 - **Text Ingestion UI** - Paste and ingest raw text content directly
 - Search interface
@@ -321,7 +321,7 @@ The repository includes a Blazor Server sample application (`TechieRagWeb`) demo
 
 Run it with:
 ```bash
-cd samples/TechieRagWeb
+cd apps/TechieDesk
 dotnet run
 ```
 

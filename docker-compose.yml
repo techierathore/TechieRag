@@ -1,0 +1,93 @@
+# TechieDesk self-host stack (REQ-FN-017/018/019).
+#
+# One-command boot:   docker compose up -d --build
+#   → builds the app image, starts Postgres/pgvector, waits for it to be healthy,
+#     then starts the app which runs its DbUp migration on start (Wave 0 blocks the
+#     app from serving if the migration fails) and comes up in zero-config OFFLINE
+#     mode (Embedded BGE-M3 + SqliteVec) — chat-able with no external AI services.
+#
+# Optional profiles (opt-in extra services):
+#   docker compose --profile qdrant up -d      # add a Qdrant vector database
+#   docker compose --profile ollama up -d      # add a local Ollama LLM/embeddings server
+#
+# All configuration is via environment variables (12-factor, REQ-FN-018). Copy
+# .env.example to .env and adjust; ASP.NET Core maps nested keys with a double
+# underscore, e.g. AppDb__Provider, AppManager__BaseUrl.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: techiedesk:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: "8080"
+      # REQ-NFR-008 (privacy / data locality): no framework telemetry leaves the instance.
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+      # App-owned schema DB (DbUp-migrated on start) → Postgres/pgvector service.
+      AppDb__Provider: Postgres
+      AppDb__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB:-techiedesk};Username=${POSTGRES_USER:-techiedesk};Password=${POSTGRES_PASSWORD:-techiedesk}"
+      # Auth mode: empty BaseUrl = offline single-user (built-in Admin, no login).
+      # Set these to run against AppManager (provide secrets here, never in git).
+      AppManager__BaseUrl: ${AppManager__BaseUrl:-}
+      AppManager__ApiKey: ${AppManager__ApiKey:-}
+      AppManager__ApiSecret: ${AppManager__ApiSecret:-}
+      AppManager__ApplicationId: ${AppManager__ApplicationId:-}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      # Upgrade-safe state (REQ-FN-019): survive container recreation.
+      - techiedesk-data:/app/data       # App DB (when Sqlite) + RAG persistence/vector store
+      - techiedesk-uploads:/app/uploads # uploaded documents
+      - techiedesk-models:/app/models   # embedded BGE-M3 ONNX model (~2.3GB) — download once
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-techiedesk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-techiedesk}
+      POSTGRES_DB: ${POSTGRES_DB:-techiedesk}
+    volumes:
+      - techiedesk-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-techiedesk} -d ${POSTGRES_DB:-techiedesk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Opt-in: Qdrant vector database (enable with --profile qdrant).
+  qdrant:
+    image: qdrant/qdrant:latest
+    profiles: ["qdrant"]
+    ports:
+      - "${QDRANT_HTTP_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
+    volumes:
+      - techiedesk-qdrant:/qdrant/storage
+    restart: unless-stopped
+
+  # Opt-in: local Ollama server (enable with --profile ollama). The first-run wizard
+  # probes http://localhost:11434/api/tags to offer discovered models (REQ-FN-016).
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - techiedesk-ollama:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  techiedesk-data:
+  techiedesk-uploads:
+  techiedesk-models:
+  techiedesk-pgdata:
+  techiedesk-qdrant:
+  techiedesk-ollama:

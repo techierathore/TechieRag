@@ -1,9 +1,9 @@
 # TrBlazeUI Feedback — surfaced during TechieRag
 
 ## Summary (filled by /flow-master on consolidation)
-- 0 blockers · 0 major · 2 open minor (TR-003 SidebarInset min-width; TR-004 DataTable scroll wrapper — both worked around app-side; TR-001 resolved) · 1 nice-to-have (TR-002 css 404)
-- **Open for the TrBlazeUI team: TR-003, TR-004** (both minor, app has workarounds; TR-004 is the higher-value fix — DataTable should self-contain its own scroll wrapper, and the shipped Tailwind build should not purge layout utilities used only in consumer `.razor`).
-- Last consolidated: 2026-07-02 (handoff — TR-004 corrected: the `overflow-x-auto` class is purged/inert, real fix is inline style, see TR-004)
+- 0 blockers · 0 major · 2 open minor (TR-003 SidebarInset min-width; TR-004 DataTable scroll wrapper — both worked around app-side; TR-001 resolved) · 3 nice-to-have (TR-002 css 404; TR-005 no Stepper/Wizard component; TR-006 no Chat/message-thread component)
+- **Open for the TrBlazeUI team: TR-003, TR-004** (both minor, app has workarounds; TR-004 is the higher-value fix — DataTable should self-contain its own scroll wrapper, and the shipped Tailwind build should not purge layout utilities used only in consumer `.razor`). Component requests: TR-005, TR-006.
+- Last consolidated: 2026-07-17 (TechieDesk mockups pass added TR-005/TR-006 component-gap requests; earlier same day: handoff after REQ-UI-014 TechieDesk rename — no new issues; the pre-existing TR-002 `{Assembly}.styles.css` 404 now presents as `TechieDesk.styles.css`, same behavior. Prior: 2026-07-02 — TR-004 corrected: the `overflow-x-auto` class is purged/inert, real fix is inline style, see TR-004)
 
 ## Issues
 
@@ -49,3 +49,17 @@
 - **⚠ CORRECTION 2026-07-02 (flow-master `*build-phase`, REQ-UI-011):** the `overflow-x-auto` wrapper class above is **INERT in this app** — the `.overflow-x-auto` Tailwind utility is **purged from the shipped `_content/TrBlazeUI.Components/trblazeui.css`** (it appears only in the sample's `.razor` markup, which TrBlazeUI's own Tailwind build does not scan), so the wrapper computes `overflow-x: visible` and never clips. Proven on `/qdrant-admin` with a **running** Qdrant container: the 6-column containers `DataTable` (long image name `docker.io/qdrant/qdrant:v1.15.5`) reaches ~488px min-content, escapes its 374px wrapper, and drives `document.scrollWidth=496` at a 390px viewport (the Stop/connect buttons sit off-canvas). Earlier pages "passed" only because their tables were narrow enough to fit 374px without needing the (non-functional) scroll. **Additional trap:** an app-owned `base.css` rule reviving `.overflow-x-auto` did NOT reach the browser either — `MapStaticAssets` served a **0-byte `base.css` to any client sending `Accept-Encoding: br, gzip`** (stale/empty precompressed companion after editing the source `wwwroot/styles/base.css`), so CSS-file fixes are unreliable mid-session.
 - **Real fix applied (app-side, 2026-07-02):** put the containment **inline on the wrapper divs** in `QdrantAdmin.razor` — `style="overflow-x:auto;max-width:100%"` (rendered into the Blazor HTML, immune to Tailwind purge and the static-asset compression pipeline). Verified live: `document.scrollWidth` 496→**390** at 390px, wrapper computed `overflow-x: auto`, the wide table now scrolls **inside** its local container; desktop 1280 no regression (`tests/verify/req-ui-011-mobile-fix.spec.ts`, both cases pass).
 - **Two suggested fixes for the library team:** (1) ship the `relative w-full overflow-auto` wrapper **inside** `DataTable` (self-contained — consumers shouldn't need any wrapper class); (2) ensure TrBlazeUI's Tailwind build safelists/scans consumer markup, or documents that layout utilities like `overflow-x-auto` used only in consumer `.razor` are purged from the shipped bundle and must be supplied by the app.
+
+### TR-005 — No Stepper/Wizard component (nice-to-have, found 2026-07-17 during TechieDesk mockups)
+
+- **Context:** TechieDesk's first-run onboarding wizard (`/setup`, `docs/mockups/setup-wizard.html`) needs a multi-step flow with step states (done/current/pending), a progress indication, and back/continue navigation.
+- **Gap:** the catalog has no Stepper/Wizard control. The mockup composes `Progress` + a custom step-label row + `Card` — replicable, but every consumer app will hand-roll the same thing.
+- **Suggested addition:** a `Stepper` component (horizontal step indicators with done/current/pending states, optional content slots per step, Back/Next wiring) in the shadcn idiom.
+- **Impact:** none on the build (composition works); design-system consistency only.
+
+### TR-006 — No Chat/message-thread component (nice-to-have, found 2026-07-17 during TechieDesk mockups)
+
+- **Context:** TechieDesk's core screen is a workspace chat (`docs/mockups/workspace-chat.html`): scrollable message list (user/assistant alignment), markdown body, citation chips, expandable citation panels, a tool-execution trace block, and a composer (textarea + mode select + mic/send).
+- **Gap:** no chat-oriented components exist. The mockup composes `ScrollArea` + styled blocks + `Badge` + `Textarea` + `Button`. Workable, but chat UIs are now a mainstream Blazor need (every LLM app).
+- **Suggested addition:** a `ChatThread`/`ChatMessage`/`ChatComposer` family (message alignment variants, streaming-cursor state, attachment/citation chip slot, composer with send-on-Enter + Shift+Enter newline).
+- **Impact:** none on the build (composition works); would materially reduce boilerplate for TechieDesk and any TechieRag consumer.

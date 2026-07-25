@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TechieDesk</RootNamespace>
+    <AssemblyName>TechieDesk</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Ensure all dependencies are copied to output -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TechieRag\TechieRag.csproj" />
+    <ProjectReference Include="..\..\src\TechieRag.Embedded\TechieRag.Embedded.csproj" />
+    <!-- REQ-FN-030: the app runs the DbUp migrator at startup and blocks serving on failure. -->
+    <ProjectReference Include="..\TechieDeskDb\TechieDeskDb.csproj" />
+  </ItemGroup>
+
+  <!-- Direct references to ensure all required DLLs are copied -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.27.0" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.35.1" />
+    <!-- Qdrant Management -->
+    <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+    <PackageReference Include="Qdrant.Client" Version="1.18.1" />
+    <!-- TrBlazeUI Component Library -->
+    <PackageReference Include="TrBlazeUI.Components" Version="1.0.7" />
+    <PackageReference Include="TrBlazeUI.Icons.Lucide" Version="1.0.7" />
+    <!--
+      REQ-NFR-004 / NU1902: TrBlazeUI.Components 1.0.7 pulls HtmlSanitizer 9.0.892, which pins
+      AngleSharp [0.17.1]. AngleSharp < 1.5.0 carries the moderate mXSS advisory
+      GHSA-pgww-w46g-26qg (annotation-xml HTML integration-point bypass). No stable HtmlSanitizer
+      release has moved off AngleSharp 0.17.x yet, so we pin the 9.1 line directly — it is the
+      first HtmlSanitizer to depend on AngleSharp 1.5.1 (>= the 1.5.0 patched version).
+      Revisit and drop this pin once HtmlSanitizer ships a stable 9.1.x.
+    -->
+    <PackageReference Include="HtmlSanitizer" Version="9.1.949-beta" />
+    <!-- Serilog: structured console + rolling-file logging for the demo (logs/) -->
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <!-- App data access (REQ-FN-029/BRD-102): Dapper + provider ADO.NET drivers. EF Core is banned in TechieDesk. -->
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageReference Include="Npgsql" Version="10.0.1" />
+  </ItemGroup>
+
+  <!-- Copy ONNX Runtime native DLLs to output root for reliable loading -->
+  <Target Name="CopyOnnxNativeDlls" AfterTargets="Build">
+    <ItemGroup>
+      <OnnxNativeDlls Include="$(OutputPath)runtimes\win-x64\native\onnxruntime*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(OnnxNativeDlls)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

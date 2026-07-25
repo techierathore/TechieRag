@@ -85,7 +85,13 @@ public class QdrantStore : IVectorStore
         this.initialized = false;
 
         var uri = new Uri(endpoint);
-        this.client = new QdrantClient(uri.Host, uri.Port, https: false, apiKey: apiKey);
+
+        // REQ-NFR-004: honour the endpoint's scheme instead of forcing cleartext. An
+        // https:// endpoint now negotiates TLS, so a remote Qdrant's API key is no longer
+        // transmitted in the clear. http:// endpoints (the local-container default) are
+        // unchanged.
+        this.client = new QdrantClient(
+            uri.Host, uri.Port, https: uri.Scheme == Uri.UriSchemeHttps, apiKey: apiKey);
     }
 
     /// <summary>

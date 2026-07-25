@@ -1,0 +1,90 @@
+@page "/pricing"
+@inject ILicenseService LicenseService
+
+<PageTitle>TechieDesk — Pricing</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Plans &amp; pricing</h1>
+        <TypographyMuted>Upgrade to unlock connectors, agents, the embed widget, and more.</TypographyMuted>
+    </div>
+
+    @if (currentPlan is not null)
+    {
+        <Alert Variant="AlertVariant.Info">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+            <AlertDescription>Your current plan: <strong>@currentPlan</strong>.</AlertDescription>
+        </Alert>
+    }
+
+    <div class="grid gap-4 md:grid-cols-3">
+        @foreach (var tier in Tiers)
+        {
+            <Card Class="@(IsCurrent(tier) ? "border-2 border-primary" : null)">
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <CardTitle>@tier.Name</CardTitle>
+                        @if (IsCurrent(tier))
+                        {
+                            <Badge Variant="BadgeVariant.Default">Current plan</Badge>
+                        }
+                        else if (tier.Popular)
+                        {
+                            <Badge Variant="BadgeVariant.Secondary">Most popular</Badge>
+                        }
+                    </div>
+                    <div class="mt-1 text-2xl font-bold tracking-tight">
+                        @tier.Price <span class="text-sm font-normal text-muted-foreground">@tier.PriceSuffix</span>
+                    </div>
+                    <CardDescription>@tier.Tagline</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-2">
+                    @foreach (var feature in tier.Features)
+                    {
+                        <div class="flex items-center gap-2 text-sm">
+                            <LucideIcon aria-hidden="true" Name="check" Size="15" Class="text-primary" />
+                            <span>@feature</span>
+                        </div>
+                    }
+                </CardContent>
+                <CardFooter>
+                    <Button Href="/profile" Variant="@(IsCurrent(tier) ? ButtonVariant.Outline : ButtonVariant.Default)" Class="w-full" Disabled="@IsCurrent(tier)">
+                        @(IsCurrent(tier) ? "Your plan" : tier.Cta)
+                    </Button>
+                </CardFooter>
+            </Card>
+        }
+    </div>
+
+    <TypographyMuted>Billing, invoices, and license activation are managed by AppManager.</TypographyMuted>
+</div>
+
+@code {
+    private string? currentPlan;
+
+    private sealed record Tier(string Name, string Price, string PriceSuffix, string Tagline, bool Popular, string Cta, string[] Features);
+
+    private static readonly Tier[] Tiers =
+    {
+        new("Free", "$0", "forever", "For local single-user, offline RAG.", false, "Current default",
+            new[] { "2 workspaces", "1 seat", "Offline RAG (BGE-M3 + SqliteVec)" }),
+        new("Professional", "$99.99", "/yr", "For teams that need connectors and agents.", true, "Upgrade",
+            new[] { "10 workspaces", "5 seats", "10k API requests/mo", "Embed widget", "Agents", "Connectors" }),
+        new("Enterprise", "Custom", "", "For scale, white-labelling, and unlimited seats.", false, "Contact sales",
+            new[] { "Unlimited workspaces & seats", "Unlimited API", "Everything in Pro", "White-label" })
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var status = await LicenseService.EnsureFreshAsync();
+        currentPlan = status.Availability switch
+        {
+            LicenseAvailability.Offline => "Free (offline)",
+            _ => status.LicenseName
+        };
+    }
+
+    private bool IsCurrent(Tier tier) =>
+        !string.IsNullOrWhiteSpace(currentPlan)
+        && currentPlan.StartsWith(tier.Name, StringComparison.OrdinalIgnoreCase);
+}

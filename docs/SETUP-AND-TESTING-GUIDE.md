@@ -59,7 +59,7 @@ dotnet build
 
 ```powershell
 # Run TechieRagWeb
-dotnet run --project samples/TechieRagWeb/TechieRagWeb.csproj
+dotnet run --project apps/TechieDesk/TechieDesk.csproj
 
 # Open browser to: https://localhost:5001 or http://localhost:5000
 ```
@@ -269,7 +269,7 @@ ollama serve
 
 ```powershell
 cd C:\3AIGenCode\TechieRag
-dotnet run --project samples/TechieRagWeb/TechieRagWeb.csproj
+dotnet run --project apps/TechieDesk/TechieDesk.csproj
 ```
 
 ### Step 3: Open in Browser

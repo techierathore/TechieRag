@@ -1,0 +1,52 @@
+@* REQ-FN-014/BRD-50: the upgrade prompt shown in place of a gated feature. Links to /pricing. *@
+
+<div class="rounded-lg border border-dashed bg-muted/40 p-5 text-center @Class">
+    <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <LucideIcon aria-hidden="true" Name="lock" Size="18" />
+    </div>
+    <TypographyH4>@Title</TypographyH4>
+    <p class="mt-1 text-sm text-muted-foreground">@Description</p>
+    @if (!string.IsNullOrWhiteSpace(RequiredLicense))
+    {
+        <div class="mt-3">
+            <Badge Variant="BadgeVariant.Secondary">Requires @RequiredLicense</Badge>
+        </div>
+    }
+    <div class="mt-4">
+        <Button Href="/pricing" Variant="ButtonVariant.Default">
+            <Button.Icon><LucideIcon aria-hidden="true" Name="sparkles" Size="16" /></Button.Icon>
+            View plans
+        </Button>
+    </div>
+</div>
+
+@code {
+    /// <summary>The gated feature code (used to build a default title/description).</summary>
+    [Parameter] public string? Feature { get; set; }
+
+    /// <summary>The license tier that unlocks the feature (shown as a badge).</summary>
+    [Parameter] public string? RequiredLicense { get; set; }
+
+    /// <summary>An explicit reason/description; falls back to a generated one.</summary>
+    [Parameter] public string? Reason { get; set; }
+
+    /// <summary>Extra CSS classes for the wrapper.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private string FeatureLabel => string.IsNullOrWhiteSpace(Feature)
+        ? "This feature"
+        : Humanize(Feature!);
+
+    private string Title => $"{FeatureLabel} is a premium feature";
+
+    private string Description => string.IsNullOrWhiteSpace(Reason)
+        ? $"Upgrade your plan to unlock {FeatureLabel.ToLowerInvariant()}."
+        : Reason!;
+
+    private static string Humanize(string code)
+    {
+        var words = code.Replace('_', ' ').ToLowerInvariant()
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w => char.ToUpperInvariant(w[0]) + w[1..]));
+    }
+}

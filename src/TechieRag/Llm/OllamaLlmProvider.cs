@@ -67,6 +67,22 @@ public class OllamaLlmProvider : ILlmProvider
         };
     }
 
+    /// <summary>
+    /// Creates an Ollama provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Model name to use.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal OllamaLlmProvider(HttpClient httpClient, string model, ILogger<OllamaLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        endpoint = httpClient.BaseAddress?.ToString().TrimEnd('/') ?? "http://localhost:11434";
+        ModelName = model;
+        this.logger = logger ?? NullLogger<OllamaLlmProvider>.Instance;
+    }
+
     /// <inheritdoc/>
     public async Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -150,6 +166,7 @@ public class OllamaLlmProvider : ILlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        var outputText = new StringBuilder();
 
         while (!reader.EndOfStream)
         {
@@ -168,11 +185,20 @@ public class OllamaLlmProvider : ILlmProvider
 
             if (!string.IsNullOrEmpty(chunk.Message?.Content))
             {
+                outputText.Append(chunk.Message.Content);
                 yield return chunk.Message.Content;
             }
         }
 
         sw.Stop();
+
+        // Fallback: estimate when the server sent no eval counts
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
         RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
@@ -223,7 +249,7 @@ public class OllamaLlmProvider : ILlmProvider
 
         var request = new Dictionary<string, object>
         {
-            ["model"] = ModelName,
+            ["model"] = options?.Model ?? ModelName,
             ["messages"] = ollamaMessages,
             ["stream"] = stream
         };

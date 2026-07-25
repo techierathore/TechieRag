@@ -57,7 +57,7 @@ ollama pull bge-m3              # Pull embedding model (if not already pulled)
 dotnet build
 
 # Step 5: Run TechieRagWeb
-cd samples/TechieRagWeb
+cd apps/TechieDesk
 dotnet run
 
 # Step 6: Open browser

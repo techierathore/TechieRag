@@ -1,0 +1,324 @@
+@page "/text-ingestion"
+@using TechieRag.Models
+@using TechieRag.Embedded
+@implements IDisposable
+@inject ITechieRag Rag
+@inject ToastService ToastService
+@inject ILogger<TextIngestion> Logger
+
+<PageTitle>Text Ingestion - TechieRag</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Text Ingestion</h1>
+        <TypographyMuted>Ingest raw text content directly into the vector database.</TypographyMuted>
+    </div>
+
+    <!-- Model Download Progress -->
+    @if (isDownloadingModel)
+    {
+        <Alert Variant="AlertVariant.Warning">
+            <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
+            <AlertTitle>Downloading BGE-M3 Model</AlertTitle>
+            <AlertDescription>
+                @downloadProgress?.StatusMessage
+                <Progress Value="@(downloadProgress?.CurrentFileProgressPercent ?? 0)" Class="mt-2" />
+                <div class="flex justify-between text-xs mt-1">
+                    <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
+                    <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
+                </div>
+            </AlertDescription>
+        </Alert>
+    }
+
+    <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Input Form -->
+        <div class="lg:col-span-2 space-y-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Text Content</CardTitle>
+                    <CardDescription>Enter or paste the text content to ingest.</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <Field>
+                        <FieldLabel>Document Name</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="documentName" Placeholder="My Document" Required="true" />
+                            <FieldDescription>A friendly name for this document.</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    <Field>
+                        <FieldLabel>Text Content</FieldLabel>
+                        <FieldContent>
+                            <Textarea @bind-Value="textContent" Placeholder="Paste your text content here..." Class="min-h-[200px]" />
+                            <div class="flex gap-4 mt-1">
+                                <TypographyMuted>@textContent.Length.ToString("N0") characters</TypographyMuted>
+                                <TypographyMuted>@textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length words</TypographyMuted>
+                            </div>
+                        </FieldContent>
+                    </Field>
+
+                    <Field>
+                        <FieldLabel>Source Info (Optional)</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="sourceInfo" Placeholder="URL or identifier" />
+                            <FieldDescription>Optional URL or identifier for the original source.</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    <div class="flex gap-3">
+                        <Button OnClick="IngestTextAsync" Disabled="isIngesting">
+                            @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Ingesting...</span> }
+                            else { <span>Ingest Text</span> }
+                        </Button>
+                        <Button Variant="ButtonVariant.Outline" OnClick="ClearForm">Clear Form</Button>
+                        <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">Clear All Data</Button>
+                    </div>
+
+                    @if (isIngesting)
+                    {
+                        <div class="space-y-2">
+                            <Progress Value="@progress" />
+                            <TypographyMuted>@progressMessage</TypographyMuted>
+                        </div>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+
+        <!-- Stats & Documents Sidebar -->
+        <div class="space-y-4">
+            @if (stats != null)
+            {
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Statistics</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <TypographyMuted>Documents</TypographyMuted>
+                                <span class="font-medium">@stats.TotalDocuments</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <TypographyMuted>Chunks</TypographyMuted>
+                                <span class="font-medium">@stats.TotalChunks</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <TypographyMuted>Storage</TypographyMuted>
+                                <span class="font-medium">@FormatSize(stats.VectorStoreSizeBytes)</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            }
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    @if (documents.Count == 0)
+                    {
+                        <TypographyMuted>No documents yet.</TypographyMuted>
+                    }
+                    else
+                    {
+                        <div class="space-y-2">
+                            @foreach (var doc in documents)
+                            {
+                                <div class="flex items-center justify-between py-1">
+                                    <span class="text-sm truncate max-w-[150px]">@doc.Name</span>
+                                    @* REQ-NFR-005: icon-only row action — the name carries the row identity so the
+                                       control is distinguishable when listed out of context by a screen reader. *@
+                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.IconSmall" OnClick="@(() => DeleteDocumentAsync(doc.Id))">
+                                        <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                                        <span class="sr-only">Delete document @doc.Id</span>
+                                    </Button>
+                                </div>
+                            }
+                        </div>
+                    }
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string documentName = "";
+    private string textContent = "";
+    private string sourceInfo = "";
+    private bool isIngesting;
+    private int progress;
+    private string? progressMessage;
+    private IngestionStats? stats;
+    private List<Document> documents = new();
+    private bool isDownloadingModel;
+    private ModelDownloadProgress? downloadProgress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ModelDownloadService.Instance.ProgressChanged += OnDownloadProgressChanged;
+        downloadProgress = ModelDownloadService.Instance.Progress;
+
+        try
+        {
+            UpdateDownloadStatus();
+            await Rag.InitializeAsync();
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            UpdateDownloadStatus();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize text ingestion page");
+            ToastService.Error($"Initialization error: {ex.Message}", "Error");
+        }
+    }
+
+    private void OnDownloadProgressChanged(object? sender, ModelDownloadProgress progress)
+    {
+        downloadProgress = progress;
+        UpdateDownloadStatus();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateDownloadStatus()
+    {
+        var status = ModelDownloadService.Instance.Progress.Status;
+        isDownloadingModel = status == ModelDownloadStatus.Downloading || status == ModelDownloadStatus.Checking;
+    }
+
+    public void Dispose()
+    {
+        ModelDownloadService.Instance.ProgressChanged -= OnDownloadProgressChanged;
+    }
+
+    private void ClearForm()
+    {
+        documentName = "";
+        textContent = "";
+        sourceInfo = "";
+    }
+
+    private async Task IngestTextAsync()
+    {
+        if (string.IsNullOrWhiteSpace(documentName))
+        {
+            ToastService.Error("Please enter a document name.", "Validation");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(textContent))
+        {
+            ToastService.Error("Please enter text content to ingest.", "Validation");
+            return;
+        }
+
+        isIngesting = true;
+        progress = 0;
+        StateHasChanged();
+
+        try
+        {
+            progress = 10;
+            progressMessage = "Preparing text content...";
+            StateHasChanged();
+            await Task.Delay(50);
+
+            var metadata = new Dictionary<string, object>
+            {
+                { "ContentType", "text" },
+                { "CharacterCount", textContent.Length },
+                { "WordCount", textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length }
+            };
+            if (!string.IsNullOrWhiteSpace(sourceInfo))
+                metadata["Source"] = sourceInfo;
+
+            progress = 30;
+            progressMessage = "Chunking and embedding text...";
+            StateHasChanged();
+            await Task.Delay(50);
+
+            var documentId = await Rag.IngestTextAsync(textContent, documentName, metadata);
+
+            progress = 100;
+            progressMessage = "Complete!";
+            ToastService.Success($"Ingested '{documentName}' (ID: {documentId})", "Success");
+
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            documentName = "";
+            textContent = "";
+            sourceInfo = "";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to ingest text content");
+            ToastService.Error($"Error: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isIngesting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ClearVectorStoreAsync()
+    {
+        try
+        {
+            await Rag.ClearAsync();
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            ToastService.Success("All data cleared.", "Cleared");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error: {ex.Message}", "Error");
+        }
+    }
+
+    private async Task DeleteDocumentAsync(string documentId)
+    {
+        try
+        {
+            await Rag.DeleteDocumentAsync(documentId);
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            ToastService.Success("Document deleted.", "Deleted");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error: {ex.Message}", "Error");
+        }
+    }
+
+    private async Task RefreshStatsAsync()
+    {
+        try { stats = await Rag.GetStatsAsync(); } catch { }
+    }
+
+    private async Task RefreshDocumentsAsync()
+    {
+        try { documents = (await Rag.ListDocumentsAsync()).ToList(); } catch { }
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 * 1024 => $"{bytes / (double)(1024 * 1024 * 1024):F1} GB",
+        >= 1024 * 1024 => $"{bytes / (double)(1024 * 1024):F1} MB",
+        >= 1024 => $"{bytes / (double)1024:F1} KB",
+        _ => $"{bytes} B"
+    };
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        >= (long)(1024 * 1024 * 1024) => $"{bytes / (1024.0 * 1024 * 1024):F2} GB",
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B"
+    };
+}

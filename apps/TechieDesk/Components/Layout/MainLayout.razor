@@ -1,0 +1,604 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject ITechieDeskUserContext UserContext
+@inject IRouteGuard RouteGuard
+@inject SessionTokenStore TokenStore
+@inject IAppManagerClient AppManager
+@inject TechieDeskAuthenticationStateProvider AuthProvider
+@inject IWorkspaceService Workspaces
+@inject ILicenseService LicenseService
+@inject TechieDesk.Services.Setup.ISetupStateService SetupState
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<MainLayout> Logger
+
+@* REQ-NFR-005 / WCAG 2.4.1: the shell renders ~20 sidebar links ahead of the page content,
+   so without this a keyboard user re-tabs the whole nav on every route. It is the first
+   focusable element in the DOM and is only visible while focused (see .td-skip-link).
+
+   The click is handled by a plain inline `onclick` rather than a bare `href="#..."` fragment
+   or Blazor's @onclick. With <base href="/">, a bare fragment resolves to `/#td-main-content`
+   and Blazor's router intercepts it as a navigation to the ROOT route — measured: activating
+   the link from /settings navigated the app to Home instead of moving focus. Calling
+   preventDefault() in an element-level handler runs before Blazor's document-level click
+   listener and stops the interception, so focus moves without any navigation. Plain JS also
+   avoids an interop round-trip on what must be an instant keyboard affordance. *@
+<a href="#td-main-content" class="td-skip-link"
+   onclick="event.preventDefault();var m=document.getElementById('td-main-content');if(m){m.focus();m.scrollIntoView();}">Skip to main content</a>
+
+<SidebarProvider DefaultOpen="true" HeightClass="h-screen">
+    <Sidebar Collapsible="true">
+        <SidebarHeader>
+            <SidebarHeaderContent>
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+                    T
+                </div>
+                <SidebarHeaderInfo>
+                    <span class="truncate font-semibold">TechieDesk</span>
+                    <span class="truncate text-xs text-muted-foreground">RAG + LLM Platform</span>
+                </SidebarHeaderInfo>
+            </SidebarHeaderContent>
+        </SidebarHeader>
+        <SidebarContent>
+            <SidebarGroup>
+                <SidebarGroupLabel>General</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/" Match="NavLinkMatch.All" Tooltip="Home">
+                                <LucideIcon aria-hidden="true" Name="house" Size="16" />
+                                <span>Home</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            @* REQ-UI-014: workspace switcher — the current user's assigned workspaces (Admin sees
+               all), with role-gated create/rename/delete. *@
+            <SidebarGroup>
+                <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        @foreach (var ws in workspaces)
+                        {
+                            var slug = Workspaces.SlugFor(ws);
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{slug}")" Tooltip="@ws.Name">
+                                    <LucideIcon aria-hidden="true" Name="layers" Size="16" />
+                                    <span>@ws.Name</span>
+                                </SidebarMenuButton>
+                                @* Wave 4 (REQ-UI-019/020/021): the Documents library for the active workspace. *@
+                                @if (string.Equals(slug, activeSlug, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <SidebarMenuButton Href="@($"/workspace/{slug}/documents")" Tooltip="Documents" Class="ml-4">
+                                        <LucideIcon aria-hidden="true" Name="file-text" Size="16" />
+                                        <span>Documents</span>
+                                    </SidebarMenuButton>
+                                }
+                                @if (Workspaces.CanManageWorkspaces)
+                                {
+                                    <DropdownMenu>
+                                        @* REQ-NFR-005: DropdownMenuTrigger already renders the <button>, so the
+                                           previous inner <button> produced a button-inside-a-button (axe
+                                           nested-interactive, serious — 2 nodes on every shell route). The
+                                           styling and the icon move onto a <span>; the accessible name is
+                                           supplied as sr-only text because the trigger's name is computed from
+                                           its content and the icon is now aria-hidden. *@
+                                        <DropdownMenuTrigger>
+                                            <span class="absolute right-1 top-1.5 rounded p-1 text-muted-foreground hover:bg-muted">
+                                                <LucideIcon aria-hidden="true" Name="ellipsis" Size="14" />
+                                                <span class="sr-only">Workspace actions</span>
+                                            </span>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            <DropdownMenuItem OnClick="@(() => BeginRenameWorkspace(ws))">
+                                                <LucideIcon aria-hidden="true" Name="pencil" Size="14" />
+                                                <span class="ml-2">Rename</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem OnClick="@(() => Nav.NavigateTo($"/workspace/{slug}/settings"))">
+                                                <LucideIcon aria-hidden="true" Name="settings-2" Size="14" />
+                                                <span class="ml-2">Settings</span>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem OnClick="@(() => BeginDeleteWorkspace(ws))">
+                                                <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                                                <span class="ml-2">Delete</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                }
+                            </SidebarMenuItem>
+                        }
+                        @if (Workspaces.CanManageWorkspaces)
+                        {
+                            <SidebarMenuItem>
+                                <button type="button" class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted" @onclick="@(() => showCreateDialog = true)">
+                                    <LucideIcon aria-hidden="true" Name="plus" Size="16" />
+                                    <span>New workspace</span>
+                                </button>
+                            </SidebarMenuItem>
+                        }
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Configuration</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/settings" Tooltip="Settings">
+                                <LucideIcon aria-hidden="true" Name="settings" Size="16" />
+                                <span>Settings</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/llm-settings" Tooltip="LLM Settings">
+                                <LucideIcon aria-hidden="true" Name="cpu" Size="16" />
+                                <span>LLM Settings</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Data</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/ingestion" Tooltip="File Ingestion">
+                                <LucideIcon aria-hidden="true" Name="file-text" Size="16" />
+                                <span>File Ingestion</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/text-ingestion" Tooltip="Text Ingestion">
+                                <LucideIcon aria-hidden="true" Name="type" Size="16" />
+                                <span>Text Ingestion</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>AI Features</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/chat" Tooltip="RAG Chat">
+                                <LucideIcon aria-hidden="true" Name="message-square" Size="16" />
+                                <span>RAG Chat</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/llm-playground" Tooltip="LLM Playground">
+                                <LucideIcon aria-hidden="true" Name="terminal" Size="16" />
+                                <span>LLM Playground</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/tool-demo" Tooltip="Tool Demo">
+                                <LucideIcon aria-hidden="true" Name="wrench" Size="16" />
+                                <span>Tool Demo</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Monitoring</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/token-usage" Tooltip="Token Usage">
+                                <LucideIcon aria-hidden="true" Name="bar-chart-3" Size="16" />
+                                <span>Token Usage</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Account</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/profile" Tooltip="Profile">
+                                <LucideIcon aria-hidden="true" Name="user" Size="16" />
+                                <span>Profile</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup>
+                <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/qdrant-admin" Tooltip="Qdrant Admin">
+                                <LucideIcon aria-hidden="true" Name="database" Size="16" />
+                                <span>Qdrant Admin</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+        </SidebarContent>
+    </Sidebar>
+
+    <SidebarInset>
+        <header class="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+            <SidebarTrigger />
+            <div class="ml-auto flex items-center gap-3">
+                <Badge Variant="BadgeVariant.Secondary">@CurrentUser.Role</Badge>
+                <DropdownMenu>
+                    @* REQ-NFR-005: same nested-interactive fix as the workspace-actions trigger above.
+                       The `outline-none focus-visible:ring-*` classes are dropped with the inner
+                       button — they resolved to an invisible ring here (no Tailwind JIT to emit
+                       --tw-ring-color), and the trigger now picks up the real focus outline from
+                       the global :focus-visible rule in base.css. *@
+                    <DropdownMenuTrigger>
+                        <span class="flex items-center gap-2 rounded-full">
+                            <Avatar Size="AvatarSize.Small">
+                                <AvatarFallback>@UserInitials</AvatarFallback>
+                            </Avatar>
+                            <span class="sr-only">User menu</span>
+                        </span>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent Class="w-56">
+                        <DropdownMenuLabel>
+                            <div class="flex flex-col">
+                                <span class="font-semibold">@CurrentUser.DisplayName</span>
+                                <span class="text-xs font-normal text-muted-foreground">@CurrentUser.Email</span>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem OnClick="GoToProfile">
+                            <LucideIcon aria-hidden="true" Name="user" Size="16" />
+                            <span class="ml-2">Profile</span>
+                        </DropdownMenuItem>
+                        @if (AuthMode.IsAppManagerEnabled)
+                        {
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem OnClick="@(() => LogoutAsync(false))">
+                                <LucideIcon aria-hidden="true" Name="log-out" Size="16" />
+                                <span class="ml-2">Log out</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem OnClick="@(() => LogoutAsync(true))">
+                                <LucideIcon aria-hidden="true" Name="log-out" Size="16" />
+                                <span class="ml-2">Log out — all devices</span>
+                            </DropdownMenuItem>
+                        }
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        </header>
+        @* REQ-FN-015/BRD-51: when AppManager is unreachable, a banner makes it explicit that the
+           instance is running on the cached last-known-good license (or degraded once grace ends). *@
+        @if (licenseStatus is { IsFromCache: true })
+        {
+            <div class="border-b px-4 py-2 @(licenseStatus.Availability == LicenseAvailability.GraceExpired ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-700 dark:text-amber-400")">
+                <div class="flex items-center gap-2 text-sm">
+                    <LucideIcon aria-hidden="true" Name="wifi-off" Size="14" />
+                    <span>@licenseStatus.Message</span>
+                    <a href="/pricing" class="ml-auto underline underline-offset-2">View plans</a>
+                </div>
+            </div>
+        }
+        @* REQ-NFR-005: id is the skip-link target; tabindex="-1" lets it receive programmatic
+           focus from the fragment jump without entering the tab order itself. *@
+        <div id="td-main-content" tabindex="-1" class="flex-1 overflow-auto p-6 md:p-8">
+            @Body
+        </div>
+    </SidebarInset>
+</SidebarProvider>
+
+<!-- REQ-UI-014: create workspace -->
+<Dialog @bind-Open="showCreateDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>New workspace</DialogTitle>
+            <DialogDescription>Create an isolated knowledge base with its own documents and settings.</DialogDescription>
+        </DialogHeader>
+        <div class="py-2">
+            <Input @bind-Value="newWorkspaceName" Placeholder="Workspace name" />
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCreateDialog = false)">Cancel</Button>
+            <Button OnClick="ConfirmCreateWorkspaceAsync" Disabled="@string.IsNullOrWhiteSpace(newWorkspaceName)">Create</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- REQ-UI-014: rename workspace -->
+<Dialog @bind-Open="showRenameDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Rename workspace</DialogTitle>
+        </DialogHeader>
+        <div class="py-2">
+            <Input @bind-Value="renameWorkspaceName" Placeholder="Workspace name" />
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showRenameDialog = false)">Cancel</Button>
+            <Button OnClick="ConfirmRenameWorkspaceAsync" Disabled="@string.IsNullOrWhiteSpace(renameWorkspaceName)">Save</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- REQ-UI-014: delete workspace (confirm) -->
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Delete '@pendingWorkspace?.Name'?</DialogTitle>
+            <DialogDescription>This removes the workspace and its document links. This cannot be undone.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteWorkspaceAsync">Delete</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<ToastProvider Position="ToastPosition.BottomRight" />
+<PortalHost />
+
+@code {
+    private TechieDeskUser CurrentUser => UserContext.CurrentUser;
+
+    private IReadOnlyList<Workspace> workspaces = Array.Empty<Workspace>();
+
+    // The slug of the workspace currently being viewed, so the active workspace can reveal its
+    // Documents sub-link (Wave 4). Recomputed on every navigation.
+    private string? activeSlug;
+
+    private bool showCreateDialog;
+    private bool showRenameDialog;
+    private bool showDeleteDialog;
+    private string newWorkspaceName = string.Empty;
+    private string renameWorkspaceName = string.Empty;
+    private Workspace? pendingWorkspace;
+
+    // The workspace switcher reflects assignment changes, so it is reloaded on first render and
+    // after every navigation (create/rename/delete happen here or on the settings page).
+    // REQ-FN-013/015: keep the license status fresh (validated at login and periodically on
+    // navigation) so the cached-license banner reflects the live AppManager reachability state.
+    private LicenseStatus? licenseStatus;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWorkspacesAsync();
+        await GuardFirstRunAsync();
+        await RefreshLicenseStatusAsync();
+    }
+
+    private async Task RefreshLicenseStatusAsync()
+    {
+        try
+        {
+            licenseStatus = await LicenseService.EnsureFreshAsync();
+        }
+        catch (Exception ex)
+        {
+            // A license read must never take down the shell.
+            Logger.LogWarning(ex, "License status refresh failed; continuing without the banner");
+        }
+    }
+
+    // Wave 5 (REQ-UI-022/023): a fresh instance is routed to the /setup wizard. The check is
+    // deliberately SATISFIABLE in the offline/dev state so the shell keeps serving every existing
+    // route: setup counts as done when the SetupComplete flag is present, OR when the instance is
+    // in offline single-user mode with a bootstrapped workspace already available (Wave 3). The
+    // wizard itself uses AuthLayout, so it never re-enters this guard (no redirect loop). Only an
+    // authenticated user is redirected — AppManager-mode visitors hit the login guard first.
+    private async Task GuardFirstRunAsync()
+    {
+        if (!RouteGuard.IsAuthenticated)
+        {
+            return;
+        }
+
+        var relative = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+        if (relative.StartsWith("/setup", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        try
+        {
+            var offlineWithWorkspace = !AuthMode.IsAppManagerEnabled && workspaces.Count > 0;
+            if (offlineWithWorkspace)
+            {
+                return;
+            }
+
+            if (!await SetupState.IsFlagCompleteAsync())
+            {
+                Nav.NavigateTo("/setup", forceLoad: false, replace: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Never let a setup-state read fault take down the shell — fail open so routes serve.
+            Logger.LogWarning(ex, "First-run setup guard check failed; continuing without redirect");
+        }
+    }
+
+    private async Task LoadWorkspacesAsync()
+    {
+        try
+        {
+            workspaces = await Workspaces.ListForCurrentUserAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load the workspace switcher list");
+            workspaces = Array.Empty<Workspace>();
+        }
+    }
+
+    private async Task ConfirmCreateWorkspaceAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newWorkspaceName)) return;
+        try
+        {
+            var created = await Workspaces.CreateWorkspaceAsync(newWorkspaceName);
+            showCreateDialog = false;
+            newWorkspaceName = string.Empty;
+            await LoadWorkspacesAsync();
+            Nav.NavigateTo($"/workspace/{Workspaces.SlugFor(created)}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create workspace");
+            ToastService.Error(ex.Message, "Create failed");
+        }
+    }
+
+    private void BeginRenameWorkspace(Workspace ws)
+    {
+        pendingWorkspace = ws;
+        renameWorkspaceName = ws.Name;
+        showRenameDialog = true;
+    }
+
+    private async Task ConfirmRenameWorkspaceAsync()
+    {
+        if (pendingWorkspace is null || string.IsNullOrWhiteSpace(renameWorkspaceName)) return;
+        try
+        {
+            await Workspaces.RenameWorkspaceAsync(pendingWorkspace.WorkspaceId, renameWorkspaceName);
+            showRenameDialog = false;
+            pendingWorkspace = null;
+            await LoadWorkspacesAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to rename workspace");
+            ToastService.Error(ex.Message, "Rename failed");
+        }
+    }
+
+    private void BeginDeleteWorkspace(Workspace ws)
+    {
+        pendingWorkspace = ws;
+        showDeleteDialog = true;
+    }
+
+    private async Task ConfirmDeleteWorkspaceAsync()
+    {
+        if (pendingWorkspace is null) return;
+        try
+        {
+            await Workspaces.DeleteWorkspaceAsync(pendingWorkspace.WorkspaceId);
+            showDeleteDialog = false;
+            pendingWorkspace = null;
+            await LoadWorkspacesAsync();
+            Nav.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete workspace");
+            ToastService.Error(ex.Message, "Delete failed");
+        }
+    }
+
+    // REQ-FN-003: the shell is the single choke point for every protected (console + account)
+    // route — public auth screens use AuthLayout and never reach here. On first render and on
+    // every navigation, an unauthenticated visitor (AppManager mode only) is redirected to
+    // /login with a deep-link return URL. Offline mode is always the built-in Admin, so the
+    // guard returns null and nothing is redirected.
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += HandleLocationChanged;
+        UpdateActiveSlug();
+        GuardCurrentRoute();
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateActiveSlug();
+        GuardCurrentRoute();
+        StateHasChanged();
+
+        // REQ-FN-013: re-validate the license on navigation (EnsureFreshAsync is a no-op until
+        // the configured interval elapses), then re-render if the banner state changed.
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshLicenseStatusAsync();
+            StateHasChanged();
+        });
+    }
+
+    // Parses the active workspace slug from a /workspace/{slug}[/...] route; null elsewhere.
+    private void UpdateActiveSlug()
+    {
+        var relative = Nav.ToBaseRelativePath(Nav.Uri);
+        var path = relative.Split('?', '#')[0].Trim('/');
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        activeSlug = segments.Length >= 2 && string.Equals(segments[0], "workspace", StringComparison.OrdinalIgnoreCase)
+            ? segments[1]
+            : null;
+    }
+
+    private void GuardCurrentRoute()
+    {
+        var relativeUrl = "/" + Nav.ToBaseRelativePath(Nav.Uri);
+        var redirect = RouteGuard.GetLoginRedirect(relativeUrl);
+        if (redirect is not null)
+        {
+            Nav.NavigateTo(redirect, forceLoad: false, replace: true);
+        }
+    }
+
+    public void Dispose() => Nav.LocationChanged -= HandleLocationChanged;
+
+    private string UserInitials
+    {
+        get
+        {
+            var name = CurrentUser.DisplayName;
+            var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var initials = parts.Length switch
+            {
+                0 => "?",
+                1 => parts[0][..1],
+                _ => $"{parts[0][0]}{parts[^1][0]}"
+            };
+            return initials.ToUpperInvariant();
+        }
+    }
+
+    private void GoToProfile() => Nav.NavigateTo("/profile");
+
+    // REQ-UI-008: logout (optionally across all devices) revokes the session at AppManager,
+    // clears the server-side circuit tokens, and returns to the login screen.
+    private async Task LogoutAsync(bool allDevices)
+    {
+        try
+        {
+            if (TokenStore.HasSession)
+            {
+                await AppManager.LogoutAsync(TokenStore.AccessToken!, TokenStore.RefreshToken, allDevices);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "AppManager logout call failed; clearing local session anyway");
+        }
+        finally
+        {
+            var email = CurrentUser.Email;
+            AuthProvider.SignOut();
+            Logger.LogInformation("User {Email} logged out (allDevices: {AllDevices})", email, allDevices);
+            Nav.NavigateTo("/login", forceLoad: true);
+        }
+    }
+}

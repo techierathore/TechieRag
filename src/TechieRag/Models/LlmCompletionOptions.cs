@@ -38,4 +38,8 @@ public class LlmCompletionOptions
 
     /// <summary>Gets or sets a seed for reproducible generation.</summary>
     public int? Seed { get; set; }
+
+    /// <summary>Gets or sets a per-request model override; null uses the provider's configured model.</summary>
+    /// <remarks>Used by workspace LLM overrides. Honored by all built-in providers.</remarks>
+    public string? Model { get; set; }
 }

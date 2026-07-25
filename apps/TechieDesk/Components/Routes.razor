@@ -1,0 +1,11 @@
+<Router AppAssembly="typeof(Program).Assembly">
+    <Found Context="routeData">
+        @* REQ-FN-003: route protection is enforced at the interactive layer by the shell
+           (MainLayout) via IRouteGuard + the custom AuthenticationStateProvider — tokens live
+           in the per-circuit SessionTokenStore, never in HttpContext, so endpoint-level
+           [Authorize] cannot see them. Public auth routes use AuthLayout and bypass the guard.
+           In offline single-user mode the guard never redirects (built-in Admin). *@
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

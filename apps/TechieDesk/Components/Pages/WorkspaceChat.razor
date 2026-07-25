@@ -1,0 +1,727 @@
+@page "/workspace/{Slug}"
+@using TechieDesk.Services.Threads
+@inject TechieRagManager Rag
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject ILogger<WorkspaceChat> Logger
+
+<PageTitle>@(workspace?.Name ?? "Workspace") — Chat</PageTitle>
+
+@if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>Workspace not available</AlertTitle>
+        <AlertDescription>This workspace does not exist or you are not assigned to it.</AlertDescription>
+    </Alert>
+}
+@* REQ-NFR-010/BRD-101: a persistence/vector-store outage is a different problem from a missing
+   or unassigned workspace, and must say so rather than misdirecting the user. *@
+else if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>Workspace data is unavailable</AlertTitle>
+        <AlertDescription>
+            The conversation store could not be reached, so this workspace cannot be opened right
+            now. Check the vector store and persistence configuration, then reload.
+            Details: @loadError
+        </AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>Loading workspace…</span>
+    </div>
+}
+else
+{
+    <div class="mb-4 flex items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@workspace.Name</h1>
+            <TypographyMuted>Chat — retrieval scoped to this workspace's documents.</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Badge Variant="BadgeVariant.Secondary">@(workspace.ChatMode == WorkspaceChatMode.Query ? "Query mode" : "Chat mode")</Badge>
+            @if (Workspaces.CanManageWorkspaces)
+            {
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="GoToSettings">
+                    <Button.Icon><LucideIcon aria-hidden="true" Name="settings-2" Size="16" /></Button.Icon>
+                    Settings
+                </Button>
+            }
+        </div>
+    </div>
+
+    <div class="td-chat-grid">
+        <!-- Threads panel (REQ-UI-016 / REQ-UI-017) -->
+        <Card>
+            <CardContent Class="p-3">
+                <div class="mb-2 flex items-center justify-between px-1">
+                    <span class="text-sm font-semibold">Threads</span>
+                    @if (threads.Count > 0)
+                    {
+                        <button type="button" class="rounded p-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive"
+                                aria-label="Delete all my history" title="Delete all my history" @onclick="BeginDeleteAll">
+                            <LucideIcon aria-hidden="true" Name="trash" Size="14" />
+                        </button>
+                    }
+                </div>
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="mb-2 w-full" OnClick="NewThreadAsync">
+                    <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="14" /></Button.Icon>
+                    New thread
+                </Button>
+
+                @if (threads.Count == 0)
+                {
+                    <div class="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
+                        No threads yet
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-1">
+                        @foreach (var thread in threads)
+                        {
+                            var isActive = activeThread?.ThreadId == thread.ThreadId;
+                            <div class="@($"flex items-center gap-1 rounded-md px-2 py-1.5 {(isActive ? "bg-accent" : "hover:bg-muted")}")">
+                                <button type="button" class="min-w-0 flex-1 text-left" @onclick="@(() => SelectThreadAsync(thread))">
+                                    <div class="truncate text-sm @(isActive ? "font-semibold" : "")">@thread.Title</div>
+                                    <div class="text-xs text-muted-foreground">@thread.UpdatedAt.ToLocalTime().ToString("MMM d")</div>
+                                </button>
+                                <DropdownMenu>
+                                    @* REQ-NFR-005: DropdownMenuTrigger renders its own <button>, so the previous
+                                       inner <button> nested one interactive control inside another (axe
+                                       nested-interactive, serious). The name includes the thread title so the
+                                       per-row action is distinguishable out of context. *@
+                                    <DropdownMenuTrigger>
+                                        <span class="rounded p-1 text-muted-foreground hover:bg-muted">
+                                            <LucideIcon aria-hidden="true" Name="ellipsis" Size="16" />
+                                            <span class="sr-only">Actions for thread @thread.Title</span>
+                                        </span>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem OnClick="@(() => BeginRename(thread))">
+                                            <LucideIcon aria-hidden="true" Name="pencil" Size="14" />
+                                            <span class="ml-2">Rename</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem OnClick="@(() => ExportThreadAsync(thread, ExportFormat.Markdown))">
+                                            <LucideIcon aria-hidden="true" Name="file-down" Size="14" />
+                                            <span class="ml-2">Export as Markdown</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem OnClick="@(() => ExportThreadAsync(thread, ExportFormat.Json))">
+                                            <LucideIcon aria-hidden="true" Name="braces" Size="14" />
+                                            <span class="ml-2">Export as JSON</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem OnClick="@(() => BeginDelete(thread))">
+                                            <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                                            <span class="ml-2">Delete</span>
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                        }
+                    </div>
+                }
+            </CardContent>
+        </Card>
+
+        <!-- Chat column (REQ-UI-018 / REQ-RAG-007/008/009/010) -->
+        <Card Class="flex flex-col">
+            <CardContent Class="flex flex-1 flex-col gap-3 p-4">
+                <div class="flex-1 space-y-4 overflow-y-auto" style="min-height:50vh;max-height:56vh">
+                    @if (activeThread is null)
+                    {
+                        <div class="flex h-full items-center justify-center">
+                            <div class="space-y-2 text-center">
+                                <LucideIcon aria-hidden="true" Name="message-square" Size="40" Class="mx-auto text-muted-foreground" />
+                                <TypographyMuted>Start a new thread to chat with @workspace.Name.</TypographyMuted>
+                            </div>
+                        </div>
+                    }
+                    else if (messages.Count == 0 && !isProcessing)
+                    {
+                        <div class="flex h-full items-center justify-center">
+                            <TypographyMuted>Ask a question to get started.</TypographyMuted>
+                        </div>
+                    }
+
+                    @foreach (var msg in messages)
+                    {
+                        <div class="@(msg.Role == "user" ? "flex justify-end" : "flex justify-start")">
+                            <div class="@(msg.Role == "user" ? "bg-primary text-primary-foreground" : "bg-muted") max-w-[85%] rounded-lg px-4 py-2">
+                                <div class="whitespace-pre-wrap text-sm">@msg.Content</div>
+                                @if (msg.Role == "assistant" && msg.Citations.Count > 0)
+                                {
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        @foreach (var cite in msg.Citations)
+                                        {
+                                            <Badge Variant="BadgeVariant.Outline" Class="text-xs">
+                                                <LucideIcon aria-hidden="true" Name="file-text" Size="12" />
+                                                <span class="ml-1">@cite.DocumentName · @cite.Score.ToString("0.00")</span>
+                                            </Badge>
+                                        }
+                                    </div>
+                                    <Collapsible Class="mt-2">
+                                        <CollapsibleTrigger Class="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <LucideIcon aria-hidden="true" Name="chevron-down" Size="12" />
+                                            <span>Show sources (@msg.Citations.Count)</span>
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                            <div class="mt-2 space-y-2">
+                                                @foreach (var cite in msg.Citations)
+                                                {
+                                                    <div class="rounded-md border border-primary/30 bg-accent/40 p-2 text-xs">
+                                                        <div class="font-semibold">@cite.DocumentName</div>
+                                                        <div class="italic text-muted-foreground">@cite.Snippet</div>
+                                                        <div class="mt-1 text-right text-muted-foreground">relevance @cite.Score.ToString("0.00")</div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (isProcessing)
+                    {
+                        <div class="flex justify-start">
+                            <div class="max-w-[85%] rounded-lg bg-muted px-4 py-2">
+                                @if (streamingSources.Count > 0)
+                                {
+                                    <div class="mb-2 flex flex-wrap gap-2">
+                                        @foreach (var cite in streamingSources)
+                                        {
+                                            <Badge Variant="BadgeVariant.Outline" Class="text-xs">
+                                                <LucideIcon aria-hidden="true" Name="file-text" Size="12" />
+                                                <span class="ml-1">@cite.DocumentName · @cite.Score.ToString("0.00")</span>
+                                            </Badge>
+                                        }
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(streamingContent))
+                                {
+                                    <div class="whitespace-pre-wrap text-sm">@streamingContent<span class="animate-pulse">▍</span></div>
+                                    <div class="mt-1 text-xs text-muted-foreground">Streaming…</div>
+                                }
+                                else
+                                {
+                                    <div class="flex items-center gap-2">
+                                        <Spinner Size="SpinnerSize.Small" />
+                                        <span class="text-sm text-muted-foreground">Retrieving &amp; thinking…</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Composer -->
+                <div class="flex items-end gap-2 border-t pt-3" @onkeydown="HandleKeyDown">
+                    <Textarea @bind-Value="userInput" Placeholder="@($"Message {workspace.Name}…")" Class="min-h-[44px] max-h-[120px] flex-1"
+                              Disabled="@(activeThread is null || isProcessing)" />
+                    @* REQ-NFR-005: icon-only control — see Chat.razor composer (axe button-name). *@
+                    <Button OnClick="SendAsync" Disabled="@(activeThread is null || isProcessing || string.IsNullOrWhiteSpace(userInput))">
+                        <LucideIcon aria-hidden="true" Name="send" Size="16" />
+                        <span class="sr-only">Send message</span>
+                    </Button>
+                </div>
+                <div class="text-xs text-muted-foreground">
+                    Retrieval scoped to this workspace · @(workspace.ChatMode == WorkspaceChatMode.Query ? "Query mode answers only from documents" : "Chat mode") · Shift+Enter for newline
+                </div>
+            </CardContent>
+        </Card>
+    </div>
+}
+
+<!-- Rename thread dialog (REQ-UI-016) -->
+<Dialog @bind-Open="showRenameDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Rename thread</DialogTitle>
+        </DialogHeader>
+        <div class="py-2">
+            <Input @bind-Value="renameTitle" Placeholder="Thread title" />
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showRenameDialog = false)">Cancel</Button>
+            <Button OnClick="ConfirmRenameAsync" Disabled="@string.IsNullOrWhiteSpace(renameTitle)">Save</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- Delete thread dialog (REQ-UI-016) -->
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Delete thread?</DialogTitle>
+            <DialogDescription>This permanently removes the thread and all of its messages. This cannot be undone.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">Delete</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- Delete all history dialog (REQ-FN-011 / BRD-36) -->
+<Dialog @bind-Open="showDeleteAllDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Delete all my history?</DialogTitle>
+            <DialogDescription>This permanently removes every conversation thread and message you own across all workspaces. This cannot be undone.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteAllDialog = false)">Cancel</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAllAsync">Delete everything</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private const int HistoryTokenBudget = 4000;
+
+    private Workspace? workspace;
+    private bool notFound;
+
+    /// <summary>Backend failure message when the workspace could not be loaded (REQ-NFR-010).</summary>
+    private string? loadError;
+
+    private string? loadedSlug;
+
+    private readonly List<ConversationThread> threads = new();
+    private ConversationThread? activeThread;
+    private readonly List<ChatDisplayMessage> messages = new();
+
+    private string? userInput;
+    private bool isProcessing;
+    private string streamingContent = string.Empty;
+    private readonly List<Citation> streamingSources = new();
+
+    private bool showRenameDialog;
+    private bool showDeleteDialog;
+    private bool showDeleteAllDialog;
+    private string renameTitle = string.Empty;
+    private ConversationThread? pendingThread;
+
+    private readonly ThreadExporter exporter = new();
+
+    /// <summary>Supported thread export serialization formats (REQ-FN-010).</summary>
+    private enum ExportFormat
+    {
+        /// <summary>Human-readable Markdown transcript.</summary>
+        Markdown,
+
+        /// <summary>Machine-readable JSON export.</summary>
+        Json
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug)
+        {
+            return;
+        }
+
+        loadedSlug = Slug;
+        await LoadWorkspaceAsync();
+    }
+
+    private async Task LoadWorkspaceAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+        threads.Clear();
+        activeThread = null;
+        messages.Clear();
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            var store = await Rag.GetConversationStoreAsync();
+            if (store is not null)
+            {
+                var list = await store.ListThreadsAsync(Workspaces.CurrentUserId, workspace.WorkspaceId);
+                threads.AddRange(list);
+                if (threads.Count > 0)
+                {
+                    await SelectThreadAsync(threads[0]);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load workspace {Slug}", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    private async Task SelectThreadAsync(ConversationThread thread)
+    {
+        activeThread = thread;
+        messages.Clear();
+
+        var store = await Rag.GetConversationStoreAsync();
+        if (store is null) return;
+
+        var stored = await store.GetMessagesAsync(thread.ThreadId);
+        foreach (var m in stored)
+        {
+            messages.Add(new ChatDisplayMessage(m.Role, m.Content ?? string.Empty, ToCitations(m.Sources)));
+        }
+    }
+
+    private async Task NewThreadAsync()
+    {
+        if (workspace is null) return;
+        var store = await Rag.GetConversationStoreAsync();
+        if (store is null) return;
+
+        var thread = await store.CreateThreadAsync(Workspaces.CurrentUserId, workspace.WorkspaceId, "New conversation");
+        threads.Insert(0, thread);
+        activeThread = thread;
+        messages.Clear();
+    }
+
+    private void BeginRename(ConversationThread thread)
+    {
+        pendingThread = thread;
+        renameTitle = thread.Title;
+        showRenameDialog = true;
+    }
+
+    private async Task ConfirmRenameAsync()
+    {
+        if (pendingThread is null || string.IsNullOrWhiteSpace(renameTitle)) return;
+        var store = await Rag.GetConversationStoreAsync();
+        if (store is not null)
+        {
+            await store.RenameThreadAsync(pendingThread.ThreadId, renameTitle.Trim());
+            pendingThread.Title = renameTitle.Trim();
+        }
+        showRenameDialog = false;
+        pendingThread = null;
+    }
+
+    private void BeginDelete(ConversationThread thread)
+    {
+        pendingThread = thread;
+        showDeleteDialog = true;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (pendingThread is null) return;
+        var store = await Rag.GetConversationStoreAsync();
+        if (store is not null)
+        {
+            await store.DeleteThreadAsync(pendingThread.ThreadId);
+        }
+        threads.RemoveAll(t => t.ThreadId == pendingThread.ThreadId);
+        if (activeThread?.ThreadId == pendingThread.ThreadId)
+        {
+            activeThread = threads.FirstOrDefault();
+            if (activeThread is not null)
+            {
+                await SelectThreadAsync(activeThread);
+            }
+            else
+            {
+                messages.Clear();
+            }
+        }
+        showDeleteDialog = false;
+        pendingThread = null;
+    }
+
+    /// <summary>
+    /// REQ-FN-010: serializes a thread's full message history (role, content, cited sources,
+    /// timestamps) to Markdown or JSON and streams it to the browser as a file download.
+    /// </summary>
+    private async Task ExportThreadAsync(ConversationThread thread, ExportFormat format)
+    {
+        try
+        {
+            var store = await Rag.GetConversationStoreAsync();
+            if (store is null)
+            {
+                ToastService.Error("Conversation storage is not configured.", "Export failed");
+                return;
+            }
+
+            var stored = await store.GetMessagesAsync(thread.ThreadId);
+            string content;
+            string fileName;
+            string mimeType;
+            if (format == ExportFormat.Markdown)
+            {
+                content = exporter.ToMarkdown(thread, stored);
+                fileName = exporter.BuildFileName(thread, "md");
+                mimeType = "text/markdown";
+            }
+            else
+            {
+                content = exporter.ToJson(thread, stored);
+                fileName = exporter.BuildFileName(thread, "json");
+                mimeType = "application/json";
+            }
+
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/download.js");
+            await module.InvokeVoidAsync("saveText", fileName, mimeType, content);
+            ToastService.Success($"Exported \"{thread.Title}\" as {(format == ExportFormat.Markdown ? "Markdown" : "JSON")}.", "Exported");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to export thread {ThreadId}", thread.ThreadId);
+            ToastService.Error("Export failed. Please try again.", "Export failed");
+        }
+    }
+
+    private void BeginDeleteAll() => showDeleteAllDialog = true;
+
+    /// <summary>
+    /// REQ-FN-011: permanently deletes the current user's entire conversation history
+    /// (all threads and messages across every workspace) via DeleteAllForUserAsync, then
+    /// clears the in-memory thread list and chat view.
+    /// </summary>
+    private async Task ConfirmDeleteAllAsync()
+    {
+        try
+        {
+            var store = await Rag.GetConversationStoreAsync();
+            if (store is not null)
+            {
+                await store.DeleteAllForUserAsync(Workspaces.CurrentUserId);
+            }
+            threads.Clear();
+            activeThread = null;
+            messages.Clear();
+            ToastService.Success("All conversation history deleted.", "History cleared");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete all history for user");
+            ToastService.Error("Could not delete history. Please try again.", "Delete failed");
+        }
+        finally
+        {
+            showDeleteAllDialog = false;
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey)
+        {
+            await SendAsync();
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        if (workspace is null || activeThread is null || isProcessing || string.IsNullOrWhiteSpace(userInput))
+        {
+            return;
+        }
+
+        var question = userInput!.Trim();
+        userInput = string.Empty;
+        isProcessing = true;
+        streamingContent = string.Empty;
+        streamingSources.Clear();
+        messages.Add(new ChatDisplayMessage("user", question, new List<Citation>()));
+        StateHasChanged();
+
+        IReadOnlyList<SearchResult> sources = Array.Empty<SearchResult>();
+
+        try
+        {
+            var store = await Rag.GetConversationStoreAsync();
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (store is null || manager is null)
+            {
+                messages.Add(new ChatDisplayMessage("assistant", "Workspace persistence is not configured.", new List<Citation>()));
+                return;
+            }
+
+            // REQ-RAG-008: persist the user message before answering so history survives restart.
+            await store.AddMessageAsync(activeThread.ThreadId, ChatMessage.User(question));
+
+            var provider = await Rag.GetLlmProviderAsync();
+            if (provider is null)
+            {
+                const string noProvider = "No LLM provider is configured. Configure one in LLM Settings to chat.";
+                messages.Add(new ChatDisplayMessage("assistant", noProvider, new List<Citation>()));
+                await store.AddMessageAsync(activeThread.ThreadId, ChatMessage.Assistant(noProvider));
+                return;
+            }
+
+            // REQ-RAG-009: persisted, token-trimmed history. The current question was just stored
+            // and the RAG chat template appends it again, so drop the trailing user turn.
+            var history = await store.GetTrimmedHistoryAsync(activeThread.ThreadId, HistoryTokenBudget, provider.EstimateTokenCount);
+            var priorTurns = ChatHistoryTrimmer.PriorTurns(history);
+
+            var options = string.IsNullOrEmpty(workspace.LlmModel) ? null : new LlmCompletionOptions { Model = workspace.LlmModel };
+
+            var tracker = await Rag.GetTokenTrackerAsync();
+            var before = tracker.GetSessionUsage();
+
+            // REQ-RAG-013 / TR-RAG-003: the library owns workspace-scoped streaming now, so pinned
+            // documents are merged into the context while streaming — the previous app-side
+            // composition of SearchAsync + provider.ChatStreamAsync silently dropped them.
+            // REQ-RAG-007/014: scoping, top-K and threshold come from the workspace settings.
+            // REQ-RAG-010: the native Sources event arrives before the first token, so the citation
+            // chips render from real SearchResults rather than a post-hoc keyword match.
+            // REQ-RAG-015: query mode emits the honest "not covered" answer without calling the LLM.
+            await foreach (var evt in manager.AskStreamWithSourcesAsync(workspace.WorkspaceId, question, priorTurns, options))
+            {
+                if (evt.Type == RagStreamEventType.Sources)
+                {
+                    sources = evt.Sources ?? Array.Empty<SearchResult>();
+                    streamingSources.Clear();
+                    streamingSources.AddRange(ToCitations(sources));
+                    StateHasChanged();
+
+                    // REQ-RAG-010: yield to the renderer so the citation chips are painted while
+                    // the LLM is still being contacted. Without this the chips can be starved
+                    // until the first token — or never shown at all if the provider fails fast.
+                    await Task.Yield();
+                    continue;
+                }
+
+                if (evt.Type == RagStreamEventType.Token)
+                {
+                    streamingContent += evt.Token;
+                    StateHasChanged();
+                }
+            }
+
+            AccountStreamedUsage(provider, question, streamingContent, tracker, before);
+
+            var citations = ToCitations(sources);
+            messages.Add(new ChatDisplayMessage("assistant", streamingContent, citations));
+            await store.AddMessageAsync(activeThread.ThreadId, ChatMessage.Assistant(streamingContent), sources);
+            await BumpThreadTitleAsync(store, question);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Workspace chat send failed");
+
+            // Keep the retrieved citations on the failed turn: retrieval succeeded, generation did not.
+            messages.Add(new ChatDisplayMessage("assistant", $"Error: {ex.Message}", ToCitations(sources)));
+        }
+        finally
+        {
+            isProcessing = false;
+            streamingContent = string.Empty;
+            streamingSources.Clear();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Renames a still-default thread to the first question so the history list is readable, then
+    /// re-sorts threads newest-first to mirror the store's ordering.
+    /// </summary>
+    private async Task BumpThreadTitleAsync(IConversationStore store, string question)
+    {
+        if (activeThread is null) return;
+        activeThread.UpdatedAt = DateTime.UtcNow;
+        if (activeThread.Title == "New conversation")
+        {
+            var title = question.Length > 48 ? question[..48] + "…" : question;
+            await store.RenameThreadAsync(activeThread.ThreadId, title);
+            activeThread.Title = title;
+        }
+        var reordered = threads.OrderByDescending(t => t.UpdatedAt).ToList();
+        threads.Clear();
+        threads.AddRange(reordered);
+    }
+
+    private void AccountStreamedUsage(ILlmProvider provider, string promptText, string answerText, ITokenTracker tracker, TokenUsageSummary before)
+    {
+        var after = tracker.GetSessionUsage();
+        if (after.TotalTokens - before.TotalTokens > 0)
+        {
+            return; // provider recorded real streamed usage
+        }
+
+        // TR-RAG-002 fallback: some providers report zero usage on streamed calls; estimate so the
+        // Token Usage dashboard still moves.
+        var estimated = new TechieRag.Models.TokenUsage
+        {
+            InputTokens = provider.EstimateTokenCount(promptText),
+            OutputTokens = provider.EstimateTokenCount(answerText),
+            ModelName = provider.ModelName,
+            ProviderName = provider.Name
+        };
+        tracker.RecordUsage(estimated);
+    }
+
+    private static List<Citation> ToCitations(IReadOnlyList<SearchResult>? sources)
+    {
+        if (sources is null || sources.Count == 0) return new List<Citation>();
+        return sources.Select(s =>
+        {
+            var snippet = s.Chunk.Text.Length > 220 ? s.Chunk.Text[..220] + "…" : s.Chunk.Text;
+            return new Citation(CitationName(s), snippet, s.Score);
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Resolves the display name for a citation chip (REQ-RAG-010 / REQ-UI-018), falling back
+    /// through the metadata keys the ingestion processors write before giving up on the raw id.
+    /// </summary>
+    /// <remarks>
+    /// Metadata round-tripped through the store arrives as JsonElement rather than string, so the
+    /// value is converted with ToString() instead of being pattern-matched as a string — matching
+    /// on the CLR type made every chip render a bare GUID.
+    /// </remarks>
+    private static string CitationName(SearchResult source)
+    {
+        foreach (var key in CitationNameKeys)
+        {
+            if (!source.Chunk.Metadata.TryGetValue(key, out var value)) continue;
+
+            var name = value?.ToString();
+            if (!string.IsNullOrWhiteSpace(name)) return name!;
+        }
+
+        return source.Chunk.DocumentId;
+    }
+
+    private static readonly string[] CitationNameKeys = ["DocumentName", "FileName", "sourceFile", "SourceFile"];
+
+    private void GoToSettings() => Nav.NavigateTo($"/workspace/{Slug}/settings");
+
+    private sealed record Citation(string DocumentName, string Snippet, float Score);
+
+    private sealed class ChatDisplayMessage
+    {
+        public string Role { get; }
+        public string Content { get; }
+        public List<Citation> Citations { get; }
+
+        public ChatDisplayMessage(string role, string content, List<Citation> citations)
+        {
+            Role = role;
+            Content = content;
+            Citations = citations;
+        }
+    }
+}

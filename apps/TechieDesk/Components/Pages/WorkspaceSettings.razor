@@ -1,0 +1,357 @@
+@page "/workspace/{Slug}/settings"
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<WorkspaceSettings> Logger
+
+<PageTitle>@(workspace?.Name ?? "Workspace") — Settings</PageTitle>
+
+@if (accessDenied)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>Not allowed</AlertTitle>
+        <AlertDescription>You need the Manager or Admin role to edit workspace settings.</AlertDescription>
+    </Alert>
+}
+else if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>Workspace not available</AlertTitle>
+        <AlertDescription>This workspace does not exist or you are not assigned to it.</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>Loading settings…</span>
+    </div>
+}
+else
+{
+    <div class="mb-4 flex items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Workspace Settings — @workspace.Name</h1>
+            <TypographyMuted>Name, prompt, model, mode, retrieval tuning, and members.</TypographyMuted>
+        </div>
+        <div class="ml-auto">
+            <Button OnClick="SaveAsync" Disabled="@isSaving">@(isSaving ? "Saving…" : "Save changes")</Button>
+        </div>
+    </div>
+
+    <Tabs DefaultValue="general">
+        <TabsList Class="grid w-full grid-cols-4">
+            <TabsTrigger Value="general">General</TabsTrigger>
+            <TabsTrigger Value="retrieval">Retrieval</TabsTrigger>
+            <TabsTrigger Value="members">Members</TabsTrigger>
+            <TabsTrigger Value="danger">Danger</TabsTrigger>
+        </TabsList>
+
+        <!-- General (REQ-UI-015 / REQ-RAG-015) -->
+        <TabsContent Value="general">
+            <Card>
+                <CardContent Class="space-y-4 p-4">
+                    <Field>
+                        <FieldLabel>Display name</FieldLabel>
+                        <FieldContent><Input @bind-Value="name" Placeholder="Workspace name" /></FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>Slug</FieldLabel>
+                        <FieldContent>
+                            <Input AriaLabel="Slug" Value="@currentSlug" Disabled="true" />
+                            <FieldDescription>Used in URLs — derived from the display name.</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>System prompt</FieldLabel>
+                        <FieldContent><Textarea @bind-Value="systemPrompt" Class="min-h-[90px]" Placeholder="You are a helpful assistant…" /></FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>LLM override</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="llmModel" Placeholder="Instance default" />
+                            <FieldDescription>Leave empty to use the instance-configured model.</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>Mode</FieldLabel>
+                        <FieldContent>
+                            <RadioGroup @bind-Value="mode" TValue="string">
+                                <div class="flex items-center space-x-2">
+                                    <RadioGroupItem Value="@("chat")" Id="mode-chat" TValue="string" />
+                                    <Label For="mode-chat">Chat — general knowledge + documents</Label>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <RadioGroupItem Value="@("query")" Id="mode-query" TValue="string" />
+                                    <Label For="mode-query">Query — documents only, answers "not in my documents" honestly</Label>
+                                </div>
+                            </RadioGroup>
+                        </FieldContent>
+                    </Field>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Retrieval (REQ-RAG-014) -->
+        <TabsContent Value="retrieval">
+            <Card>
+                <CardContent Class="space-y-4 p-4">
+                    <Field>
+                        <FieldLabel>Similarity threshold — @threshold.ToString("0.00")</FieldLabel>
+                        <FieldContent>
+                            <input type="range" class="td-range" min="0" max="1" step="0.05"
+                                   value="@threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                   @onchange="OnThresholdChanged" disabled="@(!Workspaces.CanTuneRetrieval)" />
+                            <FieldDescription>Minimum relevance a chunk must reach to be used as context (0 = no threshold).</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>Top-K snippets</FieldLabel>
+                        <FieldContent>
+                            <Input AriaLabel="Top-K snippets" @bind-Value="topKString" Disabled="@(!Workspaces.CanTuneRetrieval)" Class="max-w-[140px]" />
+                        </FieldContent>
+                    </Field>
+                    <div class="flex items-center gap-3">
+                        <Switch @bind-Checked="rerankEnabled" Id="rerank" Disabled="@(!Workspaces.CanTuneRetrieval)" />
+                        <Label For="rerank">Accuracy optimized (reranker)</Label>
+                    </div>
+                    <FieldDescription>Requires a reranking stage configured on the library (REQ-RAG-025).</FieldDescription>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Members (REQ-FN-008) -->
+        <TabsContent Value="members">
+            <Card>
+                <CardContent Class="space-y-4 p-4">
+                    @if (members.Count == 0)
+                    {
+                        <div class="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">Only you so far</div>
+                    }
+                    else
+                    {
+                        <div class="space-y-2">
+                            @foreach (var member in members)
+                            {
+                                <div class="flex items-center gap-3 rounded-md border p-2">
+                                    <Avatar Size="AvatarSize.Small"><AvatarFallback>@Initials(member.UserId)</AvatarFallback></Avatar>
+                                    <span class="text-sm">User @member.UserId</span>
+                                    <Badge Variant="BadgeVariant.Secondary">@member.RoleName</Badge>
+                                    @if (Workspaces.CanManageMembers)
+                                    {
+                                        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" Class="ml-auto" OnClick="@(() => RemoveMemberAsync(member.AssignmentId))">Remove</Button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (Workspaces.CanManageMembers)
+                    {
+                        <div class="flex flex-wrap items-end gap-2 border-t pt-3">
+                            <Field Class="flex-1 min-w-[160px]">
+                                <FieldLabel>User ID</FieldLabel>
+                                <FieldContent><Input @bind-Value="newMemberUserId" Placeholder="AppManager user id" /></FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Role</FieldLabel>
+                                <FieldContent>
+                                    <Select @bind-Value="newMemberRole" TValue="string">
+                                        <SelectTrigger><SelectValue Placeholder="Role" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem Value="@("User")" Text="User" TValue="string">User</SelectItem>
+                                            <SelectItem Value="@("Manager")" Text="Manager" TValue="string">Manager</SelectItem>
+                                            <SelectItem Value="@("Admin")" Text="Admin" TValue="string">Admin</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FieldContent>
+                            </Field>
+                            <Button Variant="ButtonVariant.Outline" OnClick="AddMemberAsync" Disabled="@string.IsNullOrWhiteSpace(newMemberUserId)">Add</Button>
+                        </div>
+                    }
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Danger (REQ-UI-014 delete confirm) -->
+        <TabsContent Value="danger">
+            <Card Class="border-destructive/50">
+                <CardContent Class="space-y-3 p-4">
+                    <TypographyMuted>Deleting a workspace removes its threads and unembeds its documents. Files remain in the instance library.</TypographyMuted>
+                    <Button Variant="ButtonVariant.Destructive" OnClick="@(() => showDeleteDialog = true)">Delete workspace</Button>
+                </CardContent>
+            </Card>
+        </TabsContent>
+    </Tabs>
+}
+
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Delete '@workspace?.Name'?</DialogTitle>
+            <DialogDescription>This cannot be undone. The workspace, its threads, and its document links will be removed.</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">Delete</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Workspace? workspace;
+    private bool notFound;
+    private bool accessDenied;
+    private bool isSaving;
+    private string? loadedSlug;
+    private string currentSlug = string.Empty;
+
+    private string name = string.Empty;
+    private string? systemPrompt;
+    private string? llmModel;
+    private string mode = "chat";
+    private double threshold;
+    private string topKString = "5";
+    private bool rerankEnabled;
+
+    private readonly List<WorkspaceMember> members = new();
+    private string newMemberUserId = string.Empty;
+    private string newMemberRole = "User";
+
+    private bool showDeleteDialog;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug) return;
+        loadedSlug = Slug;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        accessDenied = false;
+        notFound = false;
+        workspace = null;
+
+        if (!Workspaces.CanManageWorkspaces)
+        {
+            accessDenied = true;
+            return;
+        }
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            currentSlug = Workspaces.SlugFor(workspace);
+            name = workspace.Name;
+            systemPrompt = workspace.SystemPrompt;
+            llmModel = workspace.LlmModel;
+            mode = workspace.ChatMode == WorkspaceChatMode.Query ? "query" : "chat";
+            threshold = workspace.SimilarityThreshold ?? 0;
+            topKString = (workspace.TopK ?? 5).ToString();
+            rerankEnabled = workspace.RerankEnabled;
+
+            members.Clear();
+            members.AddRange(await Workspaces.GetMembersAsync(workspace.WorkspaceId));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load workspace settings for {Slug}", Slug);
+            notFound = true;
+        }
+    }
+
+    private void OnThresholdChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var v))
+        {
+            threshold = v;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (workspace is null) return;
+        isSaving = true;
+        try
+        {
+            workspace.Name = string.IsNullOrWhiteSpace(name) ? workspace.Name : name.Trim();
+            workspace.SystemPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? null : systemPrompt.Trim();
+            workspace.LlmModel = string.IsNullOrWhiteSpace(llmModel) ? null : llmModel.Trim();
+            workspace.ChatMode = mode == "query" ? WorkspaceChatMode.Query : WorkspaceChatMode.Chat;
+            workspace.SimilarityThreshold = threshold <= 0 ? null : (float)threshold;
+            workspace.TopK = int.TryParse(topKString, out var k) && k > 0 ? k : 5;
+            workspace.RerankEnabled = rerankEnabled;
+
+            await Workspaces.UpdateWorkspaceAsync(workspace);
+            ToastService.Success("Workspace settings updated.", "Saved");
+
+            var newSlug = Workspaces.SlugFor(workspace);
+            if (!string.Equals(newSlug, currentSlug, StringComparison.OrdinalIgnoreCase))
+            {
+                Nav.NavigateTo($"/workspace/{newSlug}/settings", forceLoad: false);
+            }
+            else
+            {
+                currentSlug = newSlug;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save workspace settings");
+            ToastService.Error(ex.Message, "Save failed");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task AddMemberAsync()
+    {
+        if (workspace is null || string.IsNullOrWhiteSpace(newMemberUserId)) return;
+        await Workspaces.AddMemberAsync(workspace.WorkspaceId, newMemberUserId.Trim(), newMemberRole);
+        newMemberUserId = string.Empty;
+        members.Clear();
+        members.AddRange(await Workspaces.GetMembersAsync(workspace.WorkspaceId));
+    }
+
+    private async Task RemoveMemberAsync(long assignmentId)
+    {
+        if (workspace is null) return;
+        await Workspaces.RemoveMemberAsync(assignmentId);
+        members.Clear();
+        members.AddRange(await Workspaces.GetMembersAsync(workspace.WorkspaceId));
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (workspace is null) return;
+        try
+        {
+            await Workspaces.DeleteWorkspaceAsync(workspace.WorkspaceId);
+            showDeleteDialog = false;
+            ToastService.Success("The workspace was removed.", "Workspace deleted");
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete workspace");
+            ToastService.Error(ex.Message, "Delete failed");
+        }
+    }
+
+    private static string Initials(string userId)
+        => string.IsNullOrEmpty(userId) ? "?" : userId[..Math.Min(2, userId.Length)].ToUpperInvariant();
+}

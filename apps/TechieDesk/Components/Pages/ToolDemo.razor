@@ -1,0 +1,320 @@
+@page "/tool-demo"
+@using TechieRag.Abstractions
+@using TechieRag.Models
+@using TechieRag.Services
+@using System.Text.Json
+@inject TechieDesk.Services.TechieRagManager TechieRag
+@inject ToastService ToastService
+
+<PageTitle>Tool Calling Demo</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Tool Calling Demo</h1>
+        <TypographyMuted>Demonstrate the agent tool-calling loop with sample tools.</TypographyMuted>
+    </div>
+
+    <!-- Available Tools -->
+    <Card>
+        <CardHeader>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle>Available Tools</CardTitle>
+                <Sheet>
+                    <SheetTrigger AsChild>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small">
+                            <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                            Add Custom Tool
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent>
+                        <SheetHeader>
+                            <SheetTitle>Add Custom Tool</SheetTitle>
+                            <SheetDescription>Register a custom tool with a mock response.</SheetDescription>
+                        </SheetHeader>
+                        <div class="space-y-4 py-4">
+                            <Field>
+                                <FieldLabel>Tool Name</FieldLabel>
+                                <FieldContent>
+                                    <Input @bind-Value="customToolName" Placeholder="my_tool" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Description</FieldLabel>
+                                <FieldContent>
+                                    <Input @bind-Value="customToolDescription" Placeholder="Does something useful" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Parameters (JSON Schema)</FieldLabel>
+                                <FieldContent>
+                                    <Textarea @bind-Value="customToolSchema" Placeholder='{"type":"object","properties":{}}' Class="min-h-[80px] font-mono text-sm" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>Mock Response</FieldLabel>
+                                <FieldContent>
+                                    <Textarea @bind-Value="customToolResponse" Placeholder="Response to return when tool is called" />
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <SheetFooter>
+                            <Button OnClick="AddCustomTool">Add Tool</Button>
+                        </SheetFooter>
+                    </SheetContent>
+                </Sheet>
+            </div>
+        </CardHeader>
+        <CardContent>
+            <div class="relative overflow-x-auto">
+            <DataTable TData="ToolDisplayRow" Data="@toolRows" ShowPagination="false" ShowToolbar="false">
+                <Columns>
+                    <DataTableColumn TData="ToolDisplayRow" TValue="string" Property="@(r => r.Name)" Header="Tool Name" />
+                    <DataTableColumn TData="ToolDisplayRow" TValue="string" Property="@(r => r.Description)" Header="Description" />
+                    <DataTableColumn TData="ToolDisplayRow" TValue="string" Property="@(r => r.Status)" Header="Status" />
+                </Columns>
+            </DataTable>
+            </div>
+        </CardContent>
+    </Card>
+
+    <!-- Agent Interaction -->
+    <Card>
+        <CardHeader>
+            <CardTitle>Agent Interaction</CardTitle>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div class="flex flex-col sm:flex-row gap-2">
+                <Textarea @bind-Value="agentInput" Placeholder="What's the weather in New Delhi and what is 42*17?" Class="flex-1 min-h-[44px]" />
+                <Button OnClick="RunAgentLoop" Disabled="isRunning">
+                    @if (isRunning) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Running...</span> }
+                    else { <span>Run Agent Loop</span> }
+                </Button>
+            </div>
+
+            @if (executionSteps.Count > 0)
+            {
+                <Separator />
+                <div>
+                    <TypographyH4>Execution Trace</TypographyH4>
+                    <div class="space-y-2 mt-2">
+                        @foreach (var step in executionSteps)
+                        {
+                            <div class="rounded-md border p-3 text-sm">
+                                <div class="font-medium">Step @step.StepNumber: @step.Description</div>
+                                @if (!string.IsNullOrEmpty(step.Result))
+                                {
+                                    <div class="mt-1 text-muted-foreground font-mono text-xs bg-muted rounded p-2">@step.Result</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(finalAnswer))
+            {
+                <Separator />
+                <div>
+                    <TypographyH4>Final Answer</TypographyH4>
+                    <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4 mt-2">@finalAnswer</div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(agentStats))
+                {
+                    <TypographyMuted>@agentStats</TypographyMuted>
+                }
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private ToolRegistry toolRegistry = new();
+    private List<ToolDisplayRow> toolRows = new();
+    private List<ExecutionStep> executionSteps = new();
+    private string? agentInput;
+    private string? finalAnswer;
+    private string? agentStats;
+    private bool isRunning;
+
+    // Custom tool fields
+    private string? customToolName;
+    private string? customToolDescription;
+    private string? customToolSchema;
+    private string? customToolResponse;
+
+    protected override void OnInitialized()
+    {
+        RegisterDemoTools();
+        RefreshToolList();
+    }
+
+    private static string GetJsonProp(string json, string prop)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty(prop, out var el) ? el.GetString() ?? "" : "";
+        }
+        catch { return ""; }
+    }
+
+    private void RegisterDemoTools()
+    {
+        toolRegistry.Register(
+            "get_weather",
+            "Gets current weather for a city",
+            """{"type":"object","properties":{"city":{"type":"string","description":"City name"}},"required":["city"]}""",
+            argsJson =>
+            {
+                var city = GetJsonProp(argsJson, "city");
+                if (string.IsNullOrEmpty(city)) city = "Unknown";
+                return $"32°C, Partly Cloudy, Humidity: 65% in {city}";
+            });
+
+        toolRegistry.Register(
+            "calculate_math",
+            "Evaluates simple math expressions",
+            """{"type":"object","properties":{"expression":{"type":"string","description":"Math expression"}},"required":["expression"]}""",
+            argsJson =>
+            {
+                var expr = GetJsonProp(argsJson, "expression");
+                if (string.IsNullOrEmpty(expr)) expr = "0";
+                try
+                {
+                    var result = new System.Data.DataTable().Compute(expr, "");
+                    return result?.ToString() ?? "Error";
+                }
+                catch
+                {
+                    return $"Could not evaluate: {expr}";
+                }
+            });
+
+        toolRegistry.Register(
+            "search_documents",
+            "Searches ingested documents for relevant content",
+            """{"type":"object","properties":{"query":{"type":"string","description":"Search query"}},"required":["query"]}""",
+            async (argsJson, ct) =>
+            {
+                var query = GetJsonProp(argsJson, "query");
+                var results = await TechieRag.SearchAsync(query, 3, cancellationToken: ct);
+                if (results.Count == 0) return "No matching documents found.";
+                return string.Join("\n", results.Select(r => $"[{r.Score:P0}] {r.Chunk.Text[..Math.Min(200, r.Chunk.Text.Length)]}..."));
+            });
+
+        toolRegistry.Register(
+            "get_current_time",
+            "Returns current date and time",
+            """{"type":"object","properties":{}}""",
+            _ => $"UTC: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}, Local: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+    }
+
+    private void RefreshToolList()
+    {
+        toolRows = toolRegistry.ToolDefinitions
+            .Select(t => new ToolDisplayRow(t.Name, t.Description, "Active"))
+            .ToList();
+    }
+
+    private void AddCustomTool()
+    {
+        if (string.IsNullOrWhiteSpace(customToolName) || string.IsNullOrWhiteSpace(customToolDescription))
+        {
+            ToastService.Error("Name and description are required.", "Error");
+            return;
+        }
+
+        var mockResponse = customToolResponse ?? "Custom tool response";
+        toolRegistry.Register(
+            customToolName!,
+            customToolDescription!,
+            customToolSchema ?? """{"type":"object","properties":{}}""",
+            (string _) => mockResponse);
+
+        RefreshToolList();
+        customToolName = null;
+        customToolDescription = null;
+        customToolSchema = null;
+        customToolResponse = null;
+        ToastService.Success("Custom tool added.", "Added");
+    }
+
+    private async Task RunAgentLoop()
+    {
+        var provider = await TechieRag.GetLlmProviderAsync();
+        if (provider is null)
+        {
+            ToastService.Error("No LLM provider configured. Go to LLM Settings.", "Error");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(agentInput)) return;
+
+        isRunning = true;
+        executionSteps.Clear();
+        finalAnswer = null;
+        agentStats = null;
+        StateHasChanged();
+
+        try
+        {
+            var runner = new AgentLoopRunner(provider, toolRegistry, maxIterations: 5);
+
+            var messages = new List<ChatMessage>
+            {
+                ChatMessage.User(agentInput!)
+            };
+
+            // Live execution trace — append each reported step and re-render as it arrives.
+            var progress = new Progress<AgentStep>(step =>
+            {
+                executionSteps.Add(ToExecutionStep(step));
+                InvokeAsync(StateHasChanged);
+            });
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var response = await runner.RunAsync(messages, progress: progress);
+            sw.Stop();
+
+            finalAnswer = response.Content;
+            agentStats = $"{sw.ElapsedMilliseconds}ms | {response.Usage.InputTokens + response.Usage.OutputTokens} tokens";
+
+            if (executionSteps.Count == 0)
+            {
+                executionSteps.Add(new ExecutionStep(1, "LLM generated final answer", null));
+            }
+        }
+        catch (Exception ex)
+        {
+            finalAnswer = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isRunning = false;
+        }
+    }
+
+    private ExecutionStep ToExecutionStep(AgentStep step)
+    {
+        var number = executionSteps.Count + 1;
+        return step.Kind switch
+        {
+            AgentStepKind.ToolCallRequested =>
+                new ExecutionStep(number, $"LLM requested tool(s): {step.ToolName}", null),
+            AgentStepKind.ToolExecuted =>
+                new ExecutionStep(
+                    number,
+                    step.IsSuccess
+                        ? $"Executed {step.ToolName}({step.ToolArgumentsJson})"
+                        : $"Tool {step.ToolName} failed",
+                    step.IsSuccess ? step.Content : step.ErrorMessage),
+            AgentStepKind.MaxIterationsReached =>
+                new ExecutionStep(number, "Max iterations reached — forced final answer", null),
+            _ => new ExecutionStep(number, "LLM generated final answer", null)
+        };
+    }
+
+    private record ToolDisplayRow(string Name, string Description, string Status);
+    private record ExecutionStep(int StepNumber, string Description, string? Result);
+}

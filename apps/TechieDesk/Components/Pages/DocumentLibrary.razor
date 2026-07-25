@@ -1,0 +1,737 @@
+@page "/workspace/{Slug}/documents"
+@using System.Security.Cryptography
+@using TechieRag.Embedded
+@using TrBlazeUI.Components.FileUpload
+@using TrBlazeUI.Components.Empty
+@implements IDisposable
+@inject TechieRagManager Rag
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<DocumentLibrary> Logger
+
+<PageTitle>@(workspace?.Name ?? "Workspace") — Documents</PageTitle>
+
+@* REQ-NFR-010/BRD-101: a backend outage (vector store, persistence store) must not be reported
+   as "this workspace does not exist or you are not assigned to it" — that sends the user to the
+   wrong problem. Unavailability gets its own message naming the real failure. *@
+@if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>Workspace data is unavailable</AlertTitle>
+        <AlertDescription>
+            The document store could not be reached, so this workspace cannot be opened right now.
+            Check the vector store and embedding configuration, then reload. Details: @loadError
+        </AlertDescription>
+    </Alert>
+}
+else if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>Workspace not available</AlertTitle>
+        <AlertDescription>This workspace does not exist or you are not assigned to it.</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>Loading documents…</span>
+    </div>
+}
+else
+{
+    <div class="mb-4 flex items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Documents — @workspace.Name</h1>
+            <TypographyMuted>Files chunked, embedded, and scoped to this workspace's knowledge.</TypographyMuted>
+        </div>
+        @if (canManage)
+        {
+            <div class="ml-auto flex items-center gap-2">
+                <Switch @bind-Checked="pinOnUpload" Id="pin-on-upload" />
+                <Label For="pin-on-upload">Pin new uploads</Label>
+            </div>
+        }
+    </div>
+
+    @* BGE-M3 offline model readiness — embedding runs locally against the bundled model. *@
+    @if (isDownloadingModel)
+    {
+        <Alert Variant="AlertVariant.Warning" Class="mb-4">
+            <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
+            <AlertTitle>Preparing embedding model (BGE-M3)</AlertTitle>
+            <AlertDescription>@downloadProgress?.StatusMessage</AlertDescription>
+        </Alert>
+    }
+
+    @* REQ-UI-019: drag-drop + file-picker multi-upload. *@
+    @if (canManage)
+    {
+        <Card Class="mb-4">
+            <CardContent Class="p-4">
+                <FileUpload Multiple="true"
+                            MaxFileSize="67108864"
+                            Accept="@acceptTypes"
+                            Files="uploadFiles"
+                            FilesChanged="OnFilesChangedAsync"
+                            Disabled="isUploading" />
+                <TypographyMuted Class="mt-2 block">
+                    Drag &amp; drop or browse — PDF, DOCX, XLSX, PPTX, MD, TXT, HTML, CSV, JSON + 70 code types.
+                </TypographyMuted>
+            </CardContent>
+        </Card>
+    }
+
+    @* REQ-UI-019 / REQ-UI-020 / REQ-RAG-011 / REQ-RAG-012: upload queue with per-file live status. *@
+    @if (uploadQueue.Count > 0)
+    {
+        <Card Class="mb-4">
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle>Uploads (@uploadQueue.Count)</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearFinishedUploads" Disabled="isUploading">Clear finished</Button>
+                </div>
+            </CardHeader>
+            <CardContent Class="space-y-3">
+                @foreach (var item in uploadQueue)
+                {
+                    <div class="flex items-center gap-3">
+                        <div class="w-48 shrink-0 truncate text-sm" title="@item.Name">@item.Name</div>
+                        <div class="flex-1">
+                            <Progress Value="@item.Progress" />
+                        </div>
+                        <div class="w-40 shrink-0 text-right text-xs">
+                            @switch (item.Status)
+                            {
+                                case UploadStatus.Queued:
+                                    <span class="text-muted-foreground">Queued</span>
+                                    break;
+                                case UploadStatus.Embedding:
+                                    <Badge Variant="BadgeVariant.Secondary">Embedding…</Badge>
+                                    break;
+                                case UploadStatus.Embedded:
+                                    <Badge>Embedded</Badge>
+                                    break;
+                                case UploadStatus.Duplicate:
+                                    <Badge Variant="BadgeVariant.Outline">Reused (dedupe)</Badge>
+                                    break;
+                                case UploadStatus.Rejected:
+                                    <Badge Variant="BadgeVariant.Destructive">Rejected</Badge>
+                                    break;
+                                case UploadStatus.Failed:
+                                    <Badge Variant="BadgeVariant.Destructive">Failed</Badge>
+                                    break;
+                            }
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(item.Message))
+                    {
+                        <div class="-mt-1 pl-2 text-xs text-muted-foreground">@item.Message</div>
+                    }
+                }
+            </CardContent>
+        </Card>
+    }
+
+    @* REQ-UI-021: library table (pin, name, type, size, chunks, uploaded, workspaces, status, actions). *@
+    <Card>
+        <CardHeader>
+            <CardTitle>Library (@rows.Count document@(rows.Count == 1 ? "" : "s"))</CardTitle>
+            <CardDescription>All documents embedded in this workspace.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            @if (isLoadingRows)
+            {
+                <div class="flex items-center gap-2 text-muted-foreground">
+                    <Spinner Size="SpinnerSize.Small" /> <span>Loading library…</span>
+                </div>
+            }
+            else if (rows.Count == 0)
+            {
+                <Empty Title="No documents yet"
+                       Description="Upload files above to give this workspace knowledge.">
+                    <Icon><LucideIcon aria-hidden="true" Name="file-text" Size="28" /></Icon>
+                </Empty>
+            }
+            else
+            {
+                @* TR-004: DataTable must scroll inside an inline-style overflow wrapper at 390px. *@
+                <div style="overflow-x:auto">
+                    <DataTable TData="DocRow" Data="@rows" ShowToolbar="false" ShowPagination="false">
+                        <Columns>
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "")" Header="" Width="44px">
+                                <CellTemplate Context="row">
+                                    <button type="button" class="rounded p-1 hover:bg-muted @(row.IsPinned ? "text-primary" : "text-muted-foreground")"
+                                            title="@(row.IsPinned ? "Pinned — always in workspace context" : "Pin — keep in context")"
+                                            disabled="@(!canManage || busyDocId == row.DocumentId)"
+                                            @onclick="@(() => TogglePinAsync(row))">
+                                        <LucideIcon aria-hidden="true" Name="pin" Size="15" />
+                                    </button>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Name)" Header="Name" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Type)" Header="Type">
+                                <CellTemplate Context="row">
+                                    <Badge Variant="BadgeVariant.Secondary">@row.Type</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.SizeDisplay)" Header="Size" />
+                            <DataTableColumn TData="DocRow" TValue="int" Property="@(r => r.ChunkCount)" Header="Chunks" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Uploaded)" Header="Uploaded" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.WorkspacesUsing)" Header="Workspaces" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "Embedded")" Header="Status">
+                                <CellTemplate Context="row">
+                                    <Badge>Embedded</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "")" Header="" MinWidth="150px">
+                                <CellTemplate Context="row">
+                                    <div class="flex justify-end gap-1">
+                                        @if (canManage)
+                                        {
+                                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                                    OnClick="@(() => UnembedAsync(row))" Disabled="@(busyDocId == row.DocumentId)"
+                                                    title="Remove from this workspace (vectors kept for reuse)">
+                                                Unembed
+                                            </Button>
+                                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                                    OnClick="@(() => BeginDelete(row))" Disabled="@(busyDocId == row.DocumentId)">
+                                                Delete
+                                            </Button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-xs text-muted-foreground">View only</span>
+                                        }
+                                    </div>
+                                </CellTemplate>
+                            </DataTableColumn>
+                        </Columns>
+                    </DataTable>
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <div class="mt-4 text-xs text-muted-foreground">
+        A document embedded once is reused across workspaces (content-hash dedupe). <b>Unembed</b> removes it from this
+        workspace only; <b>Delete</b> removes its vectors from every workspace.
+    </div>
+}
+
+@* REQ-FN-012: delete confirmation — removes vectors from all using workspaces. *@
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>Delete '@pendingDelete?.Name'?</DialogTitle>
+            <DialogDescription>
+                This permanently removes the document and its embeddings from
+                @(pendingDelete is null ? "this workspace" : $"{pendingDelete.UsageCount} workspace{(pendingDelete.UsageCount == 1 ? "" : "s")}") that use it. This cannot be undone.
+            </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">Delete everywhere</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Workspace? workspace;
+    private bool notFound;
+
+    /// <summary>Backend failure message when the workspace could not be loaded (REQ-NFR-010).</summary>
+    private string? loadError;
+    private string? loadedSlug;
+    private bool canManage;
+
+    private bool isLoadingRows;
+    private readonly List<DocRow> rows = new();
+
+    private IReadOnlyList<FileUploadItem> uploadFiles = Array.Empty<FileUploadItem>();
+    private readonly List<UploadItem> uploadQueue = new();
+    private bool isUploading;
+    private bool pinOnUpload;
+
+    private string? busyDocId;
+    private bool showDeleteDialog;
+    private DocRow? pendingDelete;
+
+    private bool isDownloadingModel;
+    private ModelDownloadProgress? downloadProgress;
+
+    // REQ-RAG-033 landed XLSX/PPTX/CSV processors, so those types are now accepted alongside the
+    // original nine. Everything else falls through to a supported processor or a clean per-file
+    // rejection (REQ-RAG-011).
+    // The accept/reject matrix lives in UploadTypePolicy so it can be unit-tested directly.
+    private const string acceptTypes = TechieDesk.Services.Data.UploadTypePolicy.AcceptTypes;
+
+    protected override void OnInitialized()
+    {
+        ModelDownloadService.Instance.ProgressChanged += OnDownloadProgressChanged;
+        downloadProgress = ModelDownloadService.Instance.Progress;
+        UpdateDownloadStatus();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug)
+        {
+            return;
+        }
+
+        loadedSlug = Slug;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+        rows.Clear();
+        uploadQueue.Clear();
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            canManage = Workspaces.CanManageWorkspaces;
+            await Rag.InitializeAsync();
+            await ReloadLibraryAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load document library for {Slug}", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// Rebuilds the library table by joining this workspace's document memberships with the global
+    /// document catalog (name/chunks/date) and a cross-workspace usage map (workspaces-using column).
+    /// </summary>
+    private async Task ReloadLibraryAsync()
+    {
+        if (workspace is null)
+        {
+            return;
+        }
+
+        isLoadingRows = true;
+        StateHasChanged();
+        try
+        {
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (manager is null)
+            {
+                return;
+            }
+
+            var store = manager.GetStore();
+            var wsDocs = await store.ListDocumentsAsync(workspace.WorkspaceId);
+
+            // Global catalog for the display fields the membership record does not carry.
+            var catalog = new Dictionary<string, Document>(StringComparer.Ordinal);
+            foreach (var doc in await Rag.ListDocumentsAsync())
+            {
+                catalog[doc.Id] = doc;
+            }
+
+            // Cross-workspace usage: which workspaces reference each document id.
+            var usage = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            IReadOnlyList<Workspace> allWorkspaces;
+            try
+            {
+                allWorkspaces = await manager.ListWorkspacesAsync();
+            }
+            catch
+            {
+                allWorkspaces = new[] { workspace };
+            }
+
+            foreach (var ws in allWorkspaces)
+            {
+                foreach (var link in await store.ListDocumentsAsync(ws.WorkspaceId))
+                {
+                    if (!usage.TryGetValue(link.DocumentId, out var names))
+                    {
+                        names = new List<string>();
+                        usage[link.DocumentId] = names;
+                    }
+                    if (!names.Contains(ws.Name))
+                    {
+                        names.Add(ws.Name);
+                    }
+                }
+            }
+
+            rows.Clear();
+            foreach (var link in wsDocs)
+            {
+                catalog.TryGetValue(link.DocumentId, out var doc);
+                var name = doc?.Name ?? link.DocumentId;
+                var usingNames = usage.TryGetValue(link.DocumentId, out var list) ? list : new List<string> { workspace.Name };
+                rows.Add(new DocRow
+                {
+                    DocumentId = link.DocumentId,
+                    Name = name,
+                    Type = TypeLabel(name),
+                    SizeDisplay = SizeFromMetadata(doc),
+                    ChunkCount = doc?.ChunkCount ?? 0,
+                    Uploaded = (doc?.IngestedAt ?? link.AddedAt).ToLocalTime().ToString("yyyy-MM-dd"),
+                    WorkspacesUsing = string.Join(", ", usingNames),
+                    UsageCount = usingNames.Count,
+                    IsPinned = link.IsPinned,
+                    ContentHash = link.ContentHash
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to reload workspace library");
+            ToastService.Error(ex.Message, "Library load failed");
+        }
+        finally
+        {
+            isLoadingRows = false;
+            StateHasChanged();
+        }
+    }
+
+    // REQ-UI-019: multi-file upload handler — validates, dedupes, and embeds each queued file.
+    private async Task OnFilesChangedAsync(IReadOnlyList<FileUploadItem> files)
+    {
+        uploadFiles = files;
+        if (workspace is null || files.Count == 0 || isUploading)
+        {
+            return;
+        }
+
+        var batch = files.Select(f => new UploadItem(f)).ToList();
+        uploadQueue.InsertRange(0, batch);
+        isUploading = true;
+        StateHasChanged();
+
+        var manager = await Rag.GetWorkspaceManagerAsync();
+        if (manager is null)
+        {
+            foreach (var item in batch)
+            {
+                item.Fail("Workspace persistence is not configured.");
+            }
+            isUploading = false;
+            StateHasChanged();
+            return;
+        }
+
+        var store = manager.GetStore();
+        var embeddedAny = false;
+
+        foreach (var item in batch)
+        {
+            // REQ-RAG-011: clear per-file rejection for genuinely unsupported types (no crash).
+            var rejection = TechieDesk.Services.Data.UploadTypePolicy.GetRejectionReason(item.Name);
+            if (rejection is not null)
+            {
+                item.Reject(rejection);
+                StateHasChanged();
+                continue;
+            }
+
+            item.Status = UploadStatus.Embedding;
+            item.Progress = 55;
+            StateHasChanged();
+
+            string? tempDir = null;
+            try
+            {
+                byte[] bytes;
+                await using (var readStream = item.Source.File.OpenReadStream(67108864))
+                await using (var buffer = new MemoryStream())
+                {
+                    await readStream.CopyToAsync(buffer);
+                    bytes = buffer.ToArray();
+                }
+
+                // REQ-RAG-012: content-hash dedupe pre-check so the UI can surface "reused".
+                var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+                var existing = await store.FindDocumentIdByHashAsync(hash);
+
+                // IngestFileAsync derives the document name from the file name, so stage the upload
+                // under its original name inside a unique temp directory (keeps the display name clean).
+                tempDir = Path.Combine(Path.GetTempPath(), "techiedesk-uploads", Guid.NewGuid().ToString("N"));
+                Directory.CreateDirectory(tempDir);
+                var tempPath = Path.Combine(tempDir, Path.GetFileName(item.Name));
+                await File.WriteAllBytesAsync(tempPath, bytes);
+
+                await manager.IngestFileAsync(workspace.WorkspaceId, tempPath, pinOnUpload);
+
+                if (existing is not null)
+                {
+                    item.Status = UploadStatus.Duplicate;
+                    item.Message = "Already embedded — reused across workspaces (no re-embed).";
+                }
+                else
+                {
+                    item.Status = UploadStatus.Embedded;
+                }
+                item.Progress = 100;
+                embeddedAny = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to embed {File}", item.Name);
+                item.Fail(ex.Message.Length > 160 ? ex.Message[..160] : ex.Message);
+            }
+            finally
+            {
+                if (tempDir is not null && Directory.Exists(tempDir))
+                {
+                    try { Directory.Delete(tempDir, recursive: true); } catch { /* best-effort temp cleanup */ }
+                }
+                StateHasChanged();
+            }
+        }
+
+        isUploading = false;
+        uploadFiles = Array.Empty<FileUploadItem>();
+        if (embeddedAny)
+        {
+            await ReloadLibraryAsync();
+        }
+        StateHasChanged();
+    }
+
+    private void ClearFinishedUploads()
+        => uploadQueue.RemoveAll(u => u.Status != UploadStatus.Queued && u.Status != UploadStatus.Embedding);
+
+    // REQ-RAG-013: pin toggle + persistence. Honored by WorkspaceManager.AskAsync and — since
+    // TR-RAG-003 was closed — by WorkspaceManager.AskStreamWithSourcesAsync, which merges pinned
+    // documents into the context on the streaming path the workspace chat uses.
+    private async Task TogglePinAsync(DocRow row)
+    {
+        if (workspace is null || !canManage)
+        {
+            return;
+        }
+
+        busyDocId = row.DocumentId;
+        try
+        {
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (manager is null)
+            {
+                return;
+            }
+            var next = !row.IsPinned;
+            await manager.SetPinnedAsync(workspace.WorkspaceId, row.DocumentId, next);
+            row.IsPinned = next;
+            ToastService.Success(next ? "Pinned — always kept in workspace context." : "Unpinned.", "Updated");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to toggle pin");
+            ToastService.Error(ex.Message, "Pin failed");
+        }
+        finally
+        {
+            busyDocId = null;
+        }
+    }
+
+    // REQ-UI-020: unembed removes the document from THIS workspace only; vectors stay for reuse.
+    private async Task UnembedAsync(DocRow row)
+    {
+        if (workspace is null || !canManage)
+        {
+            return;
+        }
+
+        busyDocId = row.DocumentId;
+        try
+        {
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (manager is null)
+            {
+                return;
+            }
+            await manager.GetStore().RemoveDocumentAsync(workspace.WorkspaceId, row.DocumentId);
+            ToastService.Success("Removed from this workspace. Vectors kept for reuse elsewhere.", "Unembedded");
+            await ReloadLibraryAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to unembed document");
+            ToastService.Error(ex.Message, "Unembed failed");
+        }
+        finally
+        {
+            busyDocId = null;
+        }
+    }
+
+    private void BeginDelete(DocRow row)
+    {
+        pendingDelete = row;
+        showDeleteDialog = true;
+    }
+
+    // REQ-FN-012: delete removes the document from every workspace that uses it AND deletes the shared
+    // vectors from the store (dedupe means one vector copy is shared, so this clears it everywhere).
+    private async Task ConfirmDeleteAsync()
+    {
+        if (workspace is null || pendingDelete is null)
+        {
+            return;
+        }
+
+        var target = pendingDelete;
+        busyDocId = target.DocumentId;
+        try
+        {
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (manager is null)
+            {
+                return;
+            }
+
+            var store = manager.GetStore();
+            foreach (var ws in await manager.ListWorkspacesAsync())
+            {
+                await store.RemoveDocumentAsync(ws.WorkspaceId, target.DocumentId);
+            }
+            await Rag.DeleteDocumentAsync(target.DocumentId);
+
+            ToastService.Success("Document and its embeddings were removed from all workspaces.", "Deleted");
+            showDeleteDialog = false;
+            pendingDelete = null;
+            await ReloadLibraryAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete document everywhere");
+            ToastService.Error(ex.Message, "Delete failed");
+        }
+        finally
+        {
+            busyDocId = null;
+        }
+    }
+
+    private void OnDownloadProgressChanged(object? sender, ModelDownloadProgress progress)
+    {
+        downloadProgress = progress;
+        UpdateDownloadStatus();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateDownloadStatus()
+    {
+        var status = ModelDownloadService.Instance.Progress.Status;
+        isDownloadingModel = status == ModelDownloadStatus.Downloading || status == ModelDownloadStatus.Checking;
+    }
+
+    public void Dispose() => ModelDownloadService.Instance.ProgressChanged -= OnDownloadProgressChanged;
+
+    private static string TypeLabel(string name)
+    {
+        var ext = Path.GetExtension(name);
+        return string.IsNullOrEmpty(ext) ? "FILE" : ext.TrimStart('.').ToUpperInvariant();
+    }
+
+    private static string SizeFromMetadata(Document? doc)
+    {
+        if (doc is null)
+        {
+            return "—";
+        }
+        foreach (var key in new[] { "FileSize", "Size", "fileSize", "size", "ByteSize" })
+        {
+            if (doc.Metadata.TryGetValue(key, out var value) && TryToLong(value, out var bytes) && bytes > 0)
+            {
+                return FormatSize(bytes);
+            }
+        }
+        return "—";
+    }
+
+    private static bool TryToLong(object value, out long result)
+    {
+        try
+        {
+            result = Convert.ToInt64(value);
+            return true;
+        }
+        catch
+        {
+            result = 0;
+            return false;
+        }
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024L * 1024 * 1024 => $"{bytes / (double)(1024 * 1024 * 1024):F1} GB",
+        >= 1024 * 1024 => $"{bytes / (double)(1024 * 1024):F1} MB",
+        >= 1024 => $"{bytes / (double)1024:F1} KB",
+        _ => $"{bytes} B"
+    };
+
+    /// <summary>A joined, display-ready library row (membership + catalog + usage).</summary>
+    private sealed class DocRow
+    {
+        public required string DocumentId { get; init; }
+        public required string Name { get; init; }
+        public required string Type { get; init; }
+        public required string SizeDisplay { get; init; }
+        public int ChunkCount { get; init; }
+        public required string Uploaded { get; init; }
+        public required string WorkspacesUsing { get; init; }
+        public int UsageCount { get; init; }
+        public bool IsPinned { get; set; }
+        public string ContentHash { get; init; } = string.Empty;
+    }
+
+    private enum UploadStatus { Queued, Embedding, Embedded, Duplicate, Rejected, Failed }
+
+    /// <summary>A per-file upload with live status for the queue (REQ-UI-020).</summary>
+    private sealed class UploadItem
+    {
+        public UploadItem(FileUploadItem source)
+        {
+            Source = source;
+            Name = source.Name;
+        }
+
+        public FileUploadItem Source { get; }
+        public string Name { get; }
+        public UploadStatus Status { get; set; } = UploadStatus.Queued;
+        public int Progress { get; set; }
+        public string? Message { get; set; }
+
+        public void Reject(string message)
+        {
+            Status = UploadStatus.Rejected;
+            Progress = 100;
+            Message = message;
+        }
+
+        public void Fail(string message)
+        {
+            Status = UploadStatus.Failed;
+            Progress = 100;
+            Message = message;
+        }
+    }
+}

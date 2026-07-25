@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk — UI Design Spec (Mockups) — TechieDesk</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieDesk — UI Design Spec (Mockups)</h1>
+    <div class="subtitle">The approved visual contract for the new product screens · 16 mockups · Last updated 2026-07-17</div>
+
+    <blockquote><strong>What this is.</strong> The approved visual design for TechieDesk's NEW product screens (Phases 1–4), produced before the build. Each screen has a <strong>rendered mockup</strong> (<code>docs/mockups/{screen}.html</code>, styled to look like TrBlazeUI) and a <strong>component map</strong> that ties every region to a real <strong>TrBlazeUI control</strong>, so the build (<code>/trblazeui</code>) reproduces it 1:1 and the verifier's visual-truth gate diffs the live screen against it. <strong>19 screens are mocked</strong>: 16 new product screens + 3 console screens (Qdrant Admin, LLM Settings, Token Usage) added as <em>reskin previews</em> so the prototype navigation is complete — the console screens' current-behavior baseline remains the DevGuide screenshots (<code>docs/screenshots/TechieRag/</code>); their mockups show the Phase-1 product shell they migrate into. The P5 flow builder is deferred (mocked when Phase 5 is scheduled). The owner APPROVES this before build.</blockquote>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#how-to-use">How to use</a></li>
+        <li><a href="#design-system-trblazeui">Design system (TrBlazeUI)</a></li>
+        <li><a href="#screens">Screens</a>
+          <ul>
+            <li><a href="#screen-login-login">Login</a> · <a href="#screen-register-register">Register</a> · <a href="#screen-password-recovery-forgot-password-reset-password">Password recovery</a> · <a href="#screen-profile-profile">Profile</a></li>
+            <li><a href="#screen-workspace-chat-workspace-slug">Workspace chat</a> · <a href="#screen-workspace-settings-workspace-slug-settings">Workspace settings</a> · <a href="#screen-document-library-workspace-slug-documents">Document library</a></li>
+            <li><a href="#screen-first-run-wizard-setup">First-run wizard</a> · <a href="#screen-connectors-workspace-slug-connectors">Connectors</a></li>
+            <li><a href="#screen-pricing-pricing">Pricing</a> · <a href="#screen-billing-billing">Billing</a> · <a href="#screen-support-support">Support</a></li>
+            <li><a href="#screen-admin-users-admin-users">Admin: Users</a> · <a href="#screen-admin-event-log-admin-events">Event log</a> · <a href="#screen-admin-chat-logs-admin-chats">Chat logs</a> · <a href="#screen-admin-instance-settings-admin-settings">Instance settings</a></li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <h2 id="how-to-use">How to use<a class="anchor-link" href="#how-to-use">#</a></h2>
+    <ul>
+      <li>Every screen links to its rendered mockup in <code>docs/mockups/</code>. Open the <code>.html</code> files in a browser to see the intended layout with realistic placeholder data.</li>
+      <li>The <strong>Component map</strong> is the build contract: <code>region → TrBlazeUI control</code>. Only controls that exist in the TrBlazeUI catalog (<code>docs/TrBlazeUI-AI-Reference.md</code>) are used. Two library gaps were found and logged (see Design system): no Stepper/Wizard control, no Chat-thread control — both composed from existing primitives.</li>
+      <li>To change a screen after approval: <code>*mockups TechieDesk --update</code>.</li>
+    </ul>
+
+    <h2 id="design-system-trblazeui">Design system (TrBlazeUI)<a class="anchor-link" href="#design-system-trblazeui">#</a></h2>
+    <ul>
+      <li><strong>Source:</strong> TrBlazeUI component catalog (<code>docs/TrBlazeUI-AI-Reference.md</code>, shadcn-style, OKLCH tokens, Tailwind v4).</li>
+      <li><strong>Layout shell:</strong> <code>SidebarProvider</code> + <code>Sidebar</code> (workspace switcher + grouped icon nav via <code>SidebarMenuButton</code> + <code>LucideIcon</code>: Workspace / Account / Admin / Console groups) + <code>SidebarInset</code> main column with a <code>Breadcrumb</code> topbar (license badge + avatar right). Auth screens use a centered-card layout on a soft gradient backdrop, no sidebar.</li>
+      <li><strong>Theme:</strong> <strong>indigo accent</strong> (<code>--primary ≈ #4F46E5</code> light / <code>#818CF8</code> dark, applied via TrBlazeUI's OKLCH theme variables / tweakcn shadcn theme). <strong>Permanently dark slate sidebar</strong> (deep <code>#161B2E→#10131F</code> gradient with accent-tinted active item) against a soft <code>#F6F7F9</code> light canvas — white cards + subtle shadows. <strong>Full dark mode</strong> (<code>html[data-theme="dark"]</code> in the mockups ⇔ TrBlazeUI's <code>.dark</code> in the build): every mockup carries a moon-toggle (topbar on shell screens, floating on auth screens) with the choice persisted; deep <code>#0D1017</code> canvas, <code>#151A26</code> cards, re-tinted badges/alerts/inputs/tables. User chat bubbles = accent; agent execution trace + code snippets = dark slate mono panels in both themes.</li>
+      <li><strong>Clickable prototype:</strong> the mockups are interlinked — every sidebar item (including the three Console screens), the topbar avatar/license badge, and cross-screen CTAs (login → chat, pricing → billing, …) navigate to the sibling mockup file, so the whole app can be walked through in a browser in either theme.</li>
+      <li><strong>Controls inventory used:</strong> <code>Sidebar</code>/<code>SidebarProvider</code>/<code>SidebarInset</code>/<code>SidebarMenuButton</code>, <code>Breadcrumb</code>, <code>Card</code>, <code>Tabs</code>, <code>Button</code>, <code>Input</code>, <code>Textarea</code>, <code>Label</code>, <code>Field</code>, <code>Select</code>, <code>Combobox</code>, <code>MultiSelect</code>, <code>RadioGroup</code>, <code>Checkbox</code>, <code>Switch</code>, <code>Slider</code>, <code>NumericInput</code>, <code>InputGroup</code>, <code>FileUpload</code>, <code>DataTable</code>, <code>Badge</code>, <code>Avatar</code>, <code>Progress</code>, <code>Alert</code>, <code>AlertDialog</code>, <code>Dialog</code>, <code>Sheet</code>, <code>Toast</code>, <code>Empty</code>, <code>Skeleton</code>, <code>Spinner</code>, <code>DropdownMenu</code>, <code>DatePicker</code>, <code>Pagination</code>, <code>ColorPicker</code>, <code>ScrollArea</code>, <code>Separator</code>, <code>Kbd</code>, <code>LucideIcon</code>.</li>
+      <li><strong>Library gaps (logged to <code>docs/TechieRag-TrBlazeUI-Feedback.md</code>):</strong>
+        <ul>
+          <li><strong>TR-005 — no Stepper/Wizard component.</strong> The first-run wizard composes <code>Progress</code> + a custom step-label row + <code>Card</code>.</li>
+          <li><strong>TR-006 — no Chat/message-thread component.</strong> Workspace chat composes <code>ScrollArea</code> + styled message blocks + <code>Badge</code> citation chips + a custom composer.</li>
+        </ul>
+      </li>
+      <li><strong>Standing workaround:</strong> every <code>DataTable</code> gets an inline <code>style="overflow-x:auto"</code> wrapper (TR-004 — the library's <code>.overflow-x-auto</code> class is purged from shipped CSS).</li>
+    </ul>
+
+    <h2 id="screens">Screens<a class="anchor-link" href="#screens">#</a></h2>
+
+    <h3 id="screen-login-login">Screen: Login (<code>/login</code>)<a class="anchor-link" href="#screen-login-login">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/login.html">mockups/login.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-13, BRD-26 · <strong>REQ:</strong> REQ-UI-007, REQ-UI-013</p>
+    <p><strong>Layout:</strong> centered card on muted background; wordmark above; error-state specs shown in a second card.</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Wordmark</td><td>static brand block</td><td>TD mark + name</td><td>—</td></tr>
+        <tr><td>Sign-in form</td><td><code>Card</code> + <code>Field</code>/<code>Input</code> ×2 + <code>Button</code></td><td>email, password → <code>POST /AuthSvc/login</code></td><td>invalid creds <code>Alert</code> (danger)</td></tr>
+        <tr><td>Forgot link</td><td>link beside password <code>Label</code></td><td>→ <code>/forgot-password</code></td><td>—</td></tr>
+        <tr><td>Error states</td><td><code>Alert</code> danger/warning</td><td>INVALID_CREDENTIALS, ACCOUNT_LOCKED (423), ACCOUNT_DISABLED (403)</td><td>distinct copy per code</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Notes:</strong> on success → deep-link return route (REQ-FN-003); password RSA-encrypted client-side (REQ-FN-001). Loading: button shows <code>Spinner</code>. Never blank — every AppManager error code maps to a friendly <code>Alert</code>.</p>
+
+    <h3 id="screen-register-register">Screen: Register (<code>/register</code>)<a class="anchor-link" href="#screen-register-register">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/register.html">mockups/register.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-12 · <strong>REQ:</strong> REQ-UI-006</p>
+    <p><strong>Layout:</strong> centered card; 2-col name row; stacked fields; full-width CTA.</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Form</td><td><code>Card</code> + <code>Field</code>s: <code>Input</code> ×5</td><td>first/last name, email, mobile (optional), password + confirm → <code>POST /AuthSvc/register</code></td><td>per-field validation errors</td></tr>
+        <tr><td>Password hint</td><td><code>Field</code> description</td><td>AppManager complexity rules</td><td>destructive styling on violation</td></tr>
+        <tr><td>CTA</td><td><code>Button</code> (full width)</td><td>Create account → auto-login</td><td><code>Spinner</code> while registering</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-password-recovery-forgot-password-reset-password">Screen: Password recovery (<code>/forgot-password</code>, <code>/reset-password</code>)<a class="anchor-link" href="#screen-password-recovery-forgot-password-reset-password">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/password-recovery.html">mockups/password-recovery.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-17 · <strong>REQ:</strong> REQ-UI-009</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Forgot form</td><td><code>Card</code> + <code>Input</code> + <code>Button</code></td><td>email → <code>/AuthSvc/forgot-password</code></td><td>always-success <code>Alert</code> (anti-enumeration)</td></tr>
+        <tr><td>Reset form</td><td><code>Card</code> + <code>Input</code> ×2 + <code>Button</code></td><td>token (email link) + new password</td><td>INVALID_RESET_TOKEN / APP_ID_MISMATCH <code>Alert</code> danger</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-profile-profile">Screen: Profile (<code>/profile</code>)<a class="anchor-link" href="#screen-profile-profile">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/profile.html">mockups/profile.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-18, BRD-19, BRD-22, BRD-49 · <strong>REQ:</strong> REQ-UI-010, REQ-UI-011, REQ-UI-012</p>
+    <p><strong>Layout:</strong> app shell; header + Save; 2-col card grid (personal + password left; license + GDPR right).</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Personal info</td><td><code>Card</code> + <code>Avatar</code> + <code>Input</code>s</td><td>name/mobile/avatar URL → <code>PUT /UserSvc/profile</code>; email read-only</td><td>save <code>Toast</code></td></tr>
+        <tr><td>Change password</td><td><code>Card</code> + <code>Input</code> ×3 + <code>Button</code> outline</td><td>encrypted current+new → <code>/UserSvc/change-password</code></td><td>INVALID_CURRENT_PASSWORD field error</td></tr>
+        <tr><td>License</td><td><code>Card</code> + <code>Badge</code> success</td><td>plan, expiry, days remaining, devices</td><td>expired → warning + upgrade link</td></tr>
+        <tr><td>GDPR</td><td><code>Card</code> + <code>Button</code> outline/destructive + confirm <code>Input</code></td><td>data-export &amp; delete requests (email confirm)</td><td>EMAIL_MISMATCH error; submitted <code>Alert</code> success</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-workspace-chat-workspace-slug">Screen: Workspace chat (<code>/workspace/{slug}</code>)<a class="anchor-link" href="#screen-workspace-chat-workspace-slug">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/workspace-chat.html">mockups/workspace-chat.html</a> · <strong>Role(s):</strong> assigned users+ · <strong>BRD:</strong> BRD-30, BRD-34, BRD-38, BRD-39, BRD-83, BRD-85, BRD-87, BRD-88 · <strong>REQ:</strong> REQ-UI-016, REQ-UI-017, REQ-UI-018, REQ-UI-034, REQ-UI-035, REQ-UI-036</p>
+    <p><strong>Layout:</strong> app shell; 260px threads panel + chat column (messages, composer, hint line).</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Threads panel</td><td><code>Card</code> + <code>Button</code> outline sm + list + <code>DropdownMenu</code></td><td>threads newest-first; rename/delete</td><td><code>Empty</code>: "No threads yet"</td></tr>
+        <tr><td>Messages</td><td><code>ScrollArea</code> + styled blocks (TR-006 composition)</td><td>user right/muted; assistant left, markdown</td><td>streaming cursor ▍; loading <code>Skeleton</code></td></tr>
+        <tr><td>Citations</td><td><code>Badge</code> chips + expandable panel</td><td>doc name + score; snippet on expand</td><td>absent in Direct-LLM mode</td></tr>
+        <tr><td>Agent trace</td><td>bordered mono panel (F-TOOLS pattern)</td><td>tool steps with timing</td><td>collapses when done</td></tr>
+        <tr><td>Composer</td><td><code>Select</code> + <code>Textarea</code> + <code>Button</code> ghost (mic) + <code>Button</code> (send)</td><td>message; <code>@agent</code> trigger; Shift+Enter (<code>Kbd</code>)</td><td>disabled while streaming; mic pulses</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Notes:</strong> mode = Direct-LLM / Auto-RAG; retrieval workspace-scoped; TTS read-aloud (speaker icon) on assistant messages; provider failure surfaces retry/fallback status as warning <code>Alert</code> in-thread.</p>
+
+    <h3 id="screen-workspace-settings-workspace-slug-settings">Screen: Workspace settings (<code>/workspace/{slug}/settings</code>)<a class="anchor-link" href="#screen-workspace-settings-workspace-slug-settings">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/workspace-settings.html">mockups/workspace-settings.html</a> · <strong>Role(s):</strong> Manager/Admin · <strong>BRD:</strong> BRD-28, BRD-29, BRD-47, BRD-48 · <strong>REQ:</strong> REQ-UI-015, REQ-FN-008</p>
+    <p><strong>Layout:</strong> app shell; header + Save; <code>Tabs</code> General / Retrieval / Members / Danger (mockup shows all four stacked, badged).</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>General</td><td><code>Card</code> + <code>Input</code> ×2 + <code>Textarea</code> + <code>Select</code> + <code>RadioGroup</code></td><td>name, slug, system prompt, LLM override, chat/query mode</td><td>slug conflict error</td></tr>
+        <tr><td>Retrieval</td><td><code>Card</code> + <code>Slider</code> + <code>NumericInput</code> + <code>Switch</code></td><td>threshold, top-K, rerank toggle</td><td>rerank disabled+hint until REQ-RAG-025 ships</td></tr>
+        <tr><td>Members</td><td><code>Card</code> + <code>DataTable</code> + <code>Combobox</code> + <code>Button</code> sm</td><td>member/role rows; add member</td><td><code>Empty</code>: "Only you so far"</td></tr>
+        <tr><td>Danger</td><td><code>Card</code> (danger border) + <code>Button</code> destructive + <code>AlertDialog</code></td><td>delete workspace with consequences copy</td><td>confirm/cancel</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-document-library-workspace-slug-documents">Screen: Document library (<code>/workspace/{slug}/documents</code>)<a class="anchor-link" href="#screen-document-library-workspace-slug-documents">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/document-library.html">mockups/document-library.html</a> · <strong>Role(s):</strong> Manager/Admin manage, User view · <strong>BRD:</strong> BRD-40…46 · <strong>REQ:</strong> REQ-UI-019, REQ-UI-020, REQ-UI-021</p>
+    <p><strong>Layout:</strong> app shell; header + Upload; dropzone; upload queue; library table; empty-state spec.</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Dropzone</td><td><code>FileUpload</code> (drag-drop, multi)</td><td>accepted types incl. XLSX/PPTX</td><td>per-file rejection with reason</td></tr>
+        <tr><td>Upload queue</td><td><code>Card</code> + <code>Progress</code> rows</td><td>per-file embed progress</td><td>queued / embedding % / done</td></tr>
+        <tr><td>Library table</td><td><code>DataTable</code> in <code>overflow-x:auto</code> wrapper (TR-004)</td><td>pin, name, type, size, chunks, uploaded, workspaces, status <code>Badge</code>, actions</td><td>embedded / embedding / failed(+reason)</td></tr>
+        <tr><td>Pin</td><td>toggle icon (<code>LucideIcon</code>)</td><td>always-in-context flag</td><td>tooltip</td></tr>
+        <tr><td>Delete</td><td><code>Button</code> ghost sm + <code>AlertDialog</code></td><td>removes vectors everywhere (dedupe)</td><td>confirm shows usage count</td></tr>
+        <tr><td>Empty state</td><td><code>Empty</code></td><td>"No documents yet…"</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-first-run-wizard-setup">Screen: First-run wizard (<code>/setup</code>)<a class="anchor-link" href="#screen-first-run-wizard-setup">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/setup-wizard.html">mockups/setup-wizard.html</a> · <strong>Role(s):</strong> operator (first run) · <strong>BRD:</strong> BRD-52, BRD-53, BRD-54 · <strong>REQ:</strong> REQ-UI-022, REQ-UI-023, REQ-FN-016</p>
+    <p><strong>Layout:</strong> centered 560px card; <code>Progress</code> + 5 step labels (TR-005 composition); step body; Back/Continue.</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Step indicator</td><td><code>Progress</code> + custom labels (TR-005 gap)</td><td>Defaults → AI Provider → AppManager → Admin → Workspace</td><td>done/current/pending</td></tr>
+        <tr><td>Defaults notice</td><td><code>Alert</code> success</td><td>BGE-M3 + SqliteVec applied, zero services</td><td>—</td></tr>
+        <tr><td>Ollama detect</td><td><code>Alert</code> success + <code>Select</code></td><td>detected endpoint + models</td><td>not found → info alert + manual URL</td></tr>
+        <tr><td>Provider choice</td><td><code>RadioGroup</code> (bordered rows)</td><td>Ollama / LM Studio / OpenAI-compatible / skip</td><td>—</td></tr>
+        <tr><td>Nav</td><td><code>Button</code> outline + <code>Button</code></td><td>back / continue</td><td>continue disabled until valid</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Notes:</strong> step 3 captures AppManager settings or explicit <strong>offline single-user mode</strong>; step 4 bootstraps first Admin; step 5 creates the default workspace.</p>
+
+    <h3 id="screen-connectors-workspace-slug-connectors">Screen: Connectors (<code>/workspace/{slug}/connectors</code>)<a class="anchor-link" href="#screen-connectors-workspace-slug-connectors">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/connectors.html">mockups/connectors.html</a> · <strong>Role(s):</strong> Manager/Admin · <strong>BRD:</strong> BRD-60…65 · <strong>REQ:</strong> REQ-RAG-016…020, REQ-FN-020 · <strong>Phase 2</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Source cards</td><td><code>Card</code> ×5 + <code>Button</code> outline sm</td><td>URL / crawler / YouTube / GitHub-GitLab / Confluence</td><td>license-gated <code>CONNECTORS</code> → upgrade prompt</td></tr>
+        <tr><td>Config panel</td><td><code>Card</code> + <code>Field</code>s + <code>Button</code></td><td>per-source params</td><td>validation</td></tr>
+        <tr><td>Jobs</td><td><code>DataTable</code> + <code>Progress</code> + <code>Badge</code></td><td>source, target, progress, status, items, started</td><td>running / completed / failed(+reason)</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-pricing-pricing">Screen: Pricing (<code>/pricing</code>)<a class="anchor-link" href="#screen-pricing-pricing">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/pricing.html">mockups/pricing.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-76, BRD-79 · <strong>REQ:</strong> REQ-UI-029, REQ-FN-026 · <strong>Phase 3</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Currency</td><td><code>Select</code></td><td><code>GET /LicenseSvc/types?aCurrency=</code></td><td>—</td></tr>
+        <tr><td>Tier cards</td><td><code>Card</code> ×3 (ring on current) + <code>Badge</code></td><td>features per BRD §5 matrix; CTA per tier</td><td>current-plan state</td></tr>
+        <tr><td>Promo</td><td><code>InputGroup</code> + <code>Button</code> + <code>Alert</code></td><td><code>POST /PaymentSvc/promo-codes/validate</code></td><td>valid / each error code distinct</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-billing-billing">Screen: Billing (<code>/billing</code>)<a class="anchor-link" href="#screen-billing-billing">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/billing.html">mockups/billing.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-77, BRD-78 · <strong>REQ:</strong> REQ-UI-030, REQ-UI-031 · <strong>Phase 3</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Subscription</td><td><code>Card</code> + <code>Badge</code> + <code>Button</code> outline/ghost + <code>AlertDialog</code></td><td>plan, amount, next billing; cancel period-end/immediate</td><td>ALREADY_CANCELLED handled</td></tr>
+        <tr><td>License</td><td><code>Card</code> + mono key + <code>Button</code> ghost sm</td><td>key, status, expiry, devices, deactivate device</td><td>—</td></tr>
+        <tr><td>Transactions</td><td><code>DataTable</code></td><td>number, type, amount, status, date</td><td><code>Pagination</code>; <code>Empty</code></td></tr>
+        <tr><td>Invoices</td><td><code>DataTable</code> + <code>Button</code> outline sm</td><td>download PDF</td><td>PDF_GENERATION_FAILED toast</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-admin-users-admin-users">Screen: Admin — Users (<code>/admin/users</code>)<a class="anchor-link" href="#screen-admin-users-admin-users">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/admin-users.html">mockups/admin-users.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-72, BRD-29 · <strong>REQ:</strong> REQ-UI-025 · <strong>Phase 3</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Toolbar</td><td><code>Input</code> (search) + <code>Button</code></td><td>filter; invite</td><td>—</td></tr>
+        <tr><td>Users table</td><td><code>DataTable</code> + <code>Avatar</code> + <code>Badge</code></td><td>name, email, role (read-only from AppManager), workspace chips, status, last login</td><td>disabled users flagged</td></tr>
+        <tr><td>Assignment</td><td><code>Sheet</code> + <code>Checkbox</code> list + <code>Button</code></td><td>per-user workspace membership (App DB)</td><td>save <code>Toast</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-admin-event-log-admin-events">Screen: Admin — Event log (<code>/admin/events</code>)<a class="anchor-link" href="#screen-admin-event-log-admin-events">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/admin-events.html">mockups/admin-events.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-73 · <strong>REQ:</strong> REQ-UI-026 · <strong>Phase 3</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Filters</td><td><code>DatePicker</code> ×2 + <code>Select</code> + <code>Input</code> + <code>Button</code> outline</td><td>date range, category, text</td><td>—</td></tr>
+        <tr><td>Events</td><td><code>DataTable</code> + <code>Badge</code></td><td>time, category, actor, event, source</td><td><code>Pagination</code>; <code>Empty</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-admin-chat-logs-admin-chats">Screen: Admin — Chat logs (<code>/admin/chats</code>)<a class="anchor-link" href="#screen-admin-chat-logs-admin-chats">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/admin-chats.html">mockups/admin-chats.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-74 · <strong>REQ:</strong> REQ-UI-027 · <strong>Phase 3</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Filters + export</td><td><code>Select</code> ×2 + <code>Input</code> + <code>Button</code> outline</td><td>workspace, user, text; JSON export</td><td>export logged to event log</td></tr>
+        <tr><td>Compliance note</td><td><code>Alert</code> info</td><td>admin-only visibility notice</td><td>—</td></tr>
+        <tr><td>Threads table</td><td><code>DataTable</code></td><td>workspace, user, thread, counts, last activity</td><td>row → preview</td></tr>
+        <tr><td>Preview</td><td><code>Card</code> + message blocks</td><td>2-bubble excerpt + open-full</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-admin-instance-settings-admin-settings">Screen: Admin — Instance settings (<code>/admin/settings</code>)<a class="anchor-link" href="#screen-admin-instance-settings-admin-settings">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/admin-settings.html">mockups/admin-settings.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-75, BRD-89, BRD-90, BRD-71, BRD-67 · <strong>REQ:</strong> REQ-UI-028, REQ-UI-037, REQ-UI-038, REQ-UI-024, REQ-FN-022 · <strong>Phase 3–4</strong></p>
+    <p><strong>Layout:</strong> app shell; header + Save; <code>Tabs</code> Defaults / Branding / Widget / API Keys (mockup shows all four stacked, badged).</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Defaults</td><td><code>Card</code> + <code>Select</code> ×3 + <code>NumericInput</code></td><td>default LLM/embeddings/vector store, upload limit</td><td>—</td></tr>
+        <tr><td>Branding</td><td><code>Card</code> + <code>FileUpload</code> + <code>Input</code>s + <code>ColorPicker</code> + <code>RadioGroup</code></td><td>white-label fields, accent, default theme</td><td>gated <code>WHITE_LABEL</code> → upgrade prompt</td></tr>
+        <tr><td>Widget</td><td><code>Card</code> + <code>Select</code>s + <code>Input</code> + code <code>pre</code> + preview pane</td><td>workspace, position, accent, welcome; embed snippet + preview bubble</td><td>gated <code>EMBED_WIDGET</code></td></tr>
+        <tr><td>API keys</td><td><code>Card</code> + <code>Button</code> sm + <code>Alert</code> success + <code>DataTable</code> + <code>Button</code> destructive sm</td><td>create (shown once), hashed-prefix list, revoke</td><td>revoked rows struck</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-support-support">Screen: Support (<code>/support</code>)<a class="anchor-link" href="#screen-support-support">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/support.html">mockups/support.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-80, BRD-81, BRD-82 · <strong>REQ:</strong> REQ-UI-032, REQ-UI-033, REQ-FN-027 · <strong>Phase 3</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>New issue</td><td><code>Dialog</code> + <code>Input</code> + <code>Select</code> ×2 + <code>Textarea</code> + <code>Button</code></td><td>title/type/priority/description → <code>POST /IssueSvc</code></td><td>created <code>Toast</code> with ISS number</td></tr>
+        <tr><td>Issues</td><td><code>DataTable</code> + <code>Badge</code></td><td>number, title, type, priority, status, updated</td><td>status filter; <code>Empty</code></td></tr>
+        <tr><td>Issue detail</td><td><code>Card</code> + comment thread + <code>Textarea</code> + <code>Button</code>s</td><td>comments, close issue</td><td>ALREADY_CLOSED handled</td></tr>
+      </tbody>
+    </table>
+
+    <h3 id="screen-console-reskins-qdrant-admin-llm-settings-token-usage-qdrant-admin-llm-settings-token-usage">Screen: Console reskins — Qdrant Admin / LLM Settings / Token Usage (<code>/qdrant-admin</code>, <code>/llm-settings</code>, <code>/token-usage</code>)<a class="anchor-link" href="#screen-console-reskins-qdrant-admin-llm-settings-token-usage-qdrant-admin-llm-settings-token-usage">#</a></h3>
+    <p><strong>Mockups:</strong> <a href="./mockups/qdrant-admin.html">qdrant-admin.html</a> · <a href="./mockups/llm-settings.html">llm-settings.html</a> · <a href="./mockups/token-usage.html">token-usage.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-8, BRD-9, BRD-10 (pre-existing features) · <strong>REQ:</strong> REQ-UI-003, REQ-UI-004, REQ-UI-005 (<code>Done (pre-existing)</code>)</p>
+    <p>These three screens already exist and are Verified — the mockups are <strong>reskin previews</strong> showing them inside the Phase-1 product shell (dark sidebar, Console nav group, new theme), added so the clickable prototype has no dead nav items. Functional baseline stays the DevGuide screenshots; when the Phase-1 shell lands, these screens adopt it with no behavioral change (regression-gated by the existing Playwright specs).</p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th></tr></thead>
+      <tbody>
+        <tr><td>Qdrant: container / collections / point browser</td><td><code>Card</code> + <code>Badge</code> + <code>DataTable</code> (overflow wrapper) + dark <code>pre</code> payload panel</td><td>existing QdrantAdminService data</td></tr>
+        <tr><td>LLM Settings: chat provider / embeddings / resilience</td><td><code>Card</code> + <code>Field</code>/<code>Select</code>/<code>Input</code> + <code>Slider</code> + <code>Switch</code> + <code>Alert</code></td><td>existing TechieRagConfigService bindings</td></tr>
+        <tr><td>Token Usage: stat tiles / budget / provider + ops tables</td><td><code>Card</code> + icon tiles + <code>Progress</code> + <code>Switch</code> + <code>DataTable</code></td><td>existing token tracker data</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+    <p>Last updated: 2026-07-18 · <strong>19 screens mocked</strong> (16 product + 3 console reskin previews) · Dark mode + dark sidebar shipped in all mockups · Flow builder (P5): not yet mocked</p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+</script>
+</body>
+</html>

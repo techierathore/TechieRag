@@ -65,6 +65,23 @@ public class AzureAIFoundryLlmProvider : ILlmProvider
         httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
     }
 
+    /// <summary>
+    /// Creates an Azure AI Foundry provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Deployment/model name.</param>
+    /// <param name="apiVersion">API version.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal AzureAIFoundryLlmProvider(HttpClient httpClient, string model, string apiVersion = "2024-12-01-preview", ILogger<AzureAIFoundryLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        ModelName = model;
+        completionsPath = $"/openai/deployments/{model}/chat/completions?api-version={apiVersion}";
+        this.logger = logger ?? NullLogger<AzureAIFoundryLlmProvider>.Instance;
+    }
+
     /// <inheritdoc/>
     public async Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -146,6 +163,10 @@ public class AzureAIFoundryLlmProvider : ILlmProvider
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
+        var totalInputTokens = 0;
+        var totalOutputTokens = 0;
+        var outputText = new StringBuilder();
+
         while (!reader.EndOfStream)
         {
             var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
@@ -155,15 +176,31 @@ public class AzureAIFoundryLlmProvider : ILlmProvider
             if (data == "[DONE]") break;
 
             var chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (chunk?.Usage is not null)
+            {
+                totalInputTokens = chunk.Usage.PromptTokens;
+                totalOutputTokens = chunk.Usage.CompletionTokens;
+            }
+
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
             if (!string.IsNullOrEmpty(delta))
             {
+                outputText.Append(delta);
                 yield return delta;
             }
         }
 
         sw.Stop();
-        RaiseCompletionEvent(0, 0, sw.Elapsed, true, false);
+
+        // Fallback: estimate when the server sent no usage chunk
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
+        RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
     /// <inheritdoc/>
@@ -222,6 +259,12 @@ public class AzureAIFoundryLlmProvider : ILlmProvider
             ["messages"] = apiMessages,
             ["stream"] = stream
         };
+
+        if (stream)
+        {
+            // Ask the service to append a final usage chunk to the stream (TR-RAG-002)
+            request["stream_options"] = new Dictionary<string, object> { ["include_usage"] = true };
+        }
 
         if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
         if (options?.MaxTokens is not null) request["max_tokens"] = options.MaxTokens.Value;

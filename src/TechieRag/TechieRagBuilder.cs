@@ -11,6 +11,8 @@ public class TechieRagBuilder
     private Func<Abstractions.IEmbeddingProvider>? customEmbeddingProviderFactory;
     private Func<ILlmProvider>? customLlmProviderFactory;
     private Func<IPromptTemplate>? customPromptTemplateFactory;
+    private Func<IReranker>? customRerankerFactory;
+    private Func<IChunker>? customChunkerFactory;
     private IToolHandler? toolHandler;
     private bool useConversationMemory;
 
@@ -320,6 +322,120 @@ public class TechieRagBuilder
         return this;
     }
 
+    // === NEW: Reranking, chunking, persistence, and pricing configuration ===
+
+    /// <summary>
+    /// Enables the rerank stage using a built-in API reranker (Cohere or Jina).
+    /// </summary>
+    /// <param name="source">The reranker source (Cohere or Jina).</param>
+    /// <param name="apiKey">API key for the rerank service.</param>
+    /// <param name="model">Optional model name override (defaults per source).</param>
+    /// <param name="endpoint">Optional endpoint override.</param>
+    /// <param name="topN">How many results the reranker returns (0 = same as requested topK).</param>
+    /// <param name="candidateCount">How many vector search candidates are fetched for reranking.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    public TechieRagBuilder WithReranker(
+        RerankSource source,
+        string apiKey,
+        string? model = null,
+        string? endpoint = null,
+        int topN = 0,
+        int candidateCount = 20)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(apiKey);
+        config.Rerank = new RerankConfig
+        {
+            Enabled = true,
+            Source = source,
+            ApiKey = apiKey,
+            Model = model,
+            Endpoint = endpoint,
+            TopN = topN,
+            CandidateCount = candidateCount
+        };
+        return this;
+    }
+
+    /// <summary>
+    /// Enables the rerank stage using a custom IReranker implementation
+    /// (e.g. the local ONNX cross-encoder from the TechieRag.Embedded package).
+    /// </summary>
+    /// <param name="factory">Factory that creates the reranker.</param>
+    /// <param name="topN">How many results the reranker returns (0 = same as requested topK).</param>
+    /// <param name="candidateCount">How many vector search candidates are fetched for reranking.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    public TechieRagBuilder WithReranker(Func<IReranker> factory, int topN = 0, int candidateCount = 20)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        customRerankerFactory = factory;
+        config.Rerank.Enabled = true;
+        config.Rerank.Source = RerankSource.Custom;
+        config.Rerank.TopN = topN;
+        config.Rerank.CandidateCount = candidateCount;
+        return this;
+    }
+
+    /// <summary>
+    /// Selects the chunking strategy used during ingestion.
+    /// </summary>
+    /// <param name="strategy">The chunking strategy (Recursive, Token, Markdown, or Sentence).</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    public TechieRagBuilder WithChunking(ChunkingStrategy strategy)
+    {
+        config.Processing.ChunkingStrategy = strategy;
+        return this;
+    }
+
+    /// <summary>
+    /// Provides a custom IChunker implementation used during ingestion.
+    /// </summary>
+    /// <param name="factory">Factory that creates the chunker.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    public TechieRagBuilder WithCustomChunker(Func<IChunker> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        customChunkerFactory = factory;
+        return this;
+    }
+
+    /// <summary>
+    /// Enables relational persistence for conversation threads and workspaces
+    /// (TrThread, TrMessage, TrWorkspace, TrWorkspaceDocument tables — self-created).
+    /// </summary>
+    /// <param name="provider">The persistence provider (Sqlite or Postgres).</param>
+    /// <param name="connectionString">The database connection string.</param>
+    /// <param name="defaultUserId">Default user for persistent conversation memory.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    public TechieRagBuilder WithPersistence(StoreProvider provider, string connectionString, string defaultUserId = "default")
+    {
+        ArgumentException.ThrowIfNullOrEmpty(connectionString);
+        config.Persistence = new PersistenceConfig
+        {
+            Provider = provider,
+            ConnectionString = connectionString,
+            DefaultUserId = defaultUserId
+        };
+        return this;
+    }
+
+    /// <summary>
+    /// Sets or overrides the cost-estimation pricing for a model.
+    /// </summary>
+    /// <param name="modelName">The model name (matched case-insensitively and by substring).</param>
+    /// <param name="inputPerMillionUsd">Input token price per one million tokens in USD.</param>
+    /// <param name="outputPerMillionUsd">Output token price per one million tokens in USD.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    public TechieRagBuilder WithModelPricing(string modelName, decimal inputPerMillionUsd, decimal outputPerMillionUsd)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(modelName);
+        config.UsageTracking.Pricing[modelName] = new Models.ModelPricing
+        {
+            InputPerMillionUsd = inputPerMillionUsd,
+            OutputPerMillionUsd = outputPerMillionUsd
+        };
+        return this;
+    }
+
     public ITechieRag Build()
     {
         var vectorStore = CreateVectorStore();
@@ -364,15 +480,95 @@ public class TechieRagBuilder
             }
         }
 
-        // Create conversation memory
-        IConversationMemory? conversationMemory = useConversationMemory ? new InMemoryConversationMemory() : null;
+        // Create persistence stores (if configured)
+        IConversationStore? conversationStore = CreateConversationStore();
+        IWorkspaceStore? workspaceStore = CreateWorkspaceStore();
+
+        // Create conversation memory (persistent when a conversation store is available)
+        IConversationMemory? conversationMemory = useConversationMemory
+            ? conversationStore is not null
+                ? new DbConversationMemory(conversationStore, config.Persistence.DefaultUserId)
+                : new InMemoryConversationMemory()
+            : null;
 
         // Create prompt template
         IPromptTemplate promptTemplate = customPromptTemplateFactory?.Invoke() ?? new PromptTemplateEngine(config.Prompt);
 
+        // Create reranker (if configured)
+        var reranker = CreateReranker();
+
+        // Create chunker
+        var chunker = customChunkerFactory?.Invoke() ?? CreateChunkerFromStrategy(config.Processing.ChunkingStrategy);
+
         return new TechieRagClient(vectorStore, embeddingProvider, processors, config, logger,
-            llmProvider, tokenTracker, conversationMemory, promptTemplate);
+            llmProvider, tokenTracker, conversationMemory, promptTemplate,
+            reranker, chunker, conversationStore, workspaceStore);
     }
+
+    /// <summary>
+    /// Creates the configured reranker, or null when reranking is not configured.
+    /// </summary>
+    internal IReranker? CreateReranker()
+    {
+        if (customRerankerFactory is not null)
+            return customRerankerFactory();
+
+        if (!config.Rerank.Enabled || config.Rerank.Source is RerankSource.None or RerankSource.Custom)
+            return null;
+
+        return config.Rerank.Source switch
+        {
+            RerankSource.Cohere => new Reranking.CohereReranker(
+                config.Rerank.ApiKey ?? throw new InvalidOperationException("ApiKey is required for the Cohere reranker."),
+                config.Rerank.Model ?? "rerank-v3.5",
+                config.Rerank.Endpoint,
+                config.LoggerFactory?.CreateLogger<Reranking.CohereReranker>()),
+
+            RerankSource.Jina => new Reranking.JinaReranker(
+                config.Rerank.ApiKey ?? throw new InvalidOperationException("ApiKey is required for the Jina reranker."),
+                config.Rerank.Model ?? "jina-reranker-v2-base-multilingual",
+                config.Rerank.Endpoint,
+                config.LoggerFactory?.CreateLogger<Reranking.JinaReranker>()),
+
+            RerankSource.LocalOnnx => throw new InvalidOperationException(
+                "RerankSource.LocalOnnx requires the TechieRag.Embedded package. " +
+                "Install the package and use .WithReranker(() => new OnnxCrossEncoderReranker(...))."),
+
+            _ => throw new InvalidOperationException($"Unsupported reranker source: {config.Rerank.Source}")
+        };
+    }
+
+    /// <summary>
+    /// Creates the chunker for the given strategy.
+    /// </summary>
+    internal static IChunker CreateChunkerFromStrategy(ChunkingStrategy strategy) => strategy switch
+    {
+        ChunkingStrategy.Recursive => Processors.Chunking.RecursiveChunker.Instance,
+        ChunkingStrategy.Token => new Processors.Chunking.TokenChunker(),
+        ChunkingStrategy.Markdown => new Processors.Chunking.MarkdownChunker(),
+        ChunkingStrategy.Sentence => new Processors.Chunking.SentenceChunker(),
+        _ => Processors.Chunking.RecursiveChunker.Instance
+    };
+
+    private IConversationStore? CreateConversationStore() => config.Persistence.Provider switch
+    {
+        StoreProvider.None => null,
+        StoreProvider.Sqlite => new Persistence.SqliteConversationStore(RequirePersistenceConnectionString()),
+        StoreProvider.Postgres => new Persistence.PostgresConversationStore(RequirePersistenceConnectionString()),
+        _ => throw new InvalidOperationException($"Unsupported persistence provider: {config.Persistence.Provider}")
+    };
+
+    private IWorkspaceStore? CreateWorkspaceStore() => config.Persistence.Provider switch
+    {
+        StoreProvider.None => null,
+        StoreProvider.Sqlite => new Persistence.SqliteWorkspaceStore(RequirePersistenceConnectionString()),
+        StoreProvider.Postgres => new Persistence.PostgresWorkspaceStore(RequirePersistenceConnectionString()),
+        _ => throw new InvalidOperationException($"Unsupported persistence provider: {config.Persistence.Provider}")
+    };
+
+    private string RequirePersistenceConnectionString() =>
+        config.Persistence.ConnectionString
+        ?? throw new InvalidOperationException("Persistence.ConnectionString is required when a persistence provider is configured.");
 
     /// <summary>
     /// Creates the configured LLM provider.
@@ -547,6 +743,9 @@ public class TechieRagBuilder
             new Processors.MarkdownProcessor(),
             new Processors.PdfProcessor(),
             new Processors.DocxProcessor(),
+            new Processors.XlsxProcessor(),
+            new Processors.PptxProcessor(),
+            new Processors.CsvProcessor(),
             new Processors.HtmlProcessor(),
             new Processors.JsonProcessor(),
             new Processors.TomlProcessor(),

@@ -23,32 +23,32 @@ public static class TextChunker
     private static readonly char[] SentenceEndings = ['.', '!', '?'];
 
     /// <summary>
-    /// Splits text into chunks of approximately the specified maximum size with overlap.
+    /// Splits text using the given chunking strategy, falling back to the default
+    /// recursive strategy when no chunker is supplied.
+    /// </summary>
+    /// <param name="text">The text to chunk.</param>
+    /// <param name="maxSize">Maximum size of each chunk in characters.</param>
+    /// <param name="overlap">Number of overlapping characters between consecutive chunks.</param>
+    /// <param name="chunker">Optional chunking strategy; null uses recursive chunking.</param>
+    /// <returns>An enumerable of text chunks.</returns>
+    public static IEnumerable<string> ChunkText(string text, int maxSize, int overlap, Abstractions.IChunker? chunker)
+    {
+        if (chunker is null || chunker is Chunking.RecursiveChunker)
+        {
+            return ChunkText(text, maxSize, overlap);
+        }
+
+        return chunker.Chunk(text, maxSize, overlap);
+    }
+
+    /// <summary>
+    /// Splits text into chunks of approximately the specified maximum size with overlap
+    /// using the default recursive strategy.
     /// </summary>
     /// <param name="text">The text to chunk.</param>
     /// <param name="maxSize">Maximum size of each chunk in characters.</param>
     /// <param name="overlap">Number of overlapping characters between consecutive chunks.</param>
     /// <returns>An enumerable of text chunks.</returns>
-    /// <remarks>
-    /// <para><b>Algorithm:</b></para>
-    /// <list type="number">
-    /// <item><description>Split text into paragraphs (double newline separated)</description></item>
-    /// <item><description>For each paragraph, split into sentences</description></item>
-    /// <item><description>Accumulate sentences until maxSize is reached</description></item>
-    /// <item><description>Create overlap by including trailing content from previous chunk</description></item>
-    /// </list>
-    /// <para><b>Edge Cases:</b> Handles single large sentences by splitting at word
-    /// boundaries when they exceed maxSize.</para>
-    /// </remarks>
-    /// <example>
-    /// <code>
-    /// var chunks = TextChunker.ChunkText(documentText, maxSize: 500, overlap: 50);
-    /// foreach (var chunk in chunks)
-    /// {
-    ///     // Process each chunk
-    /// }
-    /// </code>
-    /// </example>
     public static IEnumerable<string> ChunkText(string text, int maxSize, int overlap)
     {
         ArgumentNullException.ThrowIfNull(text);

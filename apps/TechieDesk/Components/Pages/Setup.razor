@@ -1,0 +1,554 @@
+@page "/setup"
+@layout AuthLayout
+@using TechieDesk.Services.Setup
+@inject ISetupStateService SetupState
+@inject IOllamaProbe OllamaProbe
+@inject TechieRagConfigService RagConfig
+@inject TechieRagManager Rag
+@inject IWorkspaceService Workspaces
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject NavigationManager Nav
+@inject ILogger<Setup> Logger
+
+@* REQ-UI-022/023, REQ-FN-016: first-run wizard. Centered card on AuthLayout (no shell),
+   matching docs/mockups/setup-wizard.html. Applies zero-config OFFLINE defaults (Embedded
+   BGE-M3 + SqliteVec), detects a local Ollama, captures the AppManager-vs-offline choice and
+   first-Admin intent, then creates the default workspace. TR-005: the step indicator is
+   composed from Progress + a custom label row (no Stepper component in TrBlazeUI). *@
+
+<PageTitle>TechieDesk — First-run setup</PageTitle>
+
+@* REQ-NFR-005: the wizard has no visible title of its own (its heading role is carried by the
+   step indicator), so the route shipped with no level-one heading at all. A visually-hidden h1
+   gives screen-reader and FocusOnNavigate users the page identity without altering the mockup. *@
+<h1 class="sr-only">First-run setup</h1>
+
+<Card Class="rounded-2xl p-2 shadow-lg" style="width:100%">
+    <CardContent Class="space-y-4 pt-6">
+        <Progress Value="@ProgressValue" Class="h-2" />
+
+        @* TR-005 step indicator — done / current / pending states. *@
+        <div class="flex justify-between gap-1.5">
+            @for (var i = 0; i < StepLabels.Length; i++)
+            {
+                var index = i;
+                var state = StepStateFor(index);
+                <div class="flex flex-1 flex-col items-center gap-1.5 text-center">
+                    <span class="@NodeClass(state)">
+                        @if (state == StepState.Done)
+                        {
+                            <LucideIcon aria-hidden="true" Name="check" Size="14" />
+                        }
+                        else
+                        {
+                            @(index + 1)
+                        }
+                    </span>
+                    <span class="@LabelClass(state)">@StepLabels[index]</span>
+                </div>
+            }
+        </div>
+
+        @* ---------------- Step 1: Offline defaults ---------------- *@
+        @if (currentStep == WizardStep.Defaults)
+        {
+            <Alert Variant="AlertVariant.Success">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-check" Size="16" /></Alert.Icon>
+                <AlertTitle>Zero-config defaults ready</AlertTitle>
+                <AlertDescription>
+                    Offline embeddings (Embedded BGE-M3) + SqliteVec vector store. No external
+                    services required — this instance is chat-able out of the box.
+                </AlertDescription>
+            </Alert>
+            <TypographyMuted>
+                You can keep everything offline, or connect a local Ollama and AppManager in the
+                next steps. Your choices are applied when you finish.
+            </TypographyMuted>
+        }
+
+        @* ---------------- Step 2: AI provider (Ollama detect) ---------------- *@
+        @if (currentStep == WizardStep.AiProvider)
+        {
+            @if (probing)
+            {
+                <div class="flex items-center gap-2 text-muted-foreground">
+                    <Spinner Size="SpinnerSize.Small" /> <span>Detecting a local Ollama…</span>
+                </div>
+            }
+            else if (ollama is { Available: true })
+            {
+                <Alert Variant="AlertVariant.Success">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="check-circle" Size="16" /></Alert.Icon>
+                    <AlertDescription>
+                        Ollama detected at @ollama.Endpoint (@ollama.Models.Count model@(ollama.Models.Count == 1 ? "" : "s")).
+                    </AlertDescription>
+                </Alert>
+
+                @if (ollama.Models.Count > 0)
+                {
+                    <Field>
+                        <FieldLabel>Chat model</FieldLabel>
+                        <FieldContent>
+                            <Select @bind-Value="selectedModel" TValue="string" Class="w-full">
+                                <SelectTrigger><SelectValue Placeholder="Select a model" /></SelectTrigger>
+                                <SelectContent>
+                                    @foreach (var model in ollama.Models)
+                                    {
+                                        <SelectItem Value="@model" Text="@model" TValue="string">@model</SelectItem>
+                                    }
+                                </SelectContent>
+                            </Select>
+                        </FieldContent>
+                    </Field>
+                }
+            }
+            else
+            {
+                <Alert Variant="AlertVariant.Info">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+                    <AlertDescription>
+                        No Ollama detected. You can stay embedded-only (offline) or point at an
+                        OpenAI-compatible endpoint below.
+                    </AlertDescription>
+                </Alert>
+            }
+
+            <div class="space-y-2">
+                @RenderProviderRow(ProviderChoice.Ollama, "Use detected Ollama", "Local models via Ollama", ollama is { Available: true })
+                @RenderProviderRow(ProviderChoice.LmStudio, "LM Studio", "OpenAI-compatible local server", true)
+                @RenderProviderRow(ProviderChoice.OpenAiCompatible, "OpenAI-compatible endpoint", "vLLM, TEI, or a hosted URL", true)
+                @RenderProviderRow(ProviderChoice.Skip, "Skip — embedded-only for now", "Chat can be configured later", true)
+            </div>
+
+            @if (provider is ProviderChoice.LmStudio or ProviderChoice.OpenAiCompatible)
+            {
+                <Field>
+                    <FieldLabel>Endpoint URL</FieldLabel>
+                    <FieldContent>
+                        <Input AriaLabel="Endpoint URL" @bind-Value="providerEndpoint"
+                               Placeholder="@(provider == ProviderChoice.LmStudio ? "http://localhost:1234" : "http://localhost:8000/v1")" />
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>Model name</FieldLabel>
+                    <FieldContent>
+                        <Input @bind-Value="selectedModel" Placeholder="model identifier" />
+                    </FieldContent>
+                </Field>
+            }
+        }
+
+        @* ---------------- Step 3: AppManager vs offline ---------------- *@
+        @if (currentStep == WizardStep.AppManager)
+        {
+            <div class="space-y-2">
+                @RenderModeRow(false, "Offline single-user mode", "No accounts — sign in automatically as the built-in Administrator.")
+                @RenderModeRow(true, "Connect AppManager", "Central licensing, accounts, and roles.")
+            </div>
+
+            @if (useAppManager)
+            {
+                <Field>
+                    <FieldLabel>AppManager base URL</FieldLabel>
+                    <FieldContent>
+                        <Input @bind-Value="appManagerBaseUrl" Placeholder="https://appmanager.example.com" />
+                    </FieldContent>
+                </Field>
+                <div class="td-grid-2">
+                    <Field>
+                        <FieldLabel>API key</FieldLabel>
+                        <FieldContent><Input @bind-Value="appManagerApiKey" Placeholder="key" /></FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>API secret</FieldLabel>
+                        <FieldContent><Input Type="InputType.Password" @bind-Value="appManagerApiSecret" Placeholder="secret" /></FieldContent>
+                    </Field>
+                </div>
+                <Alert Variant="AlertVariant.Warning">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="key-round" Size="16" /></Alert.Icon>
+                    <AlertDescription>
+                        Secrets are not written to disk by the wizard. Provide them as environment
+                        variables (<TypographyInlineCode>AppManager__ApiKey</TypographyInlineCode> /
+                        <TypographyInlineCode>AppManager__ApiSecret</TypographyInlineCode>) or via user-secrets,
+                        then restart. The base URL is saved to enable AppManager mode.
+                    </AlertDescription>
+                </Alert>
+            }
+        }
+
+        @* ---------------- Step 4: Admin account ---------------- *@
+        @if (currentStep == WizardStep.Admin)
+        {
+            @if (!useAppManager)
+            {
+                <Alert Variant="AlertVariant.Info">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="user-check" Size="16" /></Alert.Icon>
+                    <AlertDescription>
+                        Offline single-user mode: you'll sign in automatically as the built-in
+                        Administrator. No account setup is required.
+                    </AlertDescription>
+                </Alert>
+            }
+            else
+            {
+                <TypographyMuted>Create the first Administrator for this instance.</TypographyMuted>
+                <Field>
+                    <FieldLabel>Full name</FieldLabel>
+                    <FieldContent><Input @bind-Value="adminName" Placeholder="Ada Lovelace" /></FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>Email</FieldLabel>
+                    <FieldContent><Input Type="InputType.Email" @bind-Value="adminEmail" Placeholder="admin@company.com" /></FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>Password</FieldLabel>
+                    <FieldContent><Input Type="InputType.Password" @bind-Value="adminPassword" Placeholder="••••••••" /></FieldContent>
+                </Field>
+                <Alert Variant="AlertVariant.Info">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+                    <AlertDescription>
+                        The first Administrator is provisioned against AppManager on first connection
+                        (after you supply credentials via environment variables and restart).
+                    </AlertDescription>
+                </Alert>
+            }
+        }
+
+        @* ---------------- Step 5: Workspace ---------------- *@
+        @if (currentStep == WizardStep.Workspace)
+        {
+            <TypographyMuted>Name the first workspace — an isolated knowledge base with its own documents and settings.</TypographyMuted>
+            <Field>
+                <FieldLabel>Workspace name</FieldLabel>
+                <FieldContent><Input @bind-Value="workspaceName" Placeholder="Default" /></FieldContent>
+            </Field>
+            <Alert Variant="AlertVariant.Success">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="rocket" Size="16" /></Alert.Icon>
+                <AlertDescription>
+                    Finishing applies your choices, creates the workspace, and takes you into the app.
+                </AlertDescription>
+            </Alert>
+        }
+
+        @if (errorMessage is not null)
+        {
+            <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                <AlertDescription>@errorMessage</AlertDescription>
+            </Alert>
+        }
+
+        @* ---------------- Wizard navigation ---------------- *@
+        <div class="flex items-center justify-between pt-2">
+            <Button Variant="ButtonVariant.Outline" OnClick="Back" Disabled="@(currentStep == WizardStep.Defaults || isFinishing)">
+                Back
+            </Button>
+            @if (currentStep == WizardStep.Workspace)
+            {
+                <Button OnClick="FinishAsync" Disabled="@(isFinishing || string.IsNullOrWhiteSpace(workspaceName))">
+                    @if (isFinishing)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>Finishing…</span>
+                    }
+                    else
+                    {
+                        <span>Finish setup</span>
+                    }
+                </Button>
+            }
+            else
+            {
+                <Button OnClick="Next" Disabled="@isFinishing">Continue</Button>
+            }
+        </div>
+    </CardContent>
+</Card>
+
+@code {
+    private enum WizardStep { Defaults, AiProvider, AppManager, Admin, Workspace }
+
+    private enum StepState { Done, Current, Pending }
+
+    private enum ProviderChoice { Ollama, LmStudio, OpenAiCompatible, Skip }
+
+    private static readonly string[] StepLabels =
+        ["Defaults", "AI Provider", "AppManager", "Admin account", "Workspace"];
+
+    private WizardStep currentStep = WizardStep.Defaults;
+
+    // Step 2 — AI provider.
+    private bool probing = true;
+    private OllamaProbeResult? ollama;
+    private ProviderChoice provider = ProviderChoice.Skip;
+    private string providerEndpoint = string.Empty;
+    private string selectedModel = string.Empty;
+
+    // Step 3 — AppManager vs offline.
+    private bool useAppManager;
+    private string appManagerBaseUrl = string.Empty;
+    private string appManagerApiKey = string.Empty;
+    private string appManagerApiSecret = string.Empty;
+
+    // Step 4 — first Admin (AppManager mode).
+    private string adminName = string.Empty;
+    private string adminEmail = string.Empty;
+    private string adminPassword = string.Empty;
+
+    // Step 5 — workspace.
+    private string workspaceName = "Default";
+
+    private bool isFinishing;
+    private string? errorMessage;
+
+    private double ProgressValue => ((int)currentStep + 1) / (double)StepLabels.Length * 100.0;
+
+    // AppManager mode defaults to whatever the running instance is configured for, so the wizard
+    // reflects reality when re-run on an already-configured instance.
+    protected override void OnInitialized() => useAppManager = AuthMode.IsAppManagerEnabled;
+
+    // REQ-FN-016: probe Ollama once, after the first interactive render (not during prerender), so
+    // a slow/absent server never blocks first paint. Graceful: an unavailable result just offers
+    // the embedded/offline path.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            ollama = await OllamaProbe.ProbeAsync(IOllamaProbe.DefaultEndpoint);
+            if (ollama.Available)
+            {
+                provider = ProviderChoice.Ollama;
+                selectedModel = ollama.Models.FirstOrDefault() ?? string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogDebug(ex, "Ollama probe failed during setup wizard");
+            ollama = new OllamaProbeResult(false, IOllamaProbe.DefaultEndpoint, Array.Empty<string>());
+        }
+        finally
+        {
+            probing = false;
+            StateHasChanged();
+        }
+    }
+
+    private StepState StepStateFor(int index)
+    {
+        var current = (int)currentStep;
+        if (index < current) return StepState.Done;
+        return index == current ? StepState.Current : StepState.Pending;
+    }
+
+    private static string NodeClass(StepState state) => state switch
+    {
+        StepState.Done => "flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground",
+        StepState.Current => "flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary ring-2 ring-primary",
+        _ => "flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground"
+    };
+
+    private static string LabelClass(StepState state) => state switch
+    {
+        StepState.Current => "text-[11px] font-bold text-foreground",
+        StepState.Done => "text-[11px] font-medium text-primary",
+        _ => "text-[11px] font-medium text-muted-foreground"
+    };
+
+    private RenderFragment RenderProviderRow(ProviderChoice choice, string title, string subtitle, bool enabled) => __builder =>
+    {
+        var selected = provider == choice;
+        var cls = "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors "
+            + (selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40")
+            + (enabled ? " cursor-pointer" : " cursor-not-allowed opacity-50");
+        <button type="button" class="@cls" disabled="@(!enabled)" @onclick="@(() => SelectProvider(choice))">
+            <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border @(selected ? "border-primary" : "border-muted-foreground/40")">
+                @if (selected)
+                {
+                    <span class="h-2 w-2 rounded-full bg-primary"></span>
+                }
+            </span>
+            <span class="flex flex-col">
+                <span class="text-sm font-semibold">@title</span>
+                <span class="text-xs text-muted-foreground">@subtitle</span>
+            </span>
+        </button>
+    };
+
+    private RenderFragment RenderModeRow(bool appManager, string title, string subtitle) => __builder =>
+    {
+        var selected = useAppManager == appManager;
+        var cls = "flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors "
+            + (selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40");
+        <button type="button" class="@cls" @onclick="@(() => useAppManager = appManager)">
+            <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border @(selected ? "border-primary" : "border-muted-foreground/40")">
+                @if (selected)
+                {
+                    <span class="h-2 w-2 rounded-full bg-primary"></span>
+                }
+            </span>
+            <span class="flex flex-col">
+                <span class="text-sm font-semibold">@title</span>
+                <span class="text-xs text-muted-foreground">@subtitle</span>
+            </span>
+        </button>
+    };
+
+    private void SelectProvider(ProviderChoice choice)
+    {
+        provider = choice;
+        if (choice == ProviderChoice.Ollama)
+        {
+            providerEndpoint = ollama?.Endpoint ?? IOllamaProbe.DefaultEndpoint;
+            selectedModel = ollama?.Models.FirstOrDefault() ?? selectedModel;
+        }
+        else if (choice == ProviderChoice.LmStudio && string.IsNullOrWhiteSpace(providerEndpoint))
+        {
+            providerEndpoint = "http://localhost:1234";
+        }
+    }
+
+    private void Back()
+    {
+        errorMessage = null;
+        if (currentStep > WizardStep.Defaults)
+        {
+            currentStep = (WizardStep)((int)currentStep - 1);
+        }
+    }
+
+    private void Next()
+    {
+        errorMessage = null;
+        if (currentStep < WizardStep.Workspace)
+        {
+            currentStep = (WizardStep)((int)currentStep + 1);
+        }
+    }
+
+    // Applies the collected choices: offline defaults (Embedded BGE-M3 + SqliteVec) with the
+    // optional local LLM, ensures a workspace exists, and records completion. Any provider
+    // outage is tolerated — completion is recorded so the app is usable (REQ-UI-022).
+    private async Task FinishAsync()
+    {
+        if (string.IsNullOrWhiteSpace(workspaceName))
+        {
+            errorMessage = "A workspace name is required.";
+            return;
+        }
+
+        isFinishing = true;
+        errorMessage = null;
+        try
+        {
+            await ApplyOfflineDefaultsAsync();
+
+            var mode = useAppManager ? "AppManager" : "Offline";
+            var baseUrl = useAppManager && !string.IsNullOrWhiteSpace(appManagerBaseUrl)
+                ? appManagerBaseUrl.Trim()
+                : null;
+
+            await EnsureWorkspaceAsync();
+            await SetupState.MarkCompleteAsync(mode, baseUrl);
+
+            Logger.LogInformation(
+                "First-run setup completed (mode: {Mode}, provider: {Provider})", mode, provider);
+
+            Nav.NavigateTo(LandingRoute(), forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "First-run setup failed to complete");
+            errorMessage = "Setup could not be completed. Please review your choices and try again.";
+            isFinishing = false;
+        }
+    }
+
+    // REQ-UI-022: persist zero-external-service defaults, layering the chosen LLM on top.
+    private async Task ApplyOfflineDefaultsAsync()
+    {
+        var config = await RagConfig.LoadConfigAsync();
+
+        config.Embedding.Source = EmbeddingSource.Embedded;
+        config.VectorStore.Type = VectorStoreType.SqliteVec;
+        if (string.IsNullOrWhiteSpace(config.VectorStore.ConnectionString))
+        {
+            config.VectorStore.ConnectionString = "Data Source=data/techiedesk-rag-store.db";
+        }
+
+        switch (provider)
+        {
+            case ProviderChoice.Ollama when ollama is { Available: true }:
+                config.Llm.Source = LlmSource.Ollama;
+                config.Llm.Endpoint = ollama.Endpoint;
+                config.Llm.Model = string.IsNullOrWhiteSpace(selectedModel) ? "llama3.1" : selectedModel;
+                break;
+            case ProviderChoice.LmStudio:
+                config.Llm.Source = LlmSource.LmStudio;
+                config.Llm.Endpoint = string.IsNullOrWhiteSpace(providerEndpoint) ? "http://localhost:1234" : providerEndpoint.Trim();
+                config.Llm.Model = selectedModel;
+                break;
+            case ProviderChoice.OpenAiCompatible:
+                config.Llm.Source = LlmSource.OpenAICompatible;
+                config.Llm.Endpoint = providerEndpoint.Trim();
+                config.Llm.Model = selectedModel;
+                break;
+            default:
+                // Skip / embedded-only: leave the LLM unset so the instance is retrieval-ready
+                // with zero external services.
+                break;
+        }
+
+        await RagConfig.SaveConfigAsync(config);
+
+        // Rebuild the running instance so the new offline defaults take effect without a restart.
+        // Tolerate a build failure (e.g. a provider that is not reachable yet) — completion still
+        // proceeds so the app is usable and the operator can adjust settings later.
+        try
+        {
+            await Rag.ReconfigureAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "TechieRag reconfigure after setup did not complete; continuing");
+        }
+    }
+
+    private async Task EnsureWorkspaceAsync()
+    {
+        var userId = Workspaces.CurrentUserId;
+        var created = await Workspaces.EnsureDefaultWorkspaceAsync(userId);
+        if (!created && Workspaces.CanManageWorkspaces)
+        {
+            // A workspace already exists (Wave 3 bootstrap). Only create the named one when it is
+            // genuinely new, to avoid duplicating "Default".
+            var existing = await Workspaces.ListForCurrentUserAsync();
+            var alreadyNamed = existing.Any(w =>
+                string.Equals(w.Name, workspaceName.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (!alreadyNamed && !string.Equals(workspaceName.Trim(), "Default", StringComparison.OrdinalIgnoreCase))
+            {
+                await Workspaces.CreateWorkspaceAsync(workspaceName.Trim());
+            }
+        }
+    }
+
+    private string LandingRoute()
+    {
+        try
+        {
+            var target = workspaceName.Trim();
+            var visible = Workspaces.ListForCurrentUserAsync().GetAwaiter().GetResult();
+            var match = visible.FirstOrDefault(w =>
+                string.Equals(w.Name, target, StringComparison.OrdinalIgnoreCase)) ?? visible.FirstOrDefault();
+            return match is not null ? $"/workspace/{Workspaces.SlugFor(match)}" : "/";
+        }
+        catch
+        {
+            return "/";
+        }
+    }
+}

@@ -61,6 +61,24 @@ public class GoogleGeminiLlmProvider : ILlmProvider
         httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
+    /// <summary>
+    /// Creates a Google Gemini provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client.</param>
+    /// <param name="apiKey">Google AI API key.</param>
+    /// <param name="model">Model name.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal GoogleGeminiLlmProvider(HttpClient httpClient, string apiKey, string model, ILogger<GoogleGeminiLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        this.apiKey = apiKey;
+        ModelName = model;
+        baseUrl = httpClient.BaseAddress?.ToString().TrimEnd('/') ?? "https://generativelanguage.googleapis.com";
+        this.logger = logger ?? NullLogger<GoogleGeminiLlmProvider>.Instance;
+    }
+
     /// <inheritdoc/>
     public async Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -90,7 +108,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        var url = $"{baseUrl}/v1beta/models/{ModelName}:generateContent?key={apiKey}";
+        var url = $"{baseUrl}/v1beta/models/{options?.Model ?? ModelName}:generateContent?key={apiKey}";
         var request = BuildGeminiRequest(messages, options);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -133,7 +151,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
     public async IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
-        var url = $"{baseUrl}/v1beta/models/{ModelName}:streamGenerateContent?key={apiKey}&alt=sse";
+        var url = $"{baseUrl}/v1beta/models/{options?.Model ?? ModelName}:streamGenerateContent?key={apiKey}&alt=sse";
         var request = BuildGeminiRequest(messages, options);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -147,6 +165,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        var outputText = new StringBuilder();
 
         while (!reader.EndOfStream)
         {
@@ -166,11 +185,20 @@ public class GoogleGeminiLlmProvider : ILlmProvider
             var text = ExtractText(chunk.Candidates?.FirstOrDefault());
             if (!string.IsNullOrEmpty(text))
             {
+                outputText.Append(text);
                 yield return text;
             }
         }
 
         sw.Stop();
+
+        // Fallback: estimate when the API sent no usage metadata
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
         RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 

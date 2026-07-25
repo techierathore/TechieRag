@@ -1,0 +1,389 @@
+@page "/ingestion"
+@using TechieRag.Models
+@using TechieRag.Embedded
+@implements IDisposable
+@inject ITechieRag Rag
+@inject ToastService ToastService
+@inject ILogger<Ingestion> Logger
+
+<PageTitle>Document Ingestion - TechieRag</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Document Ingestion</h1>
+        <TypographyMuted>Ingest files from a directory into the vector store for semantic search.</TypographyMuted>
+    </div>
+
+    <!-- Model Download Progress -->
+    @if (isDownloadingModel)
+    {
+        <Alert Variant="AlertVariant.Warning">
+            <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
+            <AlertTitle>Downloading BGE-M3 Model</AlertTitle>
+            <AlertDescription>
+                @downloadProgress?.StatusMessage
+                <Progress Value="@(downloadProgress?.CurrentFileProgressPercent ?? 0)" Class="mt-2" />
+                <div class="flex justify-between text-xs mt-1">
+                    <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
+                    <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
+                </div>
+            </AlertDescription>
+        </Alert>
+    }
+
+    <!-- Ingestion Controls -->
+    <Card>
+        <CardHeader>
+            <CardTitle>Ingest Documents</CardTitle>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <Field>
+                <FieldLabel>Documents Folder Path</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="documentsPath" Placeholder="C:\Documents\RAGData" />
+                </FieldContent>
+            </Field>
+
+            <Field>
+                <FieldLabel>File Pattern</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="filePattern" Placeholder="*.*" />
+                    <FieldDescription>Supported: PDF, DOCX, TXT, MD, HTML, JSON, TOML, and 70+ code file types. Use *.* for all.</FieldDescription>
+                </FieldContent>
+            </Field>
+
+            <div class="flex gap-3">
+                <Button OnClick="IngestDocumentsAsync" Disabled="isIngesting">
+                    @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Ingesting...</span> }
+                    else { <span>Ingest Now</span> }
+                </Button>
+                @if (isIngesting)
+                {
+                    <Button Variant="ButtonVariant.Outline" OnClick="StopIngestion" Disabled="isCancelling">
+                        @(isCancelling ? "Stopping..." : "Stop Ingestion")
+                    </Button>
+                }
+                <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">
+                    Clear All Data
+                </Button>
+            </div>
+
+            @if (isIngesting)
+            {
+                <div class="space-y-2">
+                    <Progress Value="@progress" />
+                    <TypographyMuted>@progressMessage</TypographyMuted>
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <!-- Ingestion Results -->
+    @if (ingestionResults.Count > 0)
+    {
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle>Ingestion Results</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearResults">Clear</Button>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <div class="relative overflow-x-auto">
+                <DataTable TData="IngestionResult" Data="@ingestionResults" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.FileName)" Header="File" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? "Success" : "Failed")" Header="Status" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? r.DocumentId ?? "" : r.ErrorMessage ?? "")" Header="ID / Error" />
+                    </Columns>
+                </DataTable>
+                </div>
+            </CardContent>
+        </Card>
+    }
+
+    <!-- Statistics & Documents -->
+    <div class="grid gap-6 lg:grid-cols-2">
+        @if (stats != null)
+        {
+            <Card Class="min-w-0">
+                <CardHeader>
+                    <CardTitle>Vector Store Statistics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <TypographyMuted>Documents</TypographyMuted>
+                            <div class="text-xl font-bold">@stats.TotalDocuments</div>
+                        </div>
+                        <div>
+                            <TypographyMuted>Chunks</TypographyMuted>
+                            <div class="text-xl font-bold">@stats.TotalChunks</div>
+                        </div>
+                        <div>
+                            <TypographyMuted>Storage Size</TypographyMuted>
+                            <div class="text-xl font-bold">@FormatSize(stats.VectorStoreSizeBytes)</div>
+                        </div>
+                        <div>
+                            <TypographyMuted>Last Ingestion</TypographyMuted>
+                            <div class="text-xl font-bold">@(stats.LastIngestionTime?.ToString("g") ?? "Never")</div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        }
+
+        <Card Class="min-w-0">
+            <CardHeader>
+                <CardTitle>Ingested Documents</CardTitle>
+            </CardHeader>
+            <CardContent>
+                @if (documents.Count == 0)
+                {
+                    <TypographyMuted>No documents ingested yet.</TypographyMuted>
+                }
+                else
+                {
+                    <div class="relative overflow-x-auto">
+                    <DataTable TData="Document" Data="@documents" ShowToolbar="false">
+                        <Columns>
+                            <DataTableColumn TData="Document" TValue="string" Property="@(d => d.Name)" Header="Name" />
+                            <DataTableColumn TData="Document" TValue="int" Property="@(d => d.ChunkCount)" Header="Chunks" />
+                        </Columns>
+                    </DataTable>
+                    </div>
+                }
+            </CardContent>
+        </Card>
+    </div>
+</div>
+
+@code {
+    private string documentsPath = "";
+    private string filePattern = "*.*";
+    private bool isIngesting;
+    private int progress;
+    private string? progressMessage;
+    private IngestionStats? stats;
+    private List<Document> documents = new();
+    private List<IngestionResult> ingestionResults = new();
+    private CancellationTokenSource? ingestionCts;
+    private bool isCancelling;
+    private bool isDownloadingModel;
+    private ModelDownloadProgress? downloadProgress;
+
+    private record IngestionResult(string FileName, bool Success, string? ErrorMessage, string? DocumentId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        ModelDownloadService.Instance.ProgressChanged += OnDownloadProgressChanged;
+        downloadProgress = ModelDownloadService.Instance.Progress;
+
+        try
+        {
+            UpdateDownloadStatus();
+            await Rag.InitializeAsync();
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            UpdateDownloadStatus();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to initialize ingestion page");
+            ToastService.Error($"Initialization error: {ex.Message}", "Error");
+        }
+    }
+
+    private void OnDownloadProgressChanged(object? sender, ModelDownloadProgress progress)
+    {
+        downloadProgress = progress;
+        UpdateDownloadStatus();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateDownloadStatus()
+    {
+        var status = ModelDownloadService.Instance.Progress.Status;
+        isDownloadingModel = status == ModelDownloadStatus.Downloading || status == ModelDownloadStatus.Checking;
+    }
+
+    public void Dispose()
+    {
+        ModelDownloadService.Instance.ProgressChanged -= OnDownloadProgressChanged;
+        ingestionCts?.Cancel();
+        ingestionCts?.Dispose();
+    }
+
+    private void StopIngestion()
+    {
+        if (ingestionCts != null && !ingestionCts.IsCancellationRequested)
+        {
+            isCancelling = true;
+            ingestionCts.Cancel();
+            progressMessage = "Stopping ingestion...";
+            StateHasChanged();
+        }
+    }
+
+    private async Task IngestDocumentsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(documentsPath))
+        {
+            ToastService.Error("Please enter a documents folder path.", "Validation");
+            return;
+        }
+
+        if (!Directory.Exists(documentsPath))
+        {
+            ToastService.Error("The specified folder does not exist.", "Validation");
+            return;
+        }
+
+        ingestionCts?.Dispose();
+        ingestionCts = new CancellationTokenSource();
+        var cancellationToken = ingestionCts.Token;
+
+        isIngesting = true;
+        isCancelling = false;
+        progress = 0;
+        ingestionResults.Clear();
+        StateHasChanged();
+
+        try
+        {
+            progressMessage = "Scanning folder...";
+            StateHasChanged();
+
+            var files = Directory.GetFiles(documentsPath, filePattern, SearchOption.AllDirectories);
+
+            if (files.Length == 0)
+            {
+                ToastService.Error($"No files matching '{filePattern}' found.", "No Files");
+                isIngesting = false;
+                return;
+            }
+
+            progress = 5;
+            progressMessage = $"Found {files.Length} file(s). Starting ingestion...";
+            StateHasChanged();
+
+            int successCount = 0, failedCount = 0, skippedCount = 0;
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    skippedCount = files.Length - i;
+                    progressMessage = "Ingestion stopped by user.";
+                    break;
+                }
+
+                var file = files[i];
+                var fileName = Path.GetFileName(file);
+                progressMessage = $"Processing ({i + 1}/{files.Length}): {fileName}";
+                progress = 5 + (int)((i / (double)files.Length) * 90);
+                StateHasChanged();
+                await Task.Delay(10);
+
+                try
+                {
+                    var documentId = await Rag.IngestAsync(file, cancellationToken);
+                    ingestionResults.Add(new IngestionResult(fileName, true, null, documentId));
+                    successCount++;
+                }
+                catch (OperationCanceledException)
+                {
+                    skippedCount = files.Length - i;
+                    progressMessage = "Ingestion stopped by user.";
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    ingestionResults.Add(new IngestionResult(fileName, false, ex.Message[..Math.Min(100, ex.Message.Length)], null));
+                    failedCount++;
+                }
+            }
+
+            progress = 100;
+            progressMessage = "Complete!";
+
+            if (successCount > 0)
+                ToastService.Success($"Ingested {successCount} document(s). {(failedCount > 0 ? $"{failedCount} failed." : "")}", "Done");
+            else
+                ToastService.Error($"All {failedCount} file(s) failed to ingest.", "Failed");
+
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Ingestion failed");
+            ToastService.Error($"Error: {ex.Message}", "Error");
+        }
+        finally
+        {
+            isIngesting = false;
+            isCancelling = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearResults() { ingestionResults.Clear(); }
+
+    private async Task ClearVectorStoreAsync()
+    {
+        try
+        {
+            await Rag.ClearAsync();
+            ingestionResults.Clear();
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            ToastService.Success("All data cleared.", "Cleared");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error: {ex.Message}", "Error");
+        }
+    }
+
+    private async Task DeleteDocumentAsync(string documentId)
+    {
+        try
+        {
+            await Rag.DeleteDocumentAsync(documentId);
+            await RefreshStatsAsync();
+            await RefreshDocumentsAsync();
+            ToastService.Success("Document deleted.", "Deleted");
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error($"Error: {ex.Message}", "Error");
+        }
+    }
+
+    private async Task RefreshStatsAsync()
+    {
+        try { stats = await Rag.GetStatsAsync(); } catch { }
+    }
+
+    private async Task RefreshDocumentsAsync()
+    {
+        try { documents = (await Rag.ListDocumentsAsync()).ToList(); } catch { }
+    }
+
+    private static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024 * 1024 * 1024 => $"{bytes / (double)(1024 * 1024 * 1024):F1} GB",
+        >= 1024 * 1024 => $"{bytes / (double)(1024 * 1024):F1} MB",
+        >= 1024 => $"{bytes / (double)1024:F1} KB",
+        _ => $"{bytes} B"
+    };
+
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        >= (long)(1024 * 1024 * 1024) => $"{bytes / (1024.0 * 1024 * 1024):F2} GB",
+        >= 1024 * 1024 => $"{bytes / (1024.0 * 1024):F1} MB",
+        >= 1024 => $"{bytes / 1024.0:F0} KB",
+        _ => $"{bytes} B"
+    };
+}

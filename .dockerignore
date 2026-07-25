@@ -1,0 +1,23 @@
+# Keep the build context lean and reproducible — never ship local build output,
+# databases, logs, downloaded models, or secrets into the image.
+**/bin/
+**/obj/
+**/logs/
+**/data/
+**/uploads/
+**/models/
+src/TechieRag.Embedded/Models/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/.vs/
+**/.vscode/
+**/.idea/
+.git/
+.gitignore
+.env
+**/.env
+*.user
+docs/
+samples/
+node_modules/

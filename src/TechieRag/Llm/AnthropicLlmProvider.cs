@@ -67,6 +67,23 @@ public class AnthropicLlmProvider : ILlmProvider
         httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
     }
 
+    /// <summary>
+    /// Creates an Anthropic provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Model name.</param>
+    /// <param name="maxTokens">Default max output tokens.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal AnthropicLlmProvider(HttpClient httpClient, string model, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        ModelName = model;
+        defaultMaxTokens = maxTokens;
+        this.logger = logger ?? NullLogger<AnthropicLlmProvider>.Instance;
+    }
+
     /// <inheritdoc/>
     public async Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -151,6 +168,7 @@ public class AnthropicLlmProvider : ILlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        var outputText = new StringBuilder();
 
         while (!reader.EndOfStream)
         {
@@ -187,6 +205,7 @@ public class AnthropicLlmProvider : ILlmProvider
                         var textValue = text.GetString();
                         if (!string.IsNullOrEmpty(textValue))
                         {
+                            outputText.Append(textValue);
                             yield return textValue;
                         }
                     }
@@ -202,6 +221,14 @@ public class AnthropicLlmProvider : ILlmProvider
         }
 
         sw.Stop();
+
+        // Fallback: estimate when the API sent no usage events
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
         RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
@@ -240,7 +267,7 @@ public class AnthropicLlmProvider : ILlmProvider
     {
         var request = new Dictionary<string, object>
         {
-            ["model"] = ModelName,
+            ["model"] = options?.Model ?? ModelName,
             ["max_tokens"] = options?.MaxTokens ?? defaultMaxTokens
         };
 

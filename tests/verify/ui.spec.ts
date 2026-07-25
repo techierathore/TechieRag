@@ -21,7 +21,7 @@ type Screen = {
 };
 
 const SCREENS: Screen[] = [
-  { req: 'REQ-UI-001', name: 'home', route: '/', title: 'TechieRag Demo',
+  { req: 'REQ-UI-001', name: 'home', route: '/', title: 'TechieDesk',
     anchors: ['RAG Chat', 'LLM Playground', 'Token Usage'] },
   { req: 'REQ-UI-002', name: 'settings', route: '/settings', title: 'TechieRag Settings',
     anchors: ['Vector Store', 'Chunk Size', 'Save Configuration', 'Reset to Defaults'] },

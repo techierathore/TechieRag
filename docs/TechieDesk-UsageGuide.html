@@ -1,0 +1,846 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk — Usage &amp; Testing Guide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieDesk — Usage &amp; Testing Guide</h1>
+    <div class="sub">Case-study-driven UAT runbook · Last rendered: 2026-07-18</div>
+    <div class="group">Contents</div>
+    <ol>
+      <li><a href="#prerequisites">1. Prerequisites</a></li>
+      <li><a href="#two-run-modes">2. Two run modes</a></li>
+      <li><a href="#connecting-techiedesk-to-appmanager-credentials">3. Connecting TechieDesk to AppManager (credentials)</a></li>
+      <li><a href="#test-users">4. Test users</a></li>
+      <li><a href="#case-studies-usage-testing">5. Case studies (usage + testing)</a></li>
+      <li class="h3"><a href="#cs-1-first-run-offline-setup-via-setup-wizard">CS-1 First-run offline setup</a></li>
+      <li class="h3"><a href="#cs-2-provision-appmanager-connect">CS-2 Provision AppManager &amp; connect</a></li>
+      <li class="h3"><a href="#cs-3-account-lifecycle">CS-3 Account lifecycle</a></li>
+      <li class="h3"><a href="#cs-4-roles-authorization">CS-4 Roles &amp; authorization</a></li>
+      <li class="h3"><a href="#cs-5-workspace-management">CS-5 Workspace management</a></li>
+      <li class="h3"><a href="#cs-6-document-library">CS-6 Document library</a></li>
+      <li class="h3"><a href="#cs-7-chat-with-citations">CS-7 Chat with citations</a></li>
+      <li class="h3"><a href="#cs-8-threads-history">CS-8 Threads &amp; history</a></li>
+      <li class="h3"><a href="#cs-9-licensing-feature-gating">CS-9 Licensing &amp; feature gating</a></li>
+      <li class="h3"><a href="#cs-10-self-host-with-docker-postgres">CS-10 Self-host with Docker + Postgres</a></li>
+      <li class="h3"><a href="#cs-11-logging-resilience">CS-11 Logging &amp; resilience</a></li>
+      <li><a href="#uat-traceability-matrix">6. UAT traceability matrix</a></li>
+      <li><a href="#known-limitations-notes-for-testers">7. Known limitations &amp; notes for testers</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieDesk — Usage &amp; Testing Guide</h1>
+    <div class="subtitle">A case-study-driven UAT runbook for TechieDesk Phase-1 features.</div>
+
+    <blockquote><p><strong>What this is:</strong> a case-study-driven runbook for a person doing UAT. It shows you how to stand TechieDesk up (offline in minutes, or wired to a live AppManager), then walks you through realistic scenarios that exercise every Phase-1 feature so you can tick each one Pass/Fail. Work top-to-bottom the first time; after that, jump to whichever case study you need. Markdown source — the orchestrator renders the HTML.</p></blockquote>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#two-run-modes">Two run modes</a></li>
+        <li><a href="#connecting-techiedesk-to-appmanager-credentials">Connecting TechieDesk to AppManager (credentials)</a></li>
+        <li><a href="#test-users">Test users</a></li>
+        <li><a href="#case-studies-usage-testing">Case studies (usage + testing)</a>
+          <ul>
+            <li class="h3"><a href="#cs-1-first-run-offline-setup-via-setup-wizard">CS-1 First-run offline setup</a></li>
+            <li class="h3"><a href="#cs-2-provision-appmanager-connect">CS-2 Provision AppManager &amp; connect</a></li>
+            <li class="h3"><a href="#cs-3-account-lifecycle">CS-3 Account lifecycle</a></li>
+            <li class="h3"><a href="#cs-4-roles-authorization">CS-4 Roles &amp; authorization</a></li>
+            <li class="h3"><a href="#cs-5-workspace-management">CS-5 Workspace management</a></li>
+            <li class="h3"><a href="#cs-6-document-library">CS-6 Document library</a></li>
+            <li class="h3"><a href="#cs-7-chat-with-citations">CS-7 Chat with citations</a></li>
+            <li class="h3"><a href="#cs-8-threads-history">CS-8 Threads &amp; history</a></li>
+            <li class="h3"><a href="#cs-9-licensing-feature-gating">CS-9 Licensing &amp; feature gating</a></li>
+            <li class="h3"><a href="#cs-10-self-host-with-docker-postgres">CS-10 Self-host with Docker + Postgres</a></li>
+            <li class="h3"><a href="#cs-11-logging-resilience">CS-11 Logging &amp; resilience</a></li>
+          </ul>
+        </li>
+        <li><a href="#uat-traceability-matrix">UAT traceability matrix</a></li>
+        <li><a href="#known-limitations-notes-for-testers">Known limitations &amp; notes for testers</a></li>
+      </ol>
+    </div>
+
+    <hr>
+
+    <h2 id="prerequisites">1. Prerequisites<a class="anchor-link" href="#prerequisites">#</a></h2>
+
+    <p>You do not need everything below for every scenario — the offline path (CS-1, CS-5–CS-8) needs almost nothing. Grab the rest as the case studies call for them.</p>
+
+    <table>
+      <thead>
+        <tr><th>#</th><th>What</th><th>Needed for</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>.NET 10 SDK</strong></td>
+          <td>Everything run from source</td>
+          <td><code>dotnet --version</code> should report 10.x.</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>An LLM provider for live chat</strong></td>
+          <td>CS-7 streamed answers, chat replies in CS-5/CS-8</td>
+          <td>Ollama at <code>http://localhost:11434</code> with a chat model (<code>ollama pull llama3.1</code>), or LM Studio at <code>http://localhost:1234</code>. <strong>Ingestion/embedding do NOT need this</strong> — they run fully offline via the bundled BGE-M3 model. Without an LLM, chat replies with <code>No LLM provider is configured. Configure one in LLM Settings to chat.</code></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>A running AppManager instance</strong></td>
+          <td>CS-2, CS-3, CS-4, CS-9 (multi-user auth, roles, licensing)</td>
+          <td>Only required for AppManager-connected mode. If you don't have one, those scenarios are explicitly marked and you observe the offline/degraded behaviour instead.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Docker + Docker Compose</strong> (optional)</td>
+          <td>CS-10 (self-host + Postgres/pgvector), optional Qdrant/Ollama profiles</td>
+          <td>The daemon must be running. Without Docker, CS-10 is not exercisable — skip it and note "no daemon".</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The BGE-M3 embedding model (~2.3 GB ONNX) is bundled/downloaded on first use so that <strong>ingestion, embedding, and retrieval work with zero external services</strong>.</p>
+
+    <hr>
+
+    <h2 id="two-run-modes">2. Two run modes<a class="anchor-link" href="#two-run-modes">#</a></h2>
+
+    <p>TechieDesk boots in one of two modes, decided by whether <code>AppManager:BaseUrl</code> is set.</p>
+
+    <ul>
+      <li><strong>Mode A — Offline single-user.</strong> <code>AppManager:BaseUrl</code> is empty (the shipped default). The app signs you in automatically as the built-in <strong>Administrator</strong> — there is no login screen, and <code>/login</code> shows <code>This instance runs in offline single-user mode — no login is required.</code> Fastest path; zero external services. This is the mode CS-1 and CS-5–CS-8 assume.</li>
+      <li><strong>Mode B — AppManager-connected.</strong> <code>AppManager:BaseUrl</code> is set (plus API key/secret). The login/register screens activate, roles and licensing come from AppManager, and the user menu exposes <code>Log out</code> / <code>Log out — all devices</code>. This is the mode CS-2, CS-3, CS-4, and CS-9 assume.</li>
+    </ul>
+
+    <h3 id="what-each-mode-lets-you-test">What each mode lets you test<a class="anchor-link" href="#what-each-mode-lets-you-test">#</a></h3>
+
+    <table>
+      <thead>
+        <tr><th>Capability</th><th style="text-align:center">Offline single-user (A)</th><th style="text-align:center">AppManager-connected (B)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>First-run <code>/setup</code> wizard</td><td style="text-align:center">✅ (choose "Offline single-user mode")</td><td style="text-align:center">✅ (choose "Connect AppManager")</td></tr>
+        <tr><td>Workspaces: create/rename/delete/settings</td><td style="text-align:center">✅ (you are Admin)</td><td style="text-align:center">✅ (role-gated)</td></tr>
+        <tr><td>Document library: upload/embed/dedupe/delete</td><td style="text-align:center">✅</td><td style="text-align:center">✅</td></tr>
+        <tr><td>Threads: create/resume/export/delete</td><td style="text-align:center">✅</td><td style="text-align:center">✅</td></tr>
+        <tr><td>Chat with citations (needs an LLM)</td><td style="text-align:center">✅</td><td style="text-align:center">✅</td></tr>
+        <tr><td>Register / login / logout / forgot-reset</td><td style="text-align:center">❌ (no accounts)</td><td style="text-align:center">✅</td></tr>
+        <tr><td>Profile edit / change password / GDPR export-delete</td><td style="text-align:center">Local only (email "Managed by AppManager")</td><td style="text-align:center">✅ live</td></tr>
+        <tr><td>Roles: Admin vs Manager vs User, server-side authz</td><td style="text-align:center">❌ (always Admin)</td><td style="text-align:center">✅</td></tr>
+        <tr><td>Licensing status, feature gating, upgrade prompts</td><td style="text-align:center">Shows honest <strong>Free (offline)</strong></td><td style="text-align:center">✅ live license + grace</td></tr>
+        <tr><td>Multi-user workspace scoping</td><td style="text-align:center">Unit-asserted only (single user live)</td><td style="text-align:center">✅ live</td></tr>
+      </tbody>
+    </table>
+
+    <p>Run from source (either mode) with:</p>
+
+    <pre><code class="language-bash">dotnet run --project apps/TechieDesk</code></pre>
+
+    <p>It listens on <strong>https://localhost:60355</strong> (and http://localhost:60356). Or self-host via Docker (CS-10): <code>docker compose up -d --build</code>.</p>
+
+    <blockquote><p><strong>Secrets rule:</strong> API keys/secrets must come from environment variables or <code>dotnet user-secrets</code> — never commit them. <code>apps/TechieDesk/appsettings.json</code> ships with <code>AppManager:ApiKey</code> / <code>ApiSecret</code> <strong>empty on purpose</strong>.</p></blockquote>
+
+    <hr>
+
+    <h2 id="connecting-techiedesk-to-appmanager-credentials">3. Connecting TechieDesk to AppManager (credentials)<a class="anchor-link" href="#connecting-techiedesk-to-appmanager-credentials">#</a></h2>
+
+    <p>TechieDesk authenticates, authorizes, and licenses through your <strong>AppManager</strong> instance. From AppManager you need three values for the TechieDesk application — its <strong>Application ID</strong>, an <strong>API key</strong>, and an <strong>API secret</strong> (the <code>ak_live_...</code> key + secret AppManager issues under the application's settings) — plus at least one <strong>superadmin</strong> account with the <strong>Admin</strong> role. How you obtain those inside AppManager depends on your AppManager build; this section shows <strong>where each value goes in TechieDesk</strong>.</p>
+
+    <p>TechieDesk reads the <code>AppManager</code> section straight from configuration (<code>appsettings.json</code> is the base layer) — <strong>no environment variables are required and no code change is needed</strong>. Wire the credentials one of three ways:</p>
+
+    <p><strong>(a) <code>appsettings.Development.json</code> — recommended for local development (this is how the app is configured now).</strong> Create <code>apps/TechieDesk/appsettings.Development.json</code> (already <strong>gitignored</strong>, so the secret is never committed) with your real values. .NET automatically layers it over <code>appsettings.json</code> whenever <code>ASPNETCORE_ENVIRONMENT=Development</code>, which <code>launchSettings.json</code> sets by default — so you edit one JSON file, no env vars:</p>
+
+    <pre><code class="language-json">// apps/TechieDesk/appsettings.Development.json  — gitignored, never committed
+{
+  "AppManager": {
+    "BaseUrl": "https://192.168.1.14:5101/",
+    "ApiKey": "ak_live_your_key",
+    "ApiSecret": "sk_live_your_secret",
+    "ApplicationId": "5"
+  }
+}</code></pre>
+    <p>Then just <code>dotnet run --project apps/TechieDesk</code> — the startup log prints <code>auth mode: AppManager — login required, roles enforced server-side</code>, confirming AppManager mode is active. The <strong>tracked</strong> <code>apps/TechieDesk/appsettings.json</code> keeps its <code>AppManager</code> values <strong>empty</strong> (only the non-secret tuning defaults <code>TokenRefreshLeadSeconds</code>/<code>LicenseGraceHours</code>/<code>LicenseRevalidationMinutes</code> stay there).</p>
+
+    <blockquote><p><code>appsettings.Development.json</code> loads only in the <strong>Development</strong> environment (the default via <code>launchSettings.json</code>). For a Production run or the Docker image it is not loaded — supply the credentials via (b) instead.</p></blockquote>
+
+    <blockquote><p><strong>Self-signed AppManager certificate?</strong> If your AppManager host serves a self-signed / untrusted TLS certificate (common for a LAN instance like <code>https://192.168.1.14:5101/</code>), add <code>"AllowUntrustedServerCertificate": true</code> to the <code>AppManager</code> block in <code>appsettings.Development.json</code>. TechieDesk then trusts that certificate <strong>for the AppManager client only, and only in the Development environment</strong> — the flag is ignored outside Development, so it can never weaken TLS validation in a real deployment. (In production, install a proper CA-signed or trusted certificate on the AppManager host instead.)</p></blockquote>
+
+    <p><strong>(b) Environment variables / <code>.env</code> — for Docker &amp; production.</strong> Nested keys use <code>__</code> (double underscore); this is what <code>docker-compose.yml</code> consumes:</p>
+
+    <pre><code class="language-dotenv">AppManager__BaseUrl=https://your-appmanager-host/
+AppManager__ApiKey=ak_live_your_key
+AppManager__ApiSecret=your_secret
+AppManager__ApplicationId=5</code></pre>
+
+    <p><strong>(c) User-secrets</strong> (Development alternative to (a)): from <code>apps/TechieDesk</code>, <code>dotnet user-secrets set "AppManager:ApiKey" "ak_live_..."</code> and likewise for <code>AppManager:ApiSecret</code>, with the non-secret <code>BaseUrl</code>/<code>ApplicationId</code> in <code>appsettings.Development.json</code> or <code>appsettings.json</code>.</p>
+
+    <blockquote><p>The <code>/setup</code> wizard's <strong>Connect AppManager</strong> step (REQ-UI-023) can set the <strong>BaseUrl</strong> to enable AppManager mode, but it deliberately does <strong>not</strong> persist secrets to disk — you still provide <code>ApiKey</code>/<code>ApiSecret</code> via (a) or (b) and restart.</p></blockquote>
+
+    <blockquote><p>Setting <code>AppManager:BaseUrl</code> (non-empty) switches TechieDesk from offline single-user mode into AppManager mode; leaving it empty keeps the app offline (see §2). The API key auto-resolves the Application ID on most calls, so <code>ApplicationId</code> is optional but recommended.</p></blockquote>
+
+    <p><strong>Superadmin &amp; roles.</strong> Sign in first as the superadmin <strong><code>admin@appmanager.local</code></strong> (full credentials in §4), which must carry the AppManager <strong>Admin</strong> applicationRole for the TechieDesk application. TechieDesk maps the app-scoped <code>applicationRole</code> → its product roles <strong>Admin / Manager / User</strong> (REQ-FN-005). Additional Manager and User test accounts are listed in §4 — create them in AppManager with those roles, or register standard Users from the app's own <code>/register</code> screen (which defaults new users to the <code>User</code> role).</p>
+
+    <blockquote><p><strong>RSA password encryption is automatic.</strong> Per §2.4 of the API guide, every password field is RSA-OAEP-SHA256 encrypted against the server's public key (<code>GET /AuthSvc/public-key</code>) before it leaves the browser. TechieDesk fetches and caches that key and encrypts for you (REQ-FN-001) — there is nothing to configure. The auth footer even says so: <code>Passwords are RSA-encrypted before transmission · Accounts managed by AppManager</code>.</p></blockquote>
+
+    <hr>
+
+    <h2 id="test-users">4. Test users<a class="anchor-link" href="#test-users">#</a></h2>
+
+    <blockquote><p>⚠️ <strong>These are LOCAL UAT credentials for a self-hosted test instance. Rotate or remove them before any real deployment. Never reuse them in production.</strong></p></blockquote>
+
+    <p>Create these three accounts in your AppManager instance and assign the roles shown (wire the credentials per §3). The superadmin is owner-provided and must be entered verbatim.</p>
+
+    <table>
+      <thead>
+        <tr><th>Account (email)</th><th>Password</th><th>Role (applicationRole → product role)</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>admin@appmanager.local</code></td>
+          <td><code>Admin@123!</code></td>
+          <td><strong>Superadmin (AppManager Admin)</strong> → Admin</td>
+          <td>Owner/superadmin. Full instance + all workspaces; first-Admin login in CS-2; the "denied action succeeds here" control in CS-4.</td>
+        </tr>
+        <tr>
+          <td><code>manager@appmanager.local</code></td>
+          <td><code>Manager@123!</code></td>
+          <td>Manager</td>
+          <td>Workspace/document/connector management. Middle tier in CS-4.</td>
+        </tr>
+        <tr>
+          <td><code>user@appmanager.local</code></td>
+          <td><code>User@123!</code></td>
+          <td>User</td>
+          <td>Assigned workspaces + own data only. The "denied server-side" subject in CS-4; the scoping subject in CS-5.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>All three passwords satisfy AppManager complexity (8+ chars, 1 uppercase, 1 number, 1 special) so registration/reset won't bounce with <code>INVALID_PASSWORD</code>.</p>
+
+    <hr>
+
+    <h2 id="case-studies-usage-testing">5. Case studies (usage + testing)<a class="anchor-link" href="#case-studies-usage-testing">#</a></h2>
+
+    <p>Each case study is a short story with the exact routes, controls, and the proof that it worked. Tick the <strong>Result</strong> line as you go. Where a scenario needs a live service (AppManager, an LLM, Docker), the <strong>Preconditions</strong> say so and note what to observe if it's absent — never assume a live check happened that didn't.</p>
+
+    <hr>
+
+    <h3 id="cs-1-first-run-offline-setup-via-setup-wizard">CS-1 First-run offline setup (via /setup wizard)<a class="anchor-link" href="#cs-1-first-run-offline-setup-via-setup-wizard">#</a></h3>
+
+    <p><strong>Scenario.</strong> Priya just cloned the repo onto a laptop with no Ollama, no Docker, no AppManager. She wants a chat-able RAG instance in minutes, entirely offline.</p>
+
+    <p><strong>Covers:</strong> REQ-UI-022, REQ-UI-023, REQ-FN-016, REQ-FN-009.</p>
+
+    <p><strong>Preconditions.</strong> Mode A (offline). No accounts. No external services required. (Ollama optional — this scenario deliberately assumes it is absent to prove graceful fallback.)</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li><code>dotnet run --project apps/TechieDesk</code>, then open <strong>https://localhost:60355</strong>. A fresh instance routes you to <strong><code>/setup</code></strong> (title <em>TechieDesk — First-run setup</em>).</li>
+      <li><strong>Step "Defaults":</strong> confirm the green <em>Zero-config defaults ready</em> alert — "Offline embeddings (Embedded BGE-M3) + SqliteVec vector store". Click <strong>Continue</strong>.</li>
+      <li><strong>Step "AI Provider":</strong> the wizard probes for a local Ollama (2s). With none present you get the info alert <em>"No Ollama detected. You can stay embedded-only (offline)…"</em>. Leave <strong>Skip — embedded-only for now</strong> selected. Click <strong>Continue</strong>.</li>
+      <li><strong>Step "AppManager":</strong> choose <strong>Offline single-user mode</strong> ("No accounts — sign in automatically as the built-in Administrator."). Click <strong>Continue</strong>.</li>
+      <li><strong>Step "Admin account":</strong> with offline mode chosen you see the info alert <em>"you'll sign in automatically as the built-in Administrator. No account setup is required."</em> Click <strong>Continue</strong>.</li>
+      <li><strong>Step "Workspace":</strong> leave the name <strong>Default</strong> (or rename). Click <strong>Finish setup</strong>.</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> The wizard applies Embedded BGE-M3 + SqliteVec, creates the default workspace, and drops you into the app shell (<code>TechieDesk</code> / <em>RAG + LLM Platform</em>) at <code>/workspace/default</code>. The sidebar shows your workspace under <strong>Workspaces</strong>; <code>/setup</code> is no longer forced on next launch. If Ollama <em>were</em> running, step 3 would instead show <em>"Ollama detected at … (N models)"</em> with a <strong>Chat model</strong> picker (that is REQ-FN-016's happy path). The instance is retrieval-ready with zero external services (chat itself waits for an LLM — see CS-7).</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-2-provision-appmanager-connect">CS-2 Provision AppManager &amp; connect<a class="anchor-link" href="#cs-2-provision-appmanager-connect">#</a></h3>
+
+    <p><strong>Scenario.</strong> Owner wants the productized experience: real accounts, roles, licensing. He provisions the TechieDesk app in AppManager and connects the instance, then logs in as the first Admin.</p>
+
+    <p><strong>Covers:</strong> REQ-FN-004, REQ-FN-001, REQ-UI-023, REQ-UI-007, REQ-FN-002, REQ-FN-003, REQ-NFR-002.</p>
+
+    <p><strong>Preconditions.</strong> Mode B. <strong>Requires a running AppManager instance.</strong> If you have none, stop here and note "AppManager absent — connect step and first login not exercisable"; the app will simply remain in offline mode.</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>In your AppManager instance, ensure the <code>TechieDesk</code> application exists with an <strong>Application ID</strong>, an <code>ak_live_...</code> <strong>API key + secret</strong>, and the superadmin <code>admin@appmanager.local</code> holding the <strong>Admin</strong> applicationRole; then wire those credentials into TechieDesk per §3 and restart.</li>
+      <li>Wire the credentials via §3 step 6 (any of the three forms). Confirm <strong><code>appsettings.json</code> still has empty <code>ApiKey</code>/<code>ApiSecret</code></strong> — the live values come from env/user-secrets only (REQ-NFR-002).</li>
+      <li>Restart the app. Because <code>AppManager:BaseUrl</code> is now set, the instance boots in AppManager mode.</li>
+      <li>Browse to any protected route (e.g. <code>/</code>). You are redirected to <strong><code>/login</code></strong> with a <code>returnUrl</code> (REQ-FN-003). The offline banner is gone.</li>
+      <li>On <strong><code>/login</code></strong> (<em>Welcome back</em> / <em>Sign in to your TechieDesk instance</em>) enter <code>admin@appmanager.local</code> / <code>Admin@123!</code> and click <strong>Sign in</strong>.</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Login succeeds and lands you on the originally requested route. Behind the scenes the single <code>AppManagerClient</code> sent <code>X-Api-Key</code>/<code>X-Api-Secret</code> on every call (REQ-FN-004), fetched the RSA public key and sent an <code>encryptedPassword</code> — no plaintext on the wire (REQ-FN-001, verify in browser dev-tools Network → the login request body carries <code>encryptedPassword</code>, not <code>password</code>). The header shows an <strong>Admin</strong> role badge; the user menu now exposes <code>Log out</code> and <code>Log out — all devices</code>. Sessions refresh silently before expiry (REQ-FN-002; <code>TokenRefreshLeadSeconds</code> = 120). A wrong password shows <code>Invalid email or password.</code></p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-3-account-lifecycle">CS-3 Account lifecycle<a class="anchor-link" href="#cs-3-account-lifecycle">#</a></h3>
+
+    <p><strong>Scenario.</strong> A new teammate, Meera, registers, signs in, tidies her profile, rotates her password, recovers a forgotten one, logs out everywhere, then exercises her GDPR rights.</p>
+
+    <p><strong>Covers:</strong> REQ-UI-006, REQ-UI-007, REQ-UI-008, REQ-UI-009, REQ-UI-010, REQ-UI-011, REQ-UI-012, REQ-UI-013, REQ-FN-001, REQ-FN-002, REQ-FN-003.</p>
+
+    <p><strong>Preconditions.</strong> Mode B. <strong>Requires a running AppManager</strong> with the TechieDesk app connected (CS-2 done). Without it, none of the round-trips below can complete — note "AppManager absent" and skip.</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li><strong>Register:</strong> open <strong><code>/register</code></strong> (<em>Create your account</em>). Fill First name, Last name, Email, optional Mobile, Password (hint: <em>Min 8 chars, 1 uppercase, 1 number, 1 special character</em>), Confirm password. Click <strong>Create account</strong>. → <code>POST /AuthSvc/register</code>, auto-login on success.</li>
+      <li><strong>Login round-trip:</strong> log out, then sign back in at <strong><code>/login</code></strong> to confirm credentials persist and the role/active-license are captured.</li>
+      <li><strong>Profile view/edit:</strong> go to <strong><code>/profile</code></strong>. Edit First/Last name, Mobile, or <strong>Change avatar URL</strong>; note Email is disabled (<em>Managed by AppManager</em>). Click <strong>Save changes</strong>. → <code>PUT /UserSvc/profile</code>.</li>
+      <li><strong>Change password:</strong> in the <em>Change password</em> card enter Current, New, Confirm; click <strong>Update password</strong>. → <code>POST /UserSvc/change-password</code> (both fields RSA-encrypted). A wrong current password maps to the field as an <code>INVALID_CURRENT_PASSWORD</code> error.</li>
+      <li><strong>Forgot/reset:</strong> log out. On <code>/login</code> click <strong>Forgot password?</strong> → <strong><code>/forgot-password</code></strong>, submit the email, get the anti-enumeration success <em>"If that address exists, a reset email is on its way."</em> Use the emailed link to reach <strong><code>/reset-password?token=...</code></strong>, set a new password, click <strong>Reset password</strong>, confirm <em>"Your password has been reset. You can now sign in."</em></li>
+      <li><strong>Logout (all devices):</strong> sign in again; open the user menu → <strong>Log out — all devices</strong> → <code>POST /AuthSvc/logout</code> with <code>logoutAllDevices:true</code>.</li>
+      <li><strong>GDPR:</strong> on <code>/profile</code> in the <em>Privacy (GDPR)</em> card click <strong>Request data export</strong> (→ <code>POST /UserSvc/data-export</code>) and <strong>Request account deletion</strong> — type your email to confirm the match (→ <code>POST /UserSvc/delete-request</code>, ~7-day completion).</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Every step round-trips cleanly: registration lands authenticated as <strong>User</strong>; profile edits persist; the password change and reset both let you log in with the new password; forgot-password never reveals whether the email exists; "all devices" revokes every refresh token (a second browser session is bounced to <code>/login</code> on its next action). Export/delete each return a request acknowledgement. Friendly auth-error banners (REQ-UI-013) appear on the matching AppManager responses — e.g. <code>Account locked — too many failed attempts. Try again in 15 minutes.</code> (ACCOUNT_LOCKED), <code>Account disabled — contact your administrator.</code> (ACCOUNT_DISABLED), and the NO_APP_ACCESS banner <em>"Your account doesn't have access to this application…"</em>.</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-4-roles-authorization">CS-4 Roles &amp; authorization<a class="anchor-link" href="#cs-4-roles-authorization">#</a></h3>
+
+    <p><strong>Scenario.</strong> Three people — Admin, Manager, User — sign into the same instance. You confirm each sees the right things, and critically that a plain <strong>User is denied a role-gated action server-side</strong>, not just hidden in the UI.</p>
+
+    <p><strong>Covers:</strong> REQ-FN-005, REQ-FN-006, REQ-FN-007, REQ-FN-003, REQ-UI-013.</p>
+
+    <p><strong>Preconditions.</strong> Mode B. <strong>Requires a running AppManager</strong> with all three §4 accounts and their applicationRoles assigned. Without it, the mapping and matrix are unit-asserted only (see the matrix); note "AppManager absent — live role check skipped".</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>Sign in as <code>admin@appmanager.local</code>. Note the <strong>Admin</strong> role badge. Confirm the sidebar shows management affordances: <strong>New workspace</strong> button, per-workspace <code>⋯</code> menu (<code>Rename</code> / <code>Settings</code> / <code>Delete</code>), and the console groups.</li>
+      <li>Sign out; sign in as <code>manager@appmanager.local</code>. Confirm the <strong>Manager</strong> badge and that workspace/document management controls are present (create workspace, workspace <code>Settings</code>, document <code>Unembed</code>/<code>Delete</code>).</li>
+      <li>Sign out; sign in as <code>user@appmanager.local</code>. Confirm the <strong>User</strong> badge, that <strong>only assigned workspaces</strong> appear, and that management controls are absent (e.g. a document row shows <strong>View only</strong>, not <code>Unembed</code>/<code>Delete</code>; no <strong>New workspace</strong> button).</li>
+      <li><strong>Server-side denial:</strong> while signed in as User, attempt a role-gated operation directly — e.g. navigate to <strong><code>/workspace/{slug}/settings</code></strong> for a workspace you can see. Expect the access-denied alert <em>"Not allowed — You need the Manager or Admin role to edit workspace settings."</em> For a true server-side proof, replay a manager-only request (e.g. the save-settings or delete-workspace call) with the User's session using dev-tools/curl.</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Roles map correctly (applicationRole → Admin/Manager/User, REQ-FN-005) and the capability matrix holds (REQ-FN-006): Admin = instance + all; Manager = workspace/doc/connector management; User = assigned workspaces + own data. The forged/replayed User request in step 4 is <strong>rejected by the server</strong> regardless of what the UI showed (REQ-FN-007) — UI hiding is never the only guard. As a sanity check, the same gated action <strong>succeeds</strong> when replayed as <code>admin@appmanager.local</code>.</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-5-workspace-management">CS-5 Workspace management<a class="anchor-link" href="#cs-5-workspace-management">#</a></h3>
+
+    <p><strong>Scenario.</strong> Manager Arjun sets up a "Handbook" knowledge base, tunes how it retrieves, adds a teammate, and confirms a plain User sees only what they're assigned.</p>
+
+    <p><strong>Covers:</strong> REQ-UI-014, REQ-UI-015, REQ-FN-008, REQ-RAG-014, REQ-RAG-015.</p>
+
+    <p><strong>Preconditions.</strong> Either mode for the create/settings mechanics (offline you are Admin). The <strong>User-scoping</strong> check in step 6 needs Mode B with a real User account; offline it is single-user, so note "scoping unit-asserted only".</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>In the sidebar <strong>Workspaces</strong> group click <strong>New workspace</strong>. In the dialog (<em>Create an isolated knowledge base…</em>) type <code>Handbook</code> and click <strong>Create</strong>. It appears in the switcher and you land on <code>/workspace/handbook</code>.</li>
+      <li>Rename via the workspace <code>⋯</code> menu → <strong>Rename</strong> (<code>Save</code>); confirm the sidebar and page title update.</li>
+      <li>Open <strong><code>/workspace/handbook/settings</code></strong> (button <strong>Settings</strong>). Walk the four tabs:
+        <ul>
+          <li><strong>General:</strong> set a <strong>System prompt</strong> (e.g. <em>You are the company handbook assistant</em>), optionally an <strong>LLM override</strong> (blank = instance default), and pick a Mode: <strong>Chat — general knowledge + documents</strong> vs <strong>Query — documents only, answers "not in my documents" honestly</strong> (REQ-RAG-015).</li>
+          <li><strong>Retrieval:</strong> drag <strong>Similarity threshold</strong> (e.g. 0.30), set <strong>Top-K snippets</strong> (e.g. 5), and try the <strong>Accuracy optimized (reranker)</strong> switch (REQ-RAG-014).</li>
+          <li><strong>Members:</strong> under <strong>Add</strong>, enter a <strong>User ID</strong> and pick a <strong>Role</strong> (<code>User</code>/<code>Manager</code>/<code>Admin</code>), click <strong>Add</strong> (REQ-FN-008).</li>
+          <li>Click <strong>Save changes</strong>.</li>
+        </ul>
+      </li>
+      <li>Confirm the header badge on <code>/workspace/handbook</code> reflects <strong>Query mode</strong> or <strong>Chat mode</strong> to match your choice.</li>
+      <li>Use the sidebar switcher to hop between workspaces and confirm the active one drives the Documents sub-link and chat scope.</li>
+      <li><strong>Scoping (Mode B):</strong> sign in as <code>user@appmanager.local</code> who is a member of <code>Handbook</code> but not of another workspace. Confirm the sidebar lists <strong>only</strong> <code>Handbook</code>.</li>
+      <li><strong>Delete:</strong> back as Manager/Admin, Settings → <strong>Danger</strong> tab → <strong>Delete workspace</strong> (or sidebar <code>⋯</code> → <code>Delete</code>). Confirm the <em>"Delete '{name}'?"</em> dialog before it removes the workspace (threads + doc links; files stay in the library).</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Create/rename/delete all work with confirmation on delete; the four settings tabs persist their values (re-open to confirm); the mode badge matches; and in Mode B the User sees only assigned workspaces (REQ-FN-008). Retrieval threshold/top-K/rerank persist per workspace (REQ-RAG-014).</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-6-document-library">CS-6 Document library<a class="anchor-link" href="#cs-6-document-library">#</a></h3>
+
+    <p><strong>Scenario.</strong> Arjun loads the Handbook workspace with files, watches them embed, uploads a duplicate to see dedupe, pins a key doc, tries an unsupported spreadsheet, and deletes a document cleanly.</p>
+
+    <p><strong>Covers:</strong> REQ-UI-019, REQ-UI-020, REQ-UI-021, REQ-FN-012, REQ-RAG-011, REQ-RAG-012, REQ-RAG-013.</p>
+
+    <p><strong>Preconditions.</strong> Either mode. <strong>No LLM needed</strong> — embedding runs offline via bundled BGE-M3 (first upload may show <em>Preparing embedding model (BGE-M3)</em> while it loads).</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>Open <strong><code>/workspace/handbook/documents</code></strong> (title <em>Handbook — Documents</em>).</li>
+      <li><strong>Multi-upload:</strong> drag several files (PDF, DOCX, MD, TXT) onto the dropzone, or <strong>browse</strong> — the hint reads <em>"Drag &amp; drop or browse — PDF, DOCX, MD, TXT, HTML, CSV, JSON + 70 code types. Spreadsheets/presentations (XLSX/PPTX) are coming in a later release."</em> (max 64 MB/file). Watch the <strong>Uploads (N)</strong> card show per-file status <strong>Queued → Embedding… → Embedded</strong> (REQ-UI-019, REQ-UI-020).</li>
+      <li><strong>Dedupe:</strong> upload one of the <em>same</em> files again (or into a second workspace). Its status should read <strong>Reused (dedupe)</strong> — embedded once, reused by content hash (REQ-RAG-012).</li>
+      <li><strong>Pin:</strong> in the library table, pin a document (pin control in the first column); optionally toggle <strong>Pin new uploads</strong> for future uploads (REQ-RAG-013).</li>
+      <li><strong>Metadata table:</strong> confirm the <strong>Library (N documents)</strong> table columns render — <strong>Name · Type · Size · Chunks · Uploaded · Workspaces · Status</strong> — and that on a 390px-wide viewport the table scrolls inside its container with no page overflow (REQ-UI-021). <em>(Note: Size may display "—" — see limitations, TR-RAG-004.)</em></li>
+      <li><strong>Unsupported type:</strong> upload an <code>.xlsx</code> or <code>.pptx</code>. Expect a clear <strong>Rejected</strong> status (no crash) — the "coming in a later release" path (REQ-RAG-011).</li>
+      <li><strong>Delete:</strong> on a document row click <strong>Delete</strong>; confirm the <em>"Delete '{name}'?"</em> dialog (it shows how many workspaces use it) and click <strong>Delete everywhere</strong>. This removes vectors from every using workspace (REQ-FN-012). Compare with <strong>Unembed</strong>, which only detaches the doc from <em>this</em> workspace.</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Multiple files queue with independent progress and reach <strong>Embedded</strong>; a re-upload shows <strong>Reused (dedupe)</strong>; pinning persists with an indicator; the metadata table renders and scrolls correctly at 390px; XLSX/PPTX are cleanly <strong>Rejected</strong>; and Delete-everywhere drops the document's vectors from all workspaces after confirmation, leaving the empty-state <em>"No documents yet"</em> when the last one goes.</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-7-chat-with-citations">CS-7 Chat with citations<a class="anchor-link" href="#cs-7-chat-with-citations">#</a></h3>
+
+    <p><strong>Scenario.</strong> With the Handbook embedded, Meera asks questions and expects grounded, streamed answers with citation chips she can expand — and honest "not in my documents" when she asks something off-topic in Query mode.</p>
+
+    <p><strong>Covers:</strong> REQ-RAG-007, REQ-RAG-010, REQ-UI-018, REQ-RAG-015.</p>
+
+    <p><strong>Preconditions.</strong> Documents embedded (CS-6). <strong>Live streamed answers need an LLM provider</strong> (Ollama/LM Studio, prereq #2). <strong>Without an LLM the chat replies <code>No LLM provider is configured…</code></strong> and citation chips cannot render (they need a live RAG answer) — in that case verify only that the chat pane and composer render, and note "LLM absent — streamed citations pending provider UAT".</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>Open <strong><code>/workspace/handbook</code></strong>. Confirm the muted subtitle <em>"Chat — retrieval scoped to this workspace's documents."</em></li>
+      <li>Ask a question answerable from the embedded docs, e.g. <em>"What is our leave policy?"</em> Send (Enter; Shift+Enter for a newline). Watch the states <strong>Retrieving &amp; thinking… → Streaming…</strong>.</li>
+      <li>When the answer arrives, click <strong>Show sources (N)</strong> and expand a chip → confirm it shows the <strong>document name</strong>, a <strong>snippet</strong>, and a <strong>relevance 0.00</strong> score (REQ-UI-018). Sources are workspace-scoped (REQ-RAG-007).</li>
+      <li>Switch the workspace to <strong>Query mode</strong> (CS-5) and ask something clearly <em>not</em> in the documents, e.g. <em>"What's the weather in Paris?"</em> — expect the deterministic <em>"The workspace documents do not contain information relevant to this question."</em> (REQ-RAG-015).</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> In Chat mode you get a streamed answer grounded in this workspace's documents, with native citation chips that expand to doc/snippet/score (REQ-RAG-010, REQ-UI-018) — no cross-workspace leakage (REQ-RAG-007). In Query mode, an off-topic question returns the honest not-in-documents answer rather than a hallucination (REQ-RAG-015).</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-8-threads-history">CS-8 Threads &amp; history<a class="anchor-link" href="#cs-8-threads-history">#</a></h3>
+
+    <p><strong>Scenario.</strong> Meera keeps several conversations in the Handbook, resumes one after re-login, exports a thread for a colleague, and finally wipes her history.</p>
+
+    <p><strong>Covers:</strong> REQ-UI-016, REQ-UI-017, REQ-FN-010, REQ-FN-011, REQ-RAG-008, REQ-RAG-009.</p>
+
+    <p><strong>Preconditions.</strong> Either mode. Resuming with <em>populated</em> context (step 4) needs a prior LLM answer (an LLM); without one you can still create/rename/delete/export empty threads — note "no LLM: resume shows persisted messages only".</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>In <code>/workspace/handbook</code>, in the <strong>Threads</strong> panel click <strong>New thread</strong> — a persisted <em>New conversation</em> row replaces the <em>No threads yet</em> empty state (REQ-UI-016, REQ-RAG-008).</li>
+      <li>Send a couple of messages, then create a second thread and send a different message. Confirm the list orders <strong>newest-first</strong> (REQ-UI-017).</li>
+      <li>Rename a thread: thread <code>⋯</code> menu → <strong>Rename</strong> → set a title → <strong>Save</strong>.</li>
+      <li><strong>Resume after re-login:</strong> sign out (or restart the app in offline mode) and return to <code>/workspace/handbook</code>; select the earlier thread and confirm its full message history reloads with citations (REQ-UI-017, REQ-RAG-008), and that follow-up answers use prior turns as token-trimmed context (REQ-RAG-009).</li>
+      <li><strong>Export:</strong> thread <code>⋯</code> menu → <strong>Export as Markdown</strong>, then <strong>Export as JSON</strong> — both download files carrying roles/content/sources/timestamps (REQ-FN-010).</li>
+      <li><strong>Delete one:</strong> thread <code>⋯</code> → <strong>Delete</strong> → confirm <em>"This permanently removes the thread and all of its messages. This cannot be undone."</em> → <strong>Delete</strong>.</li>
+      <li><strong>Delete all:</strong> the trash icon (title <strong>Delete all my history</strong>) → confirm <em>"This permanently removes every conversation thread and message you own across all workspaces…"</em> → <strong>Delete everything</strong> (REQ-FN-011).</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Threads create/rename/delete with confirmation; the list is newest-first; a resumed thread reloads its persisted messages and continues with context (REQ-RAG-008/009); Markdown and JSON exports download with full content; and "Delete all my history" wipes the store to zero threads/messages.</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-9-licensing-feature-gating">CS-9 Licensing &amp; feature gating<a class="anchor-link" href="#cs-9-licensing-feature-gating">#</a></h3>
+
+    <p><strong>Scenario.</strong> Owner checks the license status card, bumps into a gated feature, sees the upgrade path and pricing, then simulates an AppManager outage to confirm the cached-license grace behaviour.</p>
+
+    <p><strong>Covers:</strong> REQ-FN-013, REQ-FN-014, REQ-FN-015.</p>
+
+    <p><strong>Preconditions.</strong> Mode B for live license/features (<strong>requires a running AppManager</strong>). Offline, the card honestly shows <strong>Free (offline)</strong> and gates fall back to the free tier — still worth checking, but note "offline: license is Free (offline), not a live AppManager license". The outage simulation (step 4) needs a previously-cached live license, so requires AppManager to have been reachable at least once.</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>Open <strong><code>/profile</code></strong> and read the <strong>License</strong> card (<em>Your current TechieDesk plan and its validation status</em>): license name · status badge, <strong>Expires</strong>, <strong>Days remaining</strong>, <strong>Last validated … UTC</strong> (REQ-FN-013). Offline it shows a <strong>Free (offline)</strong> style badge.</li>
+      <li>Hit a <strong>gated feature</strong> — e.g. a Connectors entry on Home. Expect an <strong>upgrade prompt</strong> rather than the feature (REQ-FN-014).</li>
+      <li>Follow the prompt (or the card's <strong>View plans</strong> button) to <strong><code>/pricing</code></strong> (<em>Plans &amp; pricing</em>). Confirm the three tiers: <strong>Free</strong> ($0/forever), <strong>Professional</strong> ($99.99/yr, <em>Most popular</em>, lists <em>Connectors / Agents / Embed widget / 10k API requests/mo</em>), <strong>Enterprise</strong> (Custom, <em>White-label</em>). Your current tier shows a <strong>Current plan</strong> badge and its button reads <strong>Your plan</strong> (disabled).</li>
+      <li><strong>Simulate an AppManager outage:</strong> stop AppManager (or block its URL) and reload <code>/profile</code>. Within the grace window (<code>AppManager:LicenseGraceHours</code> = 72) the card shows a <strong>Cached</strong> badge and the warning <em>"Running on cached license"</em>, and a top-of-shell cached-license banner appears with a <strong>View plans</strong> link (REQ-FN-015). Past the grace window it degrades to <em>"License verification unavailable"</em>.</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> The status card reflects live/cached/offline honestly; a gated feature yields an upgrade prompt that routes to the three-tier <code>/pricing</code>; and an AppManager outage keeps the last-known-good license working under the grace banner, then degrades after expiry — no hard crash either way.</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-10-self-host-with-docker-postgres">CS-10 Self-host with Docker + Postgres<a class="anchor-link" href="#cs-10-self-host-with-docker-postgres">#</a></h3>
+
+    <p><strong>Scenario.</strong> Owner deploys the instance the way a customer would: <code>docker compose up</code>, all config via env vars, on Postgres/pgvector, and confirms data survives a container recreate.</p>
+
+    <p><strong>Covers:</strong> REQ-FN-017, REQ-FN-018, REQ-FN-019, REQ-FN-030, REQ-FN-031, REQ-FN-029, REQ-NFR-002.</p>
+
+    <p><strong>Preconditions.</strong> <strong>Requires Docker + Docker Compose running.</strong> No daemon → this case study is not exercisable; note "no Docker daemon — validated by compose config inspection only". Run from the repo root.</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>Copy <code>.env.example</code> → <code>.env</code> and set at least <code>POSTGRES_PASSWORD</code> (default <code>change-me-please</code>), and — for AppManager mode — <code>AppManager__BaseUrl</code> / <code>AppManager__ApiKey</code> / <code>AppManager__ApiSecret</code> / <code>AppManager__ApplicationId</code>. Leaving <code>AppManager__BaseUrl</code> empty keeps it offline single-user (REQ-FN-018, REQ-NFR-002 — secrets via env, none committed).</li>
+      <li>Bring it up: <strong><code>docker compose up -d --build</code></strong>. This starts the <strong>app</strong> (<code>techiedesk:latest</code>) and <strong>postgres</strong> (<code>pgvector/pgvector:pg16</code>, health-gated). Optional profiles: <code>docker compose --profile qdrant up -d</code>, <code>docker compose --profile ollama up -d</code>.</li>
+      <li>Browse to <code>http://localhost:${APP_PORT:-8080}</code>.</li>
+      <li><strong>Migrations on start:</strong> check the app container logs for the DbUp run against Postgres — <em>"Beginning database upgrade"</em> … <em>"Database migrations applied successfully"</em> (REQ-FN-030). The Postgres schema is the per-provider equivalent of the SQLite one (REQ-FN-031).</li>
+      <li><strong>Volume persistence:</strong> create a workspace + upload a doc, then recreate the app container: <code>docker compose up -d --force-recreate app</code>. Reload — your data is still there because the named volumes persist: <code>techiedesk-data</code> (<code>/app/data</code>), <code>techiedesk-uploads</code> (<code>/app/uploads</code>), <code>techiedesk-models</code> (<code>/app/models</code>, the ~2.3 GB BGE-M3), and <code>techiedesk-pgdata</code> (<code>/var/lib/postgresql/data</code>) (REQ-FN-019).</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> One command brings up app + pgvector; the app is reachable on the mapped port; DbUp applies migrations idempotently at boot against pgvector (data access is Dapper-only, zero EF Core — REQ-FN-029); and workspaces/docs/DB survive <code>--force-recreate</code> thanks to the named volumes. All config comes from env vars (12-factor).</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h3 id="cs-11-logging-resilience">CS-11 Logging &amp; resilience<a class="anchor-link" href="#cs-11-logging-resilience">#</a></h3>
+
+    <p><strong>Scenario.</strong> Owner confirms the instance is observable and degrades gracefully: rolling Serilog logs on both executable heads, and a survivable AppManager outage / provider fallback.</p>
+
+    <p><strong>Covers:</strong> REQ-NFR-009, REQ-FN-015, REQ-NFR-010.</p>
+
+    <p><strong>Preconditions.</strong> Either mode for logs. The outage grace check reuses CS-9 step 4 (needs a cached live license); provider-fallback observation needs an LLM to fail over from. Note any absent service rather than assuming a check ran.</p>
+
+    <p><strong>Steps.</strong></p>
+    <ol>
+      <li>After a run, find the <strong>rolling Serilog files</strong> on both heads:
+        <ul>
+          <li>App head: <code>apps/TechieDesk/logs/techiedesk-&lt;yyyymmdd&gt;.log</code></li>
+          <li>Migrator head: <code>apps/TechieDeskDb/logs/techiedeskdb-&lt;yyyymmdd&gt;.log</code></li>
+        </ul>
+        Confirm startup and migration outcomes are logged (REQ-NFR-009).</li>
+      <li><strong>Outage grace:</strong> repeat CS-9 step 4 — with a cached license and AppManager down, confirm the cached-license grace banner appears and the app keeps working within the grace window (REQ-FN-015).</li>
+      <li><strong>Provider fallback / restart-safety:</strong> with an LLM configured, induce a provider failure (stop Ollama mid-chat) and confirm the app surfaces a visible status/fallback rather than crashing; then restart the app and confirm persisted workspaces/threads/docs are intact (REQ-NFR-010).</li>
+    </ol>
+
+    <p><strong>Expected result.</strong> Both heads write dated rolling logs under <code>logs/</code> capturing startup + migrations + unhandled exceptions; an AppManager outage is ridden out under the grace banner; a provider failure degrades visibly (retry/fallback) instead of crashing; and a restart loses no persisted data.</p>
+
+    <p><strong>Result:</strong> ☐ Pass ☐ Fail — notes: ______________________</p>
+
+    <hr>
+
+    <h2 id="uat-traceability-matrix">6. UAT traceability matrix<a class="anchor-link" href="#uat-traceability-matrix">#</a></h2>
+
+    <p>Every Phase-1 REQ, the case study that exercises it, and its current standing. <strong>Status legend:</strong> ✅ <em>Verified</em> = already confirmed by the agent/verifier (per <code>docs/TechieDesk-Checklist.md</code>, 2026-07-18); ⏳ <em>Owner UAT</em> = implemented but awaiting this live owner UAT (typically needs AppManager / an LLM / Docker); ⚠️ <em>Blocked</em> = owner action outstanding. Tick the <strong>UAT</strong> box as you pass each here.</p>
+
+    <table>
+      <thead>
+        <tr><th>REQ ID</th><th>Requirement (short)</th><th>Case study</th><th style="text-align:center">Prior status</th><th style="text-align:center">UAT</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>REQ-UI-006</td><td>Register screen &amp; flow</td><td>CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-007</td><td>Login screen &amp; flow</td><td>CS-2, CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-008</td><td>Logout current/all devices</td><td>CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-009</td><td>Forgot/reset password</td><td>CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-010</td><td>Change password in profile</td><td>CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-011</td><td>Profile view/update</td><td>CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-012</td><td>GDPR export/delete requests</td><td>CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-013</td><td>Friendly auth-error states</td><td>CS-3, CS-4</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-014</td><td>Workspace create/rename/delete</td><td>CS-5</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-015</td><td>Workspace settings page</td><td>CS-5</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-016</td><td>Thread create/rename/delete</td><td>CS-8</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-017</td><td>Browse &amp; resume past threads</td><td>CS-8</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-018</td><td>Expandable citation UI</td><td>CS-7</td><td style="text-align:center">⏳ Owner UAT (LLM)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-019</td><td>Drag-drop multi-file upload</td><td>CS-6</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-020</td><td>Embed/unembed live status</td><td>CS-6</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-021</td><td>Document metadata list</td><td>CS-6</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-022</td><td>Wizard offline defaults</td><td>CS-1</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-UI-023</td><td>Wizard AppManager/offline mode</td><td>CS-1, CS-2</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-001</td><td>RSA password encryption + key cache</td><td>CS-2, CS-3</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-002</td><td>Silent token refresh + session</td><td>CS-2, CS-3</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-003</td><td>Route protection + deep-link return</td><td>CS-2, CS-4</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-004</td><td>AppManagerClient (API-key headers)</td><td>CS-2</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-005</td><td>applicationRole → product-role map</td><td>CS-4</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-006</td><td>Role capability matrix</td><td>CS-4</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-007</td><td>Server-side authz on every op</td><td>CS-4</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-008</td><td>User↔workspace assignment</td><td>CS-5</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-009</td><td>Default workspace bootstrap</td><td>CS-1</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-010</td><td>Thread export (Markdown/JSON)</td><td>CS-8</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-011</td><td>Delete thread / full history</td><td>CS-8</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-012</td><td>Delete document + vectors, confirmed</td><td>CS-6</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-013</td><td>License validation + status UI</td><td>CS-9</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-014</td><td>Feature gating + upgrade prompts</td><td>CS-9</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-015</td><td>AppManager-outage grace period</td><td>CS-9, CS-11</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-016</td><td>Ollama detection in wizard</td><td>CS-1</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-017</td><td>Dockerfile + compose self-host</td><td>CS-10</td><td style="text-align:center">⏳ Owner UAT (Docker)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-018</td><td>Env-var configuration (12-factor)</td><td>CS-10</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-019</td><td>Persistent volumes</td><td>CS-10</td><td style="text-align:center">⏳ Owner UAT (Docker)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-029</td><td>Dapper-only data access (no EF Core)</td><td>CS-10</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-030</td><td>TechieDeskDb console + DbUp migrations</td><td>CS-10</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-FN-031</td><td>Per-provider migration parity</td><td>CS-10</td><td style="text-align:center">⏳ Owner UAT (Postgres)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-007</td><td>Workspace-scoped retrieval</td><td>CS-7</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-008</td><td>Persist messages via library memory</td><td>CS-8</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-009</td><td>Context from history, token-trimmed</td><td>CS-8</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-010</td><td>Native streaming citations</td><td>CS-7</td><td style="text-align:center">⏳ Owner UAT (LLM)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-011</td><td>Accept supported types; reject XLSX/PPTX</td><td>CS-6</td><td style="text-align:center">⏳ PARTIAL (P2 for XLSX/PPTX)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-012</td><td>Content-hash dedupe, embed-once</td><td>CS-6</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-013</td><td>Document pinning</td><td>CS-6</td><td style="text-align:center">⏳ PARTIAL (streaming pin, TR-RAG-003)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-014</td><td>Retrieval tuning: threshold/topK/rerank</td><td>CS-5</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-RAG-015</td><td>Chat vs query mode</td><td>CS-5, CS-7</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-NFR-001</td><td>Revoke + untrack TrBlazeUI PAT</td><td>CS-10 / §7</td><td style="text-align:center">⚠️ Blocked (owner action)</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-NFR-002</td><td>No committed secrets; env/user-secrets</td><td>CS-2, CS-10</td><td style="text-align:center">⏳ Owner UAT</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-NFR-006</td><td>Responsive @1280/390, no overflow</td><td>All CS (visual gate)</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+        <tr><td>REQ-NFR-009</td><td>Serilog rolling logs, every head</td><td>CS-11</td><td style="text-align:center">✅ Verified</td><td style="text-align:center">☐</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>Coverage:</strong> 53 Phase-1 REQs — UI-006…023, FN-001…019 + 029/030/031, RAG-007…015, NFR-001/002/006/009 — each mapped to at least one case study.</p>
+
+    <hr>
+
+    <h2 id="known-limitations-notes-for-testers">7. Known limitations &amp; notes for testers<a class="anchor-link" href="#known-limitations-notes-for-testers">#</a></h2>
+
+    <ul>
+      <li><strong>XLSX / PPTX not yet ingestible.</strong> Spreadsheets and presentations are cleanly <strong>Rejected</strong> with a "coming in a later release" message (REQ-RAG-011 PARTIAL); real support is P2 (REQ-RAG-033). Test the rejection, not the ingestion.</li>
+      <li><strong>Pinned docs (REQ-RAG-013) are honored by non-streaming ask, not the app-side streaming path.</strong> The pin toggle/indicator persists, but the scoped streaming path can't yet merge pinned context (library gap TR-RAG-003). Expect pinning to influence non-streaming answers.</li>
+      <li><strong>Document "Size" may show "—".</strong> The library table has no size field end-to-end yet (library gap TR-RAG-004) — cosmetic, not a failure.</li>
+      <li><strong>Docker / Postgres need a running daemon.</strong> CS-10 (and the Postgres migration-parity half of REQ-FN-031) can't be exercised without Docker; without it they're validated only by compose-config inspection.</li>
+      <li><strong>Live auth, licensing, and streamed chat need their services.</strong> Anything in CS-2/CS-3/CS-4/CS-9 needs a reachable <strong>AppManager</strong>; CS-7's streamed citations and populated chat need an <strong>LLM provider</strong>. Where absent, verify render/offline behaviour only and say so — don't imply a live round-trip happened.</li>
+      <li><strong>NU1902 dependency advisory.</strong> The build surfaces <code>NU1902</code> — AngleSharp 0.17.1 has a known moderate-severity advisory (GHSA-pgww-w46g-26qg) on TechieDesk + TechieDesk.Tests. Upgrade AngleSharp before any distribution (tracked under REQ-NFR-004).</li>
+      <li><strong>REQ-NFR-001 — owner security action (Blocked).</strong> Before any public/real distribution the owner must <code>git rm --cached nuget.config</code> from history and <strong>revoke/rotate the TrBlazeUI GitHub PAT</strong>. The working tree is clean (no committed <code>nuget.config</code>), but the history + PAT rotation are manual owner/git actions this UAT cannot close.</li>
+      <li><strong>UAT credentials are disposable.</strong> The §4 accounts are for this self-hosted test instance only — rotate or delete them before any real deployment; never reuse in production.</li>
+    </ul>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>
