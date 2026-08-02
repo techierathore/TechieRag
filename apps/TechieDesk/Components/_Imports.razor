@@ -8,13 +8,24 @@
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Microsoft.JSInterop
+@* REQ-FN-035: supplied implicitly by Microsoft.NET.Sdk.Web; the MAUI head's SDK does not. *@
+@using Microsoft.Extensions.Logging
 @using TechieDesk
+@using TechieDesk.Services.Hosting
 @using TechieDesk.Components
 @using TechieDesk.Components.Layout
 @using TechieDesk.Services
 @using TechieDesk.Services.AppManager
 @using TechieDesk.Services.AppManager.Models
+@using TechieDesk.Services.Appearance
 @using TechieDesk.Services.Auth
+@using TechieDesk.Services.Branding
+@using TechieDesk.Services.Localization
+@* REQ-UI-039: .resx lookups. Aliased rather than `@using TechieDesk.Resources` because MAUI treats
+   a `Resources` folder as its own asset root, and an unqualified `Resources` in a MAUI head is
+   ambiguous enough to be worth not writing. *@
+@using Microsoft.Extensions.Localization
+@using AppStrings = TechieDesk.Resources.AppStrings
 @using TechieDesk.Services.Licensing
 @using TechieDesk.Services.Workspaces
 @using TechieDesk.Components.Shared

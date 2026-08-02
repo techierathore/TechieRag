@@ -1,7 +1,12 @@
 @page "/setup"
 @layout AuthLayout
 @using TechieDesk.Services.Setup
+@using TechieDesk.Services.Agents
 @inject ISetupStateService SetupState
+@* REQ-FN-050: the owner asked the first run to check "whether the LLMs are configured, whether the
+   agents are configured". The registry is what answers the second half. *@
+@inject IAgentRegistry AgentRegistry
+@inject IStringLocalizer<AppStrings> Localizer
 @inject IOllamaProbe OllamaProbe
 @inject TechieRagConfigService RagConfig
 @inject TechieRagManager Rag
@@ -16,25 +21,37 @@
    first-Admin intent, then creates the default workspace. TR-005: the step indicator is
    composed from Progress + a custom label row (no Stepper component in TrBlazeUI). *@
 
-<PageTitle>TechieDesk — First-run setup</PageTitle>
+<PageTitle>@Localizer["SetupPageTitle"]</PageTitle>
 
 @* REQ-NFR-005: the wizard has no visible title of its own (its heading role is carried by the
    step indicator), so the route shipped with no level-one heading at all. A visually-hidden h1
    gives screen-reader and FocusOnNavigate users the page identity without altering the mockup. *@
-<h1 class="sr-only">First-run setup</h1>
+<h1 class="sr-only">@Localizer["SetupSrHeading"]</h1>
 
 <Card Class="rounded-2xl p-2 shadow-lg" style="width:100%">
     <CardContent Class="space-y-4 pt-6">
-        <Progress Value="@ProgressValue" Class="h-2" />
+        <Progress aria-label="@Localizer["SetupProgressLabel"]" Value="@Math.Round(ProgressValue)" Class="h-2" />
 
-        @* TR-005 step indicator — done / current / pending states. *@
+        @* TR-005 step indicator — done / current / pending states.
+
+           REQ-FN-050: the labels used to sit UNDER each node. That worked at five steps and does
+           not at six — measured on the maccatalyst head, not guessed: each column drops to about
+           forty-five pixels and the six labels rendered as "De-faults", "Provide r", "AppMa nager"
+           and "Worksp ace". Hindi, whose words are no shorter, would fare worse.
+
+           So the rail now carries the numbers and ONE caption names the step you are actually on.
+           Nothing is lost to assistive tech — every node keeps its full label as its accessible
+           name and its tooltip — and the caption states the position outright ("Step 3 of 6"),
+           which the coloured-node row only implied. *@
         <div class="flex justify-between gap-1.5">
-            @for (var i = 0; i < StepLabels.Length; i++)
+            @* `i != n`, not `i < n`: the `<` opens what every tag-based reader of this file takes
+               for an element, which swallows the loop header and the div after it. *@
+            @for (var i = 0; i != StepLabels.Length; i++)
             {
                 var index = i;
                 var state = StepStateFor(index);
-                <div class="flex flex-1 flex-col items-center gap-1.5 text-center">
-                    <span class="@NodeClass(state)">
+                <div class="flex flex-1 flex-col items-center">
+                    <span class="@NodeClass(state)" title="@StepLabels[index]" aria-label="@StepLabels[index]">
                         @if (state == StepState.Done)
                         {
                             <LucideIcon aria-hidden="true" Name="check" Size="14" />
@@ -44,26 +61,22 @@
                             @(index + 1)
                         }
                     </span>
-                    <span class="@LabelClass(state)">@StepLabels[index]</span>
                 </div>
             }
         </div>
+        <p class="text-center text-xs font-bold text-foreground">
+            @Localizer["SetupStepIndicator", (int)currentStep + 1, StepLabels.Length, StepLabels[(int)currentStep]]
+        </p>
 
         @* ---------------- Step 1: Offline defaults ---------------- *@
         @if (currentStep == WizardStep.Defaults)
         {
             <Alert Variant="AlertVariant.Success">
                 <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-check" Size="16" /></Alert.Icon>
-                <AlertTitle>Zero-config defaults ready</AlertTitle>
-                <AlertDescription>
-                    Offline embeddings (Embedded BGE-M3) + SqliteVec vector store. No external
-                    services required — this instance is chat-able out of the box.
-                </AlertDescription>
+                <AlertTitle>@Localizer["SetupDefaultsReadyTitle"]</AlertTitle>
+                <AlertDescription>@Localizer["SetupDefaultsReadyBody"]</AlertDescription>
             </Alert>
-            <TypographyMuted>
-                You can keep everything offline, or connect a local Ollama and AppManager in the
-                next steps. Your choices are applied when you finish.
-            </TypographyMuted>
+            <TypographyMuted>@Localizer["SetupDefaultsNote"]</TypographyMuted>
         }
 
         @* ---------------- Step 2: AI provider (Ollama detect) ---------------- *@
@@ -72,7 +85,7 @@
             @if (probing)
             {
                 <div class="flex items-center gap-2 text-muted-foreground">
-                    <Spinner Size="SpinnerSize.Small" /> <span>Detecting a local Ollama…</span>
+                    <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["SetupDetectingOllama"]</span>
                 </div>
             }
             else if (ollama is { Available: true })
@@ -80,17 +93,17 @@
                 <Alert Variant="AlertVariant.Success">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="check-circle" Size="16" /></Alert.Icon>
                     <AlertDescription>
-                        Ollama detected at @ollama.Endpoint (@ollama.Models.Count model@(ollama.Models.Count == 1 ? "" : "s")).
+                        @Localizer[ollama.Models.Count == 1 ? "SetupOllamaDetectedOne" : "SetupOllamaDetectedMany", ollama.Endpoint, ollama.Models.Count]
                     </AlertDescription>
                 </Alert>
 
                 @if (ollama.Models.Count > 0)
                 {
                     <Field>
-                        <FieldLabel>Chat model</FieldLabel>
+                        <FieldLabel>@Localizer["SetupChatModel"]</FieldLabel>
                         <FieldContent>
                             <Select @bind-Value="selectedModel" TValue="string" Class="w-full">
-                                <SelectTrigger><SelectValue Placeholder="Select a model" /></SelectTrigger>
+                                <SelectTrigger aria-label="@Localizer["SetupChatModel"]"><SelectValue Placeholder="@Localizer["SetupSelectModel"]" /></SelectTrigger>
                                 <SelectContent>
                                     @foreach (var model in ollama.Models)
                                     {
@@ -106,127 +119,147 @@
             {
                 <Alert Variant="AlertVariant.Info">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
-                    <AlertDescription>
-                        No Ollama detected. You can stay embedded-only (offline) or point at an
-                        OpenAI-compatible endpoint below.
-                    </AlertDescription>
+                    <AlertDescription>@Localizer["SetupNoOllama"]</AlertDescription>
                 </Alert>
             }
 
             <div class="space-y-2">
-                @RenderProviderRow(ProviderChoice.Ollama, "Use detected Ollama", "Local models via Ollama", ollama is { Available: true })
-                @RenderProviderRow(ProviderChoice.LmStudio, "LM Studio", "OpenAI-compatible local server", true)
-                @RenderProviderRow(ProviderChoice.OpenAiCompatible, "OpenAI-compatible endpoint", "vLLM, TEI, or a hosted URL", true)
-                @RenderProviderRow(ProviderChoice.Skip, "Skip — embedded-only for now", "Chat can be configured later", true)
+                @RenderProviderRow(ProviderChoice.Ollama, Localizer["SetupProviderOllamaTitle"], Localizer["SetupProviderOllamaSubtitle"], ollama is { Available: true })
+                @* A bare brand name has nothing to translate; the subtitle beside it carries the prose.
+                   Same call as LlmSettings.LlmSourceText makes for the same seven providers. *@
+                @RenderProviderRow(ProviderChoice.LmStudio, "LM Studio", Localizer["SetupProviderLmStudioSubtitle"], true)
+                @RenderProviderRow(ProviderChoice.OpenAiCompatible, Localizer["SetupProviderOpenAiTitle"], Localizer["SetupProviderOpenAiSubtitle"], true)
+                @RenderProviderRow(ProviderChoice.Skip, Localizer["SetupProviderSkipTitle"], Localizer["SetupProviderSkipSubtitle"], true)
             </div>
 
             @if (provider is ProviderChoice.LmStudio or ProviderChoice.OpenAiCompatible)
             {
                 <Field>
-                    <FieldLabel>Endpoint URL</FieldLabel>
+                    <FieldLabel>@Localizer["SetupEndpointUrl"]</FieldLabel>
                     <FieldContent>
-                        <Input AriaLabel="Endpoint URL" @bind-Value="providerEndpoint"
+                        <Input AriaLabel="@Localizer["SetupEndpointUrl"]" @bind-Value="providerEndpoint"
                                Placeholder="@(provider == ProviderChoice.LmStudio ? "http://localhost:1234" : "http://localhost:8000/v1")" />
                     </FieldContent>
                 </Field>
                 <Field>
-                    <FieldLabel>Model name</FieldLabel>
+                    <FieldLabel>@Localizer["SetupModelName"]</FieldLabel>
                     <FieldContent>
-                        <Input @bind-Value="selectedModel" Placeholder="model identifier" />
+                        <Input @bind-Value="selectedModel" Placeholder="@Localizer["SetupModelPlaceholder"]" />
                     </FieldContent>
                 </Field>
             }
         }
 
-        @* ---------------- Step 3: AppManager vs offline ---------------- *@
+        @* ---------------- Step 3: Agents (REQ-FN-050) ----------------
+           The LLM half of the owner's ask was already covered by the step above. This is the half
+           that was missing: it reports whether this instance has agents to answer with, and — when
+           the previous step ended embedded-only — says plainly what agents can and cannot do
+           without a provider, so "offline" is an informed choice rather than a surprise later. *@
+        @if (currentStep == WizardStep.Agents)
+        {
+            @if (agentsLoading)
+            {
+                <div class="flex items-center gap-2 text-muted-foreground">
+                    <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["SetupAgentsChecking"]</span>
+                </div>
+            }
+            else
+            {
+                <Alert Variant="AlertVariant.Success">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="bot" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["SetupAgentsReadyTitle"]</AlertTitle>
+                    <AlertDescription>@Localizer["SetupAgentsReadyDescription", agentCount]</AlertDescription>
+                </Alert>
+
+                @if (provider == ProviderChoice.Skip)
+                {
+                    <Alert Variant="AlertVariant.Info">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+                        <AlertDescription>@Localizer["SetupAgentsNoProviderNote"]</AlertDescription>
+                    </Alert>
+                }
+            }
+        }
+
+        @* ---------------- Step 4: AppManager vs offline ---------------- *@
         @if (currentStep == WizardStep.AppManager)
         {
             <div class="space-y-2">
-                @RenderModeRow(false, "Offline single-user mode", "No accounts — sign in automatically as the built-in Administrator.")
-                @RenderModeRow(true, "Connect AppManager", "Central licensing, accounts, and roles.")
+                @RenderModeRow(false, Localizer["SetupModeOfflineTitle"], Localizer["SetupModeOfflineSubtitle"])
+                @RenderModeRow(true, Localizer["SetupModeAppManagerTitle"], Localizer["SetupModeAppManagerSubtitle"])
             </div>
 
             @if (useAppManager)
             {
                 <Field>
-                    <FieldLabel>AppManager base URL</FieldLabel>
+                    <FieldLabel>@Localizer["SetupAppManagerBaseUrl"]</FieldLabel>
                     <FieldContent>
                         <Input @bind-Value="appManagerBaseUrl" Placeholder="https://appmanager.example.com" />
                     </FieldContent>
                 </Field>
                 <div class="td-grid-2">
                     <Field>
-                        <FieldLabel>API key</FieldLabel>
-                        <FieldContent><Input @bind-Value="appManagerApiKey" Placeholder="key" /></FieldContent>
+                        <FieldLabel>@Localizer["SetupApiKey"]</FieldLabel>
+                        <FieldContent><Input @bind-Value="appManagerApiKey" Placeholder="@Localizer["SetupApiKeyPlaceholder"]" /></FieldContent>
                     </Field>
                     <Field>
-                        <FieldLabel>API secret</FieldLabel>
-                        <FieldContent><Input Type="InputType.Password" @bind-Value="appManagerApiSecret" Placeholder="secret" /></FieldContent>
+                        <FieldLabel>@Localizer["SetupApiSecret"]</FieldLabel>
+                        <FieldContent><Input Type="InputType.Password" @bind-Value="appManagerApiSecret" Placeholder="@Localizer["SetupApiSecretPlaceholder"]" /></FieldContent>
                     </Field>
                 </div>
                 <Alert Variant="AlertVariant.Warning">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="key-round" Size="16" /></Alert.Icon>
                     <AlertDescription>
-                        Secrets are not written to disk by the wizard. Provide them as environment
-                        variables (<TypographyInlineCode>AppManager__ApiKey</TypographyInlineCode> /
-                        <TypographyInlineCode>AppManager__ApiSecret</TypographyInlineCode>) or via user-secrets,
-                        then restart. The base URL is saved to enable AppManager mode.
+                        @Localizer["SetupSecretsBefore"] (<TypographyInlineCode>AppManager__ApiKey</TypographyInlineCode> /
+                        <TypographyInlineCode>AppManager__ApiSecret</TypographyInlineCode>)@Localizer["SetupSecretsAfter"]
                     </AlertDescription>
                 </Alert>
             }
         }
 
-        @* ---------------- Step 4: Admin account ---------------- *@
+        @* ---------------- Step 5: Admin account ---------------- *@
         @if (currentStep == WizardStep.Admin)
         {
             @if (!useAppManager)
             {
                 <Alert Variant="AlertVariant.Info">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="user-check" Size="16" /></Alert.Icon>
-                    <AlertDescription>
-                        Offline single-user mode: you'll sign in automatically as the built-in
-                        Administrator. No account setup is required.
-                    </AlertDescription>
+                    <AlertDescription>@Localizer["SetupOfflineAdminNote"]</AlertDescription>
                 </Alert>
             }
             else
             {
-                <TypographyMuted>Create the first Administrator for this instance.</TypographyMuted>
+                <TypographyMuted>@Localizer["SetupCreateAdmin"]</TypographyMuted>
                 <Field>
-                    <FieldLabel>Full name</FieldLabel>
-                    <FieldContent><Input @bind-Value="adminName" Placeholder="Ada Lovelace" /></FieldContent>
+                    <FieldLabel>@Localizer["SetupFullName"]</FieldLabel>
+                    <FieldContent><Input @bind-Value="adminName" Placeholder="@Localizer["SetupFullNamePlaceholder"]" /></FieldContent>
                 </Field>
                 <Field>
-                    <FieldLabel>Email</FieldLabel>
+                    <FieldLabel>@Localizer["SetupEmail"]</FieldLabel>
                     <FieldContent><Input Type="InputType.Email" @bind-Value="adminEmail" Placeholder="admin@company.com" /></FieldContent>
                 </Field>
                 <Field>
-                    <FieldLabel>Password</FieldLabel>
+                    <FieldLabel>@Localizer["SetupPassword"]</FieldLabel>
                     <FieldContent><Input Type="InputType.Password" @bind-Value="adminPassword" Placeholder="••••••••" /></FieldContent>
                 </Field>
                 <Alert Variant="AlertVariant.Info">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
-                    <AlertDescription>
-                        The first Administrator is provisioned against AppManager on first connection
-                        (after you supply credentials via environment variables and restart).
-                    </AlertDescription>
+                    <AlertDescription>@Localizer["SetupAdminProvisionNote"]</AlertDescription>
                 </Alert>
             }
         }
 
-        @* ---------------- Step 5: Workspace ---------------- *@
+        @* ---------------- Step 6: Workspace ---------------- *@
         @if (currentStep == WizardStep.Workspace)
         {
-            <TypographyMuted>Name the first workspace — an isolated knowledge base with its own documents and settings.</TypographyMuted>
+            <TypographyMuted>@Localizer["SetupWorkspaceNote"]</TypographyMuted>
             <Field>
-                <FieldLabel>Workspace name</FieldLabel>
-                <FieldContent><Input @bind-Value="workspaceName" Placeholder="Default" /></FieldContent>
+                <FieldLabel>@Localizer["SetupWorkspaceName"]</FieldLabel>
+                <FieldContent><Input @bind-Value="workspaceName" Placeholder="@Localizer["SetupWorkspacePlaceholder"]" /></FieldContent>
             </Field>
             <Alert Variant="AlertVariant.Success">
                 <Alert.Icon><LucideIcon aria-hidden="true" Name="rocket" Size="16" /></Alert.Icon>
-                <AlertDescription>
-                    Finishing applies your choices, creates the workspace, and takes you into the app.
-                </AlertDescription>
+                <AlertDescription>@Localizer["SetupFinishNote"]</AlertDescription>
             </Alert>
         }
 
@@ -241,7 +274,7 @@
         @* ---------------- Wizard navigation ---------------- *@
         <div class="flex items-center justify-between pt-2">
             <Button Variant="ButtonVariant.Outline" OnClick="Back" Disabled="@(currentStep == WizardStep.Defaults || isFinishing)">
-                Back
+                @Localizer["SetupBack"]
             </Button>
             @if (currentStep == WizardStep.Workspace)
             {
@@ -249,31 +282,53 @@
                     @if (isFinishing)
                     {
                         <Spinner Size="SpinnerSize.Small" Class="mr-2" />
-                        <span>Finishing…</span>
+                        <span>@Localizer["SetupFinishing"]</span>
                     }
                     else
                     {
-                        <span>Finish setup</span>
+                        <span>@Localizer["SetupFinish"]</span>
                     }
                 </Button>
             }
             else
             {
-                <Button OnClick="Next" Disabled="@isFinishing">Continue</Button>
+                <Button OnClick="Next" Disabled="@isFinishing">@Localizer["SetupContinue"]</Button>
             }
+        </div>
+
+        @* REQ-FN-050 acceptance (2): an explicit way OUT that still settles the question. Without
+           it the only exits from a wizard the shell now insists on are "finish it" and "quit the
+           app", and the second leaves the flag unwritten so the wizard returns on the next launch —
+           precisely the "why the hell do I have to set it up every time" the owner objected to.
+           Skipping records completion in Offline/embedded-only form, so it is a one-way door. *@
+        <div class="flex justify-center pt-1">
+            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                    OnClick="SkipAsync" Disabled="@isFinishing">
+                @Localizer["SetupSkipLink"]
+            </Button>
         </div>
     </CardContent>
 </Card>
 
 @code {
-    private enum WizardStep { Defaults, AiProvider, AppManager, Admin, Workspace }
+    private enum WizardStep { Defaults, AiProvider, Agents, AppManager, Admin, Workspace }
 
     private enum StepState { Done, Current, Pending }
 
     private enum ProviderChoice { Ollama, LmStudio, OpenAiCompatible, Skip }
 
-    private static readonly string[] StepLabels =
-        ["Defaults", "AI Provider", "AppManager", "Admin account", "Workspace"];
+    // REQ-UI-050: the step labels are read by the user, so they resolve through AppStrings like
+    // every other label in the shell. Keyed off the enum so a new step cannot be added without a
+    // label — the array and the enum used to be able to drift.
+    private string[] StepLabels =>
+    [
+        Localizer["SetupStepDefaults"],
+        Localizer["SetupStepAiProvider"],
+        Localizer["SetupStepAgents"],
+        Localizer["SetupStepAppManager"],
+        Localizer["SetupStepAdmin"],
+        Localizer["SetupStepWorkspace"]
+    ];
 
     private WizardStep currentStep = WizardStep.Defaults;
 
@@ -284,18 +339,24 @@
     private string providerEndpoint = string.Empty;
     private string selectedModel = string.Empty;
 
-    // Step 3 — AppManager vs offline.
+    // Step 3 — agents (REQ-FN-050). Counted, not configured: the built-in @@agent is synthesized by
+    // the registry for every workspace, so the honest first-run check is "are there agents to
+    // answer with", not "make the user create one before they may use the app".
+    private bool agentsLoading = true;
+    private int agentCount;
+
+    // Step 4 — AppManager vs offline.
     private bool useAppManager;
     private string appManagerBaseUrl = string.Empty;
     private string appManagerApiKey = string.Empty;
     private string appManagerApiSecret = string.Empty;
 
-    // Step 4 — first Admin (AppManager mode).
+    // Step 5 — first Admin (AppManager mode).
     private string adminName = string.Empty;
     private string adminEmail = string.Empty;
     private string adminPassword = string.Empty;
 
-    // Step 5 — workspace.
+    // Step 6 — workspace.
     private string workspaceName = "Default";
 
     private bool isFinishing;
@@ -336,6 +397,36 @@
             probing = false;
             StateHasChanged();
         }
+
+        await LoadAgentReadinessAsync();
+    }
+
+    // REQ-FN-050: the agent half of the first-run check. REQ-FN-009 has already bootstrapped a
+    // default workspace by the time the wizard runs, so the registry can be asked directly; on a
+    // genuinely empty instance the count is simply zero and the step still reads correctly, because
+    // the built-in agent is synthesized per workspace the moment one exists.
+    private async Task LoadAgentReadinessAsync()
+    {
+        try
+        {
+            var visible = await Workspaces.ListForCurrentUserAsync();
+            var first = visible.FirstOrDefault();
+            agentCount = first is null
+                ? 0
+                : (await AgentRegistry.ListAsync(first.WorkspaceId)).Count;
+        }
+        catch (Exception ex)
+        {
+            // An agent read must never block setup — the step degrades to "none found" and the
+            // user carries on. Nothing here gates Continue.
+            Logger.LogDebug(ex, "Agent readiness check failed during setup wizard");
+            agentCount = 0;
+        }
+        finally
+        {
+            agentsLoading = false;
+            StateHasChanged();
+        }
     }
 
     private StepState StepStateFor(int index)
@@ -352,19 +443,15 @@
         _ => "flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground"
     };
 
-    private static string LabelClass(StepState state) => state switch
-    {
-        StepState.Current => "text-[11px] font-bold text-foreground",
-        StepState.Done => "text-[11px] font-medium text-primary",
-        _ => "text-[11px] font-medium text-muted-foreground"
-    };
-
+    // `cls` is ONE line, and stays inside the __builder lambda. Both are load-bearing for the tools
+    // that read this file rather than for the compiler: inside the lambda this is a razor TEMPLATE
+    // region, so the class strings are correctly read as markup rather than as English prose — and
+    // within a template region a C# line that does NOT end in a semicolon stands in the text stream
+    // as a phantom English run, which is what the three-line version of this produced.
     private RenderFragment RenderProviderRow(ProviderChoice choice, string title, string subtitle, bool enabled) => __builder =>
     {
         var selected = provider == choice;
-        var cls = "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors "
-            + (selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40")
-            + (enabled ? " cursor-pointer" : " cursor-not-allowed opacity-50");
+        var cls = "flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors " + (selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40") + (enabled ? " cursor-pointer" : " cursor-not-allowed opacity-50");
         <button type="button" class="@cls" disabled="@(!enabled)" @onclick="@(() => SelectProvider(choice))">
             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border @(selected ? "border-primary" : "border-muted-foreground/40")">
                 @if (selected)
@@ -379,11 +466,11 @@
         </button>
     };
 
+    // One line, inside the lambda — see RenderProviderRow above.
     private RenderFragment RenderModeRow(bool appManager, string title, string subtitle) => __builder =>
     {
         var selected = useAppManager == appManager;
-        var cls = "flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors "
-            + (selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40");
+        var cls = "flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors " + (selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40");
         <button type="button" class="@cls" @onclick="@(() => useAppManager = appManager)">
             <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border @(selected ? "border-primary" : "border-muted-foreground/40")">
                 @if (selected)
@@ -437,7 +524,7 @@
     {
         if (string.IsNullOrWhiteSpace(workspaceName))
         {
-            errorMessage = "A workspace name is required.";
+            errorMessage = Localizer["SetupWorkspaceRequired"];
             return;
         }
 
@@ -453,7 +540,12 @@
                 : null;
 
             await EnsureWorkspaceAsync();
-            await SetupState.MarkCompleteAsync(mode, baseUrl);
+
+            // REQ-FN-050 acceptance (4): record WHICH provider was chosen, including the deliberate
+            // "none". Embedded-only and never-configured look identical in the RAG config, and only
+            // this value lets the shell tell a settled offline install from an unfinished one — so
+            // only this value stops the deliberate offline user from being nagged forever.
+            await SetupState.MarkCompleteAsync(mode, baseUrl, RecordedProvider());
 
             Logger.LogInformation(
                 "First-run setup completed (mode: {Mode}, provider: {Provider})", mode, provider);
@@ -463,7 +555,33 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "First-run setup failed to complete");
-            errorMessage = "Setup could not be completed. Please review your choices and try again.";
+            errorMessage = Localizer["SetupFailed"];
+            isFinishing = false;
+        }
+    }
+
+    /// <summary>The provider value persisted for this run — "None" for a deliberate offline finish.</summary>
+    private string RecordedProvider() =>
+        provider == ProviderChoice.Skip ? ISetupStateService.NoProvider : provider.ToString();
+
+    // REQ-FN-050 acceptance (2): "set up later" is a COMPLETED outcome. It records the flag exactly
+    // as a finish does, so the wizard never reappears — a "later" that reopens the wizard on the
+    // next launch is the behaviour the owner rejected outright. Nothing else is applied: the
+    // instance keeps the zero-config embedded defaults it already boots with.
+    private async Task SkipAsync()
+    {
+        isFinishing = true;
+        errorMessage = null;
+        try
+        {
+            await SetupState.MarkSkippedAsync();
+            Logger.LogInformation("First-run setup skipped by the user; it will not be offered again");
+            Nav.NavigateTo("/", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "First-run setup skip could not be recorded");
+            errorMessage = Localizer["SetupFailed"];
             isFinishing = false;
         }
     }

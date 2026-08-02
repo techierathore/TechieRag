@@ -61,6 +61,32 @@ public interface ITechieRag
     Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int topK = 5, string? documentFilter = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Performs semantic search using a per-call options object, including the per-call
+    /// rerank switch.
+    /// </summary>
+    /// <param name="query">The natural language query to search for.</param>
+    /// <param name="options">Per-call retrieval options. When null, library defaults are used.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked list of search results with relevance scores.</returns>
+    /// <remarks>
+    /// <para><b>Purpose:</b> REQ-RAG-047 (TR-RAG-005). Reranking used to be global configuration
+    /// only, which made <see cref="Models.Workspace.RerankEnabled"/> inert. This overload carries
+    /// <see cref="SearchOptions.Rerank"/> down to the retrieval pipeline so a single caller —
+    /// notably <see cref="Services.WorkspaceManager"/> — can enable or disable the rerank stage
+    /// per call.</para>
+    /// <para><b>Default implementation:</b> Provided for backward compatibility with existing
+    /// ITechieRag implementers (ADR-005 additive-only). It forwards to the legacy overload and
+    /// therefore <b>ignores</b> <see cref="SearchOptions.Rerank"/>; implementers that wrap or
+    /// delegate to TechieRagClient should override it and forward the options object intact.
+    /// TechieRagClient overrides it with the full implementation.</para>
+    /// </remarks>
+    Task<IReadOnlyList<SearchResult>> SearchAsync(
+        string query,
+        SearchOptions? options,
+        CancellationToken cancellationToken = default) =>
+        SearchAsync(query, options?.TopK ?? 5, options?.DocumentFilter, cancellationToken);
+
+    /// <summary>
     /// Deletes a document and all its chunks from the vector store.
     /// </summary>
     /// <param name="documentId">The ID of the document to delete.</param>

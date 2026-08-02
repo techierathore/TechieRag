@@ -27,7 +27,7 @@ public sealed class UploadTypePolicyTests
     public void AcceptsSupportedTypes(string fileName)
     {
         Assert.True(UploadTypePolicy.IsSupported(fileName));
-        Assert.Null(UploadTypePolicy.GetRejectionReason(fileName));
+        Assert.Null(UploadTypePolicy.GetRejection(fileName));
     }
 
     /// <summary>Extension matching ignores case, so uppercase uploads still land.</summary>
@@ -48,11 +48,11 @@ public sealed class UploadTypePolicyTests
     [InlineData("model.onnx")]
     public void RejectsUnsupportedBinaryTypes(string fileName)
     {
-        var reason = UploadTypePolicy.GetRejectionReason(fileName);
+        var rejection = UploadTypePolicy.GetRejection(fileName);
 
         Assert.False(UploadTypePolicy.IsSupported(fileName));
-        Assert.NotNull(reason);
-        Assert.Contains("Unsupported type", reason);
+        Assert.NotNull(rejection);
+        Assert.Equal(UploadTypePolicy.UnsupportedTypeKey, rejection.MessageKey);
     }
 
     /// <summary>Legacy binary Office formats stay rejected — only the OpenXml containers are supported.</summary>
@@ -65,26 +65,27 @@ public sealed class UploadTypePolicyTests
         Assert.False(UploadTypePolicy.IsSupported(fileName));
     }
 
-    /// <summary>No rejection message still promises a "later release" — the wait is over.</summary>
+    /// <summary>No rejection key still promises a "later release" — the wait is over.</summary>
     [Theory]
     [InlineData("budget.xlsx")]
     [InlineData("old.xls")]
     [InlineData("photo.png")]
     public void NeverPromisesALaterRelease(string fileName)
     {
-        var reason = UploadTypePolicy.GetRejectionReason(fileName) ?? string.Empty;
+        var key = UploadTypePolicy.GetRejection(fileName)?.MessageKey ?? string.Empty;
 
-        Assert.DoesNotContain("later release", reason, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("later", key, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Files with no extension are rejected rather than guessed at.</summary>
     [Fact]
     public void RejectsFileWithoutExtension()
     {
-        var reason = UploadTypePolicy.GetRejectionReason("LICENSE");
+        var rejection = UploadTypePolicy.GetRejection("LICENSE");
 
-        Assert.NotNull(reason);
-        Assert.Contains("no extension", reason);
+        Assert.NotNull(rejection);
+        Assert.Equal(UploadTypePolicy.NoExtensionKey, rejection.MessageKey);
+        Assert.Equal("LICENSE", Assert.Single(rejection.Arguments));
     }
 
     /// <summary>The picker filter advertises the newly supported spreadsheet and deck types.</summary>

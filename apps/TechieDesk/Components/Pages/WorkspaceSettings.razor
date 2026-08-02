@@ -3,88 +3,90 @@
 @inject ToastService ToastService
 @inject NavigationManager Nav
 @inject ILogger<WorkspaceSettings> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>@(workspace?.Name ?? "Workspace") — Settings</PageTitle>
+<PageTitle>@Localizer["WsSettingsPageTitle", workspace?.Name ?? Localizer["WsSettingsWorkspaceFallback"].Value]</PageTitle>
 
 @if (accessDenied)
 {
     <Alert Variant="AlertVariant.Danger">
         <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
-        <AlertTitle>Not allowed</AlertTitle>
-        <AlertDescription>You need the Manager or Admin role to edit workspace settings.</AlertDescription>
+        <AlertTitle>@Localizer["WsSettingsNotAllowed"]</AlertTitle>
+        <AlertDescription>@Localizer["WsSettingsNotAllowedBody"]</AlertDescription>
     </Alert>
 }
 else if (notFound)
 {
     <Alert Variant="AlertVariant.Danger">
         <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-        <AlertTitle>Workspace not available</AlertTitle>
-        <AlertDescription>This workspace does not exist or you are not assigned to it.</AlertDescription>
+        <AlertTitle>@Localizer["WsSettingsNotAvailable"]</AlertTitle>
+        <AlertDescription>@Localizer["WsSettingsNotAvailableBody"]</AlertDescription>
     </Alert>
 }
 else if (workspace is null)
 {
     <div class="flex items-center gap-2 text-muted-foreground">
-        <Spinner Size="SpinnerSize.Small" /> <span>Loading settings…</span>
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["WsSettingsLoading"]</span>
     </div>
 }
 else
 {
     <div class="mb-4 flex items-center gap-3">
         <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Workspace Settings — @workspace.Name</h1>
-            <TypographyMuted>Name, prompt, model, mode, retrieval tuning, and members.</TypographyMuted>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["WsSettingsHeading", workspace.Name]</h1>
+            <TypographyMuted>@Localizer["WsSettingsSubtitle"]</TypographyMuted>
         </div>
         <div class="ml-auto">
-            <Button OnClick="SaveAsync" Disabled="@isSaving">@(isSaving ? "Saving…" : "Save changes")</Button>
+            <Button OnClick="SaveAsync" Disabled="@isSaving">@(isSaving ? Localizer["Saving"] : Localizer["SaveChanges"])</Button>
         </div>
     </div>
 
     <Tabs DefaultValue="general">
-        <TabsList Class="grid w-full grid-cols-4">
-            <TabsTrigger Value="general">General</TabsTrigger>
-            <TabsTrigger Value="retrieval">Retrieval</TabsTrigger>
-            <TabsTrigger Value="members">Members</TabsTrigger>
-            <TabsTrigger Value="danger">Danger</TabsTrigger>
+        <!-- REQ-FN-041: the Members tab is gone with user↔workspace assignment. One desktop
+             install serves one person, so a workspace has no membership to edit. -->
+        <TabsList Class="grid w-full grid-cols-3">
+            <TabsTrigger Value="general">@Localizer["WsSettingsTabGeneral"]</TabsTrigger>
+            <TabsTrigger Value="retrieval">@Localizer["WsSettingsTabRetrieval"]</TabsTrigger>
+            <TabsTrigger Value="danger">@Localizer["WsSettingsTabDanger"]</TabsTrigger>
         </TabsList>
 
         <!-- General (REQ-UI-015 / REQ-RAG-015) -->
-        <TabsContent Value="general">
+        <TabsContent Value="general" ForceMount="true">
             <Card>
                 <CardContent Class="space-y-4 p-4">
                     <Field>
-                        <FieldLabel>Display name</FieldLabel>
-                        <FieldContent><Input @bind-Value="name" Placeholder="Workspace name" /></FieldContent>
+                        <FieldLabel>@Localizer["WsSettingsDisplayName"]</FieldLabel>
+                        <FieldContent><Input @bind-Value="name" Placeholder="@Localizer["WsSettingsNamePlaceholder"]" /></FieldContent>
                     </Field>
                     <Field>
-                        <FieldLabel>Slug</FieldLabel>
+                        <FieldLabel>@Localizer["WsSettingsSlug"]</FieldLabel>
                         <FieldContent>
-                            <Input AriaLabel="Slug" Value="@currentSlug" Disabled="true" />
-                            <FieldDescription>Used in URLs — derived from the display name.</FieldDescription>
+                            <Input AriaLabel="@Localizer["WsSettingsSlug"]" Value="@currentSlug" Disabled="true" />
+                            <FieldDescription>@Localizer["WsSettingsSlugHint"]</FieldDescription>
                         </FieldContent>
                     </Field>
                     <Field>
-                        <FieldLabel>System prompt</FieldLabel>
-                        <FieldContent><Textarea @bind-Value="systemPrompt" Class="min-h-[90px]" Placeholder="You are a helpful assistant…" /></FieldContent>
+                        <FieldLabel>@Localizer["WsSettingsSystemPrompt"]</FieldLabel>
+                        <FieldContent><Textarea @bind-Value="systemPrompt" Class="min-h-[90px]" Placeholder="@Localizer["WsSettingsSystemPromptPlaceholder"]" /></FieldContent>
                     </Field>
                     <Field>
-                        <FieldLabel>LLM override</FieldLabel>
+                        <FieldLabel>@Localizer["WsSettingsLlmOverride"]</FieldLabel>
                         <FieldContent>
-                            <Input @bind-Value="llmModel" Placeholder="Instance default" />
-                            <FieldDescription>Leave empty to use the instance-configured model.</FieldDescription>
+                            <Input @bind-Value="llmModel" Placeholder="@Localizer["WsSettingsInstanceDefault"]" />
+                            <FieldDescription>@Localizer["WsSettingsLlmOverrideHint"]</FieldDescription>
                         </FieldContent>
                     </Field>
                     <Field>
-                        <FieldLabel>Mode</FieldLabel>
+                        <FieldLabel>@Localizer["WsSettingsMode"]</FieldLabel>
                         <FieldContent>
                             <RadioGroup @bind-Value="mode" TValue="string">
                                 <div class="flex items-center space-x-2">
                                     <RadioGroupItem Value="@("chat")" Id="mode-chat" TValue="string" />
-                                    <Label For="mode-chat">Chat — general knowledge + documents</Label>
+                                    <Label For="mode-chat">@Localizer["WsSettingsModeChat"]</Label>
                                 </div>
                                 <div class="flex items-center space-x-2">
                                     <RadioGroupItem Value="@("query")" Id="mode-query" TValue="string" />
-                                    <Label For="mode-query">Query — documents only, answers "not in my documents" honestly</Label>
+                                    <Label For="mode-query">@Localizer["WsSettingsModeQuery"]</Label>
                                 </div>
                             </RadioGroup>
                         </FieldContent>
@@ -94,92 +96,39 @@ else
         </TabsContent>
 
         <!-- Retrieval (REQ-RAG-014) -->
-        <TabsContent Value="retrieval">
+        <TabsContent Value="retrieval" ForceMount="true">
             <Card>
                 <CardContent Class="space-y-4 p-4">
                     <Field>
-                        <FieldLabel>Similarity threshold — @threshold.ToString("0.00")</FieldLabel>
+                        <FieldLabel>@Localizer["WsSettingsThreshold", threshold.ToString("0.00")]</FieldLabel>
                         <FieldContent>
                             <input type="range" class="td-range" min="0" max="1" step="0.05"
                                    value="@threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)"
                                    @onchange="OnThresholdChanged" disabled="@(!Workspaces.CanTuneRetrieval)" />
-                            <FieldDescription>Minimum relevance a chunk must reach to be used as context (0 = no threshold).</FieldDescription>
+                            <FieldDescription>@Localizer["WsSettingsThresholdHint"]</FieldDescription>
                         </FieldContent>
                     </Field>
                     <Field>
-                        <FieldLabel>Top-K snippets</FieldLabel>
+                        <FieldLabel>@Localizer["WsSettingsTopK"]</FieldLabel>
                         <FieldContent>
-                            <Input AriaLabel="Top-K snippets" @bind-Value="topKString" Disabled="@(!Workspaces.CanTuneRetrieval)" Class="max-w-[140px]" />
+                            <Input AriaLabel="@Localizer["WsSettingsTopK"]" @bind-Value="topKString" Disabled="@(!Workspaces.CanTuneRetrieval)" Class="max-w-[140px]" />
                         </FieldContent>
                     </Field>
                     <div class="flex items-center gap-3">
                         <Switch @bind-Checked="rerankEnabled" Id="rerank" Disabled="@(!Workspaces.CanTuneRetrieval)" />
-                        <Label For="rerank">Accuracy optimized (reranker)</Label>
+                        <Label For="rerank">@Localizer["WsSettingsRerank"]</Label>
                     </div>
-                    <FieldDescription>Requires a reranking stage configured on the library (REQ-RAG-025).</FieldDescription>
-                </CardContent>
-            </Card>
-        </TabsContent>
-
-        <!-- Members (REQ-FN-008) -->
-        <TabsContent Value="members">
-            <Card>
-                <CardContent Class="space-y-4 p-4">
-                    @if (members.Count == 0)
-                    {
-                        <div class="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">Only you so far</div>
-                    }
-                    else
-                    {
-                        <div class="space-y-2">
-                            @foreach (var member in members)
-                            {
-                                <div class="flex items-center gap-3 rounded-md border p-2">
-                                    <Avatar Size="AvatarSize.Small"><AvatarFallback>@Initials(member.UserId)</AvatarFallback></Avatar>
-                                    <span class="text-sm">User @member.UserId</span>
-                                    <Badge Variant="BadgeVariant.Secondary">@member.RoleName</Badge>
-                                    @if (Workspaces.CanManageMembers)
-                                    {
-                                        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" Class="ml-auto" OnClick="@(() => RemoveMemberAsync(member.AssignmentId))">Remove</Button>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    }
-
-                    @if (Workspaces.CanManageMembers)
-                    {
-                        <div class="flex flex-wrap items-end gap-2 border-t pt-3">
-                            <Field Class="flex-1 min-w-[160px]">
-                                <FieldLabel>User ID</FieldLabel>
-                                <FieldContent><Input @bind-Value="newMemberUserId" Placeholder="AppManager user id" /></FieldContent>
-                            </Field>
-                            <Field>
-                                <FieldLabel>Role</FieldLabel>
-                                <FieldContent>
-                                    <Select @bind-Value="newMemberRole" TValue="string">
-                                        <SelectTrigger><SelectValue Placeholder="Role" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem Value="@("User")" Text="User" TValue="string">User</SelectItem>
-                                            <SelectItem Value="@("Manager")" Text="Manager" TValue="string">Manager</SelectItem>
-                                            <SelectItem Value="@("Admin")" Text="Admin" TValue="string">Admin</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FieldContent>
-                            </Field>
-                            <Button Variant="ButtonVariant.Outline" OnClick="AddMemberAsync" Disabled="@string.IsNullOrWhiteSpace(newMemberUserId)">Add</Button>
-                        </div>
-                    }
+                    <FieldDescription>@Localizer["WsSettingsRerankHint"]</FieldDescription>
                 </CardContent>
             </Card>
         </TabsContent>
 
         <!-- Danger (REQ-UI-014 delete confirm) -->
-        <TabsContent Value="danger">
+        <TabsContent Value="danger" ForceMount="true">
             <Card Class="border-destructive/50">
                 <CardContent Class="space-y-3 p-4">
-                    <TypographyMuted>Deleting a workspace removes its threads and unembeds its documents. Files remain in the instance library.</TypographyMuted>
-                    <Button Variant="ButtonVariant.Destructive" OnClick="@(() => showDeleteDialog = true)">Delete workspace</Button>
+                    <TypographyMuted>@Localizer["WsSettingsDeleteNote"]</TypographyMuted>
+                    <Button Variant="ButtonVariant.Destructive" OnClick="@(() => showDeleteDialog = true)">@Localizer["WsSettingsDeleteAction"]</Button>
                 </CardContent>
             </Card>
         </TabsContent>
@@ -189,12 +138,12 @@ else
 <Dialog @bind-Open="showDeleteDialog">
     <DialogContent>
         <DialogHeader>
-            <DialogTitle>Delete '@workspace?.Name'?</DialogTitle>
-            <DialogDescription>This cannot be undone. The workspace, its threads, and its document links will be removed.</DialogDescription>
+            <DialogTitle>@Localizer["WsSettingsDeleteTitle", workspace?.Name ?? string.Empty]</DialogTitle>
+            <DialogDescription>@Localizer["WsSettingsDeleteBody"]</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
-            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">Delete</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">@Localizer["WsSettingsDeleteConfirm"]</Button>
         </DialogFooter>
     </DialogContent>
 </Dialog>
@@ -217,10 +166,6 @@ else
     private double threshold;
     private string topKString = "5";
     private bool rerankEnabled;
-
-    private readonly List<WorkspaceMember> members = new();
-    private string newMemberUserId = string.Empty;
-    private string newMemberRole = "User";
 
     private bool showDeleteDialog;
 
@@ -260,9 +205,6 @@ else
             threshold = workspace.SimilarityThreshold ?? 0;
             topKString = (workspace.TopK ?? 5).ToString();
             rerankEnabled = workspace.RerankEnabled;
-
-            members.Clear();
-            members.AddRange(await Workspaces.GetMembersAsync(workspace.WorkspaceId));
         }
         catch (Exception ex)
         {
@@ -295,7 +237,7 @@ else
             workspace.RerankEnabled = rerankEnabled;
 
             await Workspaces.UpdateWorkspaceAsync(workspace);
-            ToastService.Success("Workspace settings updated.", "Saved");
+            ToastService.Success(Localizer["WsSettingsSavedBody"], Localizer["Saved"]);
 
             var newSlug = Workspaces.SlugFor(workspace);
             if (!string.Equals(newSlug, currentSlug, StringComparison.OrdinalIgnoreCase))
@@ -310,29 +252,12 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to save workspace settings");
-            ToastService.Error(ex.Message, "Save failed");
+            ToastService.Error(ex.Message, Localizer["SaveFailed"]);
         }
         finally
         {
             isSaving = false;
         }
-    }
-
-    private async Task AddMemberAsync()
-    {
-        if (workspace is null || string.IsNullOrWhiteSpace(newMemberUserId)) return;
-        await Workspaces.AddMemberAsync(workspace.WorkspaceId, newMemberUserId.Trim(), newMemberRole);
-        newMemberUserId = string.Empty;
-        members.Clear();
-        members.AddRange(await Workspaces.GetMembersAsync(workspace.WorkspaceId));
-    }
-
-    private async Task RemoveMemberAsync(long assignmentId)
-    {
-        if (workspace is null) return;
-        await Workspaces.RemoveMemberAsync(assignmentId);
-        members.Clear();
-        members.AddRange(await Workspaces.GetMembersAsync(workspace.WorkspaceId));
     }
 
     private async Task ConfirmDeleteAsync()
@@ -342,16 +267,13 @@ else
         {
             await Workspaces.DeleteWorkspaceAsync(workspace.WorkspaceId);
             showDeleteDialog = false;
-            ToastService.Success("The workspace was removed.", "Workspace deleted");
+            ToastService.Success(Localizer["WsSettingsDeletedBody"], Localizer["WsSettingsDeletedTitle"]);
             Nav.NavigateTo("/", forceLoad: false);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to delete workspace");
-            ToastService.Error(ex.Message, "Delete failed");
+            ToastService.Error(ex.Message, Localizer["WsSettingsDeleteFailed"]);
         }
     }
-
-    private static string Initials(string userId)
-        => string.IsNullOrEmpty(userId) ? "?" : userId[..Math.Min(2, userId.Length)].ToUpperInvariant();
 }

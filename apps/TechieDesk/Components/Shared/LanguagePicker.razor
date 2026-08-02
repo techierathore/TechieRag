@@ -1,0 +1,80 @@
+@* REQ-UI-039 (BRD-91) — the language picker.
+
+   SELF-CONTAINED: injects only LanguageCoordinator, takes no parameters, renders a labelled Select.
+   It is embedded in AppearancePanel below, and can equally be dropped into the topbar or the
+   first-run wizard as-is.
+
+   Choosing a language takes effect on the NEXT launch, and this control says so rather than looking
+   broken. See LanguageCoordinator.SetAsync for the two in-place mechanisms that were built, driven
+   on the shipping Catalyst bundle and found not to work — a WebView reload kills the Blazor host
+   outright, and a re-render keeps resolving the culture the renderer started with. *@
+
+@inject LanguageCoordinator Language
+@inject IStringLocalizer<AppStrings> Localizer
+
+<div class="space-y-1.5">
+    <Label For="td-language-picker">@Localizer["LanguageLabel"]</Label>
+    @* TR-024: the CLOSED trigger renders the raw bound value, not the chosen item's label — without
+       DisplayTextSelector this control reads "hi" instead of "हिन्दी", which is precisely the
+       information a language picker exists to show. Smoked and confirmed on this screen. *@
+    <Select TValue="string" Value="@selectedCulture" ValueChanged="OnCultureChangedAsync"
+            DisplayTextSelector="@(culture => SupportedLanguages.Resolve(culture).NativeName)"
+            Class="w-64">
+        <SelectTrigger Id="td-language-picker">
+            <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+            @foreach (var language in LanguageCoordinator.Available)
+            {
+                @* The list shows each language in ITSELF ("हिन्दी", not "Hindi"). Someone who has
+                   landed in a UI they cannot read is scanning for their own language's name. *@
+                <SelectItem TValue="string" Value="@language.Culture" Text="@language.NativeName">
+                    @language.NativeName
+                </SelectItem>
+            }
+        </SelectContent>
+    </Select>
+    <TypographyMuted Class="block text-xs">@Localizer["LanguageDescription"]</TypographyMuted>
+
+    @* Shown only after a change has actually been made — a permanent "restart to apply" line under
+       an untouched picker is noise. It renders in the language currently ON SCREEN rather than the
+       one just chosen, which is the same limitation it is explaining and also the right answer: the
+       reader has been reading this window in that language up to now. TR-022: no `id` on Alert. *@
+    @if (restartPending)
+    {
+        <Alert Variant="AlertVariant.Info">
+            <AlertDescription>
+                @(saveFailed ? Localizer["LanguageNotStored"] : Localizer["LanguageRestartNotice"])
+            </AlertDescription>
+        </Alert>
+    }
+</div>
+
+@code {
+    private string selectedCulture = SupportedLanguages.DefaultCulture;
+
+    // The notice is state, not a constant: it appears only once the operator has actually chosen a
+    // different language in this window, and it stays for the rest of the session because the
+    // restart it is asking for has not happened yet.
+    private bool restartPending;
+    private bool saveFailed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Language.EnsureAppliedAsync();
+        selectedCulture = Language.Current.Culture;
+    }
+
+    private async Task OnCultureChangedAsync(string? culture)
+    {
+        var chosen = SupportedLanguages.Resolve(culture);
+        if (string.Equals(chosen.Culture, selectedCulture, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        selectedCulture = chosen.Culture;
+        saveFailed = !await Language.SetAsync(chosen);
+        restartPending = true;
+    }
+}

@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk DevGuide — Console</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieDesk DevGuide — Console</h1>
+    <div class="sub">Last rendered: 2026-07-29</div>
+    <div class="group">Contents</div>
+      <ol>
+        <li><a href="#qdrant-admin-qdrantadmin"><code>/qdrant-admin</code> — QdrantAdmin</a></li>
+        <li class="h3"><a href="#controls">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service">Data lineage — Razor → injected service</a></li>
+        <li><a href="#llm-settings-llmsettings"><code>/llm-settings</code> — LlmSettings</a></li>
+        <li class="h3"><a href="#controls-2">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-2">Data lineage — Razor → injected service</a></li>
+        <li><a href="#token-usage-tokenusage"><code>/token-usage</code> — TokenUsage</a></li>
+        <li class="h3"><a href="#controls-3">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-3">Data lineage — Razor → injected service</a></li>
+        <li><a href="#llm-playground-llmplayground"><code>/llm-playground</code> — LlmPlayground</a></li>
+        <li class="h3"><a href="#controls-4">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-4">Data lineage — Razor → injected service</a></li>
+        <li><a href="#ingestion-ingestion"><code>/ingestion</code> — Ingestion</a></li>
+        <li class="h3"><a href="#controls-5">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-5">Data lineage — Razor → injected service</a></li>
+        <li><a href="#text-ingestion-textingestion"><code>/text-ingestion</code> — TextIngestion</a></li>
+        <li class="h3"><a href="#controls-6">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-6">Data lineage — Razor → injected service</a></li>
+        <li><a href="#chat-chat"><code>/chat</code> — Chat</a></li>
+        <li class="h3"><a href="#controls-7">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-7">Data lineage — Razor → injected service</a></li>
+        <li><a href="#rag-config-ragconfig"><code>/rag-config</code> — RagConfig</a></li>
+        <li class="h3"><a href="#controls-8">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-8">Data lineage — Razor → injected service</a></li>
+      </ol>
+  </nav>
+  <main>
+    <h1>TechieDesk DevGuide — Console</h1>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#qdrant-admin-qdrantadmin"><code>/qdrant-admin</code> — QdrantAdmin</a>
+          <ul>
+            <li><a href="#controls">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#llm-settings-llmsettings"><code>/llm-settings</code> — LlmSettings</a>
+          <ul>
+            <li><a href="#controls-2">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-2">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#token-usage-tokenusage"><code>/token-usage</code> — TokenUsage</a>
+          <ul>
+            <li><a href="#controls-3">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-3">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#llm-playground-llmplayground"><code>/llm-playground</code> — LlmPlayground</a>
+          <ul>
+            <li><a href="#controls-4">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-4">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#ingestion-ingestion"><code>/ingestion</code> — Ingestion</a>
+          <ul>
+            <li><a href="#controls-5">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-5">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#text-ingestion-textingestion"><code>/text-ingestion</code> — TextIngestion</a>
+          <ul>
+            <li><a href="#controls-6">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-6">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#chat-chat"><code>/chat</code> — Chat</a>
+          <ul>
+            <li><a href="#controls-7">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-7">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#rag-config-ragconfig"><code>/rag-config</code> — RagConfig</a>
+          <ul>
+            <li><a href="#controls-8">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-8">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <p><em>Generated 2026-07-28 · reflects code as built.</em> <a href="./TechieDesk-DevGuide.md">← index</a></p>
+    <blockquote>
+      <p>✅ <strong>Runtime-verified 2026-07-29</strong> — re-swept on the live <strong>Mac Catalyst</strong> head over Appium (<code>mac2</code>), bound by <code>appPath</code> to the universal Release bundle, driving <strong>28 of the 30 screens</strong> at <strong>1600×1240</strong> and <strong>1024×720</strong> (the REQ-UI-041 floor). Every <code>Observed</code> line below is what the running app did; <code>Visual (§4b)</code> is the overlap / zero-size / off-viewport geometry check plus a human look at the screenshot. Screens that could not be reached say so and are <strong>not</strong> claimed as verified. Screenshots: <code>test-results/ui-verify/</code>.</p>
+    </blockquote>
+    <p>8 screen(s) in this area.</p>
+    <h2 id="qdrant-admin-qdrantadmin"><code>/qdrant-admin</code> — QdrantAdmin<a class="anchor-link" href="#qdrant-admin-qdrantadmin">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/QdrantAdmin.razor</code> (1169 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → CONSOLE → Qdrant Admin</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — Docker-daemon card (endpoint-kind Select, address Input, TLS Switch, Test/Use buttons, active-endpoint panel, <code>Not connected</code> badge) and the Qdrant connection card (Host/Port/API key, 4 status tiles, connection string + Copy). Failures render honestly and specifically (“The Docker socket /var/run/docker.sock is not present…”).</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Collection CRUD, point browse/detail and container lifecycle (REQ-UI-003) are behind a live connection and are <strong>unreachable on this host</strong> — there is no Docker daemon and no Qdrant. This is an environment dependency, not a defect.</li>
+      <li>⚠ <strong>Icon defect (TR-032):</strong> Icon not found: alert-circle renders as literal text on this screen.</li>
+    </ul>
+    <p><img alt="QdrantAdmin" src="../screenshots/TechieDesk/qdrant-admin.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls">Controls<a class="anchor-link" href="#controls">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>34</td><td>18, 19, 22, 23…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>13</td><td>30, 184, 217, 227…</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>12</td><td>19, 23, 76, 80…</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>9</td><td>124, 125, 142, 143…</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>8</td><td>68, 194, 200, 206…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>5</td><td>35, 40, 153, 156…</td></tr>
+        <tr><td><code>&lt;Dialog&gt;</code></td><td>4</td><td>283, 379, 559, 573</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>3</td><td>341, 440, 515</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>2</td><td>56, 408</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>1</td><td>92</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>DockerService.ConfigureEndpointAsync()</code></td><td><code>IDockerContainerService</code></td><td>807</td></tr>
+        <tr><td><code>DockerService.CreateQdrantContainerAsync()</code></td><td><code>IDockerContainerService</code></td><td>984</td></tr>
+        <tr><td><code>DockerService.GetActiveEndpointAsync()</code></td><td><code>IDockerContainerService</code></td><td>739, 890</td></tr>
+        <tr><td><code>DockerService.GetContainerLogsAsync()</code></td><td><code>IDockerContainerService</code></td><td>842</td></tr>
+        <tr><td><code>DockerService.ListQdrantContainersAsync()</code></td><td><code>IDockerContainerService</code></td><td>898</td></tr>
+        <tr><td><code>DockerService.PullQdrantImageAsync()</code></td><td><code>IDockerContainerService</code></td><td>856</td></tr>
+        <tr><td><code>DockerService.RestartContainerAsync()</code></td><td><code>IDockerContainerService</code></td><td>875</td></tr>
+        <tr><td><code>DockerService.StartContainerAsync()</code></td><td><code>IDockerContainerService</code></td><td>1005</td></tr>
+        <tr><td><code>DockerService.StopContainerAsync()</code></td><td><code>IDockerContainerService</code></td><td>1020</td></tr>
+        <tr><td><code>DockerService.TestConnectionAsync()</code></td><td><code>IDockerContainerService</code></td><td>780, 893</td></tr>
+        <tr><td><code>JS.InvokeVoidAsync()</code></td><td><code>IJSRuntime</code></td><td>964</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;QdrantAdmin&gt;</code></td><td>847, 863, 928</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;QdrantAdmin&gt;</code></td><td>793, 946</td></tr>
+        <tr><td><code>QdrantService.BrowseVectorsAsync()</code></td><td><code>IQdrantAdminService</code></td><td>1081, 1094, 1118…</td></tr>
+        <tr><td><code>QdrantService.ConfigureEndpoint()</code></td><td><code>IQdrantAdminService</code></td><td>907, 935</td></tr>
+        <tr><td><code>QdrantService.CreateCollectionAsync()</code></td><td><code>IQdrantAdminService</code></td><td>1042</td></tr>
+        <tr><td><code>QdrantService.DeleteCollectionAsync()</code></td><td><code>IQdrantAdminService</code></td><td>1057</td></tr>
+        <tr><td><code>QdrantService.DeleteVectorAsync()</code></td><td><code>IQdrantAdminService</code></td><td>1141</td></tr>
+        <tr><td><code>QdrantService.GetClusterInfoAsync()</code></td><td><code>IQdrantAdminService</code></td><td>917</td></tr>
+        <tr><td><code>QdrantService.GetCollectionInfoAsync()</code></td><td><code>IQdrantAdminService</code></td><td>1077</td></tr>
+        <tr><td><code>QdrantService.GetVectorByIdAsync()</code></td><td><code>IQdrantAdminService</code></td><td>1130</td></tr>
+        <tr><td><code>QdrantService.ListCollectionsAsync()</code></td><td><code>IQdrantAdminService</code></td><td>918</td></tr>
+        <tr><td><code>QdrantService.TestConnectionAsync()</code></td><td><code>IQdrantAdminService</code></td><td>912</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>776, 792, 824…</td></tr>
+        <tr><td><code>ToastService.Show()</code></td><td><code>ToastService</code></td><td>816</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>785, 857, 876…</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IDockerContainerService</code>, <code>IQdrantAdminService</code>, <code>ToastService</code>, <code>ILogger&lt;QdrantAdmin&gt;</code>, <code>IJSRuntime</code></p>
+    <p><strong>Conditional render guards:</strong> 14 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (daemonTest is { Success: false })</code> (line 122)</li>
+      <li><code>@if (!string.IsNullOrEmpty(daemonTest.FailureKind))</code> (line 131)</li>
+      <li><code>@if (!string.IsNullOrEmpty(daemonSecurityWarning))</code> (line 140)</li>
+    </ul>
+    <h2 id="llm-settings-llmsettings"><code>/llm-settings</code> — LlmSettings<a class="anchor-link" href="#llm-settings-llmsettings">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/LlmSettings.razor</code> (689 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → CONSOLE → LLM Settings</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <strong>all three tabs driven.</strong> <em>Provider</em>: Source Select with 7 providers plus the Resilience card. <em>Usage</em>: token-tracking Switch, Max total tokens, Max cost, the alert-threshold Slider and <code>Block Requests When Exceeded</code>. <em>Prompts</em>: system prompt, RAG and context templates, context limits.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size on every tab.</li>
+      <li><strong>Known issues (2026-07-29):</strong> ✅ <strong>REQ-UI-043 proven end-to-end.</strong> Selecting <code>OpenAI-compatible endpoint</code> swapped the visible field set (Base URL / Model / API key / Max tokens / Temperature / Test connection) — no union-of-all-providers form — and <code>Save &amp; apply</code> was <strong>refused</strong> with the error named on each offending field (<code>Base URL required</code>, <code>Model required</code>, <code>API key required</code>) plus a <code>This provider is not fully configured</code> summary. The named regression (saving OpenAI-compatible with no endpoint) is prevented. Configuration was restored to <code>None</code> afterwards.</li>
+    </ul>
+    <p><img alt="LlmSettings" src="../screenshots/TechieDesk/llm-settings.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-2">Controls<a class="anchor-link" href="#controls-2">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Input&gt;</code></td><td>12</td><td>117, 123, 134, 163…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>4</td><td>65, 95, 145, 191</td></tr>
+        <tr><td><code>&lt;Separator&gt;</code></td><td>4</td><td>79, 108, 112, 158</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>4</td><td>102, 128, 152, 182</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>4</td><td>103, 129, 153, 183</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>3</td><td>16, 17, 80</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>3</td><td>18, 27, 81</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>3</td><td>38, 86, 380</td></tr>
+        <tr><td><code>&lt;Slider&gt;</code></td><td>2</td><td>177, 485</td></tr>
+        <tr><td><code>&lt;Textarea&gt;</code></td><td>2</td><td>200, 206</td></tr>
+        <tr><td><code>&lt;Tabs&gt;</code></td><td>1</td><td>56</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>1</td><td>362</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-2">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-2">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>ConfigService.LoadConfigAsync()</code></td><td><code>TechieRagConfigService</code></td><td>301</td></tr>
+        <tr><td><code>ConfigService.SaveConfigAsync()</code></td><td><code>TechieRagConfigService</code></td><td>574, 618</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;LlmSettings&gt;</code></td><td>310, 592, 625…</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;LlmSettings&gt;</code></td><td>569, 576, 620…</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;LlmSettings&gt;</code></td><td>558, 587, 646…</td></tr>
+        <tr><td><code>RagManager.GetLlmProviderAsync()</code></td><td><code>TechieRagManager</code></td><td>643</td></tr>
+        <tr><td><code>RagManager.ReconfigureAsync()</code></td><td><code>TechieRagManager</code></td><td>575, 619</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>311, 561, 588…</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>577, 621, 666</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>TechieRagConfigService</code>, <code>TechieRagManager</code>, <code>ToastService</code>, <code>ILogger&lt;LlmSettings&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 19 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isSaving) { &lt;Spinner Size="SpinnerSize.Small" Class="mr-2" /&gt; &lt;span&gt;Saving...&lt;/span&gt; }</code> (line 18)</li>
+      <li><code>@if (isLoading)</code> (line 24)</li>
+      <li><code>@if (validationSummary.Count &gt; 0)</code> (line 32)</li>
+    </ul>
+    <h2 id="token-usage-tokenusage"><code>/token-usage</code> — TokenUsage<a class="anchor-link" href="#token-usage-tokenusage">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/TokenUsage.razor</code> (183 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → CONSOLE → Token Usage</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — 4 stat tiles populated (Total tokens, Input/Output, Estimated cost, Operations), <code>Usage by Model</code> with a labelled empty state, <code>Reset Session</code>. <strong>Budget Status proven</strong>: setting a budget on <code>/llm-settings</code> → <em>Usage</em> made the card appear with both <code>&lt;Progress&gt;</code> bars (<code>Token budget used</code>, <code>Cost budget used</code>) and correct <code>0 / 10,000</code> and <code>$0.0000 / $5.00</code> values.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size, with and without the Budget Status card.</li>
+      <li><strong>Known issues (2026-07-29):</strong> The Budget Status card is <strong>correctly conditional</strong>, not renders-empty: it appears only once a budget is configured. Budgets were reverted to 0 after the check. Block-on-exceed enforcement needs a live provider and is <strong>unexercised</strong>.</li>
+    </ul>
+    <p><img alt="TokenUsage" src="../screenshots/TechieDesk/token-usage.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-3">Controls<a class="anchor-link" href="#controls-3">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Card&gt;</code></td><td>6</td><td>24, 32, 40, 48…</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>2</td><td>16, 17</td></tr>
+        <tr><td><code>&lt;Progress&gt;</code></td><td>2</td><td>73, 84</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>90, 97</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>17</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>1</td><td>118</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-3">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-3">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>TechieRag.GetTokenTrackerAsync()</code></td><td><code>TechieDesk.Services.TechieRagManager</code></td><td>141</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>173</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>TechieDesk.Services.TechieRagManager</code>, <code>ToastService</code></p>
+    <p><strong>Conditional render guards:</strong> 5 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (budgetStatus != null)</code> (line 59)</li>
+      <li><code>@if (budgetStatus.Budget.MaxTotalTokens &gt; 0)</code> (line 66)</li>
+      <li><code>@if (budgetStatus.Budget.MaxCostUsd &gt; 0)</code> (line 77)</li>
+    </ul>
+    <h2 id="llm-playground-llmplayground"><code>/llm-playground</code> — LlmPlayground<a class="anchor-link" href="#llm-playground-llmplayground">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/LlmPlayground.razor</code> (395 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → CONSOLE → LLM Playground (re-linked 2026-07-28)</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — 3 tabs (Completion / Structured Output / Chat), system and user prompt Textareas, Temperature, Max tokens, Streaming Switch, <code>Generate</code>.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Generation is <strong>unexercised</strong> — no LLM provider is reachable on this host.</li>
+    </ul>
+    <p><img alt="LlmPlayground" src="../screenshots/TechieDesk/llm-playground.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-4">Controls<a class="anchor-link" href="#controls-4">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Card&gt;</code></td><td>5</td><td>26, 75, 94, 128…</td></tr>
+        <tr><td><code>&lt;Textarea&gt;</code></td><td>4</td><td>34, 40, 102, 168</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>4</td><td>66, 119, 146, 169</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>2</td><td>47, 53</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>67, 120</td></tr>
+        <tr><td><code>&lt;Tabs&gt;</code></td><td>1</td><td>16</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>1</td><td>60</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>1</td><td>61</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>1</td><td>108</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>170</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-4">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-4">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>TechieRag.GetLlmProviderAsync()</code></td><td><code>TechieDesk.Services.TechieRagManager</code></td><td>198</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>200</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>TechieDesk.Services.TechieRagManager</code>, <code>ToastService</code></p>
+    <p><strong>Conditional render guards:</strong> 6 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isGenerating) { &lt;Spinner Size="SpinnerSize.Small" Class="mr-2" /&gt; &lt;span&gt;Generating...&lt;/span&gt; }</code> (line 67)</li>
+      <li><code>@if (!string.IsNullOrEmpty(completionResponse))</code> (line 73)</li>
+      <li><code>@if (!string.IsNullOrEmpty(completionStats))</code> (line 81)</li>
+    </ul>
+    <h2 id="ingestion-ingestion"><code>/ingestion</code> — Ingestion<a class="anchor-link" href="#ingestion-ingestion">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Ingestion.razor</code> (515 lines)</li>
+      <li><strong>Reached via:</strong> native Go menu, "Document Ingestion" ⌘3 (MainPage.xaml.cs:81)</li>
+      <li>⚠ <strong>Not in the sidebar</strong> — reachable only from the native Go menu, "Document Ingestion" ⌘3 (MainPage.xaml.cs:81).</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <strong>now observed</strong> (was <code>not observed</code> on 2026-07-28). Driven through the native Go menu → <em>Document Ingestion</em> ⌘3. Folder-path and pattern Inputs, <code>Choose files…</code>/<code>Choose folder…</code>, <code>Ingest Now</code>, a Vector-store statistics card (12 documents / 13 chunks / 100.0 KB / last ingestion) and an <code>Ingested Documents</code> table with 12 rows across 3 pages.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> This screen's <code>Storage Size</code> column <strong>does</strong> show real byte sizes, unlike the workspace document library — the two read different stores.</li>
+    </ul>
+    <h3 id="controls-5">Controls<a class="anchor-link" href="#controls-5">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>6</td><td>46, 50, 73, 79…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>4</td><td>36, 101, 126, 153</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>21, 22</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>22, 74</td></tr>
+        <tr><td><code>&lt;Progress&gt;</code></td><td>2</td><td>26, 91</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>2</td><td>47, 51</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>2</td><td>59, 67</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>2</td><td>110, 165</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-5">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-5">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Ingestion&gt;</code></td><td>220, 266, 295…</td></tr>
+        <tr><td><code>Rag.ClearAsync()</code></td><td><code>ITechieRag</code></td><td>462</td></tr>
+        <tr><td><code>Rag.DeleteDocumentAsync()</code></td><td><code>ITechieRag</code></td><td>478</td></tr>
+        <tr><td><code>Rag.GetStatsAsync()</code></td><td><code>ITechieRag</code></td><td>491</td></tr>
+        <tr><td><code>Rag.IngestAsync()</code></td><td><code>ITechieRag</code></td><td>415</td></tr>
+        <tr><td><code>Rag.InitializeAsync()</code></td><td><code>ITechieRag</code></td><td>213</td></tr>
+        <tr><td><code>Rag.ListDocumentsAsync()</code></td><td><code>ITechieRag</code></td><td>496</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>221, 267, 276…</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>436, 466, 481</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>ITechieRag</code>, <code>ToastService</code>, <code>ILogger&lt;Ingestion&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 7 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isDownloadingModel)</code> (line 19)</li>
+      <li><code>@if (isIngesting) { &lt;Spinner Size="SpinnerSize.Small" Class="mr-2" /&gt; &lt;span&gt;Ingesting...&lt;/span&gt; }</code> (line 74)</li>
+      <li><code>@if (isIngesting)</code> (line 77)</li>
+    </ul>
+    <h2 id="text-ingestion-textingestion"><code>/text-ingestion</code> — TextIngestion<a class="anchor-link" href="#text-ingestion-textingestion">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/TextIngestion.razor</code> (325 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → CONSOLE → Text Ingestion (re-linked 2026-07-28)</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — Document-name Input, content Textarea with a live character/word counter, source Input, <code>Ingest Text</code>/<code>Clear Form</code>/<code>Clear All Data</code>, a Statistics card with real values and a Documents list with per-row delete.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+    </ul>
+    <p><img alt="TextIngestion" src="../screenshots/TechieDesk/text-ingestion.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-6">Controls<a class="anchor-link" href="#controls-6">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>4</td><td>71, 75, 76, 135</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>3</td><td>37, 94, 117</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>20, 21</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>21, 72</td></tr>
+        <tr><td><code>&lt;Progress&gt;</code></td><td>2</td><td>25, 82</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>2</td><td>46, 65</td></tr>
+        <tr><td><code>&lt;Textarea&gt;</code></td><td>1</td><td>54</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>136</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-6">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-6">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;TextIngestion&gt;</code></td><td>176, 259</td></tr>
+        <tr><td><code>Rag.ClearAsync()</code></td><td><code>ITechieRag</code></td><td>273</td></tr>
+        <tr><td><code>Rag.DeleteDocumentAsync()</code></td><td><code>ITechieRag</code></td><td>288</td></tr>
+        <tr><td><code>Rag.GetStatsAsync()</code></td><td><code>ITechieRag</code></td><td>301</td></tr>
+        <tr><td><code>Rag.IngestTextAsync()</code></td><td><code>ITechieRag</code></td><td>245</td></tr>
+        <tr><td><code>Rag.InitializeAsync()</code></td><td><code>ITechieRag</code></td><td>169</td></tr>
+        <tr><td><code>Rag.ListDocumentsAsync()</code></td><td><code>ITechieRag</code></td><td>306</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>177, 210, 216…</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>249, 276, 291</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>ITechieRag</code>, <code>ToastService</code>, <code>ILogger&lt;TextIngestion&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 5 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isDownloadingModel)</code> (line 18)</li>
+      <li><code>@if (isIngesting) { &lt;Spinner Size="SpinnerSize.Small" Class="mr-2" /&gt; &lt;span&gt;Ingesting...&lt;/span&gt; }</code> (line 72)</li>
+      <li><code>@if (isIngesting)</code> (line 79)</li>
+    </ul>
+    <h2 id="chat-chat"><code>/chat</code> — Chat<a class="anchor-link" href="#chat-chat">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Chat.razor</code> (410 lines)</li>
+      <li><strong>Reached via:</strong> native Go menu, "RAG Chat" ⌘2 (MainPage.xaml.cs:80)</li>
+      <li>⚠ <strong>Not in the sidebar</strong> — reachable only from the native Go menu, "RAG Chat" ⌘2 (MainPage.xaml.cs:80).</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <strong>now observed</strong> (was <code>not observed</code> on 2026-07-28). Driven through the native Go menu → <em>RAG Chat</em> ⌘2. Chat-configuration card (Mode, Doc filter, Top-K, Streaming), session counters, message Input and <code>New Conversation</code>/<code>Clear Chat</code>.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Answering is <strong>unexercised</strong> — no LLM provider is reachable.</li>
+    </ul>
+    <h3 id="controls-7">Controls<a class="anchor-link" href="#controls-7">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>7</td><td>19, 23, 34, 36…</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>5</td><td>18, 19, 22, 23…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>2</td><td>31, 92</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>2</td><td>45, 59</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>1</td><td>73</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>1</td><td>80</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>1</td><td>81</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>1</td><td>122</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>1</td><td>145</td></tr>
+        <tr><td><code>&lt;Textarea&gt;</code></td><td>1</td><td>157</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-7">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-7">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Chat&gt;</code></td><td>227</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;Chat&gt;</code></td><td>364</td></tr>
+        <tr><td><code>TechieRag.AskAsync()</code></td><td><code>TechieDesk.Services.TechieRagManager</code></td><td>320</td></tr>
+        <tr><td><code>TechieRag.GetLlmProviderAsync()</code></td><td><code>TechieDesk.Services.TechieRagManager</code></td><td>252, 296</td></tr>
+        <tr><td><code>TechieRag.GetTokenTrackerAsync()</code></td><td><code>TechieDesk.Services.TechieRagManager</code></td><td>261, 306, 357</td></tr>
+        <tr><td><code>TechieRag.SearchAsync()</code></td><td><code>TechieDesk.Services.TechieRagManager</code></td><td>240, 293</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>TechieDesk.Services.TechieRagManager</code>, <code>ToastService</code>, <code>ILogger&lt;Chat&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 4 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (messages.Count == 0)</code> (line 94)</li>
+      <li><code>@if (msg.Role == "assistant" &amp;&amp; msg.Sources?.Count &gt; 0)</code> (line 110)</li>
+      <li><code>@if (isProcessing)</code> (line 134)</li>
+    </ul>
+    <h2 id="rag-config-ragconfig"><code>/rag-config</code> — RagConfig<a class="anchor-link" href="#rag-config-ragconfig">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/RagConfig.razor</code> (409 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → CONSOLE → RAG Configuration (renamed from /settings 2026-07-28)</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — Embedding configuration (Source <code>Ollama</code>, model <code>bge-m3</code>, endpoint), Vector store (<code>SqliteVec</code>, <code>techierag.db</code>), Document processing (chunk size 500 / overlap 50), Advanced settings (telemetry Switch), <code>Reset to Defaults</code> / <code>Save Configuration</code>.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+    </ul>
+    <p><img alt="RagConfig" src="../screenshots/TechieDesk/rag-config.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-8">Controls<a class="anchor-link" href="#controls-8">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Input&gt;</code></td><td>8</td><td>72, 83, 93, 104…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>5</td><td>34, 113, 157, 183…</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>27, 207</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>2</td><td>43, 122</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>2</td><td>201, 204</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>1</td><td>62</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>1</td><td>190</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>1</td><td>191</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-8">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-8">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>ConfigService.LoadConfigAsync()</code></td><td><code>TechieRagConfigService</code></td><td>254, 335</td></tr>
+        <tr><td><code>ConfigService.ResetToDefaults()</code></td><td><code>TechieRagConfigService</code></td><td>334</td></tr>
+        <tr><td><code>ConfigService.SaveConfigAsync()</code></td><td><code>TechieRagConfigService</code></td><td>317</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;RagConfig&gt;</code></td><td>259, 323</td></tr>
+        <tr><td><code>RagManager.ReconfigureAsync()</code></td><td><code>TechieRagManager</code></td><td>318</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>260, 324</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>319, 336</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>TechieRagConfigService</code>, <code>TechieRagManager</code>, <code>ToastService</code>, <code>ILogger&lt;RagConfig&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 6 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isLoading)</code> (line 24)</li>
+      <li><code>@if (config.Embedding.Source == EmbeddingSource.Embedded)</code> (line 60)</li>
+      <li><code>@if (config.Embedding.Source == EmbeddingSource.Onnx)</code> (line 78)</li>
+    </ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

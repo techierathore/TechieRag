@@ -1,0 +1,51 @@
+TechieDesk for macOS — installing an UNSIGNED build
+====================================================
+
+This build is not signed with an Apple Developer ID and is not notarized
+(REQ-FN-038c — the owner has no Apple Developer identity). Everything in the
+app works normally; what is missing is Apple's signature, and macOS therefore
+treats the app as coming from an unidentified developer.
+
+INSTALL
+-------
+1. Drag TechieDesk.app onto the Applications folder in this window.
+
+2. The first launch WILL be refused. macOS shows either
+     "TechieDesk.app is damaged and can't be opened"
+   or
+     "TechieDesk.app cannot be opened because the developer cannot be verified"
+   Neither means the download is corrupt — it means the app is unsigned and
+   carries a quarantine flag from having been downloaded.
+
+3. Remove the quarantine flag, once, in Terminal:
+
+     xattr -dr com.apple.quarantine /Applications/TechieDesk.app
+
+   Then open the app normally. You will not need to repeat this.
+
+   (Right-click -> Open sometimes works instead, but on recent macOS versions
+   the "is damaged" variant cannot be bypassed that way — the xattr command is
+   the reliable route.)
+
+WHAT THIS COSTS YOU
+-------------------
+One feature is genuinely degraded, not just cosmetically:
+
+  * Sessions and provider API keys are NOT stored in the macOS Keychain.
+    Mac Catalyst refuses Keychain access to a build without a
+    provisioning-profile-backed entitlement (errSecMissingEntitlement). The app
+    detects this at startup, logs it, and falls back to memory-only for the
+    run. Nothing sensitive is written to a file instead — the secret simply
+    does not survive a restart, so you sign in again after quitting.
+
+    This is REQ-FN-039's known gap and it disappears the moment the app is
+    signed; the code needs no change.
+
+Everything else — local RAG, workspaces, ingestion, Qdrant administration,
+the data directory under ~/Library/Application Support/TechieDesk — is
+unaffected.
+
+UNINSTALL
+---------
+Delete /Applications/TechieDesk.app. Your data stays at
+~/Library/Application Support/TechieDesk until you delete that too.

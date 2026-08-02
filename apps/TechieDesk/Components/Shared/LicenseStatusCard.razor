@@ -1,11 +1,19 @@
 @* REQ-FN-013/BRD-49: license status card — name / status / expiry, with honest offline and
-   cached-license (REQ-FN-015) states. Reads from ILicenseService (POST /LicenseSvc/validate). *@
+   cached-license (REQ-FN-015) states. Reads from ILicenseService (POST /LicenseSvc/validate).
+
+   REQ-FN-044/045 (BRD-142/143): also surfaces the resolved instance mode (Individual / Team /
+   Enterprise) and the AppManager seat behind it, on this existing licence surface rather than on
+   a new screen. A degraded seat renders as an INFORMATIONAL line, never a warning or a block —
+   BRD-129 makes an unassigned, expired, revoked or unverifiable seat a full-capability Individual
+   install, so nagging about it here would contradict the requirement. *@
 @inject ILicenseService LicenseService
+@inject IInstanceModeService InstanceModeService
+@inject IStringLocalizer<AppStrings> Localizer
 
 <Card>
     <CardHeader>
-        <CardTitle>License</CardTitle>
-        <CardDescription>Your current TechieDesk plan and its validation status</CardDescription>
+        <CardTitle>@Localizer["LicenseCardTitle"]</CardTitle>
+        <CardDescription>@Localizer["LicenseCardDescription"]</CardDescription>
     </CardHeader>
     <CardContent Class="space-y-3">
         @if (status is null)
@@ -17,17 +25,23 @@
         {
             <div class="flex items-center gap-2">
                 <Badge Variant="@BadgeVariantFor(status.Availability)">
-                    @(status.LicenseName ?? "Unknown") @if (!string.IsNullOrWhiteSpace(status.Status)) { <text>· @status.Status</text> }
+                    @(status.LicenseName ?? Localizer["LicenseCardUnknown"].Value) @if (!string.IsNullOrWhiteSpace(status.Status)) { <text>· @status.Status</text> }
                 </Badge>
                 @if (status.IsFromCache)
                 {
                     <Badge Variant="BadgeVariant.Outline">
-                        <LucideIcon aria-hidden="true" Name="wifi-off" Size="12" Class="mr-1" /> Cached
+                        <LucideIcon aria-hidden="true" Name="wifi-off" Size="12" Class="mr-1" /> @Localizer["LicenseCardCached"]
                     </Badge>
                 }
                 @if (status.Availability == LicenseAvailability.Offline)
                 {
-                    <Badge Variant="BadgeVariant.Outline">Offline</Badge>
+                    <Badge Variant="BadgeVariant.Outline">@Localizer["LicenseCardOffline"]</Badge>
+                }
+                @if (mode is not null)
+                {
+                    <Badge Variant="@(mode.IsTeamOrEnterprise ? BadgeVariant.Default : BadgeVariant.Outline)">
+                        @ModeLabel(mode.Mode)
+                    </Badge>
                 }
             </div>
 
@@ -35,57 +49,81 @@
             {
                 <Alert Variant="AlertVariant.Warning">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="wifi-off" Size="16" /></Alert.Icon>
-                    <AlertTitle>Running on cached license</AlertTitle>
-                    <AlertDescription>@status.Message</AlertDescription>
+                    <AlertTitle>@Localizer["LicenseCardCachedTitle"]</AlertTitle>
+                    <AlertDescription>@status.Describe(Localize)</AlertDescription>
                 </Alert>
             }
             else if (status.Availability == LicenseAvailability.GraceExpired)
             {
                 <Alert Variant="AlertVariant.Danger">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
-                    <AlertTitle>License verification unavailable</AlertTitle>
-                    <AlertDescription>@status.Message</AlertDescription>
+                    <AlertTitle>@Localizer["LicenseCardGraceTitle"]</AlertTitle>
+                    <AlertDescription>@status.Describe(Localize)</AlertDescription>
                 </Alert>
             }
             else if (status.Availability == LicenseAvailability.Invalid)
             {
                 <Alert Variant="AlertVariant.Danger">
                     <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
-                    <AlertDescription>@status.Message</AlertDescription>
+                    <AlertDescription>@status.Describe(Localize)</AlertDescription>
                 </Alert>
             }
             else
             {
-                <TypographyMuted>@status.Message</TypographyMuted>
+                <TypographyMuted>@status.Describe(Localize)</TypographyMuted>
             }
 
             <div class="space-y-1.5 text-sm">
+                @* REQ-FN-044: the mode is observable in the UI, on the surface that already
+                   exists for licensing. *@
+                @if (mode is not null)
+                {
+                    <div class="flex justify-between border-b py-1">
+                        <span class="text-muted-foreground">@Localizer["LicenseCardInstanceMode"]</span>
+                        <span class="font-medium">@ModeLabel(mode.Mode)</span>
+                    </div>
+                    @if (mode.Seat != SeatState.None)
+                    {
+                        <div class="flex justify-between border-b py-1">
+                            <span class="text-muted-foreground">@Localizer["LicenseCardTeamSeat"]</span>
+                            <span class="font-medium">@SeatLabel(mode.Seat)</span>
+                        </div>
+                    }
+                }
                 @if (status.ExpiryDate is not null)
                 {
                     <div class="flex justify-between border-b py-1">
-                        <span class="text-muted-foreground">Expires</span>
+                        <span class="text-muted-foreground">@Localizer["LicenseCardExpires"]</span>
                         <span class="font-medium">@status.ExpiryDate.Value.ToString("yyyy-MM-dd")</span>
                     </div>
                 }
                 @if (status.DaysRemaining is not null)
                 {
                     <div class="flex justify-between border-b py-1">
-                        <span class="text-muted-foreground">Days remaining</span>
+                        <span class="text-muted-foreground">@Localizer["LicenseCardDaysRemaining"]</span>
                         <span class="font-medium">@status.DaysRemaining</span>
                     </div>
                 }
                 @if (status.ValidatedAt is not null)
                 {
                     <div class="flex justify-between border-b py-1">
-                        <span class="text-muted-foreground">Last validated</span>
-                        <span class="font-medium">@status.ValidatedAt.Value.ToString("yyyy-MM-dd HH:mm") UTC</span>
+                        <span class="text-muted-foreground">@Localizer["LicenseCardLastValidated"]</span>
+                        <span class="font-medium">@status.ValidatedAt.Value.ToString("yyyy-MM-dd HH:mm") @Localizer["LicenseCardUtc"]</span>
                     </div>
                 }
             </div>
 
+            @* REQ-FN-045 / BRD-129: a lapsed seat is stated plainly and reassuringly. It is
+               deliberately a muted line and not an Alert — losing a seat costs paid team
+               features, never access to your own documents, so it is not a warning. *@
+            @if (mode is not null && mode.IsSeatDegraded && mode.Seat != SeatState.None)
+            {
+                <TypographyMuted>@mode.Describe(Localize)</TypographyMuted>
+            }
+
             <Button Href="/pricing" Variant="ButtonVariant.Outline" Size="ButtonSize.Small">
                 <Button.Icon><LucideIcon aria-hidden="true" Name="sparkles" Size="14" /></Button.Icon>
-                View plans
+                @Localizer["ViewPlans"]
             </Button>
         }
     </CardContent>
@@ -93,11 +131,35 @@
 
 @code {
     private LicenseStatus? status;
+    private InstanceModeStatus? mode;
 
     protected override async Task OnInitializedAsync()
     {
         status = await LicenseService.EnsureFreshAsync();
+
+        // REQ-FN-044: resolves from the status just read — no second validation call and no
+        // second cache. Fails open to Individual inside the service, so this cannot throw the
+        // profile page.
+        mode = await InstanceModeService.EnsureFreshAsync();
     }
+
+    /// <summary>The REQ-UI-051 delegate: the ONE place a licensing key becomes a sentence here.</summary>
+    private string Localize(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
+
+    // REQ-UI-055: the same key the resolver's own sentences open with, so the badge above and the
+    // sentence below it cannot end up calling the mode two different things in one language.
+    private string ModeLabel(InstanceMode instanceMode)
+        => Localizer[InstanceModeResolver.ModeLabelKey(instanceMode)].Value;
+
+    private string SeatLabel(SeatState seat) => seat switch
+    {
+        SeatState.Assigned => Localizer["LicenseCardSeatAssigned"].Value,
+        SeatState.Unassigned => Localizer["LicenseCardSeatUnassigned"].Value,
+        SeatState.Expired => Localizer["LicenseCardSeatExpired"].Value,
+        SeatState.Revoked => Localizer["LicenseCardSeatRevoked"].Value,
+        SeatState.Unverified => Localizer["LicenseCardSeatUnverified"].Value,
+        _ => Localizer["LicenseCardSeatNone"].Value
+    };
 
     private static BadgeVariant BadgeVariantFor(LicenseAvailability availability) => availability switch
     {

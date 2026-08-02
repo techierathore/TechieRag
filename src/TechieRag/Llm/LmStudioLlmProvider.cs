@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
+using TechieRag.Diagnostics;
 using TechieRag.Models;
 
 namespace TechieRag.Llm;
@@ -18,7 +19,7 @@ namespace TechieRag.Llm;
 /// using the OpenAI-compatible API at /v1/chat/completions.</para>
 /// <para><b>Code Flow:</b> Created by TechieRagBuilder when LlmSource.LmStudio is configured.</para>
 /// </remarks>
-public class LmStudioLlmProvider : ILlmProvider
+public class LmStudioLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
     private readonly HttpClient httpClient;
     private readonly ILogger<LmStudioLlmProvider> logger;
@@ -34,6 +35,11 @@ public class LmStudioLlmProvider : ILlmProvider
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
+
+    /// <inheritdoc/>
+    /// <remarks>Images are encoded as <c>image_url</c> content parts, inline as a data URI or by URL (REQ-RAG-039).</remarks>
+    public bool SupportsInput(ChatContentKind kind) =>
+        kind is ChatContentKind.Text or ChatContentKind.Image;
 
     /// <inheritdoc/>
     public event EventHandler<LlmCompletionEventArgs>? OnCompletionCompleted;
@@ -118,6 +124,7 @@ public class LmStudioLlmProvider : ILlmProvider
         var choice = result.Choices?.FirstOrDefault();
         var inputTokens = result.Usage?.PromptTokens ?? 0;
         var outputTokens = result.Usage?.CompletionTokens ?? 0;
+        var cacheReadTokens = result.Usage?.CachedTokens ?? 0;
         var toolCalls = ParseToolCalls(choice?.Message?.ToolCalls);
 
         var llmResponse = new LlmResponse
@@ -128,6 +135,7 @@ public class LmStudioLlmProvider : ILlmProvider
             {
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
+                CacheReadTokens = cacheReadTokens,
                 ModelName = ModelName,
                 ProviderName = Name
             },
@@ -135,7 +143,7 @@ public class LmStudioLlmProvider : ILlmProvider
             ModelName = result.Model ?? ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls);
+        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens);
         return llmResponse;
     }
 
@@ -230,7 +238,10 @@ public class LmStudioLlmProvider : ILlmProvider
         var apiMessages = messages.Select(m =>
         {
             var msg = new Dictionary<string, object> { ["role"] = m.Role };
-            if (m.Content is not null) msg["content"] = m.Content;
+            if (m.Content is not null || m.Parts is { Count: > 0 })
+            {
+                msg["content"] = OpenAIMessageMapper.BuildContent(m);
+            }
             if (m.ToolCallId is not null) msg["tool_call_id"] = m.ToolCallId;
             if (m.ToolCalls is { Count: > 0 })
             {
@@ -256,6 +267,10 @@ public class LmStudioLlmProvider : ILlmProvider
             // Ask the server to append a final usage chunk to the stream (TR-RAG-002)
             request["stream_options"] = new Dictionary<string, object> { ["include_usage"] = true };
         }
+
+        // REQ-RAG-043: prefix caching on these services is automatic; only the routing key is
+        // expressible on the wire. See PromptCacheOptions for what is intentionally not sent.
+        OpenAIMessageMapper.ApplyPromptCache(request, options?.PromptCache);
 
         if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
         if (options?.MaxTokens is not null) request["max_tokens"] = options.MaxTokens.Value;
@@ -293,8 +308,11 @@ public class LmStudioLlmProvider : ILlmProvider
         }).ToList();
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
+    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
     {
+        TechieRagTelemetry.RecordLlmCompletion(
+            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens);
+
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
             InputTokens = inputTokens,
@@ -379,6 +397,21 @@ internal class OpenAIUsage
 
     [JsonPropertyName("total_tokens")]
     public int TotalTokens { get; set; }
+
+    /// <summary>Cache breakdown of the prompt tokens, where the service reports one (REQ-RAG-043).</summary>
+    [JsonPropertyName("prompt_tokens_details")]
+    public OpenAIPromptTokensDetails? PromptTokensDetails { get; set; }
+
+    /// <summary>Prompt tokens served from the service's automatic prefix cache; zero when unreported.</summary>
+    /// <remarks>These are counted inside <c>prompt_tokens</c>, not on top of it, so they must not be
+    /// added to the input total — only reported alongside it.</remarks>
+    public int CachedTokens => PromptTokensDetails?.CachedTokens ?? 0;
+}
+
+internal class OpenAIPromptTokensDetails
+{
+    [JsonPropertyName("cached_tokens")]
+    public int CachedTokens { get; set; }
 }
 
 internal class OpenAIStreamChunk

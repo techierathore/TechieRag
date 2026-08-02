@@ -1,89 +1,96 @@
+using System.Reflection;
 using TechieDesk.Services.Auth;
-using TechieDesk.Tests.Support;
 using Xunit;
 
 namespace TechieDesk.Tests.Auth;
 
 /// <summary>
-/// REQ-FN-003 / BRD-20: route protection — unauthenticated visitors are redirected to
-/// /login?returnUrl={deep link}; offline mode never redirects.
+/// REQ-FN-036 / BRD-129 + REQ-FN-041: account-free launch, and no access decision left anywhere in
+/// the route guard. It has no login redirect, and since the role/capability matrix was deleted it
+/// has no redirect of any kind — only a sign-in-state report the shell uses for its menu.
 /// </summary>
+/// <remarks>
+/// These tests replace the REQ-FN-003 / BRD-20 suite that asserted an unauthenticated visitor on an
+/// AppManager-configured install was sent to <c>/login?returnUrl={deep link}</c>. REQ-FN-041 then
+/// retired two further cases outright — <c>UnderPrivilegedUserSentToDenied</c> and
+/// <c>PrivilegedUserPassesCapabilityRoute</c> — because their subject, <c>GetRedirect(Capability)</c>,
+/// no longer exists: one install serves one person, who is always the local owner, so there is no
+/// under-privileged caller to divert to <c>/denied</c>.
+/// </remarks>
 public sealed class RouteGuardTests
 {
-    private static RouteGuard Guard(bool appManagerEnabled, TechieDeskUser? sessionUser)
+    private static RouteGuard Guard(TechieDeskUser? sessionUser)
     {
-        var store = new SessionTokenStore();
-        if (sessionUser != null)
-        {
-            store.SetSession(sessionUser, "access-token-1", "refresh-token-1", DateTimeOffset.UtcNow.AddHours(1));
-        }
-
-        var mode = TestFactory.Mode(appManagerEnabled);
-        var context = new TechieDeskUserContext(mode, store);
-        return new RouteGuard(mode, context, new CapabilityService());
+        var sessions = SessionTestHarness.Store();
+        var handle = sessionUser is null ? null : SessionTestHarness.SignIn(sessions, sessionUser);
+        return new RouteGuard(SessionTestHarness.Circuit(sessions, handle));
     }
 
     /// <summary>
-    /// An unauthenticated visitor hitting a protected deep link is redirected to /login with
-    /// the originally requested route (including its query string) preserved in returnUrl.
+    /// THE acceptance: a first launch with no AppManager configuration and nobody signed in reaches
+    /// every route. The guard exposes nothing that could send the user anywhere.
     /// </summary>
     [Fact]
-    public void AnonymousRedirectedWithReturnUrl()
+    public void LaunchNeverRedirectsAnywhere()
     {
-        var guard = Guard(true, null);
+        var guard = Guard(null);
 
-        var redirect = guard.GetLoginRedirect("/settings?tab=providers");
-
-        Assert.Equal("/login?returnUrl=%2Fsettings%3Ftab%3Dproviders", redirect);
-    }
-
-    /// <summary>An authenticated user is not redirected from a protected route.</summary>
-    [Fact]
-    public void AuthenticatedUserNotRedirected()
-    {
-        var user = new TechieDeskUser(123, "jane.doe@example.com", "Jane Doe", ProductRole.User, true);
-        var guard = Guard(true, user);
-
-        Assert.Null(guard.GetLoginRedirect("/chat"));
-        Assert.True(guard.IsAuthenticated);
+        Assert.False(guard.IsSignedIn);
+        Assert.DoesNotContain(
+            typeof(IRouteGuard).GetMembers(BindingFlags.Public | BindingFlags.Instance),
+            member => member.Name.Contains("Redirect", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
-    /// In offline single-user mode nothing requires login: no redirect is ever issued and the
-    /// visitor counts as authenticated (built-in Admin, BRD-54).
+    /// The re-expression of the old "AnonymousRedirectedWithReturnUrl" case, which asserted that a
+    /// configured-AppManager install bounced an unauthenticated visitor to /login. A configured
+    /// install can no longer behave differently at all: the guard has no auth-mode dependency left
+    /// to branch on, so having AppManager set up is not a state the routing layer can observe.
     /// </summary>
     [Fact]
-    public void OfflineModeNeverRedirects()
+    public void ConfiguredInstanceCannotBehaveDifferently()
     {
-        var guard = Guard(false, null);
+        var parameters = typeof(RouteGuard).GetConstructors().Single().GetParameters();
 
-        Assert.Null(guard.GetLoginRedirect("/qdrant-admin"));
-        Assert.Null(guard.GetRedirect("/qdrant-admin", Capability.ManageQdrant));
-        Assert.True(guard.IsAuthenticated);
+        Assert.DoesNotContain(
+            parameters, parameter => parameter.ParameterType == typeof(ITechieDeskAuthModeProvider));
+
+        Assert.False(Guard(null).IsSignedIn);
     }
 
     /// <summary>
-    /// A capability-gated route sends an authenticated but under-privileged user to /denied,
-    /// not to /login.
+    /// Structural guarantee: the gate cannot come back by flipping a condition. No member of
+    /// <see cref="IRouteGuard"/> mentions login, and after REQ-FN-041 none mentions a capability
+    /// either — reinstating either turns this test red.
     /// </summary>
     [Fact]
-    public void UnderPrivilegedUserSentToDenied()
+    public void GuardExposesNoAccessDecision()
     {
-        var user = new TechieDeskUser(123, "jane.doe@example.com", "Jane Doe", ProductRole.User, true);
-        var guard = Guard(true, user);
+        var members = typeof(IRouteGuard).GetMembers(BindingFlags.Public | BindingFlags.Instance);
 
-        Assert.Equal("/denied", guard.GetRedirect("/admin/settings", Capability.AccessAdminConsole));
+        Assert.DoesNotContain(
+            members, member => member.Name.Contains("Login", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            members, member => member.Name.Contains("Capability", StringComparison.OrdinalIgnoreCase));
+
+        // The whole contract is one read-only property. Anything else is an access decision.
+        var property = Assert.Single(typeof(IRouteGuard).GetProperties(BindingFlags.Public | BindingFlags.Instance));
+        Assert.Equal(nameof(IRouteGuard.IsSignedIn), property.Name);
+        Assert.DoesNotContain(
+            typeof(IRouteGuard).GetMethods(BindingFlags.Public | BindingFlags.Instance),
+            method => !method.IsSpecialName);
     }
 
     /// <summary>
-    /// A capability-gated route lets a sufficiently privileged user through with no redirect.
+    /// Sign-in state is reported from the SESSION, not from the auth mode, so the shell can offer
+    /// "Sign in" versus "Log out" without that answer ever gating a route.
     /// </summary>
     [Fact]
-    public void PrivilegedUserPassesCapabilityRoute()
+    public void SignedInSessionIsReportedSignedIn()
     {
-        var admin = new TechieDeskUser(1, "admin@example.com", "Admin", ProductRole.Admin, true);
-        var guard = Guard(true, admin);
+        var user = new TechieDeskUser(123, "jane.doe@example.com", "Jane Doe", ProductRole.Admin, true);
 
-        Assert.Null(guard.GetRedirect("/admin/settings", Capability.AccessAdminConsole));
+        Assert.True(Guard(user).IsSignedIn);
+        Assert.False(Guard(null).IsSignedIn);
     }
 }

@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- REQ-RAG-036 / BRD-117: the OpenTelemetry exporters ship as their OWN opt-in package, not
+         inside TechieRag. Linking OpenTelemetry.Exporter.* into the core would push an exporter into
+         every consumer's dependency graph, including consumers (TechieDesk, REQ-NFR-008 / BRD-99)
+         that promise their users the instance phones no home. Keeping it separate means the core
+         package still links no exporter at all, so the structural absence guards on both sides stay
+         true by construction. Frameworks mirror TechieRag so an LTS consumer can take it too. -->
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Package Metadata -->
+    <PackageId>TechieRag.Telemetry</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Techie Rathor</Authors>
+    <Company>TechieRathor</Company>
+    <Description>Opt-in OpenTelemetry metric and trace exporters for TechieRag. Default target is loopback only (http://localhost:4318) and nothing is exported until the host explicitly enables tracing or metrics, so adding this package to a project does not start any egress on its own.</Description>
+    <PackageTags>RAG;AI;OpenTelemetry;Observability;Tracing;Metrics;OTLP;Prometheus;Jaeger</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Stable releases only (no -rc / -beta): the repo ships zero pre-release packages. -->
+    <PackageReference Include="OpenTelemetry" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.17.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+  </ItemGroup>
+
+</Project>

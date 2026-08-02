@@ -1,7 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    REQ-FN-035: this was an OutputType=Exe console. A self-contained MAUI application cannot
+    reference a non-self-contained executable (NETSDK1150), and the desktop head must call
+    MigrationRunner in-process at launch (ADR-007). So the migrator is now a library, and the
+    development console moved verbatim to TechieDeskDb.Cli, which references this project — the
+    console entry point REQ-FN-030's re-scope requires is preserved, not dropped.
+  -->
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>TechieDeskDb</RootNamespace>
     <AssemblyName>TechieDeskDb</AssemblyName>
@@ -15,8 +21,12 @@
     <EmbeddedResource Include="Scripts\**\*.sql" />
   </ItemGroup>
   <ItemGroup>
+    <!--
+      dbup-postgresql was removed on 2026-07-28 with the PostgreSQL path (REQ-FN-029, BRD-102
+      amended 2026-07-26). Only Scripts/Sqlite ever existed, so the Postgres branch could never
+      have applied a single script.
+    -->
     <PackageReference Include="dbup-core" Version="6.1.1" />
-    <PackageReference Include="dbup-postgresql" Version="7.0.1" />
     <PackageReference Include="dbup-sqlite" Version="6.0.4" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />

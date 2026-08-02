@@ -1,0 +1,62 @@
+@* REQ-UI-037 (BRD-89) — the product lockup, drawn from the white-label branding.
+
+   SELF-CONTAINED: injects only IBrandingStore, renders the mark and the name. This is the CONSUMER
+   half of REQ-UI-037 — without it the Branding panel would be a form that stores four values nothing
+   ever reads. It is used by AuthLayout, and is the component to drop into MainLayout's
+   SidebarHeaderContent in place of the hardcoded "T" mark and "TechieDesk" span.
+
+   Deliberately NOT gated on WHITE_LABEL: the gate belongs on the ability to CHANGE the branding
+   (BrandingPanel), not on the ability to render it. An install that has been branded and then had
+   its licence lapse should not have its own name disappear from its own window; it should be unable
+   to change it, which is what the gate on the panel does. *@
+
+@inject IBrandingStore Branding
+@inject ILogger<BrandLockup> Logger
+
+@if (logoDataUri is not null)
+{
+    <img src="@logoDataUri" alt="" class="td-branding-mark" />
+}
+else
+{
+    <span class="td-branding-mark td-branding-mark-fallback">@Initials</span>
+}
+<span class="@NameClass">@productName</span>
+
+@code {
+    /// <summary>Extra CSS classes applied to the product name.</summary>
+    [Parameter] public string? NameClass { get; set; } = "font-semibold";
+
+    private string productName = BrandingSettings.DefaultProductName;
+    private string? logoDataUri;
+
+    // Mirrors MainLayout's existing lettermark so an unbranded install is visually unchanged.
+    private string Initials
+    {
+        get
+        {
+            var words = productName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return words.Length switch
+            {
+                0 => "?",
+                1 => words[0][..1].ToUpperInvariant(),
+                _ => $"{words[0][0]}{words[1][0]}".ToUpperInvariant()
+            };
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var branding = await Branding.LoadAsync();
+            productName = branding.ProductName;
+            logoDataUri = branding.LogoDataUri;
+        }
+        catch (Exception ex)
+        {
+            // The shipped identity is already in the fields, so the lockup always renders something.
+            Logger.LogWarning(ex, "Could not load the branding for the lockup");
+        }
+    }
+}

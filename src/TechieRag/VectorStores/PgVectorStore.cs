@@ -531,9 +531,11 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
                 SourcePath = reader.GetString(2),
                 ChunkCount = reader.GetInt32(3),
                 IngestedAt = reader.GetDateTime(4),
+                // Unwrapped rather than deserialized straight into object values: JsonElement is not
+                // IConvertible, so a stored number would be unreadable to every ordinary caller.
                 Metadata = reader.IsDBNull(5)
                     ? new Dictionary<string, object>()
-                    : JsonSerializer.Deserialize<Dictionary<string, object>>(reader.GetString(5)) ?? new Dictionary<string, object>()
+                    : DocumentMetadataKeys.FromJson(reader.GetString(5))
             });
         }
 

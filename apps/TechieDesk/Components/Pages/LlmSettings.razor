@@ -3,20 +3,21 @@
 @inject TechieRagManager RagManager
 @inject ToastService ToastService
 @inject ILogger<LlmSettings> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>LLM Settings</PageTitle>
+<PageTitle>@Localizer["LlmPageTitle"]</PageTitle>
 
 <div class="space-y-6">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">LLM Configuration</h1>
-            <TypographyMuted>Configure LLM providers, fallback, usage tracking, and prompts.</TypographyMuted>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["LlmPageTitle"]</h1>
+            <TypographyMuted>@Localizer["LlmSubtitle"]</TypographyMuted>
         </div>
-        <div class="flex gap-2">
-            <Button Variant="ButtonVariant.Outline" OnClick="ResetToDefaultsAsync" Disabled="isSaving">Reset</Button>
+        <div class="flex flex-none gap-2">
+            <Button Variant="ButtonVariant.Outline" OnClick="ResetToDefaultsAsync" Disabled="isSaving">@Localizer["LlmReset"]</Button>
             <Button OnClick="SaveConfigAsync" Disabled="isSaving">
-                @if (isSaving) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Saving...</span> }
-                else { <span>Save</span> }
+                @if (isSaving) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["LlmSaving"]</span> }
+                else { <span>@Localizer["LlmSaveAndApply"]</span> }
             </Button>
         </div>
     </div>
@@ -29,79 +30,148 @@
     }
     else
     {
+        @if (validationSummary.Count > 0)
+        {
+            @* TR-022 workaround: Alert does NOT splat unmatched attributes — passing `id` throws
+               "Object of type 'TrBlazeUI.Components.Alert.Alert' does not have a property matching
+               the name 'id'" and takes the whole circuit down. The id lives on a wrapper instead. *@
+            <div id="llm-validation-summary">
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <AlertTitle>@Localizer["LlmNotFullyConfigured"]</AlertTitle>
+                    <AlertDescription>
+                        <ul class="td-llm-errors">
+                            @foreach (var message in validationSummary)
+                            {
+                                <li>@message</li>
+                            }
+                        </ul>
+                    </AlertDescription>
+                </Alert>
+            </div>
+        }
+
+        @* TR-021 workaround: TrBlazeUI Tabs in CONTROLLED mode (Value + ValueChanged) renders the
+           trigger strip but no active trigger and no panel content, so the whole page body is blank.
+           Falling back to the uncontrolled DefaultValue form; the save-time failures stay visible
+           because they are ALSO summarised in the page-level alert above the tab strip. *@
         <Tabs DefaultValue="provider">
-            <TabsList Class="grid w-full grid-cols-4">
-                <TabsTrigger Value="provider">Provider</TabsTrigger>
-                <TabsTrigger Value="fallback">Fallback</TabsTrigger>
-                <TabsTrigger Value="usage">Usage</TabsTrigger>
-                <TabsTrigger Value="prompts">Prompts</TabsTrigger>
+            <TabsList Class="grid w-full grid-cols-3">
+                <TabsTrigger Value="provider">@Localizer["LlmTabProvider"]</TabsTrigger>
+                <TabsTrigger Value="usage">@Localizer["LlmTabUsage"]</TabsTrigger>
+                <TabsTrigger Value="prompts">@Localizer["LlmTabPrompts"]</TabsTrigger>
             </TabsList>
 
-            <TabsContent Value="provider">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Primary LLM Provider</CardTitle>
-                        <CardDescription>Select and configure the primary LLM for text generation.</CardDescription>
-                    </CardHeader>
-                    <CardContent Class="space-y-4">
-                        @RenderLlmFields(config.Llm, "primary")
-                    </CardContent>
-                </Card>
+            <TabsContent Value="provider" ForceMount="true">
+                <div class="td-llm-grid">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>@Localizer["LlmChatProviderTitle"]</CardTitle>
+                            <CardDescription>
+                                @Localizer["LlmChatProviderDescription"]
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent Class="space-y-4">
+                            @RenderLlmFields(config.Llm, "primary", primaryErrors, OnPrimarySourceChanged)
+
+                            @if (config.Llm.Source != LlmSource.None)
+                            {
+                                <Separator />
+                                <Button Variant="ButtonVariant.Outline" OnClick="TestLlmConnectionAsync" Disabled="isTesting">
+                                    @if (isTesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["LlmTesting"]</span> }
+                                    else { <span>@Localizer["LlmTestConnection"]</span> }
+                                </Button>
+                                @if (!string.IsNullOrEmpty(testResult))
+                                {
+                                    <Alert Variant="@(testSuccess ? AlertVariant.Success : AlertVariant.Danger)">
+                                        <AlertDescription>@testResult</AlertDescription>
+                                    </Alert>
+                                }
+                            }
+                        </CardContent>
+                    </Card>
+
+                    <div class="flex flex-col gap-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>@Localizer["LlmResilienceTitle"]</CardTitle>
+                                <CardDescription>@Localizer["LlmResilienceDescription"]</CardDescription>
+                            </CardHeader>
+                            <CardContent Class="space-y-4">
+                                <div class="flex items-center space-x-2">
+                                    <Switch Checked="enableFallback" CheckedChanged="OnFallbackToggled" Id="enable-fallback" />
+                                    <Label For="enable-fallback">@Localizer["LlmFailoverLabel"]</Label>
+                                </div>
+
+                                @if (enableFallback)
+                                {
+                                    <Separator />
+                                    @RenderLlmFields(fallbackConfig, "fallback", fallbackErrors, OnFallbackSourceChanged)
+                                }
+
+                                <Separator />
+                                <div class="td-llm-pair">
+                                    <Field>
+                                        <FieldLabel>@Localizer["LlmMaxRetriesLabel"]</FieldLabel>
+                                        <FieldContent>
+                                            <Input AriaLabel="@Localizer["LlmMaxRetriesAria"]" Type="InputType.Number" @bind-Value="maxRetriesString" />
+                                        </FieldContent>
+                                    </Field>
+                                    <Field>
+                                        <FieldLabel>@Localizer["LlmTimeoutSeconds"]</FieldLabel>
+                                        <FieldContent>
+                                            <Input AriaLabel="@Localizer["LlmTimeoutSeconds"]" Type="InputType.Number" @bind-Value="timeoutString" />
+                                        </FieldContent>
+                                    </Field>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <Switch @bind-Checked="config.Resilience.HandleRateLimiting" Id="rate-limit" />
+                                    <Label For="rate-limit">@Localizer["LlmHandleRateLimiting"]</Label>
+                                </div>
+                                <Field>
+                                    <FieldLabel>@Localizer["LlmCircuitBreakerThresholdLabel"]</FieldLabel>
+                                    <FieldContent>
+                                        <Input AriaLabel="@Localizer["LlmCircuitBreakerThresholdAria"]" Type="InputType.Number" @bind-Value="cbThresholdString" />
+                                        <FieldDescription>@Localizer["LlmCircuitBreakerHelp"]</FieldDescription>
+                                    </FieldContent>
+                                </Field>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </TabsContent>
 
-            <TabsContent Value="fallback">
+            <TabsContent Value="usage" ForceMount="true">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Fallback LLM Provider</CardTitle>
-                        <CardDescription>If the primary fails, this provider is used automatically.</CardDescription>
-                    </CardHeader>
-                    <CardContent Class="space-y-4">
-                        <div class="flex items-center space-x-2">
-                            <Switch @bind-Checked="enableFallback" Id="enable-fallback" />
-                            <Label For="enable-fallback">Enable Fallback Provider</Label>
-                        </div>
-
-                        @if (enableFallback)
-                        {
-                            <Separator />
-                            @RenderLlmFields(fallbackConfig, "fallback")
-                        }
-                    </CardContent>
-                </Card>
-            </TabsContent>
-
-            <TabsContent Value="usage">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Usage Tracking &amp; Budgets</CardTitle>
-                        <CardDescription>Set token and cost limits to manage LLM usage.</CardDescription>
+                        <CardTitle>@Localizer["LlmUsageBudgetsTitle"]</CardTitle>
+                        <CardDescription>@Localizer["LlmUsageBudgetsDescription"]</CardDescription>
                     </CardHeader>
                     <CardContent Class="space-y-4">
                         <div class="flex items-center space-x-2">
                             <Switch @bind-Checked="config.UsageTracking.Enabled" Id="enable-tracking" />
-                            <Label For="enable-tracking">Enable Token Tracking</Label>
+                            <Label For="enable-tracking">@Localizer["LlmEnableTokenTracking"]</Label>
                         </div>
 
                         @if (config.UsageTracking.Enabled)
                         {
                             <Separator />
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="td-llm-pair">
                                 <Field>
-                                    <FieldLabel>Max Total Tokens</FieldLabel>
+                                    <FieldLabel>@Localizer["LlmMaxTotalTokensLabel"]</FieldLabel>
                                     <FieldContent>
-                                        <Input AriaLabel="Max total tokens" Type="InputType.Number" @bind-Value="maxTotalTokensString" />
+                                        <Input AriaLabel="@Localizer["LlmMaxTotalTokensAria"]" Type="InputType.Number" @bind-Value="maxTotalTokensString" />
                                     </FieldContent>
                                 </Field>
                                 <Field>
-                                    <FieldLabel>Max Cost (USD)</FieldLabel>
+                                    <FieldLabel>@Localizer["LlmMaxCostLabel"]</FieldLabel>
                                     <FieldContent>
-                                        <Input AriaLabel="Max cost (USD)" Type="InputType.Number" @bind-Value="maxCostString" />
+                                        <Input AriaLabel="@Localizer["LlmMaxCostAria"]" Type="InputType.Number" @bind-Value="maxCostString" />
                                     </FieldContent>
                                 </Field>
                             </div>
 
                             <Field>
-                                <FieldLabel>Alert Threshold: @config.UsageTracking.AlertThreshold.ToString("P0")</FieldLabel>
+                                <FieldLabel>@Localizer["LlmAlertThreshold", config.UsageTracking.AlertThreshold.ToString("P0")]</FieldLabel>
                                 <FieldContent>
                                     <Slider @bind-Value="alertThresholdSlider" Min="0" Max="100" Step="5" />
                                 </FieldContent>
@@ -109,105 +179,50 @@
 
                             <div class="flex items-center space-x-2">
                                 <Switch @bind-Checked="config.UsageTracking.BlockOnExceeded" Id="block-exceeded" />
-                                <Label For="block-exceeded">Block Requests When Exceeded</Label>
+                                <Label For="block-exceeded">@Localizer["LlmBlockOnExceeded"]</Label>
                             </div>
                         }
                     </CardContent>
                 </Card>
             </TabsContent>
 
-            <TabsContent Value="prompts">
-                <div class="space-y-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>RAG Prompt Template</CardTitle>
-                            <CardDescription>Customize how the system prompt and context are formatted.</CardDescription>
-                        </CardHeader>
-                        <CardContent Class="space-y-4">
+            <TabsContent Value="prompts" ForceMount="true">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>@Localizer["LlmPromptTemplateTitle"]</CardTitle>
+                        <CardDescription>@Localizer["LlmPromptTemplateDescription"]</CardDescription>
+                    </CardHeader>
+                    <CardContent Class="space-y-4">
+                        <Field>
+                            <FieldLabel>@Localizer["LlmSystemPrompt"]</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="config.Prompt.SystemPrompt" Class="min-h-[100px]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["LlmContextTemplate"]</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="config.Prompt.ContextChunkTemplate" Class="min-h-[80px]" />
+                            </FieldContent>
+                        </Field>
+                        <div class="td-llm-pair">
                             <Field>
-                                <FieldLabel>System Prompt</FieldLabel>
+                                <FieldLabel>@Localizer["LlmMaxContextChunksLabel"]</FieldLabel>
                                 <FieldContent>
-                                    <Textarea @bind-Value="config.Prompt.SystemPrompt" Class="min-h-[100px]" />
+                                    <Input AriaLabel="@Localizer["LlmMaxContextChunksAria"]" Type="InputType.Number" @bind-Value="maxContextChunksString" />
                                 </FieldContent>
                             </Field>
                             <Field>
-                                <FieldLabel>Context Template</FieldLabel>
+                                <FieldLabel>@Localizer["LlmMaxContextTokensLabel"]</FieldLabel>
                                 <FieldContent>
-                                    <Textarea @bind-Value="config.Prompt.ContextChunkTemplate" Class="min-h-[80px]" />
+                                    <Input AriaLabel="@Localizer["LlmMaxContextTokensAria"]" Type="InputType.Number" @bind-Value="maxContextTokensString" />
                                 </FieldContent>
                             </Field>
-                            <div class="grid grid-cols-2 gap-4">
-                                <Field>
-                                    <FieldLabel>Max Context Chunks</FieldLabel>
-                                    <FieldContent>
-                                        <Input AriaLabel="Max context chunks" Type="InputType.Number" @bind-Value="maxContextChunksString" />
-                                    </FieldContent>
-                                </Field>
-                                <Field>
-                                    <FieldLabel>Max Context Tokens</FieldLabel>
-                                    <FieldContent>
-                                        <Input AriaLabel="Max context tokens" Type="InputType.Number" @bind-Value="maxContextTokensString" />
-                                    </FieldContent>
-                                </Field>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Resilience Settings</CardTitle>
-                            <CardDescription>Configure retry and circuit breaker behavior.</CardDescription>
-                        </CardHeader>
-                        <CardContent Class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <Field>
-                                    <FieldLabel>Max Retries</FieldLabel>
-                                    <FieldContent>
-                                        <Input AriaLabel="Max retries" Type="InputType.Number" @bind-Value="maxRetriesString" />
-                                    </FieldContent>
-                                </Field>
-                                <Field>
-                                    <FieldLabel>Timeout (seconds)</FieldLabel>
-                                    <FieldContent>
-                                        <Input AriaLabel="Timeout (seconds)" Type="InputType.Number" @bind-Value="timeoutString" />
-                                    </FieldContent>
-                                </Field>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <Switch @bind-Checked="config.Resilience.HandleRateLimiting" Id="rate-limit" />
-                                <Label For="rate-limit">Handle Rate Limiting</Label>
-                            </div>
-                            <Field>
-                                <FieldLabel>Circuit Breaker Threshold</FieldLabel>
-                                <FieldContent>
-                                    <Input AriaLabel="Circuit breaker threshold" Type="InputType.Number" @bind-Value="cbThresholdString" />
-                                    <FieldDescription>Number of consecutive failures before opening the circuit.</FieldDescription>
-                                </FieldContent>
-                            </Field>
-                        </CardContent>
-                    </Card>
-                </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </TabsContent>
         </Tabs>
-
-        <!-- Connection Test -->
-        <Card>
-            <CardHeader>
-                <CardTitle>Connection Test</CardTitle>
-            </CardHeader>
-            <CardContent Class="space-y-4">
-                <Button OnClick="TestLlmConnectionAsync" Disabled="isTesting">
-                    @if (isTesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Testing...</span> }
-                    else { <span>Test LLM Connection</span> }
-                </Button>
-                @if (!string.IsNullOrEmpty(testResult))
-                {
-                    <Alert Variant="@(testSuccess ? AlertVariant.Success : AlertVariant.Danger)">
-                        <AlertDescription>@testResult</AlertDescription>
-                    </Alert>
-                }
-            </CardContent>
-        </Card>
     }
 </div>
 
@@ -220,6 +235,15 @@
     private bool enableFallback;
     private string? testResult;
     private bool testSuccess;
+
+    /// <summary>Save-time failures for the primary provider, keyed by the offending field.</summary>
+    private readonly Dictionary<string, string> primaryErrors = new(StringComparer.Ordinal);
+
+    /// <summary>Save-time failures for the fallback provider, keyed by the offending field.</summary>
+    private readonly Dictionary<string, string> fallbackErrors = new(StringComparer.Ordinal);
+
+    /// <summary>Every save-time failure, rendered as the page-level summary alert.</summary>
+    private readonly List<string> validationSummary = new();
 
     private double alertThresholdSlider
     {
@@ -283,7 +307,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load LLM configuration");
-            ToastService.Error("Failed to load configuration.", "Error");
+            ToastService.Error(Localizer["LlmLoadFailedBody"], Localizer["LlmErrorTitle"]);
         }
         finally
         {
@@ -291,104 +315,336 @@
         }
     }
 
-    private RenderFragment RenderLlmFields(LlmConfig llmConfig, string prefix) => __builder =>
+    private void OnFallbackToggled(bool value)
+    {
+        enableFallback = value;
+        ClearValidation();
+    }
+
+    /// <summary>
+    /// Clears any previous save-time failures, so a provider change never leaves errors naming
+    /// fields the new provider does not even show (REQ-UI-043).
+    /// </summary>
+    private void ClearValidation()
+    {
+        primaryErrors.Clear();
+        fallbackErrors.Clear();
+        validationSummary.Clear();
+    }
+
+    private void OnPrimarySourceChanged(LlmSource source)
+    {
+        config.Llm.Source = source;
+        ApplyDefaultEndpoint(config.Llm);
+        testResult = null;
+        ClearValidation();
+    }
+
+    private void OnFallbackSourceChanged(LlmSource source)
+    {
+        fallbackConfig.Source = source;
+        ApplyDefaultEndpoint(fallbackConfig);
+        ClearValidation();
+    }
+
+    /// <summary>
+    /// Materialises a local server's well-known base URL into the bound field (REQ-FN-052).
+    /// </summary>
+    /// <param name="llmConfig">The provider block whose source has just changed.</param>
+    /// <remarks>
+    /// The box already displayed <c>http://localhost:11434</c> for Ollama — as PLACEHOLDER text, which
+    /// reads as a filled-in value but leaves the bound field empty, so <b>Save &amp; apply</b> was
+    /// refused with "Base URL is required for the Ollama provider" and the provider never reached
+    /// <c>techierag-config.json</c>. Writing the same value into the model makes what the operator sees
+    /// and what is saved the same thing. Only filled when empty, so a value already typed is never
+    /// overwritten, and only for providers whose default is a real address
+    /// (<see cref="LlmConfigValidator.HasUsableDefaultEndpoint"/>) — a remote provider's endpoint is
+    /// account-specific and stays blank and required.
+    /// </remarks>
+    private void ApplyDefaultEndpoint(LlmConfig llmConfig)
+    {
+        if (!string.IsNullOrWhiteSpace(llmConfig.Endpoint)
+            || !LlmConfigValidator.HasUsableDefaultEndpoint(llmConfig.Source))
+        {
+            return;
+        }
+
+        llmConfig.Endpoint = LlmConfigValidator.DefaultEndpoint(llmConfig.Source);
+        Logger.LogInformation(
+            "Filled the {Source} base URL with its default {Endpoint} (REQ-FN-052)",
+            llmConfig.Source, llmConfig.Endpoint);
+    }
+
+    /// <summary>
+    /// Names one of the two provider blocks for assistive technology (REQ-NFR-005).
+    /// </summary>
+    /// <param name="prefix">The element-id prefix the block was rendered with.</param>
+    /// <returns>A human-readable name for the block.</returns>
+    private string ProviderLabel(string prefix) =>
+        prefix == "fallback" ? Localizer["LlmProviderBlockFallback"] : Localizer["LlmProviderBlockPrimary"];
+
+    /// <summary>
+    /// Renders only the fields the selected provider actually needs, each marked required, each able
+    /// to carry the save-time failure that named it (REQ-UI-043 / BRD-136).
+    /// </summary>
+    private RenderFragment RenderLlmFields(
+        LlmConfig llmConfig,
+        string prefix,
+        Dictionary<string, string> errors,
+        Action<LlmSource> onSourceChanged) => __builder =>
     {
         <Field>
-            <FieldLabel>Source</FieldLabel>
+            <FieldLabel For="@($"{prefix}-source")">@Localizer["LlmSourceLabel"]</FieldLabel>
             <FieldContent>
-                <Select @bind-Value="@llmConfig.Source" TValue="LlmSource">
-                    <SelectTrigger>
-                        <SelectValue Placeholder="Select LLM provider" /></SelectTrigger>
+                @* TR-024: without DisplayTextSelector the trigger paints the raw bound value
+                   ("OpenAICompatible") instead of the option's localized text. The bound value is
+                   the LlmSource enum and stays culture-invariant — only the DISPLAY is translated. *@
+                <Select Value="@llmConfig.Source" ValueChanged="@((LlmSource s) => onSourceChanged(s))" TValue="LlmSource"
+                        DisplayTextSelector="LlmSourceText">
+                    @* REQ-NFR-005 / WCAG 4.1.2: role="combobox" is nameFrom:author, so the trigger's
+                       visible text is NOT its accessible name and the visible <label> alone leaves it
+                       unnamed. This fragment is rendered twice on the page (chat and embedding
+                       provider), so the name has to carry the prefix or the two read identically. *@
+                    <SelectTrigger id="@($"{prefix}-source")" aria-label="@Localizer["LlmProviderAria", ProviderLabel(prefix)]">
+                        <SelectValue Placeholder="@Localizer["LlmSelectProviderPlaceholder"]" /></SelectTrigger>
                     <SelectContent>
-                        <SelectItem Value="LlmSource.None" Text="None" TValue="LlmSource">None</SelectItem>
-                        <SelectItem Value="LlmSource.Ollama" Text="Ollama" TValue="LlmSource">Ollama</SelectItem>
-                        <SelectItem Value="LlmSource.LmStudio" Text="LM Studio" TValue="LlmSource">LM Studio</SelectItem>
-                        <SelectItem Value="LlmSource.OpenAICompatible" Text="OpenAI-Compatible" TValue="LlmSource">OpenAI-Compatible</SelectItem>
-                        <SelectItem Value="LlmSource.AzureAIFoundry" Text="Azure AI Foundry" TValue="LlmSource">Azure AI Foundry</SelectItem>
-                        <SelectItem Value="LlmSource.GoogleGemini" Text="Google Gemini" TValue="LlmSource">Google Gemini</SelectItem>
-                        <SelectItem Value="LlmSource.Anthropic" Text="Anthropic" TValue="LlmSource">Anthropic</SelectItem>
+                        <SelectItem Value="LlmSource.None" Text="@LlmSourceText(LlmSource.None)" TValue="LlmSource">@LlmSourceText(LlmSource.None)</SelectItem>
+                        <SelectItem Value="LlmSource.Ollama" Text="@LlmSourceText(LlmSource.Ollama)" TValue="LlmSource">@LlmSourceText(LlmSource.Ollama)</SelectItem>
+                        <SelectItem Value="LlmSource.LmStudio" Text="@LlmSourceText(LlmSource.LmStudio)" TValue="LlmSource">@LlmSourceText(LlmSource.LmStudio)</SelectItem>
+                        <SelectItem Value="LlmSource.OpenAICompatible" Text="@LlmSourceText(LlmSource.OpenAICompatible)" TValue="LlmSource">@LlmSourceText(LlmSource.OpenAICompatible)</SelectItem>
+                        <SelectItem Value="LlmSource.AzureAIFoundry" Text="@LlmSourceText(LlmSource.AzureAIFoundry)" TValue="LlmSource">@LlmSourceText(LlmSource.AzureAIFoundry)</SelectItem>
+                        <SelectItem Value="LlmSource.GoogleGemini" Text="@LlmSourceText(LlmSource.GoogleGemini)" TValue="LlmSource">@LlmSourceText(LlmSource.GoogleGemini)</SelectItem>
+                        <SelectItem Value="LlmSource.Anthropic" Text="@LlmSourceText(LlmSource.Anthropic)" TValue="LlmSource">@LlmSourceText(LlmSource.Anthropic)</SelectItem>
                     </SelectContent>
                 </Select>
             </FieldContent>
         </Field>
 
-        @if (llmConfig.Source != LlmSource.None)
+        @if (llmConfig.Source == LlmSource.None)
         {
-            <Field>
-                <FieldLabel>Endpoint</FieldLabel>
-                <FieldContent>
-                    <Input @bind-Value="llmConfig.Endpoint" Placeholder="@GetLlmEndpointPlaceholder(llmConfig.Source)" />
-                </FieldContent>
-            </Field>
-
-            @if (llmConfig.Source is LlmSource.OpenAICompatible or LlmSource.AzureAIFoundry or LlmSource.GoogleGemini or LlmSource.Anthropic)
+            <Alert Variant="AlertVariant.Warning">
+                <AlertDescription>
+                    @Localizer["LlmDirectChatDisabledWarning"]
+                </AlertDescription>
+            </Alert>
+        }
+        else
+        {
+            @if (LlmConfigValidator.RequiresEndpoint(llmConfig.Source))
             {
-                <Field>
-                    <FieldLabel>API Key</FieldLabel>
+                <Field IsInvalid="@errors.ContainsKey(LlmConfigValidator.EndpointField)">
+                    <FieldLabel>
+                        @(llmConfig.Source == LlmSource.AzureAIFoundry ? Localizer["LlmEndpointLabel"] : Localizer["LlmBaseUrlLabel"])
+                        @RenderRequiredMarker()
+                    </FieldLabel>
                     <FieldContent>
-                        <Input Type="InputType.Password" @bind-Value="llmConfig.ApiKey" Placeholder="Enter API key" />
+                        <Input Id="@($"{prefix}-endpoint")"
+                               AriaLabel="@Localizer["LlmEndpointLabel"]"
+                               Required="true"
+                               AriaInvalid="@errors.ContainsKey(LlmConfigValidator.EndpointField)"
+                               @bind-Value="llmConfig.Endpoint"
+                               Placeholder="@GetLlmEndpointPlaceholder(llmConfig.Source)" />
+                        @if (llmConfig.Source == LlmSource.AzureAIFoundry)
+                        {
+                            <FieldDescription>@Localizer["LlmAzureEndpointHint"]</FieldDescription>
+                        }
+                        @if (errors.TryGetValue(LlmConfigValidator.EndpointField, out var endpointError))
+                        {
+                            <FieldError>@endpointError</FieldError>
+                        }
                     </FieldContent>
                 </Field>
             }
 
-            <Field>
-                <FieldLabel>Model</FieldLabel>
-                <FieldContent>
-                    <Input @bind-Value="llmConfig.Model" Placeholder="@GetLlmModelPlaceholder(llmConfig.Source)" />
-                </FieldContent>
-            </Field>
+            @if (LlmConfigValidator.RequiresModel(llmConfig.Source))
+            {
+                <Field IsInvalid="@errors.ContainsKey(LlmConfigValidator.ModelField)">
+                    <FieldLabel>
+                        @(LlmConfigValidator.UsesDeploymentName(llmConfig.Source) ? Localizer["LlmDeploymentNameLabel"] : Localizer["LlmModelLabel"])
+                        @RenderRequiredMarker()
+                    </FieldLabel>
+                    <FieldContent>
+                        <Input Id="@($"{prefix}-model")"
+                               AriaLabel="@Localizer["LlmModelLabel"]"
+                               Required="true"
+                               AriaInvalid="@errors.ContainsKey(LlmConfigValidator.ModelField)"
+                               @bind-Value="llmConfig.Model"
+                               Placeholder="@GetLlmModelPlaceholder(llmConfig.Source)" />
+                        @if (LlmConfigValidator.UsesDeploymentName(llmConfig.Source))
+                        {
+                            <FieldDescription>@Localizer["LlmDeploymentNameHint"]</FieldDescription>
+                        }
+                        @if (errors.TryGetValue(LlmConfigValidator.ModelField, out var modelError))
+                        {
+                            <FieldError>@modelError</FieldError>
+                        }
+                    </FieldContent>
+                </Field>
+            }
 
-            <div class="grid grid-cols-2 gap-4">
+            @if (LlmConfigValidator.RequiresApiVersion(llmConfig.Source))
+            {
+                <Field IsInvalid="@errors.ContainsKey(LlmConfigValidator.ApiVersionField)">
+                    <FieldLabel>@Localizer["LlmApiVersionLabel"] @RenderRequiredMarker()</FieldLabel>
+                    <FieldContent>
+                        <Input Id="@($"{prefix}-apiversion")"
+                               AriaLabel="@Localizer["LlmApiVersionLabel"]"
+                               Required="true"
+                               AriaInvalid="@errors.ContainsKey(LlmConfigValidator.ApiVersionField)"
+                               @bind-Value="llmConfig.ApiVersion"
+                               Placeholder="2024-10-21" />
+                        @if (errors.TryGetValue(LlmConfigValidator.ApiVersionField, out var versionError))
+                        {
+                            <FieldError>@versionError</FieldError>
+                        }
+                    </FieldContent>
+                </Field>
+            }
+
+            @if (LlmConfigValidator.RequiresApiKey(llmConfig.Source))
+            {
+                <Field IsInvalid="@errors.ContainsKey(LlmConfigValidator.ApiKeyField)">
+                    <FieldLabel>@Localizer["LlmApiKeyLabel"] @RenderRequiredMarker()</FieldLabel>
+                    <FieldContent>
+                        <Input Id="@($"{prefix}-apikey")"
+                               AriaLabel="@Localizer["LlmApiKeyLabel"]"
+                               Type="InputType.Password"
+                               Required="true"
+                               AriaInvalid="@errors.ContainsKey(LlmConfigValidator.ApiKeyField)"
+                               @bind-Value="llmConfig.ApiKey"
+                               Placeholder="@Localizer["LlmApiKeyPlaceholder"]" />
+                        <FieldDescription>@Localizer["LlmApiKeyEncryptedHint"]</FieldDescription>
+                        @if (errors.TryGetValue(LlmConfigValidator.ApiKeyField, out var apiKeyError))
+                        {
+                            <FieldError>@apiKeyError</FieldError>
+                        }
+                    </FieldContent>
+                </Field>
+            }
+
+            <div class="td-llm-pair">
                 <Field>
-                    <FieldLabel>Temperature: @llmConfig.Temperature.ToString("F1")</FieldLabel>
+                    <FieldLabel>@Localizer["LlmTemperatureLabel", llmConfig.Temperature.ToString("F1")]</FieldLabel>
                     <FieldContent>
                         <Slider Value="@((double)llmConfig.Temperature)" ValueChanged="@(v => llmConfig.Temperature = (float)v)" Min="0" Max="2" Step="0.1" />
                     </FieldContent>
                 </Field>
                 <Field>
-                    <FieldLabel>Max Tokens</FieldLabel>
+                    <FieldLabel>@Localizer["LlmMaxTokensLabel"]</FieldLabel>
                     <FieldContent>
-                        <Input AriaLabel="Max tokens" Type="InputType.Number" Value="@llmConfig.MaxTokens.ToString()" ValueChanged="@((string? v) => { if (int.TryParse(v, out var n)) llmConfig.MaxTokens = n; })" />
+                        <Input AriaLabel="@Localizer["LlmMaxTokensLabel"]" Type="InputType.Number" Value="@llmConfig.MaxTokens.ToString()" ValueChanged="@((string? v) => { if (int.TryParse(v, out var n)) llmConfig.MaxTokens = n; })" />
                     </FieldContent>
                 </Field>
             </div>
         }
     };
 
-    private string? GetMaxTokensString(LlmConfig c)
+    /// <summary>Renders the small uppercase "required" marker the mockup places beside a field label.</summary>
+    private RenderFragment RenderRequiredMarker() => __builder =>
     {
-        return c.MaxTokens.ToString();
-    }
-
-    private void SetMaxTokens(LlmConfig c, string? value)
-    {
-        if (int.TryParse(value, out var v)) c.MaxTokens = v;
-    }
-
-    private string GetLlmEndpointPlaceholder(LlmSource source) => source switch
-    {
-        LlmSource.Ollama => "http://localhost:11434",
-        LlmSource.LmStudio => "http://localhost:1234",
-        LlmSource.OpenAICompatible => "https://api.openai.com",
-        LlmSource.AzureAIFoundry => "https://your-resource.openai.azure.com",
-        LlmSource.GoogleGemini => "https://generativelanguage.googleapis.com",
-        LlmSource.Anthropic => "https://api.anthropic.com",
-        _ => ""
+        <span class="ml-1.5 text-xs font-bold uppercase tracking-wide text-destructive">@Localizer["LlmRequiredMarker"]</span>
     };
+
+    // REQ-FN-052: the placeholder and the value filled in by ApplyDefaultEndpoint come from ONE
+    // table, so the greyed-out hint can never again promise an address the saved configuration
+    // does not hold.
+    private string GetLlmEndpointPlaceholder(LlmSource source) =>
+        LlmConfigValidator.DefaultEndpoint(source);
 
     private string GetLlmModelPlaceholder(LlmSource source) => source switch
     {
         LlmSource.Ollama => "llama3.2",
         LlmSource.LmStudio => "llama3.2",
         LlmSource.OpenAICompatible => "gpt-4o",
-        LlmSource.AzureAIFoundry => "gpt-4o",
+        LlmSource.AzureAIFoundry => "gpt-4o-prod",
         LlmSource.GoogleGemini => "gemini-2.0-flash",
         LlmSource.Anthropic => "claude-sonnet-4-5-20250929",
         _ => ""
     };
 
+    /// <summary>
+    /// Collects every save-time failure onto the field that caused it.
+    /// </summary>
+    /// <returns>True when the form may be saved.</returns>
+    private bool ValidateForSave()
+    {
+        ClearValidation();
+
+        foreach (var error in LlmConfigValidator.Validate(config.Llm))
+        {
+            var message = FieldErrorText(error);
+            primaryErrors[error.Field] = message;
+            validationSummary.Add(Localizer["LlmValidationChatProvider", message]);
+        }
+
+        if (enableFallback)
+        {
+            foreach (var error in LlmConfigValidator.Validate(fallbackConfig))
+            {
+                var message = FieldErrorText(error);
+                fallbackErrors[error.Field] = message;
+                validationSummary.Add(Localizer["LlmValidationFallbackProvider", message]);
+            }
+        }
+
+        return validationSummary.Count == 0;
+    }
+
+    /// <summary>
+    /// REQ-UI-051: restates a validator failure in the user's language.
+    /// </summary>
+    /// <param name="error">The failure the validator raised.</param>
+    /// <returns>The message shown under the field and in the page-level summary.</returns>
+    /// <remarks>
+    /// <see cref="LlmConfigValidator"/> is shared with <c>TechieRagConfigService</c> and
+    /// <c>TechieRagManager</c>, so it stays static and carries a resource KEY plus the provider
+    /// name rather than an English sentence. This page resolves the pair; the config service and
+    /// the manager, which only log, use <c>Describe()</c> instead and stay culture-invariant.
+    /// The provider name is a brand and stays in Latin script inside the translated sentence.
+    /// The switch this replaced re-derived the endpoint-versus-base-URL and model-versus-deployment
+    /// splits a SECOND time from the field constant, and fell back to the validator's English for
+    /// any field it did not recognise.
+    /// </remarks>
+    private string FieldErrorText(LlmValidationError error) =>
+        Localizer[error.MessageKey, error.ProviderName].Value;
+
+    /// <summary>
+    /// REQ-UI-051 / TR-024: the localized display text for a provider.
+    /// </summary>
+    /// <param name="source">The provider to name.</param>
+    /// <returns>The option text, and the text the Select trigger paints once one is chosen.</returns>
+    /// <remarks>
+    /// Only <see cref="LlmSource.None"/> has anything to translate; every other entry is a brand
+    /// name and is deliberately returned unchanged. The BOUND value is the enum, so nothing
+    /// translated ever reaches <c>techierag-config.json</c>.
+    /// </remarks>
+    private string LlmSourceText(LlmSource source) => source switch
+    {
+        LlmSource.Ollama => "Ollama",
+        LlmSource.LmStudio => "LM Studio",
+        LlmSource.OpenAICompatible => Localizer["LlmSourceOpenAiCompatible"],
+        LlmSource.AzureAIFoundry => "Azure AI Foundry",
+        LlmSource.GoogleGemini => "Google Gemini",
+        LlmSource.Anthropic => "Anthropic",
+        _ => Localizer["LlmSourceNone"]
+    };
+
     private async Task SaveConfigAsync()
     {
+        // REQ-UI-043 / BRD-136: refuse a half-configured provider here, with the failure named on the
+        // offending field. Saving it used to succeed and then throw
+        // "Endpoint is required for OpenAI-compatible LLM provider" on every unrelated page that
+        // builds a TechieRag instance, /token-usage included.
+        if (!ValidateForSave())
+        {
+            Logger.LogWarning(
+                "Save refused: the {Source} provider is not fully configured (REQ-UI-043): {Errors}",
+                config.Llm.Source, string.Join(" ", validationSummary));
+            ToastService.Error(validationSummary[0], Localizer["LlmNotFullyConfigured"]);
+            StateHasChanged();
+            return;
+        }
+
         isSaving = true;
         StateHasChanged();
 
@@ -397,15 +653,50 @@
         try
         {
             config.LlmFallback = enableFallback ? fallbackConfig : null;
-            await ConfigService.SaveConfigAsync(config);
+            // REQ-NFR-004: this screen owns the LLM stack only. It shares `Llm` with App
+            // Settings, so saving the whole document used to revert that screen's embedding
+            // and vector-store edits as a side effect of saving a model name.
+            await ConfigService.SaveConfigAsync(
+                config,
+                TechieRagConfigSections.Llm
+                | TechieRagConfigSections.LlmFallback
+                | TechieRagConfigSections.Prompt
+                | TechieRagConfigSections.Resilience
+                | TechieRagConfigSections.UsageTracking);
             await RagManager.ReconfigureAsync();
-            Logger.LogInformation("LLM configuration saved and applied (reconfigured) successfully");
-            ToastService.Success("LLM configuration saved and applied.", "Saved");
+
+            // REQ-FN-052: re-read what was actually persisted rather than keeping the form's own
+            // object as the truth. The page's read-back is then DERIVED from the store the RAG
+            // instance builds from — so a save that was refused or that failed can no longer leave the
+            // screen showing the provider as if it had been applied.
+            config = await ConfigService.LoadConfigAsync();
+            fallbackConfig = config.LlmFallback ?? new LlmConfig();
+            enableFallback = config.LlmFallback is not null && config.LlmFallback.Source != LlmSource.None;
+
+            Logger.LogInformation(
+                "LLM configuration saved and applied (reconfigured) successfully; the page now reflects "
+                + "{Source} as persisted in {Path}",
+                config.Llm.Source, ConfigService.ConfigFilePath);
+            ToastService.Success(Localizer["LlmSavedBody"], Localizer["Saved"]);
+        }
+        catch (LlmConfigValidationException ex)
+        {
+            // Belt and braces: the service refuses the same defect class independently of this form.
+            foreach (var error in ex.Errors)
+            {
+                // REQ-UI-051: ex.Message is the INVARIANT log form (key plus provider). What the
+                // user sees is built from the errors themselves, each of which names a key.
+                var message = FieldErrorText(error);
+                primaryErrors[error.Field] = message;
+                validationSummary.Add(message);
+            }
+            Logger.LogWarning(ex, "Save refused by TechieRagConfigService validation (REQ-UI-043)");
+            ToastService.Error(ex.Message, Localizer["LlmNotFullyConfigured"]);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to save LLM configuration");
-            ToastService.Error($"Failed to save: {ex.Message}", "Error");
+            ToastService.Error(Localizer["LlmSaveFailedBody", ex.Message], Localizer["LlmErrorTitle"]);
         }
         finally
         {
@@ -417,6 +708,7 @@
     private async Task ResetToDefaultsAsync()
     {
         isSaving = true;
+        ClearValidation();
         StateHasChanged();
 
         try
@@ -427,16 +719,32 @@
             config.UsageTracking = new UsageTrackingConfig();
             config.Resilience = new ResilienceConfig();
             config.Prompt = new PromptConfig();
-            config.LlmFallback = enableFallback ? fallbackConfig : null;
-            await ConfigService.SaveConfigAsync(config);
+            config.LlmFallback = null;
+            testResult = null;
+            // Same ownership on reset: restoring THIS screen's defaults must not also
+            // reset the embedding provider or vector store, which it does not own.
+            await ConfigService.SaveConfigAsync(
+                config,
+                TechieRagConfigSections.Llm
+                | TechieRagConfigSections.LlmFallback
+                | TechieRagConfigSections.Prompt
+                | TechieRagConfigSections.Resilience
+                | TechieRagConfigSections.UsageTracking);
             await RagManager.ReconfigureAsync();
+
+            // REQ-FN-052: same rule as Save — the screen shows what the store holds, not what the
+            // form hoped to put there.
+            config = await ConfigService.LoadConfigAsync();
+            fallbackConfig = config.LlmFallback ?? new LlmConfig();
+            enableFallback = config.LlmFallback is not null && config.LlmFallback.Source != LlmSource.None;
+
             Logger.LogInformation("LLM settings reset to defaults, persisted and reconfigured");
-            ToastService.Success("LLM settings reset to defaults.", "Reset");
+            ToastService.Success(Localizer["LlmResetDoneBody"], Localizer["LlmReset"]);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to reset LLM configuration");
-            ToastService.Error($"Failed to reset: {ex.Message}", "Error");
+            ToastService.Error(Localizer["LlmResetFailedBody", ex.Message], Localizer["LlmErrorTitle"]);
         }
         finally
         {
@@ -457,9 +765,9 @@
             if (provider is null)
             {
                 Logger.LogWarning("Test LLM connection: no provider configured — save settings first");
-                testResult = "No LLM provider configured. Save settings first.";
+                testResult = Localizer["LlmTestNoProvider"];
                 testSuccess = false;
-                ToastService.Error("No LLM provider configured. Save your settings first.", "Not configured");
+                ToastService.Error(Localizer["LlmNoProviderBody"], Localizer["LlmNotConfiguredTitle"]);
                 return;
             }
 
@@ -473,24 +781,24 @@
             var response = await provider.CompleteAsync("Say 'hello' in one word.", cancellationToken: cts.Token);
             sw.Stop();
 
-            testResult = $"Connected - {provider.ModelName} via {provider.Name} (response: {sw.ElapsedMilliseconds}ms)";
+            testResult = Localizer["LlmTestConnected", provider.ModelName, provider.Name, sw.ElapsedMilliseconds];
             testSuccess = true;
             Logger.LogInformation("LLM connection test succeeded in {Elapsed}ms", sw.ElapsedMilliseconds);
-            ToastService.Success(testResult, "Connected");
+            ToastService.Success(testResult, Localizer["LlmConnectedTitle"]);
         }
         catch (OperationCanceledException)
         {
-            testResult = "Connection timed out after 20s — check the endpoint URL is reachable and the model is loaded.";
+            testResult = Localizer["LlmTestTimedOut"];
             testSuccess = false;
             Logger.LogWarning("LLM connection test timed out after 20s (endpoint {Endpoint})", config.Llm.Endpoint);
-            ToastService.Error(testResult, "Timeout");
+            ToastService.Error(testResult, Localizer["LlmTimeoutTitle"]);
         }
         catch (Exception ex)
         {
-            testResult = $"Connection failed: {ex.Message}";
+            testResult = Localizer["LlmTestFailed", ex.Message];
             testSuccess = false;
             Logger.LogError(ex, "LLM connection test failed (endpoint {Endpoint})", config.Llm.Endpoint);
-            ToastService.Error($"Connection failed: {ex.Message}", "Test failed");
+            ToastService.Error(Localizer["LlmConnectionFailedBody", ex.Message], Localizer["LlmTestFailedTitle"]);
         }
         finally
         {

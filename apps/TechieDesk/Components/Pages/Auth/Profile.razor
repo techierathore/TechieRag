@@ -6,25 +6,26 @@
 @inject ITokenRefresher TokenRefresher
 @inject ToastService ToastService
 @inject ILogger<Profile> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>TechieDesk — Profile</PageTitle>
+<PageTitle>@Localizer["ProfilePageTitle"]</PageTitle>
 
 <div class="space-y-6">
     <div class="flex items-center gap-3">
         <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Profile</h1>
-            <TypographyMuted>Your details as shown across this instance</TypographyMuted>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["ProfileHeading"]</h1>
+            <TypographyMuted>@Localizer["ProfileSubtitle"]</TypographyMuted>
         </div>
         <div class="ml-auto">
             <Button OnClick="SaveProfileAsync" Disabled="isSavingProfile || !canManage">
                 @if (isSavingProfile)
                 {
                     <Spinner Size="SpinnerSize.Small" Class="mr-2" />
-                    <span>Saving…</span>
+                    <span>@Localizer["Saving"]</span>
                 }
                 else
                 {
-                    <span>Save changes</span>
+                    <span>@Localizer["SaveChanges"]</span>
                 }
             </Button>
         </div>
@@ -34,8 +35,8 @@
     {
         <Alert Variant="AlertVariant.Info">
             <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
-            <AlertTitle>Offline single-user mode</AlertTitle>
-            <AlertDescription>Accounts are managed by AppManager. Profile editing, password changes, and GDPR requests are unavailable while running offline.</AlertDescription>
+            <AlertTitle>@Localizer["ProfileOfflineTitle"]</AlertTitle>
+            <AlertDescription>@Localizer["ProfileOfflineBody"]</AlertDescription>
         </Alert>
     }
 
@@ -44,8 +45,8 @@
             <!-- Personal information -->
             <Card>
                 <CardHeader>
-                    <CardTitle>Personal information</CardTitle>
-                    <CardDescription>Your details as shown across this instance</CardDescription>
+                    <CardTitle>@Localizer["ProfilePersonalTitle"]</CardTitle>
+                    <CardDescription>@Localizer["ProfileSubtitle"]</CardDescription>
                 </CardHeader>
                 <CardContent Class="space-y-4">
                     <div class="flex items-center gap-4">
@@ -57,45 +58,45 @@
                             <AvatarFallback>@Initials</AvatarFallback>
                         </Avatar>
                         <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => showAvatarInput = !showAvatarInput)" Disabled="!canManage">
-                            Change avatar URL
+                            @Localizer["ProfileChangeAvatar"]
                         </Button>
                     </div>
 
                     @if (showAvatarInput)
                     {
                         <Field>
-                            <FieldLabel>Avatar URL</FieldLabel>
+                            <FieldLabel>@Localizer["ProfileAvatarUrl"]</FieldLabel>
                             <FieldContent>
-                                <Input Type="InputType.Url" @bind-Value="profileImageUrl" Placeholder="https://…/avatar.png" Disabled="!canManage" />
+                                <Input Type="InputType.Url" @bind-Value="profileImageUrl" Placeholder="@Localizer["ProfileAvatarPlaceholder"]" Disabled="!canManage" />
                             </FieldContent>
                         </Field>
                     }
 
                     <div class="td-grid-2">
                         <Field>
-                            <FieldLabel>First name</FieldLabel>
+                            <FieldLabel>@Localizer["ProfileFirstName"]</FieldLabel>
                             <FieldContent>
-                                <Input @bind-Value="firstName" Disabled="!canManage" AriaLabel="First name" />
+                                <Input @bind-Value="firstName" Disabled="!canManage" AriaLabel="@Localizer["ProfileFirstName"]" />
                             </FieldContent>
                         </Field>
                         <Field>
-                            <FieldLabel>Last name</FieldLabel>
+                            <FieldLabel>@Localizer["ProfileLastName"]</FieldLabel>
                             <FieldContent>
-                                <Input @bind-Value="lastName" Disabled="!canManage" AriaLabel="Last name" />
+                                <Input @bind-Value="lastName" Disabled="!canManage" AriaLabel="@Localizer["ProfileLastName"]" />
                             </FieldContent>
                         </Field>
                     </div>
 
                     <Field>
-                        <FieldLabel>Email</FieldLabel>
+                        <FieldLabel>@Localizer["ProfileEmail"]</FieldLabel>
                         <FieldContent>
-                            <Input Type="InputType.Email" Value="@email" Disabled="true" AriaLabel="Email" />
-                            <FieldDescription>Managed by AppManager</FieldDescription>
+                            <Input Type="InputType.Email" Value="@email" Disabled="true" AriaLabel="@Localizer["ProfileEmail"]" />
+                            <FieldDescription>@Localizer["ProfileManagedByAppManager"]</FieldDescription>
                         </FieldContent>
                     </Field>
 
                     <Field>
-                        <FieldLabel>Mobile</FieldLabel>
+                        <FieldLabel>@Localizer["ProfileMobile"]</FieldLabel>
                         <FieldContent>
                             <Input Type="InputType.Tel" @bind-Value="mobile" Placeholder="+91 98765 43210" Disabled="!canManage" />
                         </FieldContent>
@@ -106,12 +107,12 @@
             <!-- Change password -->
             <Card>
                 <CardHeader>
-                    <CardTitle>Change password</CardTitle>
-                    <CardDescription>Choose a strong password you don't use elsewhere</CardDescription>
+                    <CardTitle>@Localizer["ProfileChangePassword"]</CardTitle>
+                    <CardDescription>@Localizer["ProfileChangePasswordHint"]</CardDescription>
                 </CardHeader>
                 <CardContent Class="space-y-4">
                     <Field IsInvalid="@(currentPasswordError is not null)">
-                        <FieldLabel>Current password</FieldLabel>
+                        <FieldLabel>@Localizer["ProfileCurrentPassword"]</FieldLabel>
                         <FieldContent>
                             <Input Type="InputType.Password" @bind-Value="currentPassword" Placeholder="••••••••" Disabled="!canManage" AriaInvalid="@(currentPasswordError is not null)" />
                             @if (currentPasswordError is not null)
@@ -121,7 +122,7 @@
                         </FieldContent>
                     </Field>
                     <Field IsInvalid="@(newPasswordError is not null)">
-                        <FieldLabel>New password</FieldLabel>
+                        <FieldLabel>@Localizer["ProfileNewPassword"]</FieldLabel>
                         <FieldContent>
                             <Input Type="InputType.Password" @bind-Value="newPassword" Placeholder="••••••••" Disabled="!canManage" AriaInvalid="@(newPasswordError is not null)" />
                             @if (newPasswordError is not null)
@@ -130,12 +131,12 @@
                             }
                             else
                             {
-                                <FieldDescription>Min 8 chars, 1 uppercase, 1 number, 1 special character</FieldDescription>
+                                <FieldDescription>@Localizer["ProfilePasswordRule"]</FieldDescription>
                             }
                         </FieldContent>
                     </Field>
                     <Field IsInvalid="@(confirmPasswordError is not null)">
-                        <FieldLabel>Confirm new password</FieldLabel>
+                        <FieldLabel>@Localizer["ProfileConfirmPassword"]</FieldLabel>
                         <FieldContent>
                             <Input Type="InputType.Password" @bind-Value="confirmPassword" Placeholder="••••••••" Disabled="!canManage" AriaInvalid="@(confirmPasswordError is not null)" />
                             @if (confirmPasswordError is not null)
@@ -148,11 +149,11 @@
                         @if (isChangingPassword)
                         {
                             <Spinner Size="SpinnerSize.Small" Class="mr-2" />
-                            <span>Updating…</span>
+                            <span>@Localizer["ProfileUpdating"]</span>
                         }
                         else
                         {
-                            <span>Update password</span>
+                            <span>@Localizer["ProfileUpdatePassword"]</span>
                         }
                     </Button>
                 </CardContent>
@@ -167,8 +168,8 @@
             <!-- Privacy / GDPR -->
             <Card>
                 <CardHeader>
-                    <CardTitle>Privacy (GDPR)</CardTitle>
-                    <CardDescription>Your data, your rules.</CardDescription>
+                    <CardTitle>@Localizer["ProfilePrivacyTitle"]</CardTitle>
+                    <CardDescription>@Localizer["ProfilePrivacyDescription"]</CardDescription>
                 </CardHeader>
                 <CardContent Class="space-y-3">
                     @if (gdprMessage is not null)
@@ -184,9 +185,9 @@
                         {
                             <Spinner Size="SpinnerSize.Small" Class="mr-2" />
                         }
-                        <span>Request data export</span>
+                        <span>@Localizer["ProfileRequestExport"]</span>
                     </Button>
-                    <TypographyMuted>You'll receive an email when your export is ready.</TypographyMuted>
+                    <TypographyMuted>@Localizer["ProfileExportHint"]</TypographyMuted>
 
                     <Separator />
 
@@ -195,18 +196,18 @@
                         {
                             <Spinner Size="SpinnerSize.Small" Class="mr-2" />
                         }
-                        <span>Request account deletion</span>
+                        <span>@Localizer["ProfileRequestDeletion"]</span>
                     </Button>
                     <Field IsInvalid="@(deleteError is not null)">
                         <FieldContent>
-                            <Input @bind-Value="deleteConfirmEmail" Placeholder="Type your email to confirm" Disabled="!canManage" AriaInvalid="@(deleteError is not null)" />
+                            <Input @bind-Value="deleteConfirmEmail" Placeholder="@Localizer["ProfileDeleteConfirmPlaceholder"]" Disabled="!canManage" AriaInvalid="@(deleteError is not null)" />
                             @if (deleteError is not null)
                             {
                                 <FieldError>@deleteError</FieldError>
                             }
                             else
                             {
-                                <FieldDescription>Deletion completes in ~7 days per AppManager policy.</FieldDescription>
+                                <FieldDescription>@Localizer["ProfileDeletionHint"]</FieldDescription>
                             }
                         </FieldContent>
                     </Field>
@@ -289,7 +290,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to load profile");
-            ToastService.Error("Could not load your profile. Please try again.", "Error");
+            ToastService.Error(Localizer["ProfileLoadFailed"], Localizer["ProfileErrorToast"]);
         }
     }
 
@@ -312,12 +313,12 @@
                 ProfileImageUrl = string.IsNullOrWhiteSpace(profileImageUrl) ? null : profileImageUrl.Trim()
             });
             Logger.LogInformation("Profile updated for {Email}", email);
-            ToastService.Success("Your profile has been saved.", "Saved");
+            ToastService.Success(Localizer["ProfileSavedBody"], Localizer["Saved"]);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to save profile");
-            ToastService.Error("Could not save your profile. Please try again.", "Error");
+            ToastService.Error(Localizer["ProfileSaveFailed"], Localizer["ProfileErrorToast"]);
         }
         finally
         {
@@ -331,17 +332,17 @@
 
         if (string.IsNullOrEmpty(currentPassword))
         {
-            currentPasswordError = "Enter your current password.";
+            currentPasswordError = Localizer["ProfileCurrentPasswordRequired"];
         }
 
         if (!PasswordPolicy.IsValid(newPassword))
         {
-            newPasswordError = "Min 8 chars, 1 uppercase, 1 number, 1 special character.";
+            newPasswordError = Localizer["ProfilePasswordRuleError"];
         }
 
         if (confirmPassword != newPassword)
         {
-            confirmPasswordError = "Passwords do not match.";
+            confirmPasswordError = Localizer["ProfilePasswordMismatch"];
         }
 
         if (currentPasswordError is not null || newPasswordError is not null || confirmPasswordError is not null || !canManage)
@@ -356,7 +357,7 @@
             await AppManager.ChangePasswordAsync(TokenStore.AccessToken!, currentPassword, newPassword);
             Logger.LogInformation("Password changed for {Email}", email);
             currentPassword = newPassword = confirmPassword = string.Empty;
-            ToastService.Success("Your password has been updated.", "Password changed");
+            ToastService.Success(Localizer["ProfilePasswordChangedBody"], Localizer["ProfilePasswordChangedTitle"]);
         }
         catch (AppManagerException ex)
         {
@@ -364,13 +365,13 @@
             switch (ex.Error)
             {
                 case AppManagerError.InvalidCurrentPassword:
-                    currentPasswordError = "Your current password is incorrect.";
+                    currentPasswordError = Localizer["ProfileCurrentPasswordWrong"];
                     break;
                 case AppManagerError.InvalidPassword:
-                    newPasswordError = "Password does not meet the complexity requirements.";
+                    newPasswordError = Localizer["ProfilePasswordTooWeak"];
                     break;
                 default:
-                    ToastService.Error("Could not change your password. Please try again.", "Error");
+                    ToastService.Error(Localizer["ProfilePasswordChangeFailed"], Localizer["ProfileErrorToast"]);
                     break;
             }
         }
@@ -394,12 +395,12 @@
             await TokenRefresher.EnsureValidTokenAsync();
             await AppManager.RequestDataExportAsync(TokenStore.AccessToken!);
             Logger.LogInformation("GDPR data export requested for {Email}", email);
-            gdprMessage = "Your data export request has been submitted. You'll receive an email when it's ready.";
+            gdprMessage = Localizer["ProfileExportSubmitted"];
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Data export request failed");
-            ToastService.Error("Could not submit your export request. Please try again.", "Error");
+            ToastService.Error(Localizer["ProfileExportFailed"], Localizer["ProfileErrorToast"]);
         }
         finally
         {
@@ -414,7 +415,7 @@
 
         if (!string.Equals(deleteConfirmEmail.Trim(), email, StringComparison.OrdinalIgnoreCase))
         {
-            deleteError = "Type your account email exactly to confirm.";
+            deleteError = Localizer["ProfileDeleteEmailRequired"];
             return;
         }
 
@@ -429,15 +430,15 @@
             await TokenRefresher.EnsureValidTokenAsync();
             await AppManager.RequestAccountDeletionAsync(TokenStore.AccessToken!, deleteConfirmEmail.Trim());
             Logger.LogInformation("GDPR account deletion requested for {Email}", email);
-            gdprMessage = "Your account deletion request has been submitted. It completes in ~7 days.";
+            gdprMessage = Localizer["ProfileDeletionSubmitted"];
             deleteConfirmEmail = string.Empty;
         }
         catch (AppManagerException ex)
         {
             Logger.LogWarning("Account deletion request failed ({ErrorCode})", ex.ErrorCode);
             deleteError = ex.Error == AppManagerError.EmailMismatch
-                ? "The email you entered doesn't match your account."
-                : "Could not submit your deletion request. Please try again.";
+                ? Localizer["ProfileDeleteEmailMismatch"].Value
+                : Localizer["ProfileDeletionFailed"].Value;
         }
         finally
         {

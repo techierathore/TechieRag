@@ -1,131 +1,85 @@
 @page "/"
+@inject IWorkspaceService Workspaces
+@inject NavigationManager Nav
+@inject ILogger<Home> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-049 / REQ-FN-036 (BRD-129, BRD-1).
+
+   What used to live at "/" was the TechieRag library's SAMPLE landing page — "A configurable RAG +
+   LLM management platform for .NET" over cards for Document Ingestion / RAG Chat / LLM Playground /
+   Tool Calling Demo / Token Usage. It survived the MAUI conversion untouched and was the first thing
+   the product showed on every launch, despite appearing in no mockup and describing the library
+   rather than the app.
+
+   TechieDesk is a workspace application, so "/" is not a destination — it is a decision about where
+   the user belongs right now. REQ-FN-036 already claimed the app "opens straight into a workspace";
+   until this change that was not true of the landing route, only of the absence of a login gate.
+
+   Deliberately a redirect and not a dashboard: a dashboard here would be a new screen the approved
+   design does not contain, and inventing one is how the sample landing survived this long. *@
 
 <PageTitle>TechieDesk</PageTitle>
 
-<div class="space-y-6">
-    <div>
-        <TypographyH1>TechieDesk</TypographyH1>
-        <TypographyLead>A configurable RAG + LLM management platform for .NET</TypographyLead>
-    </div>
-
-    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-            <CardHeader>
-                <div class="flex items-center gap-2">
-                    <LucideIcon aria-hidden="true" Name="file-text" Size="20" />
-                    <CardTitle>Document Ingestion</CardTitle>
-                </div>
-                <CardDescription>Ingest files and text into the vector store for semantic search.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Href="/ingestion" Variant="ButtonVariant.Outline" Class="w-full">
-                    <Button.Icon><LucideIcon aria-hidden="true" Name="upload" Size="16" /></Button.Icon>
-                    File Ingestion
-                </Button>
-            </CardFooter>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <div class="flex items-center gap-2">
-                    <LucideIcon aria-hidden="true" Name="message-square" Size="20" />
-                    <CardTitle>RAG Chat</CardTitle>
-                </div>
-                <CardDescription>Ask questions and get AI-generated answers using your documents as context.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Href="/chat" Variant="ButtonVariant.Outline" Class="w-full">
-                    <Button.Icon><LucideIcon aria-hidden="true" Name="message-square" Size="16" /></Button.Icon>
-                    Open Chat
-                </Button>
-            </CardFooter>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <div class="flex items-center gap-2">
-                    <LucideIcon aria-hidden="true" Name="terminal" Size="20" />
-                    <CardTitle>LLM Playground</CardTitle>
-                </div>
-                <CardDescription>Test LLM completions, structured output, and streaming directly.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Href="/llm-playground" Variant="ButtonVariant.Outline" Class="w-full">
-                    <Button.Icon><LucideIcon aria-hidden="true" Name="terminal" Size="16" /></Button.Icon>
-                    Open Playground
-                </Button>
-            </CardFooter>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <div class="flex items-center gap-2">
-                    <LucideIcon aria-hidden="true" Name="wrench" Size="20" />
-                    <CardTitle>Tool Calling Demo</CardTitle>
-                </div>
-                <CardDescription>Explore the agent tool-calling loop with built-in demo tools.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Href="/tool-demo" Variant="ButtonVariant.Outline" Class="w-full">
-                    <Button.Icon><LucideIcon aria-hidden="true" Name="wrench" Size="16" /></Button.Icon>
-                    Tool Demo
-                </Button>
-            </CardFooter>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <div class="flex items-center gap-2">
-                    <LucideIcon aria-hidden="true" Name="bar-chart-3" Size="20" />
-                    <CardTitle>Token Usage</CardTitle>
-                </div>
-                <CardDescription>Monitor token consumption, costs, and budget status.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Href="/token-usage" Variant="ButtonVariant.Outline" Class="w-full">
-                    <Button.Icon><LucideIcon aria-hidden="true" Name="bar-chart-3" Size="16" /></Button.Icon>
-                    View Usage
-                </Button>
-            </CardFooter>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <div class="flex items-center gap-2">
-                    <LucideIcon aria-hidden="true" Name="settings" Size="20" />
-                    <CardTitle>Configuration</CardTitle>
-                </div>
-                <CardDescription>Configure embedding providers, vector stores, and LLM settings.</CardDescription>
-            </CardHeader>
-            <CardFooter>
-                <Button Href="/settings" Variant="ButtonVariant.Outline" Class="w-full">
-                    <Button.Icon><LucideIcon aria-hidden="true" Name="settings" Size="16" /></Button.Icon>
-                    Settings
-                </Button>
-            </CardFooter>
-        </Card>
-
-        @* REQ-FN-014/BRD-50: a license-gated surface. Connectors is a premium feature — on the
-           Free/offline tier this renders the upgrade prompt (link to /pricing); with a Pro+
-           license (validated via FeatureSvc) it renders the real card. *@
-        <FeatureGate Feature="CONNECTORS">
-            <ChildContent>
-                <Card>
-                    <CardHeader>
-                        <div class="flex items-center gap-2">
-                            <LucideIcon aria-hidden="true" Name="plug" Size="20" />
-                            <CardTitle>Connectors</CardTitle>
-                        </div>
-                        <CardDescription>Sync knowledge from Slack, SharePoint, Google Drive, and more.</CardDescription>
-                    </CardHeader>
-                    <CardFooter>
-                        <Button Href="/settings" Variant="ButtonVariant.Outline" Class="w-full">
-                            <Button.Icon><LucideIcon aria-hidden="true" Name="plug" Size="16" /></Button.Icon>
-                            Manage connectors
-                        </Button>
-                    </CardFooter>
-                </Card>
-            </ChildContent>
-        </FeatureGate>
-    </div>
+@* Shown only for the instant before the redirect resolves, and on the genuinely unreachable path
+   where navigation fails — never a dead end with no explanation. *@
+<div class="flex h-full min-h-[60vh] items-center justify-center">
+    @if (failure is null)
+    {
+        <Spinner Size="SpinnerSize.Large" />
+        <span class="sr-only">@Localizer["HomeOpening"]</span>
+    }
+    else
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["HomeOpenFailedTitle"]</AlertTitle>
+            <AlertDescription>
+                @failure
+                <br />
+                @Localizer["HomeOpenFailedBefore"] <a href="/settings/data" class="underline">@Localizer["HomeOpenFailedLink"]</a>
+                @Localizer["HomeOpenFailedAfter"]
+            </AlertDescription>
+        </Alert>
+    }
 </div>
+
+@code {
+    private string? failure;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // A workspace is the evidence that matters, and it is checked FIRST — deliberately.
+            //
+            // The obvious order is the other way round (setup flag, then workspaces), and the first
+            // smoke of this redirect proved it wrong: this install has a working `Default` workspace
+            // full of documents but its setup flag was never written, so a flag-first check threw an
+            // established user into the onboarding wizard on launch. The flag records that someone
+            // walked the wizard; it does not record whether the app is usable, and those came apart
+            // the moment the wizard stopped being the only route in.
+            //
+            // MainLayout.GuardFirstRunAsync already owns first-run redirection for every route, so a
+            // genuinely fresh install still reaches the wizard — this is a fallback for the one case
+            // it cannot cover, an install with no workspace at all.
+            var all = await Workspaces.ListForCurrentUserAsync();
+            if (all.Count == 0)
+            {
+                Nav.NavigateTo("/setup", replace: true);
+                return;
+            }
+
+            // replace: true so the redirect does not become a back-navigation target that bounces
+            // the user forward again the moment they try to leave.
+            Nav.NavigateTo($"/workspace/{Workspaces.SlugFor(all[0])}", replace: true);
+        }
+        catch (Exception exception)
+        {
+            // REQ-NFR-010: a failure here would otherwise leave a permanently blank window, because
+            // this route renders nothing of its own.
+            Logger.LogError(exception, "Could not resolve a workspace to open at startup");
+            failure = exception.Message;
+        }
+    }
+}

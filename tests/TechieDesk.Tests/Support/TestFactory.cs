@@ -53,7 +53,8 @@ public static class TestFactory
         var options = appManagerEnabled
             ? DefaultOptions()
             : new AppManagerOptions { BaseUrl = string.Empty };
-        return new TechieDeskAuthModeProvider(Options.Create(options));
+        return new TechieDeskAuthModeProvider(
+            Options.Create(options), NullLogger<TechieDeskAuthModeProvider>.Instance);
     }
 
     /// <summary>Serializes the standard public-key success envelope.</summary>

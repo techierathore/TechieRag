@@ -141,7 +141,9 @@ public sealed class LicenseCachePersistenceTests : IDisposable
         Assert.Equal(LicenseAvailability.Cached, cached.Availability);
         Assert.True(cached.IsFromCache);
         Assert.Equal("Professional", cached.LicenseName);
-        Assert.Contains("cached license", cached.Message, StringComparison.OrdinalIgnoreCase);
+        // REQ-UI-055: the sentence is a resource key now, read back through the real localizer.
+        using var resources = new ResourceHarness("en");
+        Assert.Contains("cached licence", cached.Describe(resources.Localize), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -164,7 +166,9 @@ public sealed class LicenseCachePersistenceTests : IDisposable
         var expired = await restarted.ValidateAsync();
 
         Assert.Equal(LicenseAvailability.GraceExpired, expired.Availability);
-        Assert.Contains("grace period", expired.Message, StringComparison.OrdinalIgnoreCase);
+        using var resources = new ResourceHarness("en");
+        Assert.Contains("grace period", expired.Describe(resources.Localize), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("72", expired.Describe(resources.Localize), StringComparison.Ordinal);
     }
 
     /// <summary>

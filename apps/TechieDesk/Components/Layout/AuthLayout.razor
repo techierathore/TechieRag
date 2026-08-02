@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+@inject IStringLocalizer<AppStrings> Localizer
 
 @* Centered-card layout for the public auth screens (login/register/password recovery),
    matching docs/mockups/*.html — no sidebar, soft gradient backdrop. *@
@@ -10,11 +11,17 @@
            a landmark, which is what axe's `region` rule is asking for. Both are display:contents-
            free plain wrappers, so the parent flex column still sees the same children. *@
         <header class="flex flex-col gap-4">
-            <a href="/login" class="flex items-center justify-center gap-2.5 text-lg font-bold tracking-tight">
-                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-xs font-extrabold text-primary-foreground shadow">TD</span>
-                <span>TechieDesk</span>
+            @* REQ-FN-036: the lockup points back into the APP, not at /login. Nobody is ever sent
+               here by the app, so the way out must be a way forward — the workspace is usable with
+               or without an account. *@
+            @* REQ-UI-037 (BRD-89): the lockup is drawn from the white-label branding rather than
+               hardcoded, so a branded install shows its own mark and name on the screens an outside
+               user is most likely to see first. BrandLockup falls back to the shipped TechieDesk
+               identity, so an unbranded install is unchanged. *@
+            <a href="/" class="flex items-center justify-center gap-2.5 text-lg font-bold tracking-tight">
+                <BrandLockup NameClass="" />
             </a>
-            <div class="-mt-2 text-center text-sm text-muted-foreground">Chat with your documents — self-hosted.</div>
+            <div class="-mt-2 text-center text-sm text-muted-foreground">@Localizer["AuthStrapline"]</div>
         </header>
 
         @* REQ-NFR-005: the auth screens had no landmark at all, so every element on them was
@@ -28,8 +35,12 @@
             @Body
         </main>
 
+        @* REQ-FN-036 / BRD-129: was "Accounts managed by AppManager", which read as "you need one".
+           The escape hatch itself lives on the sign-in/registration screens rather than here,
+           because this layout is shared with the first-run wizard (/setup), where "continue without
+           an account" would be meaningless. *@
         <footer class="text-center text-xs text-muted-foreground">
-            Passwords are RSA-encrypted before transmission · Accounts managed by AppManager
+            @Localizer["AuthFooterNote"]
         </footer>
     </div>
 </div>

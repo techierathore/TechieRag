@@ -5,13 +5,14 @@
 @inject ITechieRag Rag
 @inject ToastService ToastService
 @inject ILogger<TextIngestion> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Text Ingestion - TechieRag</PageTitle>
+<PageTitle>@Localizer["TextInPageTitle"]</PageTitle>
 
 <div class="space-y-6">
     <div>
-        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Text Ingestion</h1>
-        <TypographyMuted>Ingest raw text content directly into the vector database.</TypographyMuted>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["TextInTitle"]</h1>
+        <TypographyMuted>@Localizer["TextInSubtitle"]</TypographyMuted>
     </div>
 
     <!-- Model Download Progress -->
@@ -19,13 +20,13 @@
     {
         <Alert Variant="AlertVariant.Warning">
             <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
-            <AlertTitle>Downloading BGE-M3 Model</AlertTitle>
+            <AlertTitle>@Localizer["TextInDownloadingModel"]</AlertTitle>
             <AlertDescription>
-                @downloadProgress?.StatusMessage
-                <Progress Value="@(downloadProgress?.CurrentFileProgressPercent ?? 0)" Class="mt-2" />
+                @(downloadProgress?.StatusMessage)
+                <Progress aria-label="@Localizer["TextInModelDownloadProgress"]" Value="@Math.Round((double)(downloadProgress?.CurrentFileProgressPercent ?? 0))" Class="mt-2" />
                 <div class="flex justify-between text-xs mt-1">
                     <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
-                    <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
+                    <span>@Localizer["TextInFileProgress", (downloadProgress?.CompletedFiles ?? 0) + 1, downloadProgress?.TotalFiles ?? 5]</span>
                 </div>
             </AlertDescription>
         </Alert>
@@ -36,50 +37,50 @@
         <div class="lg:col-span-2 space-y-4">
             <Card>
                 <CardHeader>
-                    <CardTitle>Text Content</CardTitle>
-                    <CardDescription>Enter or paste the text content to ingest.</CardDescription>
+                    <CardTitle>@Localizer["TextInTextContent"]</CardTitle>
+                    <CardDescription>@Localizer["TextInTextContentDescription"]</CardDescription>
                 </CardHeader>
                 <CardContent Class="space-y-4">
                     <Field>
-                        <FieldLabel>Document Name</FieldLabel>
+                        <FieldLabel>@Localizer["TextInDocumentName"]</FieldLabel>
                         <FieldContent>
-                            <Input @bind-Value="documentName" Placeholder="My Document" Required="true" />
-                            <FieldDescription>A friendly name for this document.</FieldDescription>
+                            <Input @bind-Value="documentName" Placeholder="@Localizer["TextInDocumentNamePlaceholder"]" Required="true" />
+                            <FieldDescription>@Localizer["TextInDocumentNameHint"]</FieldDescription>
                         </FieldContent>
                     </Field>
 
                     <Field>
-                        <FieldLabel>Text Content</FieldLabel>
+                        <FieldLabel>@Localizer["TextInTextContent"]</FieldLabel>
                         <FieldContent>
-                            <Textarea @bind-Value="textContent" Placeholder="Paste your text content here..." Class="min-h-[200px]" />
+                            <Textarea @bind-Value="textContent" Placeholder="@Localizer["TextInTextContentPlaceholder"]" Class="min-h-[200px]" />
                             <div class="flex gap-4 mt-1">
-                                <TypographyMuted>@textContent.Length.ToString("N0") characters</TypographyMuted>
-                                <TypographyMuted>@textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length words</TypographyMuted>
+                                <TypographyMuted>@Localizer["TextInCharacterCount", textContent.Length.ToString("N0")]</TypographyMuted>
+                                <TypographyMuted>@(Localizer["TextInWordCount", textContent.Split(new[] { ' ', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries).Length])</TypographyMuted>
                             </div>
                         </FieldContent>
                     </Field>
 
                     <Field>
-                        <FieldLabel>Source Info (Optional)</FieldLabel>
+                        <FieldLabel>@Localizer["TextInSourceInfo"]</FieldLabel>
                         <FieldContent>
-                            <Input @bind-Value="sourceInfo" Placeholder="URL or identifier" />
-                            <FieldDescription>Optional URL or identifier for the original source.</FieldDescription>
+                            <Input @bind-Value="sourceInfo" Placeholder="@Localizer["TextInSourceInfoPlaceholder"]" />
+                            <FieldDescription>@Localizer["TextInSourceInfoHint"]</FieldDescription>
                         </FieldContent>
                     </Field>
 
                     <div class="flex gap-3">
                         <Button OnClick="IngestTextAsync" Disabled="isIngesting">
-                            @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Ingesting...</span> }
-                            else { <span>Ingest Text</span> }
+                            @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["TextInIngesting"]</span> }
+                            else { <span>@Localizer["TextInIngestText"]</span> }
                         </Button>
-                        <Button Variant="ButtonVariant.Outline" OnClick="ClearForm">Clear Form</Button>
-                        <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">Clear All Data</Button>
+                        <Button Variant="ButtonVariant.Outline" OnClick="ClearForm">@Localizer["TextInClearForm"]</Button>
+                        <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">@Localizer["TextInClearAllData"]</Button>
                     </div>
 
                     @if (isIngesting)
                     {
                         <div class="space-y-2">
-                            <Progress Value="@progress" />
+                            <Progress aria-label="@Localizer["TextInIngestionProgress"]" Value="@Math.Round((double)progress)" />
                             <TypographyMuted>@progressMessage</TypographyMuted>
                         </div>
                     }
@@ -93,20 +94,20 @@
             {
                 <Card>
                     <CardHeader>
-                        <CardTitle>Statistics</CardTitle>
+                        <CardTitle>@Localizer["TextInStatistics"]</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div class="space-y-3">
                             <div class="flex justify-between">
-                                <TypographyMuted>Documents</TypographyMuted>
+                                <TypographyMuted>@Localizer["TextInDocuments"]</TypographyMuted>
                                 <span class="font-medium">@stats.TotalDocuments</span>
                             </div>
                             <div class="flex justify-between">
-                                <TypographyMuted>Chunks</TypographyMuted>
+                                <TypographyMuted>@Localizer["TextInChunks"]</TypographyMuted>
                                 <span class="font-medium">@stats.TotalChunks</span>
                             </div>
                             <div class="flex justify-between">
-                                <TypographyMuted>Storage</TypographyMuted>
+                                <TypographyMuted>@Localizer["TextInStorage"]</TypographyMuted>
                                 <span class="font-medium">@FormatSize(stats.VectorStoreSizeBytes)</span>
                             </div>
                         </div>
@@ -116,12 +117,12 @@
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Documents</CardTitle>
+                    <CardTitle>@Localizer["TextInDocuments"]</CardTitle>
                 </CardHeader>
                 <CardContent>
                     @if (documents.Count == 0)
                     {
-                        <TypographyMuted>No documents yet.</TypographyMuted>
+                        <TypographyMuted>@Localizer["TextInNoDocuments"]</TypographyMuted>
                     }
                     else
                     {
@@ -134,7 +135,7 @@
                                        control is distinguishable when listed out of context by a screen reader. *@
                                     <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.IconSmall" OnClick="@(() => DeleteDocumentAsync(doc.Id))">
                                         <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
-                                        <span class="sr-only">Delete document @doc.Id</span>
+                                        <span class="sr-only">@Localizer["TextInDeleteDocument", doc.Id]</span>
                                     </Button>
                                 </div>
                             }
@@ -174,7 +175,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to initialize text ingestion page");
-            ToastService.Error($"Initialization error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["TextInInitializationError", ex.Message], Localizer["TextInErrorTitle"]);
         }
     }
 
@@ -207,13 +208,13 @@
     {
         if (string.IsNullOrWhiteSpace(documentName))
         {
-            ToastService.Error("Please enter a document name.", "Validation");
+            ToastService.Error(Localizer["TextInEnterDocumentName"], Localizer["TextInValidationTitle"]);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(textContent))
         {
-            ToastService.Error("Please enter text content to ingest.", "Validation");
+            ToastService.Error(Localizer["TextInEnterTextContent"], Localizer["TextInValidationTitle"]);
             return;
         }
 
@@ -224,7 +225,7 @@
         try
         {
             progress = 10;
-            progressMessage = "Preparing text content...";
+            progressMessage = Localizer["TextInProgressPreparing"];
             StateHasChanged();
             await Task.Delay(50);
 
@@ -238,15 +239,15 @@
                 metadata["Source"] = sourceInfo;
 
             progress = 30;
-            progressMessage = "Chunking and embedding text...";
+            progressMessage = Localizer["TextInProgressChunking"];
             StateHasChanged();
             await Task.Delay(50);
 
             var documentId = await Rag.IngestTextAsync(textContent, documentName, metadata);
 
             progress = 100;
-            progressMessage = "Complete!";
-            ToastService.Success($"Ingested '{documentName}' (ID: {documentId})", "Success");
+            progressMessage = Localizer["TextInProgressComplete"];
+            ToastService.Success(Localizer["TextInIngestedDocument", documentName, documentId], Localizer["TextInSuccessTitle"]);
 
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
@@ -257,7 +258,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to ingest text content");
-            ToastService.Error($"Error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["TextInErrorBody", ex.Message], Localizer["TextInErrorTitle"]);
         }
         finally
         {
@@ -273,11 +274,11 @@
             await Rag.ClearAsync();
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-            ToastService.Success("All data cleared.", "Cleared");
+            ToastService.Success(Localizer["TextInAllDataCleared"], Localizer["TextInClearedTitle"]);
         }
         catch (Exception ex)
         {
-            ToastService.Error($"Error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["TextInErrorBody", ex.Message], Localizer["TextInErrorTitle"]);
         }
     }
 
@@ -288,11 +289,11 @@
             await Rag.DeleteDocumentAsync(documentId);
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-            ToastService.Success("Document deleted.", "Deleted");
+            ToastService.Success(Localizer["TextInDocumentDeleted"], Localizer["TextInDeletedTitle"]);
         }
         catch (Exception ex)
         {
-            ToastService.Error($"Error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["TextInErrorBody", ex.Message], Localizer["TextInErrorTitle"]);
         }
     }
 

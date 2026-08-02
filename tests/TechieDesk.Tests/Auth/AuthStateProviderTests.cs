@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using TechieDesk.Services.AppManager.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 using TechieDesk.Services.Auth;
 using TechieDesk.Tests.Support;
 using Xunit;
@@ -7,26 +7,33 @@ using Xunit;
 namespace TechieDesk.Tests.Auth;
 
 /// <summary>
-/// REQ-FN-003/005: the custom AuthenticationStateProvider — offline mode is authenticated as
-/// the built-in Admin, AppManager mode reflects the per-circuit session with the mapped role
-/// exposed as a role claim.
+/// The custom AuthenticationStateProvider: the local owner (built-in Admin) until an AppManager
+/// account is signed in for licensing, then that account with its mapped role as a role claim.
 /// </summary>
+/// <remarks>
+/// REQ-FN-036 / BRD-129: the provider no longer produces an anonymous principal. Two tests below
+/// asserted that an AppManager-configured install started (and reverted to) an UNAUTHENTICATED
+/// state — the identity half of the anonymous-vs-authenticated split. That is wrong by design now:
+/// one desktop install is operated by its owner, and signing in activates a licence rather than
+/// creating the right to use the app. Both are re-expressed rather than dropped.
+/// </remarks>
 public sealed class AuthStateProviderTests
 {
-    private static (TechieDeskAuthenticationStateProvider Provider, SessionTokenStore Store) Build(bool appManagerEnabled)
+    private static TechieDeskAuthenticationStateProvider Provider(ISessionStore store, string? handle)
     {
-        var store = new SessionTokenStore();
-        var provider = new TechieDeskAuthenticationStateProvider(TestFactory.Mode(appManagerEnabled), store);
-        return (provider, store);
+        return new TechieDeskAuthenticationStateProvider(
+            SessionTestHarness.Circuit(store, handle),
+            NullLogger<TechieDeskAuthenticationStateProvider>.Instance);
     }
 
     /// <summary>
-    /// In offline mode every circuit is authenticated as the built-in Admin without a login.
+    /// With no AppManager configured every scope is authenticated as the built-in Admin without a
+    /// login — the launch state REQ-FN-036 requires to be a working one.
     /// </summary>
     [Fact]
-    public async Task OfflineStateIsAdmin()
+    public async Task AccountFreeStateIsAdmin()
     {
-        var (provider, _) = Build(false);
+        var provider = Provider(SessionTestHarness.Store(), null);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -34,68 +41,58 @@ public sealed class AuthStateProviderTests
         Assert.True(state.User.IsInRole(nameof(ProductRole.Admin)));
     }
 
-    /// <summary>In AppManager mode a circuit without a session is anonymous.</summary>
+    /// <summary>
+    /// Re-expresses "AppManagerModeStartsAnonymous": a scope with no session handle is the local
+    /// owner, not an anonymous visitor. Configuring AppManager does not create a signed-out state
+    /// the app has to be rescued from.
+    /// </summary>
     [Fact]
-    public async Task AppManagerModeStartsAnonymous()
+    public async Task NoSessionResolvesToTheLocalOwner()
     {
-        var (provider, _) = Build(true);
+        var provider = Provider(SessionTestHarness.Store(), null);
 
         var state = await provider.GetAuthenticationStateAsync();
 
-        Assert.False(state.User.Identity!.IsAuthenticated);
+        Assert.True(state.User.Identity!.IsAuthenticated);
+        Assert.Equal(TechieDeskUser.BuiltInAdmin.Email, state.User.FindFirstValue(ClaimTypes.Email));
     }
 
     /// <summary>
-    /// SignIn maps the app-scoped applicationRole to a product role claim (BRD-23), stores the
-    /// tokens server-side only, and produces an authenticated principal.
+    /// A circuit holding a live handle exposes the app-scoped role mapped at login (BRD-23) and
+    /// the session's email, while the tokens stay in the server-side store.
     /// </summary>
     [Fact]
-    public async Task SignInExposesMappedRole()
+    public async Task SessionHandleExposesMappedRole()
     {
-        var (provider, store) = Build(true);
-        var auth = new AuthResponseData
-        {
-            UserId = 123,
-            Email = "jane.doe@example.com",
-            FirstName = "Jane",
-            LastName = "Doe",
-            ApplicationRole = "Manager",
-            AccessToken = "access-token-1",
-            RefreshToken = "refresh-token-1",
-            TokenExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
-        };
+        var store = SessionTestHarness.Store();
+        var user = new TechieDeskUser(123, "jane.doe@example.com", "Jane Doe", ProductRole.Manager, true);
+        var handle = SessionTestHarness.SignIn(store, user);
+        var provider = Provider(store, handle);
 
-        provider.SignIn(auth);
         var state = await provider.GetAuthenticationStateAsync();
 
         Assert.True(state.User.Identity!.IsAuthenticated);
         Assert.True(state.User.IsInRole(nameof(ProductRole.Manager)));
         Assert.Equal("jane.doe@example.com", state.User.FindFirstValue(ClaimTypes.Email));
-        Assert.Equal("access-token-1", store.AccessToken);
-        Assert.Equal(ProductRole.Manager, store.User!.Role);
+        Assert.Equal("access-token-1", store.Resolve(handle)!.AccessToken);
     }
 
-    /// <summary>SignOut clears the server-side session and returns the circuit to anonymous.</summary>
+    /// <summary>
+    /// Re-expresses "InvalidatedSessionBecomesAnonymous": invalidating the session drops the
+    /// AppManager identity and falls back to the local owner. The user keeps working on their own
+    /// data; what they lose is the licence, not the app.
+    /// </summary>
     [Fact]
-    public async Task SignOutClearsSession()
+    public async Task InvalidatedSessionFallsBackToTheLocalOwner()
     {
-        var (provider, store) = Build(true);
-        provider.SignIn(new AuthResponseData
-        {
-            UserId = 123,
-            Email = "jane.doe@example.com",
-            FirstName = "Jane",
-            LastName = "Doe",
-            ApplicationRole = "User",
-            AccessToken = "access-token-1",
-            RefreshToken = "refresh-token-1",
-            TokenExpiresAt = DateTimeOffset.UtcNow.AddHours(1)
-        });
+        var store = SessionTestHarness.Store();
+        var handle = SessionTestHarness.SignIn(store, SessionTestHarness.User());
+        var provider = Provider(store, handle);
 
-        provider.SignOut();
+        store.Invalidate(handle);
         var state = await provider.GetAuthenticationStateAsync();
 
-        Assert.False(state.User.Identity!.IsAuthenticated);
-        Assert.False(store.HasSession);
+        Assert.True(state.User.Identity!.IsAuthenticated);
+        Assert.Equal(TechieDeskUser.BuiltInAdmin.Email, state.User.FindFirstValue(ClaimTypes.Email));
     }
 }

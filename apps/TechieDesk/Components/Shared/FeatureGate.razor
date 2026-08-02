@@ -1,6 +1,11 @@
 @* REQ-FN-014/BRD-50: renders ChildContent only when the feature is licensed; otherwise renders
-   an upgrade prompt (or a caller-supplied Denied fragment). Reads decisions from IFeatureGate. *@
+   an upgrade prompt (or a caller-supplied Denied fragment). Reads decisions from IFeatureGate.
+
+   REQ-UI-055 (BRD-91): FeatureDecision no longer carries an English sentence. It carries a resource
+   key (our own copy) or the licence server's verbatim words, and DescribeReason picks between them —
+   which is why this component now injects a localizer it did not need before. *@
 @inject IFeatureGate Gate
+@inject IStringLocalizer<AppStrings> Localizer
 
 @if (decision is null)
 {
@@ -25,7 +30,7 @@ else
 {
     <UpgradePrompt Feature="@Feature"
                    RequiredLicense="@decision.RequiredLicense"
-                   Reason="@decision.Reason"
+                   Reason="@decision.DescribeReason(Localize)"
                    Class="@Class" />
 }
 
@@ -46,6 +51,9 @@ else
     [Parameter] public string? Class { get; set; }
 
     private FeatureDecision? decision;
+
+    /// <summary>The REQ-UI-051 delegate: the ONE place a licensing key becomes a sentence here.</summary>
+    private string Localize(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
 
     protected override async Task OnParametersSetAsync()
     {

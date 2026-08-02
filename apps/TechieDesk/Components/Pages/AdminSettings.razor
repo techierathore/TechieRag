@@ -1,0 +1,458 @@
+@page "/admin/settings"
+@using TechieDesk.Services.Settings
+@* Not in _Imports.razor — an unresolved component tag would silently render as raw HTML. *@
+@using TrBlazeUI.Components.NumericInput
+@inject TechieRagConfigService ConfigService
+@inject TechieRagManager RagManager
+@inject IAppDefaultsStore DefaultsStore
+@inject IAppSettingsChangeLog ChangeLog
+@inject ToastService ToastService
+@inject NavigationManager Navigation
+@inject IStringLocalizer<AppStrings> Localizer
+@inject ILogger<AdminSettings> Logger
+
+@* REQ-UI-028 / BRD-75 — built to docs/mockups/admin-settings.html.
+
+   The three provider fields on the Defaults tab are the LIVE TechieRag configuration, the same
+   values the console screens at /settings and /llm-settings edit — not a second copy that would
+   drift from what the application actually runs. The upload ceiling is app-owned and kept in the
+   app database. Saving records what changed in the operator event log (REQ-UI-026), which is why
+   /admin/events has real rows to show on a fresh install.
+
+   Tabs: Defaults is built here. Branding hosts REQ-UI-037/038/039 (AppearancePanel + BrandingPanel).
+   Updates HOSTS the existing AppUpdates component (REQ-FN-038b, /settings/updates) unchanged, which
+   is exactly what the UI design says should happen when this screen is built.
+
+   REQ-UI-037/038/039, 2026-07-28 — EVERY tab on this screen is addressable as `?tab=<value>`.
+   Two reasons, both load-bearing:
+
+   1. The Branding tab is the ONLY place AppearancePanel and BrandingPanel are mounted (the orphaned
+      /settings/appearance route was deleted). Until now the sole way to see them was to click the
+      TabsTrigger, and a screen whose content is reachable by exactly one gesture is a screen that
+      cannot be linked to, bookmarked, restored after a reload, or driven by a test that does not
+      want to depend on the widget under test.
+   2. TR-008 recorded the Branding trigger as "not actionable at runtime". Re-probed live on the
+      Catalyst head this session: it IS actionable — WebKit maps role="tab" to AXRadioButton/
+      AXTabButton, which XCUITest surfaces as XCUIElementTypeTab, and the earlier probe only looked
+      for Button/Link/RadioButton/Other. The trigger works; the query parameter is the second,
+      widget-independent way in.
+
+   Uncontrolled Tabs (DefaultValue) plus an @key, NOT controlled Tabs (Value/ValueChanged): TR-021 —
+   the controlled path renders no active trigger and no panel at all. Bumping the key re-creates the
+   Tabs component so it re-reads DefaultValue, which is the only way a deep link can move an
+   uncontrolled tab strip. *@
+
+<PageTitle>@Localizer["AppSettingsPageTitle"]</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["AppSettingsTitle"]</h1>
+            <TypographyMuted>@Localizer["AppSettingsDescription"]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button OnClick="SaveAsync" Disabled="@(isSaving || isLoading)">
+                @if (isSaving)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                    <span>@Localizer["Saving"]</span>
+                }
+                else
+                {
+                    <span>@Localizer["SaveChanges"]</span>
+                }
+            </Button>
+        </div>
+    </div>
+
+    @if (loadError is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["AppSettingsLoadFailedTitle"]</AlertTitle>
+            <AlertDescription>@loadError</AlertDescription>
+        </Alert>
+    }
+
+    <Tabs @key="tabsEpoch" DefaultValue="@activeTab" OnValueChange="OnTabChanged">
+        <TabsList>
+            <TabsTrigger Value="@DefaultsTab">@Localizer["AppSettingsTabDefaults"]</TabsTrigger>
+            <TabsTrigger Value="@BrandingTab">@Localizer["AppSettingsTabBranding"]</TabsTrigger>
+            <TabsTrigger Value="@UpdatesTab">@Localizer["AppSettingsTabUpdates"]</TabsTrigger>
+        </TabsList>
+
+        <!-- Defaults -->
+        <TabsContent Value="@DefaultsTab" ForceMount="true">
+            @if (isLoading)
+            {
+                <div class="flex items-center gap-2 p-4">
+                    <Spinner Size="SpinnerSize.Small" />
+                    <TypographyMuted>@Localizer["AppSettingsLoading"]</TypographyMuted>
+                </div>
+            }
+            else
+            {
+                <Card>
+                    <CardContent Class="td-settings-body">
+                        <div class="mb-2 flex items-center gap-2">
+                            <Badge Variant="BadgeVariant.Secondary">@Localizer["AppSettingsTabDefaults"]</Badge>
+                        </div>
+
+                        <div class="td-settings-grid">
+                            <Field>
+                                <FieldLabel For="defaults-llm">@Localizer["AppSettingsDefaultLlm"]</FieldLabel>
+                                <FieldContent>
+                                    <Select @bind-Value="llmProviderValue" TValue="string" DisplayTextSelector="@LlmDisplay">
+                                        <SelectTrigger Id="defaults-llm">
+                                            <SelectValue Placeholder="@Localizer["AppSettingsSelectProvider"]" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            @foreach (var source in LlmSources)
+                                            {
+                                                <SelectItem Value="@source.ToString()" Text="@LlmSourceLabel(source)" TValue="string">@LlmSourceLabel(source)</SelectItem>
+                                            }
+                                        </SelectContent>
+                                    </Select>
+                                    <FieldDescription>@LlmModelDescription</FieldDescription>
+                                </FieldContent>
+                            </Field>
+
+                            <Field>
+                                <FieldLabel For="defaults-embeddings">@Localizer["AppSettingsDefaultEmbeddings"]</FieldLabel>
+                                <FieldContent>
+                                    <Select @bind-Value="embeddingProviderValue" TValue="string" DisplayTextSelector="@EmbeddingDisplay">
+                                        <SelectTrigger Id="defaults-embeddings">
+                                            <SelectValue Placeholder="@Localizer["AppSettingsSelectProvider"]" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            @foreach (var source in EmbeddingSources)
+                                            {
+                                                <SelectItem Value="@source.ToString()" Text="@EmbeddingSourceLabel(source)" TValue="string">@EmbeddingSourceLabel(source)</SelectItem>
+                                            }
+                                        </SelectContent>
+                                    </Select>
+                                    <FieldDescription>@Localizer["AppSettingsEmbeddingsHint"]</FieldDescription>
+                                </FieldContent>
+                            </Field>
+
+                            <Field>
+                                <FieldLabel For="defaults-vectorstore">@Localizer["AppSettingsVectorStore"]</FieldLabel>
+                                <FieldContent>
+                                    <Select @bind-Value="vectorStoreValue" TValue="string" DisplayTextSelector="@VectorStoreDisplay">
+                                        <SelectTrigger Id="defaults-vectorstore">
+                                            <SelectValue Placeholder="@Localizer["AppSettingsSelectStore"]" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem Value="@(VectorStoreType.SqliteVec.ToString())" Text="@Localizer["AppSettingsStoreSqliteVec"]" TValue="string">@Localizer["AppSettingsStoreSqliteVec"]</SelectItem>
+                                            <SelectItem Value="@(VectorStoreType.Qdrant.ToString())" Text="Qdrant" TValue="string">Qdrant</SelectItem>
+                                            @* The PostgreSQL path was dropped from this screen with the desktop pivot. An
+                                               install already configured for it keeps its option so that opening this page
+                                               cannot silently rewrite the store the vectors are actually in. *@
+                                            @if (config.VectorStore.Type == VectorStoreType.PgVector)
+                                            {
+                                                <SelectItem Value="@(VectorStoreType.PgVector.ToString())" Text="@Localizer["AppSettingsStorePgVector"]" TValue="string">@Localizer["AppSettingsStorePgVector"]</SelectItem>
+                                            }
+                                        </SelectContent>
+                                    </Select>
+                                    <FieldDescription>@Localizer["AppSettingsVectorStoreHint"]</FieldDescription>
+                                </FieldContent>
+                            </Field>
+
+                            <Field>
+                                <FieldLabel For="defaults-upload">@Localizer["AppSettingsMaxUpload"]</FieldLabel>
+                                <FieldContent>
+                                    <div class="flex items-center gap-2">
+                                        <NumericInput TValue="int" @bind-Value="maxUploadSizeMb"
+                                                      Min="1" Max="@AppDefaultsStore.MaximumMaxUploadSizeMb" Step="1"
+                                                      Id="defaults-upload" Class="td-settings-number" />
+                                        <span class="text-sm text-muted-foreground">@Localizer["AppSettingsMegabytes"]</span>
+                                    </div>
+                                    @* Stated plainly: this is stored as the app-wide default, and the
+                                       upload paths still carry their own fixed 64 MB read ceiling. It
+                                       becomes the number they enforce when they are changed to read it. *@
+                                    <FieldDescription>@Localizer["AppSettingsMaxUploadHint"]</FieldDescription>
+                                </FieldContent>
+                            </Field>
+                        </div>
+                    </CardContent>
+                </Card>
+            }
+        </TabsContent>
+
+        <!-- Branding — REQ-UI-037, deliberately not built here -->
+        @* REQ-UI-038 + REQ-UI-037. The seam this tab declared is now filled by the two real panels.
+
+           TWO panels, not the mockup's one card, and the split is deliberate. The mockup draws the
+           accent and default-theme controls INSIDE the card carrying the `WHITE_LABEL — Enterprise`
+           badge, which would put dark mode behind a paywall. Appearance is BRD-90 (REQ-UI-038) and is
+           ungated; white-labelling is BRD-89 (REQ-UI-037) and is licence-gated. Rendered one above
+           the other in this tab they read as the mockup's single panel, with only the second gated. *@
+        <TabsContent Value="@BrandingTab" ForceMount="true">
+            <div class="space-y-6">
+                <AppearancePanel />
+                <BrandingPanel />
+            </div>
+        </TabsContent>
+
+        <!-- Updates — the REQ-FN-038b surface, hosted rather than duplicated -->
+        <TabsContent Value="@UpdatesTab" ForceMount="true">
+            @* Embedded: this tab supplies the page's title and heading, so the component must not
+               emit a second <PageTitle> and a second <h1> into the same document. *@
+            <AppUpdates Embedded="true" />
+        </TabsContent>
+    </Tabs>
+</div>
+
+@code {
+    /// <summary>Query value and <c>TabsTrigger</c>/<c>TabsContent</c> value of the defaults tab.</summary>
+    private const string DefaultsTab = "defaults";
+
+    /// <summary>Query value of the branding tab — REQ-UI-037 / REQ-UI-038 / REQ-UI-039.</summary>
+    private const string BrandingTab = "branding";
+
+    /// <summary>Query value of the updates tab — REQ-FN-038b.</summary>
+    private const string UpdatesTab = "updates";
+
+    private static readonly string[] KnownTabs = [DefaultsTab, BrandingTab, UpdatesTab];
+
+    // Materialised OUTSIDE the markup on purpose: written inline, `Enum.GetValues<LlmSource>()`
+    // puts a `<LlmSource>` in the markup stream, which every tag-based reader of this file — the
+    // localization coverage counter included — takes for an element and splits the loop header on.
+    private static readonly LlmSource[] LlmSources = Enum.GetValues<LlmSource>();
+
+    private static readonly EmbeddingSource[] EmbeddingSources = Enum.GetValues<EmbeddingSource>();
+
+    /// <summary>Gets or sets the tab requested by <c>?tab=</c> on the current URL.</summary>
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "tab")]
+    public string? Tab { get; set; }
+
+    private string activeTab = DefaultsTab;
+
+    // Bumped ONLY when the URL asks for a tab the strip is not already showing. Uncontrolled Tabs
+    // reads DefaultValue once, in its own OnInitialized, so re-creating the component is the only
+    // way an external request can move it (TR-021 rules out the controlled path). Bumping it on
+    // every change instead would tear down and rebuild the panels on a plain trigger click.
+    private int tabsEpoch;
+
+    private TechieRagConfig config = new();
+    private AppDefaults loaded = new(LlmSource.None, string.Empty, EmbeddingSource.Embedded, VectorStoreType.SqliteVec, AppDefaultsStore.DefaultMaxUploadSizeMb);
+
+    private int maxUploadSizeMb = AppDefaultsStore.DefaultMaxUploadSizeMb;
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? loadError;
+
+    private string llmProviderValue
+    {
+        get => config.Llm.Source.ToString();
+        set
+        {
+            if (Enum.TryParse<LlmSource>(value, out var parsed))
+            {
+                config.Llm.Source = parsed;
+            }
+        }
+    }
+
+    private string embeddingProviderValue
+    {
+        get => config.Embedding.Source.ToString();
+        set
+        {
+            if (Enum.TryParse<EmbeddingSource>(value, out var parsed))
+            {
+                config.Embedding.Source = parsed;
+            }
+        }
+    }
+
+    private string vectorStoreValue
+    {
+        get => config.VectorStore.Type.ToString();
+        set
+        {
+            if (Enum.TryParse<VectorStoreType>(value, out var parsed))
+            {
+                config.VectorStore.Type = parsed;
+            }
+        }
+    }
+
+    private string LlmModelDescription => string.IsNullOrWhiteSpace(config.Llm.Model)
+        ? Localizer["AppSettingsNoModelChosen"].Value
+        : Localizer["AppSettingsModelIs", config.Llm.Model].Value;
+
+    /// <summary>
+    /// Resolves a requested tab name to one this screen actually has.
+    /// </summary>
+    /// <param name="requested">The raw <c>?tab=</c> value, which comes from a URL and may be
+    /// anything.</param>
+    /// <returns>A known tab value; the defaults tab when the request is absent or unrecognised.</returns>
+    /// <remarks>
+    /// Total rather than throwing, and case-insensitive: the value arrives from a link someone typed
+    /// or a bookmark written by an older build, so an unrecognised tab must open the screen on its
+    /// first tab rather than break the route.
+    /// </remarks>
+    private static string ResolveTab(string? requested)
+    {
+        if (string.IsNullOrWhiteSpace(requested))
+        {
+            return DefaultsTab;
+        }
+
+        var trimmed = requested.Trim();
+        foreach (var known in KnownTabs)
+        {
+            if (string.Equals(known, trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                return known;
+            }
+        }
+
+        return DefaultsTab;
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var requested = ResolveTab(Tab);
+        if (!string.Equals(requested, activeTab, StringComparison.Ordinal))
+        {
+            activeTab = requested;
+            tabsEpoch++;
+        }
+    }
+
+    // Fired by the tab strip itself. Writing the choice back into the URL is what makes the Branding
+    // tab linkable and survive a reload; `replace` keeps Back going to the previous SCREEN rather
+    // than walking three tabs backwards. activeTab is updated FIRST so the navigation this causes
+    // finds nothing to reconcile and leaves the epoch alone.
+    private void OnTabChanged(string? value)
+    {
+        var chosen = ResolveTab(value);
+        if (string.Equals(chosen, activeTab, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        activeTab = chosen;
+        Navigation.NavigateTo($"/admin/settings?tab={chosen}", replace: true);
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            config = await ConfigService.LoadConfigAsync();
+            maxUploadSizeMb = await DefaultsStore.GetMaxUploadSizeMbAsync();
+            loaded = Snapshot();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Loading app settings failed");
+            loadError = exception.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private AppDefaults Snapshot() => new(
+        config.Llm.Source,
+        config.Llm.Model,
+        config.Embedding.Source,
+        config.VectorStore.Type,
+        maxUploadSizeMb);
+
+    private async Task SaveAsync()
+    {
+        if (maxUploadSizeMb < 1 || maxUploadSizeMb > AppDefaultsStore.MaximumMaxUploadSizeMb)
+        {
+            ToastService.Error(
+                Localizer["AppSettingsUploadRange", AppDefaultsStore.MaximumMaxUploadSizeMb],
+                Localizer["AppSettingsNotSaved"]);
+            return;
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            var after = Snapshot();
+
+            // REQ-NFR-004: this screen owns the default embedding, vector store and LLM. Saving
+            // the whole document from a copy loaded on open silently reverted RAG Configuration's
+            // and LLM Settings' edits to the same sections; naming what it owns stops that.
+            await ConfigService.SaveConfigAsync(
+                config,
+                TechieRagConfigSections.Embedding
+                | TechieRagConfigSections.VectorStore
+                | TechieRagConfigSections.Llm);
+            await RagManager.ReconfigureAsync();
+            await DefaultsStore.SetMaxUploadSizeMbAsync(maxUploadSizeMb);
+
+            // Audited AFTER the write succeeded. Recording an intent that then failed would put a
+            // change in the event log that never happened.
+            var changes = await ChangeLog.RecordAsync(loaded, after);
+            loaded = after;
+
+            ToastService.Success(
+                changes.Count == 0
+                    ? Localizer["AppSettingsNothingChanged"]
+                    : Localizer[changes.Count == 1 ? "AppSettingsSavedOne" : "AppSettingsSavedMany", changes.Count],
+                Localizer["AppSettingsSavedToast"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Saving app settings failed");
+            ToastService.Error(exception.Message, Localizer["AppSettingsNotSaved"]);
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    // Without these the closed trigger renders the raw bound value — "LmStudio" instead of
+    // "LM Studio (local)" — because the item labels are only registered once the list opens.
+
+    private string LlmDisplay(string value) =>
+        Enum.TryParse<LlmSource>(value, out var parsed) ? LlmSourceLabel(parsed) : value;
+
+    private string EmbeddingDisplay(string value) =>
+        Enum.TryParse<EmbeddingSource>(value, out var parsed) ? EmbeddingSourceLabel(parsed) : value;
+
+    private string VectorStoreDisplay(string value) => value switch
+    {
+        nameof(VectorStoreType.SqliteVec) => Localizer["AppSettingsStoreSqliteVec"].Value,
+        nameof(VectorStoreType.Qdrant) => "Qdrant",
+        nameof(VectorStoreType.PgVector) => Localizer["AppSettingsStorePgVector"].Value,
+        _ => value
+    };
+
+    private string LlmSourceLabel(LlmSource source) => source switch
+    {
+        LlmSource.None => Localizer["AppSettingsLlmNone"].Value,
+        LlmSource.Ollama => Localizer["AppSettingsLlmOllama"].Value,
+        LlmSource.LmStudio => Localizer["AppSettingsLlmLmStudio"].Value,
+        LlmSource.OpenAICompatible => Localizer["AppSettingsLlmOpenAiCompatible"].Value,
+        LlmSource.AzureAIFoundry => "Azure AI Foundry",
+        LlmSource.GoogleGemini => "Google Gemini",
+        LlmSource.Anthropic => "Anthropic Claude",
+        _ => source.ToString()
+    };
+
+    private string EmbeddingSourceLabel(EmbeddingSource source) => source switch
+    {
+        EmbeddingSource.Embedded => Localizer["AppSettingsEmbeddingEmbedded"].Value,
+        EmbeddingSource.Onnx => Localizer["AppSettingsEmbeddingOnnx"].Value,
+        EmbeddingSource.Ollama => Localizer["AppSettingsLlmOllama"].Value,
+        EmbeddingSource.LmStudio => Localizer["AppSettingsLlmLmStudio"].Value,
+        _ => source.ToString()
+    };
+}

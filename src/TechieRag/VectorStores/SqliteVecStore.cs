@@ -166,7 +166,7 @@ public class SqliteVecStore : IVectorStore
                 Name = docName,
                 SourcePath = sourcePath,
                 IngestedAt = DateTime.UtcNow.ToString("o"),
-                Metadata = "{}"
+                Metadata = SerializeDocumentMetadata(chunk)
             });
 
         var vectorBytes = chunk.Vector != null ? SerializeVector(chunk.Vector) : null;
@@ -243,7 +243,7 @@ public class SqliteVecStore : IVectorStore
                         Name = docName,
                         SourcePath = sourcePath,
                         IngestedAt = DateTime.UtcNow.ToString("o"),
-                        Metadata = "{}"
+                        Metadata = SerializeDocumentMetadata(firstChunk)
                     },
                     transaction);
             }
@@ -572,6 +572,21 @@ public class SqliteVecStore : IVectorStore
     }
 
     /// <summary>
+    /// Builds the JSON written to a document row's <c>Metadata</c> column.
+    /// </summary>
+    /// <param name="firstChunk">The chunk the document row is being created from.</param>
+    /// <returns>A JSON object holding the chunk's document-scoped metadata; <c>{}</c> when it has none.</returns>
+    /// <remarks>
+    /// This column used to be a hardcoded <c>{}</c>, so everything an ingestion route recorded about
+    /// a document — its byte size, the URL it came from — existed on the chunks and was invisible to
+    /// <see cref="ListDocumentsAsync"/>, which is the API a catalogue screen reads. Only the keys in
+    /// <see cref="DocumentMetadataKeys.DocumentScoped"/> are lifted: a page number or an audio offset
+    /// belongs to one chunk and would be a lie at document level.
+    /// </remarks>
+    private static string SerializeDocumentMetadata(TextChunk firstChunk) =>
+        JsonSerializer.Serialize(DocumentMetadataKeys.ExtractDocumentScoped(firstChunk.Metadata));
+
+    /// <summary>
     /// Serializes a float array to bytes for SQLite BLOB storage.
     /// </summary>
     /// <param name="vector">The vector to serialize.</param>
@@ -657,9 +672,10 @@ public class SqliteVecStore : IVectorStore
         /// </summary>
         public Document ToDocument()
         {
-            var metadata = string.IsNullOrEmpty(Metadata)
-                ? new Dictionary<string, object>()
-                : JsonSerializer.Deserialize<Dictionary<string, object>>(Metadata) ?? new Dictionary<string, object>();
+            // Not a plain Deserialize: that hands back JsonElement values, which are not
+            // IConvertible, so a caller reading a stored number gets an exception or a silent
+            // fallback. FromJson unwraps them to the primitives that were stored.
+            var metadata = DocumentMetadataKeys.FromJson(Metadata);
 
             return new Document
             {

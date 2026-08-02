@@ -42,4 +42,10 @@ public class LlmCompletionOptions
     /// <summary>Gets or sets a per-request model override; null uses the provider's configured model.</summary>
     /// <remarks>Used by workspace LLM overrides. Honored by all built-in providers.</remarks>
     public string? Model { get; set; }
+
+    /// <summary>Gets or sets prompt-caching controls passed through to the provider (REQ-RAG-043 / BRD-124).</summary>
+    /// <remarks>Null means "say nothing about caching", which leaves each provider on its own default —
+    /// automatic prefix caching for OpenAI-style services, none for Anthropic. See
+    /// <see cref="PromptCacheOptions"/> for what each provider does with it.</remarks>
+    public PromptCacheOptions? PromptCache { get; set; }
 }

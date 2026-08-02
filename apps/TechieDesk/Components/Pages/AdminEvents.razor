@@ -1,0 +1,488 @@
+@page "/admin/events"
+@using System.Text.Json
+@using Microsoft.Extensions.Configuration
+@using TechieDesk.Services.Data
+@using TechieDesk.Services.Storage
+@using TechieDeskDb
+@* Not in _Imports.razor — an unresolved component tag would silently render as raw HTML. *@
+@using TrBlazeUI.Components.DatePicker
+@using TrBlazeUI.Components.Pagination
+@using TrBlazeUI.Primitives.Table
+@inject IEventLogRepository EventLogs
+@inject IConfiguration Configuration
+@inject ToastService ToastService
+@inject ILogger<AdminEvents> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-026 / BRD-73 — built to docs/mockups/admin-events.html. Every row on this page is read
+   from the "EventLog" table at render time; nothing here is seeded, sampled or illustrative, so an
+   install that has recorded nothing yet shows the empty state rather than a demonstration grid. *@
+
+<PageTitle>@Localizer["EventsPageTitle"]</PageTitle>
+
+<div class="space-y-4">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["EventsTitle"]</h1>
+            <TypographyMuted>@SubtitleText</TypographyMuted>
+        </div>
+    </div>
+
+    @* REQ-NFR-010: a query that failed says so. An empty grid would otherwise read as
+       "nothing has ever happened on this install", which is a different fact entirely. *@
+    @if (loadError is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["EventsLoadFailed"]</AlertTitle>
+            <AlertDescription>@loadError</AlertDescription>
+        </Alert>
+    }
+
+    <!-- Filters -->
+    <Card>
+        <CardContent Class="td-events-toolbar">
+            <DatePicker @bind-Value="fromDate" Placeholder="@Localizer["EventsFrom"]" Class="td-events-date" />
+            <DatePicker @bind-Value="toDate" Placeholder="@Localizer["EventsTo"]" Class="td-events-date" />
+            <Select @bind-Value="categoryValue" TValue="string" Class="td-events-category"
+                    DisplayTextSelector="@CategoryDisplay">
+                <SelectTrigger aria-label="@Localizer["EventsFilterByCategory"]">
+                    <SelectValue Placeholder="@Localizer["EventsAllCategories"]" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem Value="@AllCategoriesValue" Text="@Localizer["EventsAllCategories"]" TValue="string">@Localizer["EventsAllCategories"]</SelectItem>
+                    @foreach (var category in categories)
+                    {
+                        <SelectItem Value="@category" Text="@category" TValue="string">@category</SelectItem>
+                    }
+                </SelectContent>
+            </Select>
+            <Input @bind-Value="searchText" Placeholder="@Localizer["EventsSearchPlaceholder"]" AriaLabel="@Localizer["EventsSearchAria"]"
+                   Class="td-events-search" />
+            <Button Variant="ButtonVariant.Outline" OnClick="ApplyFilterAsync" Disabled="isLoading">@Localizer["EventsFilter"]</Button>
+        </CardContent>
+    </Card>
+
+    <!-- Events -->
+    <Card Class="overflow-hidden">
+        <div class="relative overflow-x-auto">
+            <DataTable TData="EventLog" Data="@rows" ShowToolbar="false" ShowPagination="false"
+                       InitialPageSize="@PageSize" IsLoading="isLoading" AriaLabel="@Localizer["EventsTitle"]">
+                <Columns>
+                    <DataTableColumn TData="EventLog" TValue="DateTime" Property="@(e => e.OccurredAt)" Header="@Localizer["EventsColumnTime"]">
+                        <CellTemplate Context="row">
+                            @* The mockup shows a bare time because its sample is one day wide. A real
+                               log is not, so the date rides underneath rather than being guessed at. *@
+                            <div class="font-mono text-sm">@row.OccurredAt.ToLocalTime().ToString("HH:mm:ss")</div>
+                            <div class="text-xs text-muted-foreground">@row.OccurredAt.ToLocalTime().ToString("dd MMM yyyy")</div>
+                        </CellTemplate>
+                    </DataTableColumn>
+                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => e.Category)" Header="@Localizer["EventsCategory"]">
+                        <CellTemplate Context="row">
+                            <Badge Variant="@CategoryVariant(row.Category)">@row.Category</Badge>
+                        </CellTemplate>
+                    </DataTableColumn>
+                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => e.Actor)" Header="@Localizer["EventsActor"]" />
+                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => e.EventName)" Header="@Localizer["EventsEvent"]" />
+                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => e.Source ?? string.Empty)" Header="@Localizer["EventsSource"]">
+                        <CellTemplate Context="row">
+                            <span class="font-mono text-xs">@(string.IsNullOrWhiteSpace(row.Source) ? "—" : row.Source)</span>
+                        </CellTemplate>
+                    </DataTableColumn>
+                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => string.Empty)" Header="@Localizer["EventsColumnActions"]" HeaderClass="td-th-label-hidden">
+                        <CellTemplate Context="row">
+                            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                    OnClick="@(() => OpenDetailsAsync(row))">@Localizer["EventsDetails"]</Button>
+                        </CellTemplate>
+                    </DataTableColumn>
+                </Columns>
+                <EmptyTemplate>
+                    @* Deliberately NOT TrBlazeUI's <Empty>. In 1.0.7 that control was reported
+                       rendering its icon and nothing else — a blank panel where the explanation
+                       should be — and the failure is invisible to the compiler. The empty state is
+                       the entire message this screen has on a fresh install, so it is written out
+                       here where what renders is what is written. *@
+                    <div class="td-events-empty">
+                        <LucideIcon aria-hidden="true" Name="list" Size="36" />
+                        <div class="td-events-empty-title">@EmptyTitle</div>
+                        <div class="td-events-empty-text">@EmptyDescription</div>
+                    </div>
+                </EmptyTemplate>
+            </DataTable>
+        </div>
+        <div class="td-events-foot">
+            <Pagination State="pageState" OnPageChanged="OnPageChangedAsync" Class="td-events-pager">
+                <PaginationInfo Format="@Localizer["EventsPaginationFormat"]" EmptyText="@Localizer["EventsNoEvents"]" />
+                <PaginationContent>
+                    <PaginationItem><PaginationPrevious Text="@Localizer["EventsPrev"]" /></PaginationItem>
+                    <PaginationItem><PaginationNext Text="@Localizer["EventsNext"]" /></PaginationItem>
+                </PaginationContent>
+            </Pagination>
+        </div>
+    </Card>
+</div>
+
+@* Row details — the grid line is a summary, this is the record behind it (UI design, 2026-07-26). *@
+<Dialog Open="detailsOpen" OpenChanged="OnDetailsOpenChanged">
+    <DialogContent Class="td-dialog-wide">
+        <DialogHeader>
+            <DialogTitle>@(selected?.EventName ?? Localizer["EventsEvent"].Value)</DialogTitle>
+            <DialogDescription>@DetailsSubtitle</DialogDescription>
+        </DialogHeader>
+
+        @if (selected is not null)
+        {
+            <Tabs DefaultValue="summary">
+                <TabsList>
+                    <TabsTrigger Value="summary">@Localizer["EventsTabSummary"]</TabsTrigger>
+                    <TabsTrigger Value="payload">@Localizer["EventsTabRawRecord"]</TabsTrigger>
+                    <TabsTrigger Value="related">@Localizer["EventsRelated"]</TabsTrigger>
+                </TabsList>
+
+                <TabsContent Value="summary" ForceMount="true">
+                    <div class="td-detail-grid">
+                        <div class="text-muted-foreground">@Localizer["EventsCategory"]</div>
+                        <div><Badge Variant="@CategoryVariant(selected.Category)">@selected.Category</Badge></div>
+
+                        <div class="text-muted-foreground">@Localizer["EventsActor"]</div>
+                        <div>@selected.Actor</div>
+
+                        <div class="text-muted-foreground">@Localizer["EventsSource"]</div>
+                        <div>@(string.IsNullOrWhiteSpace(selected.Source) ? "—" : selected.Source)</div>
+
+                        <div class="text-muted-foreground">@Localizer["EventsOccurred"]</div>
+                        <div>@selected.OccurredAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm:ss") <span class="text-xs text-muted-foreground">(@selected.OccurredAt.ToString("u"))</span></div>
+
+                        <div class="text-muted-foreground">@Localizer["EventsEventId"]</div>
+                        <div class="font-mono text-xs">@selected.EventLogId</div>
+
+                        <div class="text-muted-foreground">@Localizer["EventsCorrelationId"]</div>
+                        <div class="font-mono text-xs">@(string.IsNullOrWhiteSpace(selected.CorrelationId) ? "—" : selected.CorrelationId)</div>
+                    </div>
+
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                OnClick="CopyEventIdAsync">@Localizer["EventsCopyEventId"]</Button>
+                        @if (!string.IsNullOrWhiteSpace(selected.CorrelationId))
+                        {
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                    OnClick="CopyCorrelationIdAsync">@Localizer["EventsCopyCorrelationId"]</Button>
+                        }
+                        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                OnClick="RevealLogFolder">@Localizer["EventsRevealLogFolder"]</Button>
+                    </div>
+                </TabsContent>
+
+                <TabsContent Value="payload" ForceMount="true">
+                    <TypographyMuted Class="mb-2 block text-xs">
+                        @Localizer["EventsPayloadHint"]
+                    </TypographyMuted>
+                    @if (string.IsNullOrWhiteSpace(selected.Detail))
+                    {
+                        @* Saying "no payload" is the honest answer. Rendering an empty code block
+                           would look like the record failed to load. *@
+                        <TypographyMuted>@Localizer["EventsNoPayload"]</TypographyMuted>
+                    }
+                    else
+                    {
+                        <pre class="td-raw-record">@FormatDetail(selected.Detail)</pre>
+                    }
+                </TabsContent>
+
+                <TabsContent Value="related" ForceMount="true">
+                    @if (string.IsNullOrWhiteSpace(selected.CorrelationId))
+                    {
+                        <TypographyMuted>
+                            @Localizer["EventsNoCorrelation"]
+                        </TypographyMuted>
+                    }
+                    else if (related.Count <= 1)
+                    {
+                        <TypographyMuted>
+                            @Localizer["EventsNoOtherShares"] <span class="font-mono text-xs">@selected.CorrelationId</span>.
+                        </TypographyMuted>
+                    }
+                    else
+                    {
+                        @* The list includes the event this sheet is showing — a job read forwards is
+                           only legible with its own step in place. *@
+                        <TypographyMuted Class="mb-2 block text-xs">
+                            @Localizer["EventsRelatedIntro"]
+                            <span class="font-mono">@selected.CorrelationId</span>@Localizer["EventsOldestFirst"]
+                        </TypographyMuted>
+                        <div class="relative overflow-x-auto">
+                            <DataTable TData="EventLog" Data="@related" ShowToolbar="false" ShowPagination="false"
+                                       InitialPageSize="200" AriaLabel="@Localizer["EventsRelated"]">
+                                <Columns>
+                                    <DataTableColumn TData="EventLog" TValue="DateTime" Property="@(e => e.OccurredAt)" Header="@Localizer["EventsColumnTime"]">
+                                        <CellTemplate Context="row">
+                                            <span class="font-mono text-xs">@row.OccurredAt.ToLocalTime().ToString("HH:mm:ss")</span>
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => e.EventName)" Header="@Localizer["EventsEvent"]" />
+                                    <DataTableColumn TData="EventLog" TValue="string" Property="@(e => e.Category)" Header="@Localizer["EventsCategory"]">
+                                        <CellTemplate Context="row">
+                                            <Badge Variant="@CategoryVariant(row.Category)">@row.Category</Badge>
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                </Columns>
+                            </DataTable>
+                        </div>
+                    }
+                </TabsContent>
+            </Tabs>
+        }
+
+        <DialogFooter>
+            <DialogClose AsChild>
+                <Button Variant="ButtonVariant.Outline">@Localizer["EventsClose"]</Button>
+            </DialogClose>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>Select value standing for "no category filter".</summary>
+    private const string AllCategoriesValue = "*";
+
+    /// <summary>Rows per page; also the page size handed to the grid so it does not re-slice.</summary>
+    private const int PageSize = 25;
+
+    private readonly PaginationState pageState = new() { CurrentPage = 1, PageSize = PageSize };
+
+    private IReadOnlyList<EventLog> rows = [];
+    private IReadOnlyList<EventLog> related = [];
+    private IReadOnlyList<string> categories = [];
+
+    private EventLog? selected;
+    private bool? detailsOpen;
+
+    private DateTime? fromDate;
+    private DateTime? toDate;
+    private string categoryValue = AllCategoriesValue;
+    private string searchText = string.Empty;
+
+    private bool isLoading = true;
+    private bool hasFilters;
+    private string? loadError;
+
+    private string SubtitleText
+    {
+        get
+        {
+            if (pageState.TotalItems == 0)
+            {
+                return Localizer["EventsSubtitleEmpty"];
+            }
+
+            var summary = categories.Count == 0
+                ? Localizer["EventsSubtitleRecordedHere"].Value
+                : string.Join(", ", categories).ToLowerInvariant();
+            return Localizer["EventsSubtitleCount", pageState.TotalItems.ToString("N0"), summary];
+        }
+    }
+
+    private string EmptyTitle => hasFilters ? Localizer["EventsEmptyFiltered"] : Localizer["EventsEmptyNone"];
+
+    private string EmptyDescription => hasFilters
+        ? Localizer["EventsEmptyFilteredHint"]
+        : Localizer["EventsEmptyNoneHint"];
+
+    private string DetailsSubtitle
+    {
+        get
+        {
+            if (selected is null)
+            {
+                return string.Empty;
+            }
+
+            var stamp = selected.OccurredAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm:ss");
+            return Localizer["EventsDetailSubtitle", stamp, selected.Category, selected.EventLogId];
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private EventLogFilter BuildFilter() => new()
+    {
+        Category = categoryValue == AllCategoriesValue ? null : categoryValue,
+        // The picker yields a local calendar day. Taking it as UTC would silently shift the
+        // boundary by the offset and drop events the operator can see on screen.
+        From = fromDate?.Date.ToUniversalTime(),
+        To = toDate?.Date.AddDays(1).AddTicks(-1).ToUniversalTime(),
+        SearchText = string.IsNullOrWhiteSpace(searchText) ? null : searchText,
+        Offset = (pageState.CurrentPage - 1) * PageSize,
+        Limit = PageSize
+    };
+
+    private async Task ReloadAsync()
+    {
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            var filter = BuildFilter();
+            hasFilters = filter.Category is not null
+                || filter.From is not null
+                || filter.To is not null
+                || filter.SearchText is not null;
+
+            var total = await EventLogs.CountAsync(filter);
+
+            // A filter change can leave the current page beyond the end of the new result set,
+            // which would render an empty grid over a non-zero total. Walk back to the last page
+            // that exists and re-query rather than showing that.
+            var lastPage = total == 0 ? 1 : (total + PageSize - 1) / PageSize;
+            if (pageState.CurrentPage > lastPage)
+            {
+                pageState.CurrentPage = lastPage;
+                filter = BuildFilter();
+            }
+
+            pageState.TotalItems = total;
+            pageState.PageSize = PageSize;
+            rows = await EventLogs.QueryAsync(filter);
+            categories = await EventLogs.ListCategoriesAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Reading the event log failed");
+            loadError = exception.Message;
+            rows = [];
+            pageState.TotalItems = 0;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplyFilterAsync()
+    {
+        // A new filter always starts at page one; keeping the old page number would open the
+        // results somewhere in the middle for no reason the operator asked for.
+        pageState.CurrentPage = 1;
+        await ReloadAsync();
+    }
+
+    private async Task OnPageChangedAsync(int page)
+    {
+        pageState.CurrentPage = page < 1 ? 1 : page;
+        await ReloadAsync();
+    }
+
+    private async Task OpenDetailsAsync(EventLog row)
+    {
+        selected = row;
+        related = [];
+        detailsOpen = true;
+
+        try
+        {
+            related = await EventLogs.QueryByCorrelationAsync(row.CorrelationId);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Reading correlated events for {EventLogId} failed", row.EventLogId);
+            ToastService.Error(exception.Message, Localizer["EventsRelatedUnavailable"]);
+        }
+    }
+
+    private void OnDetailsOpenChanged(bool open)
+    {
+        detailsOpen = open;
+        if (!open)
+        {
+            selected = null;
+            related = [];
+        }
+    }
+
+    /// <summary>
+    /// Renders the closed trigger. Without this the trigger shows the raw bound value — the
+    /// sentinel "*" was rendering literally until the list had been opened once.
+    /// </summary>
+    private string CategoryDisplay(string value) =>
+        value == AllCategoriesValue ? Localizer["EventsAllCategories"] : value;
+
+    private static BadgeVariant CategoryVariant(string category) => category switch
+    {
+        "Auth" => BadgeVariant.Default,
+        "Ingestion" => BadgeVariant.Secondary,
+        "Configuration" => BadgeVariant.Outline,
+        _ => BadgeVariant.Secondary
+    };
+
+    /// <summary>Pretty-prints a JSON detail payload, leaving anything else exactly as written.</summary>
+    private static string FormatDetail(string detail)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(detail);
+            return JsonSerializer.Serialize(document.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch (JsonException)
+        {
+            // Not every writer emits JSON, and mangling a plain-text payload to make it look like
+            // JSON would misrepresent what was actually recorded.
+            return detail;
+        }
+    }
+
+    private async Task CopyEventIdAsync()
+    {
+        if (selected is not null)
+        {
+            await CopyAsync(selected.EventLogId.ToString(), Localizer["EventsLabelEventId"]);
+        }
+    }
+
+    private async Task CopyCorrelationIdAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(selected?.CorrelationId))
+        {
+            await CopyAsync(selected.CorrelationId, Localizer["EventsLabelCorrelationId"]);
+        }
+    }
+
+    private async Task CopyAsync(string value, string label)
+    {
+        try
+        {
+            await Clipboard.Default.SetTextAsync(value);
+            ToastService.Success(Localizer["EventsCopiedBody", label, value], Localizer["EventsCopiedTitle"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Clipboard write failed");
+            ToastService.Error(Localizer["EventsClipboardUnavailable", exception.Message], Localizer["EventsNotCopiedTitle"]);
+        }
+    }
+
+    private void RevealLogFolder()
+    {
+        var logFolder = Path.Combine(
+            DataDirectory.Resolve(Configuration[DataDirectory.ConfigKey]),
+            DataDirectory.LogDirectoryName);
+
+        var outcome = FileManagerReveal.Reveal(logFolder);
+        // REQ-UI-055: the outcome carries a resource key and its values, not a sentence.
+        var message = Localizer[outcome.MessageKey, outcome.Arguments].Value;
+        if (outcome.Launched)
+        {
+            ToastService.Success(message, Localizer["EventsLogFolderTitle"]);
+            return;
+        }
+
+        Logger.LogWarning("Reveal failed for {Path}: {MessageKey}", logFolder, outcome.MessageKey);
+        ToastService.Error(message, Localizer["EventsRevealFailed"]);
+    }
+}

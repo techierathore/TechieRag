@@ -1,95 +1,108 @@
 ---
 project: TechieRag
-stack: .NET 10 class library (NuGet) + TechieRag.Embedded (ONNX BGE-M3) + TechieDesk Blazor Server app (TrBlazeUI, apps/TechieDesk)
-last_updated: 2026-07-20
-current_phase: Build — UAT blocked by REQ-FN-032
+stack: .NET 10 class library (NuGet) + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieDesk desktop app (MAUI Blazor Hybrid — macOS + Windows, TrBlazeUI, apps/TechieDesk)
+last_updated: 2026-08-02
+current_phase: Build — 100 open; service-layer English 569 → 330
 last_verified_build: PASS
-last_verified_date: 2026-07-20
+last_verified_date: 2026-08-02
 ---
 
 # TechieRag — Status
 
 Configurable .NET 10 RAG library (NuGet) + TechieDesk product app. **This file is the dashboard only** —
-per-REQ evidence lives in `docs/TechieDesk-Checklist.md` (Requirements Status table; single live tracker for
-app + library + feedback); the frozen legacy scope in `docs/TechieRag-Checklist.md`; library defects in the
-per-library feedback files.
+per-REQ evidence lives in `docs/TechieDesk-Checklist.md` (Requirements Status table); library defects in
+the per-library feedback files.
 
 ## Where I am
 
-**2026-07-20 `*build-phase TechieDesk` — 5 parallel clusters, scope = close both PARTIALs + 6 cross-cutting NFRs.**
-Build 0-err, 0×NU1902; `dotnet test` **270/270** (66 lib + 204 app). Both PARTIALs cleared: REQ-RAG-011/033
-(XLSX/PPTX/CSV processors, reusing existing OpenXml dep) and REQ-RAG-013 + TR-RAG-003 (workspace-scoped
-`AskStreamWithSourcesAsync` merging pinned docs). Six NFRs moved off `Not Started`: NFR-003 (perf — 4.2ms UI, 2.9s
-10-page embed, 100/100 circuits), NFR-007 (120/120 cross-engine cells, 0px overflow), NFR-008 (zero egress
-violations), NFR-010 (restart-safety proven), NFR-004 + NFR-005 `PARTIAL`.
-
-**Three prior rows were overstated and are corrected.** REQ-UI-007 `Implemented 90% → FAIL` (login "confirmed" was
-the network call, not a usable session — REQ-FN-032). REQ-RAG-014 `Verified → Needs re-verify` (persistence was
-verified, behavior recorded; `Workspace.RerankEnabled` is dead config — REQ-RAG-047). The 2026-07-18 verify ledger's
-boot line omits `ASPNETCORE_ENVIRONMENT=Development`, under which Blazor never boots — its render-gate claims are
-unfalsifiable (screenshots gone); Cluster D's 20-route × 3-engine re-sweep restores confidence in the render half.
-Nothing was promoted to `Verified` this run — build-phase's ceiling is `Implemented`.
+One `*build-phase` fanned **six ways** in parallel on `REQ-UI-055`, with `*verify all` chained inline.
+Build **0 errors**, **2,180 tests pass**. Service-layer English **569 → 330** — a 239-literal
+reduction — and the ratchet is lowered to 330 so it cannot be given back. **23/23 screens sweep clean
+in Hindi.** Two new rows raised from what the work uncovered.
 
 ## Next command to run
 
-⚠ The prior "Owner UAT — READY NOW" pointer was WRONG and is withdrawn — AppManager mode cannot be signed into
-(REQ-FN-032). UAT is blocked until it is fixed.
+```
+/TechieFlow:agents:flow-master *build-phase TechieDesk   (OpenCode: /flow-master *build-phase TechieDesk)
+```
 
-`/TechieFlow:agents:flow-master *build-phase TechieDesk` — open: **REQ-FN-032** (login loop; needs an owner
-architecture decision on session continuity first — see Known blockers), REQ-RAG-047, REQ-RAG-048, plus P2 scope
-(REQ-RAG-016…020/031/032/034/035, REQ-FN-020).
-
-Verify only after those: `/TechieFlow:agents:verifier *verify all TechieDesk`. Its promotion ceiling is capped by
-three blockers — login loop (auth track), TR-008 TrBlazeUI a11y defects (NFR-005), no LLM provider (streamed rows).
-
-Docs: `*devguide TechieDesk` still does not exist.
+Build leads because `REQ-UI-056`, `REQ-UI-057`, `REQ-RAG-045`, `REQ-RAG-046` are unbuilt and `REQ-UI-007`,
+`REQ-FN-045`, `REQ-FN-051`, `REQ-RAG-044`, `REQ-UI-040` are `PARTIAL`. ⚠ **But of those nine, only
+`REQ-UI-057` (a test-fixture port race) is buildable without you** — `REQ-UI-056` needs your
+persisted-English decision, `REQ-RAG-045/046` are BRD-deferred by your decision, and the five `PARTIAL`
+rows are environment-gated. **The higher-value moves are yours, not another build pass:** start Ollama or
+Docker (unlocks most of the 44 `Needs re-verify` rows), or decide `REQ-UI-056`.
 
 ## Open requirements
 
-- **TechieDesk: 90 open** of 130 in `docs/TechieDesk-Checklist.md#requirements-status` — **40 terminal**
-  (29 `Verified` + 11 `Done (pre-existing)`). Open: 1 `FAIL` (UI-007 login loop); 1 `Needs re-verify` (RAG-014,
-  needs RAG-047); 2 `PARTIAL` (NFR-004 owner decisions, NFR-005 blocked by TR-008); ~33 `Implemented` — auth track
-  (UI-006/008…013, FN-002/003/013/014/015) now **UAT-blocked** by FN-032, plus RAG-010/011/013/033,
-  NFR-003/007/008/010, FN-012/016/017/018/019/031, UI-017…023, NFR-002; NFR-001 `Blocked` (owner PAT);
-  3 NEW `Not Started` (FN-032, RAG-047, RAG-048); ~50 `Not Started` in P2–P5.
-- **TechieRag (legacy scope): none open.** All 37 REQs terminal in the frozen `docs/TechieRag-Checklist.md`.
+- **TechieDesk: 100 open** of 170 — **70 terminal** (52 `Verified` + 18 `N/A`). **0 `FAIL`.** Open: 44
+  `Needs re-verify`, 37 `Implemented`, 10 `Blocked`, 5 `PARTIAL`, 2 `Planned`, 2 `Not Started`.
+- **Delivered**: `REQ-UI-055` → `Implemented` 75%. Six slices converted — connectors −32, scheduling −62,
+  licensing −38, backup/Docker −62, leaf services −18, agent skills −3. ~250 keys, parity intact.
+- **Raised**: `REQ-UI-056` (65 deferred literals + a persisted-English **policy decision**),
+  `REQ-UI-057` (a test flake three clusters hit independently).
 
 ## Known blockers
 
-- 🚫 **BLOCKER (REQ-FN-032) — AppManager mode cannot be logged into.** `Login.razor:117` `NavigateTo(…, forceLoad: true)` destroys the circuit; `SessionTokenStore` is per-circuit by design, so the next circuit has no session and `IRouteGuard` loops to `/login`. Login itself succeeds (AppManager 200). Fix needs session continuity across circuits (auth cookie / protected browser storage), weakening the "tokens never leave the server" property FN-002/NFR-004 assume — usual reconciliation is a signed HttpOnly/Secure/SameSite cookie holding only a session handle. **OWNER ARCHITECTURE DECISION; not made unilaterally.** Blocks the entire ~13-row live AppManager UAT track.
-- ⚠ **OWNER DECISION (REQ-NFR-004a):** the NU1902 fix pins `HtmlSanitizer 9.1.949-beta`, putting TWO pre-release packages (+ `AngleSharp.Css 1.0.0-beta.216`) into a distributable product. No stable HtmlSanitizer exists on AngleSharp ≥1.5.0; real fix is upstream (TR-009).
-- ⚠ **OWNER DECISION (REQ-NFR-004b):** `techierag-config.json` persists provider API keys in cleartext at rest. Gitignored, so NFR-002 (no committed secrets) stands — but it wants encryption at rest.
-- ⚠ **Security (REQ-NFR-001):** TrBlazeUI PAT tracked in `nuget.config` history — owner must `git rm --cached nuget.config` + revoke/rotate the PAT (git/GitHub actions, owner-only). Working tree is clean + gitignored.
-- ⚠ **TR-008 (REQ-NFR-005):** 60 axe nodes (15 critical + 27 serious) remain inside TrBlazeUI 1.0.7 and are NOT app-fixable — Select triggers are unnameable, Tabs emit invalid `aria-controls`, Slider/Progress/FileUpload unnamed. NFR-005 cannot reach `Verified` without a TrBlazeUI release.
-- ✅ **NU1902 CLEARED** 2026-07-20 — AngleSharp now resolves to 1.5.1; build 0×NU1902, `dotnet list --vulnerable` clean.
-- **Live externals for UAT:** AppManager is **wired and live-proven** — `admin@appmanager.local` logged in end-to-end (public-key + login 200 over TLS to `192.168.1.14:5101`). Self-signed cert handled by the dev-only `AppManager:AllowUntrustedServerCertificate` flag (Development-only, AppManager client only). The auth network cluster (UI-006…013 / FN-001…007) is now UAT-reachable — run `*verify all` to promote. Still needed: an **LLM provider** for streamed-chat rows and **Docker** for the Postgres/compose rows.
-- RAG retrieval runs offline via bundled BGE-M3 (cached under apps/TechieDesk/bin/.../models/bge-m3) — no external embed server.
+- 🔴 **DECISION NEEDED (`REQ-UI-056`): persisted English in the database.** `ScheduleRunItem.Reason`,
+  `ScheduleRun.FailureReason` and `ScheduleRun.Detail` hold English rows already on disk that cannot be
+  re-rendered, so any conversion needs a **permanent** key-or-legacy-text fallback. Two clusters found
+  this independently and neither would decide it alone. 65 connector literals wait on it.
+- 🔴 **THE ENVIRONMENT IS THE CEILING, not the pace.** ~58 of the 100 open rows need something this
+  machine does not have: an LLM provider (Ollama), a reachable AppManager, Docker, IMAP, Postgres, an
+  Apple signing identity, or Windows platform sources. **Ollama and Docker alone would unlock most of
+  the 44 `Needs re-verify` rows.** Only you can provide these.
+- ⚠ **The licence banner has never been seen on screen.** `MainLayout.razor:524` was this pass's
+  highest-visibility fix, but it renders only when AppManager supplies a licence message — a live probe
+  found zero licence text on this install. Proven by test in both cultures; unproven visually.
+- ⚠ **Read-aloud in Hindi is unverified on a real Mac.** `MauiReadAloudService` spoke with no
+  `SpeechOptions.Locale`, so Hindi answers were being **silently skipped by an English voice** — a
+  pre-existing defect now gated on `CanSpeakAsync`. Whether a `hi-IN` voice is installed is a per-machine
+  fact only a run can answer.
+- ⚠ **~2,900 Hindi keys are agent-produced**, not a native speaker's. Terms wanting a ruling: `सीट` (seat),
+  `ग्रेस अवधि` (grace period), `View → दृश्य`, `Provider → प्रोवाइडर`. One known infelicity is shipped and
+  recorded in code (`CronDescriber` repeats तारीख़ in a multi-date list).
+- ⚠ **`REQ-UI-057`**: a `ConnectorEndToEndTests` port-binding flake makes the suite non-deterministic.
+  Three clusters hit it independently — the danger is it teaches people to re-run rather than investigate.
+- ⚠ **330 service literals remain**, a substantial share of which is *deliberate* machine-facing text the
+  counter cannot distinguish from prose. That is why it is a ratchet, not a zero gate.
+- 🔴 **`REQ-FN-043`** Apple signing identity — one owner decision gating four REQs.
+- 🔴 **`REQ-FN-035`**: the Windows head has no platform sources.
+- ⚠ **OWNER DECISIONS carried**: MCP threat model; a restored `.tdbak` mints a new install identity and
+  burns a seat; `REQ-UI-040`'s run-from-chat and the flow-builder vocabulary both want a `*mockups` pass.
+- ⚠ **`REQ-NFR-001`** PAT still in `nuget.config` history — owner must untrack and rotate.
 
 ## Library feedback summary
 
-- **TrBlazeUI:** 0 major, 2 open minor (TR-003 SidebarInset; TR-004 DataTable scroll), 1 nice-to-have
-  (TR-002 css 404 — `TechieDesk.styles.css` 404 re-confirmed this run, cosmetic, all pages render styled) — `docs/TechieRag-TrBlazeUI-Feedback.md`
-- **TechieRag:** TR-RAG-001/002 fixed (REQ-RAG-024/029, Verified); TR-RAG-003/004 open minor (app worked around) — `docs/TechieRag-TechieRag-Feedback.md`
+- **TrBlazeUI — 28 entries.** **TR-024 closed-with-workaround** (`Select.DisplayTextSelector`, now applied
+  to 14 Selects). **TR-039** (`NumberInput` does not exist; the wrong guess renders an invisible control).
+  **TR-038** (reference-doc parameter tables materially incomplete). **TR-008 corrected.**
+- **TechieRag — 43 entries.** TR-RAG-041 fixed in-library; TR-RAG-042/043 open.
 
 ## Standards compliance
 
-- Verifier greps clean 2026-07-18: 0 underscore-field violations, 0 test-method-underscore violations, 0 EF Core refs in apps/. Build 4 warnings (all NU1902 AngleSharp).
+- Build **0 errors**; **2,180 tests pass** (1,519 app + 661 lib), 28 skipped.
+- Markup localization **100%** under a **deliberately widened** definition; the numerator definition is
+  untouched, so 45/117/942/1709/2280 remains one comparable series.
+- Greps clean: no `a`/`v`/`obj` field prefixes, no underscore fields, no underscored test names.
+- ⚠ Pre-existing: `MauiProgram.cs` `SCREAMING_SNAKE_CASE` env var; ~14 CS1591 in `TechieRagManager.cs`.
 
 ## Verification log
 
-| Date | Phase | Result |
-|------|-------|--------|
-| 2026-07-02 | Full verify (`*verify all`, 36 REQs, live LM Studio + Qdrant) | Builds 0-err, xUnit, Playwright 37/37; live ingest/RAG/token/Qdrant proven — [details](docs/TechieRag-Checklist.md#requirements-status) |
-| 2026-07-02 | Handoff | Ship-ready for UAT; all 36 REQs terminal — [details](docs/TechieRag-Checklist.md#requirements-status) |
-| 2026-07-17 | Build+verify (`*build-phase`, REQ-UI-014 rename) | TechieDesk rename Verified; Playwright 10/10 @1280/390; all 37 legacy REQs terminal — [details](docs/TechieRag-Checklist.md#requirements-status) |
-| 2026-07-17 | Split (`*split-brd TechieDesk`) | TechieDesk BRD + checklist: 127 REQs (40 UI/31 FN/46 RAG/10 NFR); 11 Done pre-existing, 2 PARTIAL, 114 Not Started |
-| 2026-07-18 | Full verify (`*verify all` TechieDesk, Phase 1) | Build 0-err; 180/180 tests; greps clean; 19-route Playwright sweep @1280/390 + live drives. **26 REQs → Verified** (auth/persistence logic, RAG-024…030 lib primitives, UI-014/015/016 live, NFR-009). **REQ-UI-022 visual FAIL** (/setup stepper overflow @390) → Needs re-verify; NFR-006 PARTIAL. AppManager/LLM/Docker rows render-confirmed, pending owner UAT — [details](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-07-18 | Build Phase-1 (`*build-phase TechieDesk`, 6 waves + fix) | All Phase-1 features built via parallel subagents (trblazeui/techierag/flow-master). Clean rebuild 0-err; **204/204 tests** (53 lib + 151 app); greps clean. Waves 0-5 (foundation/auth/library/workspaces/doc-library/wizard-docker) + Wave 6 (thread export/delete FN-010/011, licensing FN-013/014/015, /setup @390 fix). **+4 Verified** (UI-022 re-verified, FN-010/011, NFR-006) → **30 Verified total**; FN-013/014/015 Implemented (AppManager UAT). 2 new lib gaps logged (TR-RAG-003/004) — [details](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-07-18 | Config + live AppManager login | Moved AppManager creds to gitignored `appsettings.Development.json` (no env vars, no committed secret; NFR-002 restored); added dev-only `AppManager:AllowUntrustedServerCertificate` (Development + AppManager-client-scoped) for the self-signed host. Build 0-err. **Live-proven:** boot → AppManager mode; `GET /AuthSvc/public-key` + `POST /AuthSvc/login` → 200 over TLS to `192.168.1.14:5101`; **superadmin login succeeded** (RSA pw accepted). Auth cluster (UI-006…013/FN-001…007) now UAT-reachable — next: `*verify all` to promote — [details](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-07-18 | Re-verify (`*verify all TechieDesk`, offline sweep) | Independent re-verification, no verdict changes. Clean build; **204/204 tests** (151 app + 53 lib) re-run green. Booted offline single-user Admin (port 5099) + 20-route Playwright render+visual sweep @1280/390: **0 horizontal overflow anywhere** (NFR-006), no blank/error screens; 14 screens visually confirmed look-right incl. all 11 `Done (pre-existing)` console rows + auth/workspace/doc/profile/wizard/pricing. **0 new defects.** No promotions possible offline — 27 `Implemented` rows need live AppManager/LLM/Docker (owner UAT). Re-confirmed known issues: TR-002 scoped-css 404 (cosmetic), NU1902 AngleSharp (NFR-004). No DevGuide exists → `*devguide TechieDesk` recommended — [details](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-07-20 | Build (`*build-phase TechieDesk`, 5 clusters: FIX + NFR audits) | Build 0-err, **0×NU1902**; **270/270 tests** (66 lib + 204 app). Closed both PARTIALs: RAG-011/033 (XLSX/PPTX/CSV processors, existing OpenXml dep reused) and RAG-013 + **TR-RAG-003** (workspace-scoped `AskStreamWithSourcesAsync` merging pinned docs; pinned chip live-observed pre-token). 6 NFRs off `Not Started`: NFR-003 (4.2ms UI / 2.9s 10-page embed / 100-circuit), NFR-007 (**120/120** cross-engine cells, 0px overflow), NFR-008 (0 egress violations), NFR-010 (restart-safety proven; vector-store outage mis-reported as "workspace does not exist" — **fixed**), NFR-004 + NFR-005 `PARTIAL`. **3 corrections to prior rows:** UI-007 → `FAIL` (**REQ-FN-032 login loop** — AppManager mode unusable; prior "live login confirmed" proved the network call, not a session), RAG-014 `Verified` → `Needs re-verify` (rerank is dead config → REQ-RAG-047), and the 2026-07-18 ledger boot line omits `ASPNETCORE_ENVIRONMENT=Development` (without it Blazor never boots) — corrected in `docs/.last-verify.json`. **Nothing promoted to `Verified`** (build ceiling = `Implemented`). 8 new library gaps logged (TR-RAG-005…008, TR-008/009/010) — [details](docs/TechieDesk-Checklist.md#requirements-status) |
+| Date | Phase | Result | Status table |
+|------|-------|--------|--------------|
+| 2026-08-02 | **`*build-phase` (6 parallel clusters) → `*verify all` inline** | ✅ **2,180 tests pass, 0 errors, 23/23 screens clean in Hindi at both widths.** 🔴 **Service-layer English 569 → 330** and the ratchet lowered to match, so the gain is locked. `CronDescriber` was the hard one and was solved properly — Hindi reverses three joins, so it now composes from whole localizable patterns, and there is deliberately **no English default overload**. 🔴 **A live pre-existing defect found**: read-aloud spoke with no locale, so Hindi answers were being **silently skipped by an English voice**. 🔴 Traps avoided by evidence: the audience split was *found* at `AgentLoopRunner.cs:126`, not judged; the Turkish-i trap in promo codes; a bound value that was the English label. ⚠ **Three mutations came back GREEN and were reported** — including a `.resx` heredoc that silently never applied, which would fake a RED-proof invisibly. ⚠ **My own errors**: I told all six clusters the ratchet would go red (it is a ceiling); and a probe mutation of mine poisoned intermediates across three projects and looked like a real compile error | [table](docs/TechieDesk-Checklist.md#requirements-status) |
+| 2026-08-02 | **`*build-phase` (2 clusters) → `*verify all` inline** | ✅ **2,073 tests pass, 0 errors. Both defects the previous smoke found are FIXED and verified live.** 🔴 `REQ-UI-054`: root cause proven and it was **not** the title collision I hypothesised — UIKit hands every Catalyst app a stock `Format ▸ Font ▸ Text Size` owning `⌘+`/`⌘−`, and `UIMenuBuilder` **discards the entire menu** that re-declares an owned key, silently. Proved by probe (a `⌘0`-only menu drew, a `⌘+`-only menu did not); in Hindi the identifiers ran `td.menu.0/1/3` with `td.menu.2` missing. Fixed in `AppDelegate`; `दृश्य` now shows `ज़ूम इन`/`ज़ूम आउट`/`वास्तविक आकार`. 🔴 `REQ-UI-051` service layer: services now return **invariant keys** — chosen because the page-level mapping was already leaking. `/settings/data` verified in Devanagari with paths still Latin. 🔴 **569 service-layer literals found** → `REQ-UI-055`, frozen by a ratchet. ⚠ **Three of my own recorded claims were wrong and are corrected**: the impact of `REQ-UI-054` (the shortcuts DID work when the web view had focus), its root cause, and my inference about what a cluster had been doing. ⚠ A mutation exposed that **a missing Hindi key silently resolves to English** | [table](docs/TechieDesk-Checklist.md#requirements-status) |
+| 2026-08-01 | **`*build-phase` (4 clusters) → `*verify all` inline** | ✅ **2,055 tests pass, 0 errors, 23/23 screens clean at both widths in English AND Hindi — including the native menu bar in Devanagari.** 🔴 **Markup localization COMPLETE (100%)**, and the counter was widened on purpose so its own number would stop flattering us. 🔴 `REQ-UI-051`: the biggest find was unbriefed — `LlmSettings`' entire provider form lives in a `RenderFragment` inside `@code`, invisible to the counter while the page read zero. 🔴 **Two defects found by looking at the running app**: the `View` menu never reaches the menu bar (`REQ-UI-054`), and service-layer English still renders on `/settings/data`. 🔴 **`REQ-UI-053` DISPROVEN by probe** — a DOM `id` does not cross the BlazorWebView boundary; `nav-` appears 0 times in the AX tree. ⚠ **A harness gap closed for the second pass running**: `/settings/backup` had shipped for days and had never been graded. ⚠ **Third instance of one pattern**: localizing a surface silently invalidated a harness selector (`CHROMELESS` this time) | [table](docs/TechieDesk-Checklist.md#requirements-status) |
+| 2026-08-01 | **`*build-phase` (3+1 clusters) → `*verify all` inline** | ✅ 2,019 tests. BRD-123 orchestration framework + BRD-92 flow builder, proven across a kill-and-relaunch. `REQ-UI-050` 48.2% → 80.1% | [table](docs/TechieDesk-Checklist.md#requirements-status) |
 
 ## Deferred / future
 
-- TechieDesk Phase 2–5 roadmap (connectors, REST API, widget, agents, i18n, billing/support) — per-phase REQs in `docs/TechieDesk-Checklist.md`.
-- OpenTelemetry exporters (REQ-RAG-036), net8.0 TFM (REQ-RAG-037), more vector stores/providers (REQ-RAG-034/035/044).
+- **`REQ-UI-056`** — the 65 deferred connector literals, once the persisted-English policy is decided.
+- **`REQ-UI-057`** — the connector test-fixture port race.
+- A test asserting `run_sweep.SIDEBAR` covers every `SidebarMenuButton`, and one asserting no harness
+  selector is an English literal — that pattern has now bitten three times.
+- Wiring `menu_check.py` into `verify-phase`; it is the only check that can see the REQ-UI-054 class.
+- Library-side English in `src/TechieRag` (`GuardedToolHandler`, `FlowRunner` block messages) — what a
+  Hindi user actually sees for a flow tool-call block. No cluster owns it.
+- `REQ-UI-040` run-from-chat + a `*mockups` pass; `REQ-RAG-045/046`; `PgVectorStore`'s real-Postgres test.

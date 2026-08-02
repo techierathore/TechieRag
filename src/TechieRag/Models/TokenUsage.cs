@@ -12,6 +12,17 @@ public class TokenUsage
     /// <summary>Gets the total tokens (input + output).</summary>
     public int TotalTokens => InputTokens + OutputTokens;
 
+    /// <summary>Gets or sets prompt tokens served from the provider's cache (REQ-RAG-043 / BRD-124).</summary>
+    /// <remarks>Zero when the provider reported nothing, which is not the same as a cache miss — Ollama
+    /// and LM Studio have no cache to report on at all. Billed at a discount where the provider caches.</remarks>
+    public int CacheReadTokens { get; set; }
+
+    /// <summary>Gets or sets prompt tokens written into the provider's cache (REQ-RAG-043 / BRD-124).</summary>
+    /// <remarks>Anthropic bills a cache write at a premium over an ordinary input token, so this is
+    /// tracked separately rather than folded into <see cref="InputTokens"/>: a caller comparing the cost
+    /// of caching against not caching needs the two apart.</remarks>
+    public int CacheWriteTokens { get; set; }
+
     /// <summary>Gets or sets the estimated cost in USD.</summary>
     public decimal EstimatedCostUsd { get; set; }
 

@@ -351,7 +351,38 @@ public enum EmbeddingSource
     /// Supports OpenAI-compatible and Ollama-compatible API formats.
     /// Configure endpoint, API path, and format via EmbeddingConfig.
     /// </remarks>
-    Http
+    Http,
+
+    /// <summary>
+    /// Cohere embed API (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>
+    /// Asymmetric models: documents are embedded with <c>search_document</c> and queries with
+    /// <c>search_query</c>. Requires an API key.
+    /// </remarks>
+    Cohere,
+
+    /// <summary>
+    /// Voyage AI embeddings (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>
+    /// OpenAI-shaped API with an asymmetric <c>input_type</c>. Requires an API key.
+    /// </remarks>
+    Voyage,
+
+    /// <summary>
+    /// Mistral embeddings (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>OpenAI-shaped API, symmetric embeddings. Requires an API key.</remarks>
+    Mistral,
+
+    /// <summary>
+    /// Google Gemini embeddings (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>
+    /// Uses the <c>batchEmbedContents</c> method with a retrieval task type. Requires an API key.
+    /// </remarks>
+    GoogleGemini
 }
 
 /// <summary>
@@ -479,6 +510,20 @@ public class LlmConfig
 
     /// <summary>Gets or sets the maximum context window size in tokens.</summary>
     public int MaxContextTokens { get; set; } = 128000;
+
+    /// <summary>
+    /// Gets or sets the named connector from <c>LlmConnectorCatalog</c> to use, e.g. <c>groq</c>
+    /// (REQ-RAG-034).
+    /// </summary>
+    /// <remarks>
+    /// <para>Lets configuration name a service instead of pasting its base URL. When set and
+    /// <see cref="Endpoint"/> is empty, the connector's endpoint and provider implementation are
+    /// used; an explicit <see cref="Endpoint"/> always wins, so a self-hosted or proxied deployment
+    /// can still override it.</para>
+    /// <para>A new property on a configuration class rather than a new <see cref="LlmSource"/>
+    /// member, so no consumer's existing switch over <see cref="LlmSource"/> changes meaning.</para>
+    /// </remarks>
+    public string? Connector { get; set; }
 }
 
 /// <summary>Configuration for token usage tracking and budgets.</summary>

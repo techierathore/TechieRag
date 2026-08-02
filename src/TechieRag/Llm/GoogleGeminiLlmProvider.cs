@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
+using TechieRag.Diagnostics;
 using TechieRag.Models;
 
 namespace TechieRag.Llm;
@@ -20,7 +21,7 @@ namespace TechieRag.Llm;
 /// role names differ ("model" instead of "assistant"), and tool definitions use
 /// a different schema format ("functionDeclarations").</para>
 /// </remarks>
-public class GoogleGeminiLlmProvider : ILlmProvider
+public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
     private readonly HttpClient httpClient;
     private readonly string apiKey;
@@ -38,6 +39,11 @@ public class GoogleGeminiLlmProvider : ILlmProvider
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
+
+    /// <inheritdoc/>
+    /// <remarks>Images are encoded as <c>inlineData</c> parts, or as <c>fileData</c> when referenced by URL (REQ-RAG-039).</remarks>
+    public bool SupportsInput(ChatContentKind kind) =>
+        kind is ChatContentKind.Text or ChatContentKind.Image;
 
     /// <inheritdoc/>
     public event EventHandler<LlmCompletionEventArgs>? OnCompletionCompleted;
@@ -127,6 +133,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
         var toolCalls = ExtractToolCalls(candidate);
         var inputTokens = result.UsageMetadata?.PromptTokenCount ?? 0;
         var outputTokens = result.UsageMetadata?.CandidatesTokenCount ?? 0;
+        var cacheReadTokens = result.UsageMetadata?.CachedContentTokenCount ?? 0;
 
         var llmResponse = new LlmResponse
         {
@@ -136,6 +143,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
             {
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
+                CacheReadTokens = cacheReadTokens,
                 ModelName = ModelName,
                 ProviderName = Name
             },
@@ -143,7 +151,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider
             ModelName = ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls);
+        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens);
         return llmResponse;
     }
 
@@ -247,10 +255,10 @@ public class GoogleGeminiLlmProvider : ILlmProvider
         // Map messages (skip system messages)
         var contents = messages
             .Where(m => m.Role != "system")
-            .Select(m => new
+            .Select(m => new Dictionary<string, object>
             {
-                role = m.Role == "assistant" ? "model" : m.Role,
-                parts = new[] { new { text = m.Content ?? string.Empty } }
+                ["role"] = m.Role == "assistant" ? "model" : m.Role,
+                ["parts"] = BuildParts(m)
             }).ToList();
 
         request["contents"] = contents;
@@ -263,6 +271,11 @@ public class GoogleGeminiLlmProvider : ILlmProvider
 
         if (genConfig.Count > 0)
             request["generationConfig"] = genConfig;
+
+        // REQ-RAG-043: Gemini's cache is a resource the caller creates out of band and then names.
+        // The breakpoint flags on PromptCacheOptions have no analogue here, so they are not sent.
+        if (!string.IsNullOrEmpty(options?.PromptCache?.ProviderCacheId))
+            request["cachedContent"] = options.PromptCache.ProviderCacheId;
 
         // Tool definitions
         if (options?.Tools is { Count: > 0 })
@@ -282,6 +295,52 @@ public class GoogleGeminiLlmProvider : ILlmProvider
         }
 
         return request;
+    }
+
+    /// <summary>Builds Gemini parts for one message, images included (REQ-RAG-039).</summary>
+    private static List<object> BuildParts(ChatMessage message)
+    {
+        var parts = new List<object>();
+
+        if (message.Parts is { Count: > 0 })
+        {
+            foreach (var part in message.Parts)
+            {
+                if (part.Kind == ChatContentKind.Image && part.Image is not null)
+                {
+                    parts.Add(part.Image.IsInline
+                        ? new Dictionary<string, object>
+                        {
+                            ["inlineData"] = new Dictionary<string, object>
+                            {
+                                ["mimeType"] = part.Image.MediaType,
+                                ["data"] = part.Image.Base64Data!
+                            }
+                        }
+                        : new Dictionary<string, object>
+                        {
+                            ["fileData"] = new Dictionary<string, object>
+                            {
+                                ["mimeType"] = part.Image.MediaType,
+                                ["fileUri"] = part.Image.Url!.ToString()
+                            }
+                        });
+                }
+                else if (part.Text is not null)
+                {
+                    parts.Add(new Dictionary<string, object> { ["text"] = part.Text });
+                }
+            }
+        }
+
+        // Gemini rejects an empty parts array, and the legacy shape always sent one text part even
+        // for an empty message. Keeping that floor preserves the existing behaviour exactly.
+        if (parts.Count == 0)
+        {
+            parts.Add(new Dictionary<string, object> { ["text"] = message.Content ?? string.Empty });
+        }
+
+        return parts;
     }
 
     private static string? ExtractText(GeminiCandidate? candidate)
@@ -314,8 +373,11 @@ public class GoogleGeminiLlmProvider : ILlmProvider
         return functionCalls.Count > 0 ? functionCalls : null;
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
+    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
     {
+        TechieRagTelemetry.RecordLlmCompletion(
+            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens);
+
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
             InputTokens = inputTokens,
@@ -380,5 +442,9 @@ public class GoogleGeminiLlmProvider : ILlmProvider
 
         [JsonPropertyName("totalTokenCount")]
         public int TotalTokenCount { get; set; }
+
+        /// <summary>Prompt tokens served from a cachedContent resource (REQ-RAG-043).</summary>
+        [JsonPropertyName("cachedContentTokenCount")]
+        public int CachedContentTokenCount { get; set; }
     }
 }

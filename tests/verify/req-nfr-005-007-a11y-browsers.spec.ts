@@ -2,6 +2,31 @@ import { test, expect, chromium, firefox, webkit, Browser, Page } from '@playwri
 import { AxeBuilder } from '@axe-core/playwright';
 
 /**
+ * ⚠ THIS SUITE CANNOT REACH THE SHIPPING APP ANY MORE — 2026-07-29, REQ-NFR-005 / REQ-NFR-011.
+ *
+ * It was written against the Blazor SERVER head and drives a browser at `baseUrl` over HTTP.
+ * REQ-FN-035 replaced that head with a MAUI Blazor Hybrid one: `Program.cs` is gone, there is no
+ * Kestrel listener, no `/_framework/blazor.web.js` to fetch, and no CDP endpoint on the Mac
+ * Catalyst WKWebView. Every test below would fail at `page.goto`, and `bootIsHealthy` would fail
+ * at the first `fetch` — not because accessibility regressed, but because there is nothing
+ * listening. The Appium `mac2` driver that DOES reach the desktop head exposes the native
+ * XCUIElement tree only, never the web view's DOM or a JavaScript context, so it cannot host
+ * axe-core either.
+ *
+ * The accessibility sweep therefore moved INSIDE the process: `apps/TechieDesk/A11yScanRunner.cs`
+ * (Debug-only, armed by `TECHIEDESK_A11Y_SCAN=1`) evaluates the same axe-core 4.12.1 bundle in the
+ * live WebView and walks every shipped route. See that file's header for how to run it.
+ *
+ * The suite is SKIPPED rather than deleted: the assertions are still the right ones, and they
+ * become runnable again the moment a web-hosted head exists (or a WebView debugging bridge lands).
+ * Deleting them would lose the only written-down definition of what "fixed" meant.
+ */
+test.describe.configure({ mode: 'serial' });
+
+const suiteCanReachTheApp = false;
+
+
+/**
  * REQ-NFR-005 (BRD-96) accessibility + REQ-NFR-007 (BRD-98) evergreen-browser support.
  *
  * The app MUST be served with ASPNETCORE_ENVIRONMENT=Development. Without it
@@ -48,6 +73,8 @@ async function gotoReady(page: Page, route: string): Promise<void> {
 }
 
 test.describe('REQ-NFR-005 accessibility', () => {
+  test.skip(!suiteCanReachTheApp, 'MAUI head has no HTTP endpoint — see A11yScanRunner.cs');
+
   test('boot is healthy so the sweep measures a live page', async () => {
     for (const asset of ['/', '/_framework/blazor.web.js', '/_content/TrBlazeUI.Components/trblazeui.css']) {
       const res = await fetch(baseUrl + asset);
@@ -159,6 +186,8 @@ test.describe('REQ-NFR-005 accessibility', () => {
 });
 
 test.describe('REQ-NFR-007 evergreen browser support', () => {
+  test.skip(!suiteCanReachTheApp, 'MAUI head has no HTTP endpoint — see A11yScanRunner.cs');
+
   // Chromium covers both Chrome and Edge — Edge is Chromium-based and is not a separate
   // engine. WebKit is Safari's engine. Gecko is Firefox.
   const engines: Array<[string, { launch: () => Promise<Browser> }]> = [

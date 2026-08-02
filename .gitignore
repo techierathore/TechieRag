@@ -54,8 +54,10 @@ CLAUDE.md
 # TechieFlow agent artifacts — machine-generated test harness & logs, never commit (managed by scaffold/update-framework.sh)
 /package.json
 /package-lock.json
+node_modules/
 test-results/
 playwright-report/
+.verify/
 logs/
 .DS_Store
 /docs/.last-verify.json

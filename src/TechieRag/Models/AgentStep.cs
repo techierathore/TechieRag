@@ -13,7 +13,28 @@ public enum AgentStepKind
     FinalAnswer,
 
     /// <summary>The loop hit its iteration limit and a final answer was forced.</summary>
-    MaxIterationsReached
+    MaxIterationsReached,
+
+    /// <summary>An orchestrated flow began executing one node (REQ-RAG-042).</summary>
+    NodeStarted,
+
+    /// <summary>An orchestrated flow finished one node and recorded its output (REQ-RAG-042).</summary>
+    NodeCompleted,
+
+    /// <summary>An orchestrated flow followed one outgoing edge to the next node (REQ-RAG-042).</summary>
+    RouteTaken,
+
+    /// <summary>Control passed from one agent to another, carrying the declared context (REQ-RAG-042).</summary>
+    HandoffPerformed,
+
+    /// <summary>A guardrail refused a step; nothing it guarded was executed (REQ-RAG-042).</summary>
+    GuardrailBlocked,
+
+    /// <summary>The flow's step budget ran out, so execution stopped rather than looping (REQ-RAG-042).</summary>
+    StepBudgetExhausted,
+
+    /// <summary>An orchestrated flow reached a terminal node and stopped (REQ-RAG-042).</summary>
+    FlowCompleted
 }
 
 /// <summary>
@@ -25,8 +46,15 @@ public enum AgentStepKind
 /// One step is emitted per LLM tool-call request, per individual tool execution, and for the
 /// final answer (or when the iteration limit is reached). This lets a UI render an execution
 /// trace of what the agent actually did, rather than only the final response.
+/// <para><b>Extension point (REQ-RAG-042).</b> This type is deliberately NOT sealed. Multi-agent
+/// orchestration reports through the very same <c>IProgress&lt;AgentStep&gt;</c> channel, emitting
+/// <c>TechieRag.Orchestration.FlowStep</c> — a subclass that adds node, routing and guardrail
+/// identity. An existing single-agent trace renderer therefore keeps working against the base
+/// properties without knowing flows exist, and a flow-aware renderer pattern-matches on
+/// <c>FlowStep</c> for the extra detail. A second, parallel trace format was rejected precisely
+/// because it would fork what a consumer has to render.</para>
 /// </remarks>
-public sealed class AgentStep
+public class AgentStep
 {
     /// <summary>Gets the 1-based agent-loop iteration this step belongs to.</summary>
     public required int Iteration { get; init; }

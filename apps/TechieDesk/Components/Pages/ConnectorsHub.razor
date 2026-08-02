@@ -1,0 +1,1438 @@
+@page "/workspace/{Slug}/connectors"
+@using Microsoft.Extensions.DependencyInjection
+@using TechieDesk.Services.Connectors
+@using TechieDesk.Services.Localization
+@using TechieDesk.Services.Scheduling
+@using TechieRag.Connectors
+@implements IDisposable
+@inject IServiceProvider Services
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<ConnectorsHub> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@(workspace?.Name ?? Localizer["HubWorkspaceFallback"].Value) — @Localizer["HubConnectorsPageTitle"]</PageTitle>
+
+@* REQ-NFR-010/BRD-101: a backend outage is not "this workspace does not exist". *@
+@if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["HubLoadErrorTitle"]</AlertTitle>
+        <AlertDescription>
+            @Localizer["HubLoadErrorBody"] @loadError
+        </AlertDescription>
+    </Alert>
+}
+else if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["HubNotFoundTitle"]</AlertTitle>
+        <AlertDescription>@Localizer["HubNotFoundBody"]</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["HubLoadingWorkspace"]</span>
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight">@Localizer["HubTitle", workspace.Name]</h1>
+        <TypographyMuted>
+            @Localizer["HubIntro"]
+        </TypographyMuted>
+    </div>
+
+    @if (!canManage)
+    {
+        <Alert Variant="AlertVariant.Warning" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["HubViewOnlyTitle"]</AlertTitle>
+            <AlertDescription>@Localizer["HubViewOnlyBody"]</AlertDescription>
+        </Alert>
+    }
+
+    @* The mockup's ".src-grid" (docs/mockups/connectors.html): an icon tile, a name, one line of
+       description and a Configure button per source. Only sources that WORK are shown — a tile that
+       cannot succeed teaches the operator that this screen lies. Two rules produce this grid:
+         · the two WEB sources are hard-coded because they are shipped and live-proven
+           (REQ-RAG-016/017) and run through IWebIngestionService, not through a connector job;
+         · every other tile comes from IConnectorJobService.AvailableTypes, so GitHub/GitLab and
+           Confluence appear the moment the connector cluster registers a real IConnectorResolver,
+           with no edit here. Hard-coding them today would ship two tiles that cannot run.
+       Deliberately ABSENT: YouTube (REQ-RAG-018, postponed by owner decision 2026-07-27 — the
+       platform serves zero-byte transcript bodies, TR-RAG-015) and Email/IMAP (REQ-RAG-049, not in
+       scope). Neither gets a "coming soon" tile: an inert control is the same lie as a broken one. *@
+    <div class="mb-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        @foreach (var tile in SourceTiles)
+        {
+            <Card Class="@(tile.Key == selectedType ? "border-primary" : null)">
+                <CardContent Class="flex h-full flex-col gap-1">
+                    <span class="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
+                        <LucideIcon aria-hidden="true" Name="@tile.Icon" Size="18" />
+                    </span>
+                    <span class="font-semibold">@tile.Name</span>
+                    <TypographyMuted Class="block text-xs">@tile.Description</TypographyMuted>
+                    <div class="mt-auto pt-4">
+                        @if (tile.Href is { } href)
+                        {
+                            @* A real anchor, not a button with a click handler: this tile GOES
+                               somewhere, so it must behave like a link — keyboard activation, the
+                               address in the status line, and AXLink rather than AXButton for a
+                               screen reader. Button renders an anchor when given Href. *@
+                            <Button Href="@href" Variant="ButtonVariant.Outline" Size="ButtonSize.Small">
+                                <span>@Localizer["HubConfigure"]</span>
+                            </Button>
+                        }
+                        else
+                        {
+                            <div class="flex flex-wrap items-center gap-2">
+                                @* A tile now carries the two different things an operator wants from a
+                                   source: ADD one — the address, branch, filters and credential, which is a
+                                   form of its own and is where BRD-63/64's "can connect a repository / a
+                                   space" is actually satisfied — and RUN one that already exists, which is
+                                   the panel below. They are separate controls because they are separate
+                                   acts: adding writes configuration and reads nothing; running reads. *@
+                                <Button Href="@AddConnectorHref(tile.Key)" Size="ButtonSize.Small">
+                                    <LucideIcon aria-hidden="true" Name="plus" Size="15" Class="mr-2" />
+                                    <span>@Localizer["HubAdd"]</span>
+                                </Button>
+                                @* aria-pressed is what makes the connector tiles a set of toggles rather
+                                   than unrelated buttons: without it a screen reader is never told which
+                                   source the configuration panel below belongs to. *@
+                                <Button Variant="@(tile.Key == selectedType ? ButtonVariant.Default : ButtonVariant.Outline)"
+                                        Size="ButtonSize.Small"
+                                        aria-pressed="@(tile.Key == selectedType ? "true" : "false")"
+                                        OnClick="@(() => SelectConnectorType(tile.Key))">
+                                    <span>@(tile.Key == selectedType ? Localizer["HubSelected"] : Localizer["HubRunOne"])</span>
+                                </Button>
+                            </div>
+                        }
+                    </div>
+                </CardContent>
+            </Card>
+        }
+    </div>
+
+    @* The honest empty state the contract requires of every consumer of AvailableTypes
+       (IConnectorResolver: "Empty is a legitimate answer, and the connector hub must render it as
+       'none installed'"). It is an informational note, NOT an error: the two web sources above are
+       fully usable, so this screen is working exactly as built. *@
+    @if (jobs is not null && jobs.AvailableTypes.Count == 0)
+    {
+        <Alert Variant="AlertVariant.Info" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["HubNoConnectorsInstalledTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["HubNoConnectorsInstalledBody"]
+            </AlertDescription>
+        </Alert>
+    }
+
+    @* ── Saved connectors ───────────────────────────────────────────────────────────────────
+       What a connector IS, as opposed to what a run does. Rendered as a list of rows rather than a
+       table on purpose: each row carries four controls and a variable number of state badges, and a
+       six-column table of those is unreadable at a narrow width and inherits TR-004/TR-028 for
+       nothing in return. *@
+    @if (registry is not null)
+    {
+        @* The one failure this product can predict in advance: a connector that expects a token whose
+           token cannot be read on this machine. Left unsaid, it surfaces at 07:00 on a schedule
+           rather than now, while somebody is watching. Raised to the top of the screen because it is
+           true of the machine, not of whichever row happens to be on screen. *@
+        @if (BrokenCredentials.Count > 0)
+        {
+            <Alert Variant="AlertVariant.Warning" AccentBorder="true" Class="mb-4">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                <AlertTitle>
+                    @(BrokenCredentials.Count == 1
+                        ? Localizer["HubBrokenCredsTitleOne"]
+                        : Localizer["HubBrokenCredsTitleMany", BrokenCredentials.Count])
+                </AlertTitle>
+                <AlertDescription>
+                    @string.Join(", ", BrokenCredentials.Select(saved => saved.DisplayName))
+                    @(BrokenCredentials.Count == 1
+                        ? Localizer["HubBrokenCredsBodyOne"]
+                        : Localizer["HubBrokenCredsBodyMany"])
+                </AlertDescription>
+            </Alert>
+        }
+
+        <Card Class="mb-4">
+            <CardHeader>
+                <CardTitle>@Localizer["HubSavedConnectorsTitle"]</CardTitle>
+                <CardDescription>
+                    @Localizer["HubSavedConnectorsDesc"]
+                </CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                @* CredentialsAreDurable false must be shown, not hidden: it is the difference between
+                   "your connector is configured" and "your connector is configured until you close the
+                   app", and only the second one explains a schedule that starts failing overnight. *@
+                @if (registry.CredentialsAreDurable)
+                {
+                    <TypographyMuted Class="block text-xs">
+                        <LucideIcon aria-hidden="true" Name="key-round" Size="13" Class="mr-1 inline" />
+                        @Localizer[registry.CredentialStorageDescriptionKey]
+                    </TypographyMuted>
+                }
+                else
+                {
+                    <Alert Variant="AlertVariant.Warning">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["HubEphemeralTokensTitle"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer[registry.CredentialStorageDescriptionKey]
+                            @Localizer["HubEphemeralTokensBody"]
+                        </AlertDescription>
+                    </Alert>
+                }
+
+                @if (savedConnectors.Count == 0)
+                {
+                    <div class="rounded-lg border border-dashed p-6 text-center">
+                        <TypographyMuted Class="block text-sm">
+                            @Localizer["HubNothingSavedYet"]
+                        </TypographyMuted>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var saved in savedConnectors)
+                    {
+                        <div class="space-y-2 rounded-lg border p-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <LucideIcon aria-hidden="true" Name="@IconFor(saved.ConnectorType)" Size="16"
+                                            Class="shrink-0 text-muted-foreground" />
+                                <span class="font-medium">@saved.DisplayName</span>
+                                <Badge Variant="BadgeVariant.Secondary">@TypeBadge(saved)</Badge>
+                                @* TR-027 — BadgeVariant has no success or warning tone, so "has a working
+                                   token" can only be Outline rather than green. The text carries it. *@
+                                @if (saved is { HasCredential: true, CredentialResolves: false })
+                                {
+                                    <Badge Variant="BadgeVariant.Destructive">@Localizer["HubBadgeTokenUnreadable"]</Badge>
+                                }
+                                else if (saved.HasCredential)
+                                {
+                                    <Badge Variant="BadgeVariant.Outline">@Localizer["HubBadgeTokenStored"]</Badge>
+                                }
+                                else
+                                {
+                                    <Badge Variant="BadgeVariant.Outline">@Localizer["HubBadgeReadsAnonymously"]</Badge>
+                                }
+                            </div>
+
+                            <TypographyMuted Class="block text-xs">@saved.Settings.Describe(saved.ConnectorType, Localize)</TypographyMuted>
+
+                            <TypographyMuted Class="block text-xs">
+                                @(saved.LastSyncUtc is { } last
+                                    ? Localizer["HubLastRun", last.ToLocalTime().ToString("g"), saved.KnownItemCount]
+                                    : Localizer["HubNeverRun"])
+                                · @Localizer["HubChangedAt", saved.UpdatedUtc.ToLocalTime().ToString("g")]
+                            </TypographyMuted>
+
+                            @if (saved is { HasCredential: true, CredentialResolves: false })
+                            {
+                                <TypographyMuted Class="block text-xs text-destructive">
+                                    @Localizer["HubRowBrokenCredential"]
+                                </TypographyMuted>
+                            }
+
+                            @if (testResults.TryGetValue(saved.ConnectorId, out var result))
+                            {
+                                <Alert Variant="@(result is null ? AlertVariant.Success : AlertVariant.Danger)">
+                                    <Alert.Icon>
+                                        <LucideIcon aria-hidden="true" Name="@(result is null ? "circle-check" : "circle-x")" Size="16" />
+                                    </Alert.Icon>
+                                    <AlertTitle>@(result is null ? Localizer["HubReachedIt"] : Localizer["HubCouldNotReachIt"])</AlertTitle>
+                                    <AlertDescription>
+                                        @(result ?? Localizer["HubTestOkBody"].Value)
+                                    </AlertDescription>
+                                </Alert>
+                            }
+
+                            @* ── Delete confirmation, inline in the row ──────────────────────────
+                               Inline rather than an AlertDialog because TrBlazeUI's AlertDialog does
+                               not open in controlled mode (TR-031, proven live: the handler runs and
+                               @@bind-Open goes true, and nothing renders). The confirmation states the
+                               catalogue consequence HERE, at the moment the operator is deciding it:
+                               deleting a connector deliberately leaves everything it already ingested
+                               in the library (IConnectorRepository.DeleteAsync — a recorded product
+                               decision), and a bare "this cannot be undone" lets the reader assume a
+                               cascade that never happens. *@
+                            @if (pendingDelete?.ConnectorId == saved.ConnectorId)
+                            {
+                                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                                    <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                                    <AlertTitle>@Localizer["HubDeleteConfirmTitle", saved.DisplayName]</AlertTitle>
+                                    <AlertDescription>
+                                        @Localizer["HubDeleteConfirmBodyLead"] <b>@Localizer["HubDeleteConfirmBodyKept"]</b> @Localizer["HubDeleteConfirmBodyTail"]
+                                    </AlertDescription>
+                                </Alert>
+                            }
+
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if (pendingDelete?.ConnectorId == saved.ConnectorId)
+                                {
+                                    <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                            OnClick="DeleteConfirmedAsync">
+                                        <LucideIcon aria-hidden="true" Name="trash-2" Size="15" Class="mr-2" />
+                                        <span>@Localizer["HubConfirmDelete"]</span>
+                                    </Button>
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                            OnClick="CancelDelete">
+                                        <span>@Localizer["HubKeepIt"]</span>
+                                    </Button>
+                                }
+                                else
+                                {
+                                <Button Href="@EditConnectorHref(saved.ConnectorId)"
+                                        Variant="ButtonVariant.Outline" Size="ButtonSize.Small">
+                                    <LucideIcon aria-hidden="true" Name="square-pen" Size="15" Class="mr-2" />
+                                    <span>@Localizer["HubEdit"]</span>
+                                </Button>
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                        Disabled="@(testingId == saved.ConnectorId)"
+                                        OnClick="@(() => TestSavedAsync(saved.ConnectorId))">
+                                    <LucideIcon aria-hidden="true" Name="flask-conical" Size="15" Class="mr-2" />
+                                    <span>@Localizer["HubTestConnection"]</span>
+                                </Button>
+                                @* Deliberately NOT disabled after a click. A second press returns the SAME
+                                   run id — the job service guards an in-flight run itself — so greying the
+                                   button out would be a claim about state this screen does not own. *@
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                        Disabled="@(jobs is null || !canManage)"
+                                        OnClick="@(() => SyncNowAsync(saved.ConnectorId))">
+                                    <LucideIcon aria-hidden="true" Name="play" Size="15" Class="mr-2" />
+                                    <span>@Localizer["HubSyncNow"]</span>
+                                </Button>
+                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                        Disabled="@(!canManage)"
+                                        OnClick="@(() => AskToDelete(saved))">
+                                    <LucideIcon aria-hidden="true" Name="trash-2" Size="15" Class="mr-2" />
+                                    <span>@Localizer["HubDelete"]</span>
+                                </Button>
+                                @if (testingId == saved.ConnectorId)
+                                {
+                                    <Spinner Size="SpinnerSize.Small" />
+                                }
+                                }
+                            </div>
+                        </div>
+                    }
+                }
+            </CardContent>
+        </Card>
+    }
+
+    @if (SelectedConnectorType is { } connectorType)
+    {
+        @* The mockup puts each source's fields in a modal. They are inline here for the same reason
+           the web surface is a page: a repository or wiki import runs for minutes and reports
+           per-item progress, and a dialog that cannot be left without abandoning the run is the
+           wrong container for it. The mockup's per-source title is kept.
+           This panel starts a RUN. The mockup's host/repository/branch/token fields are not here
+           because they do not belong to a run: ConnectorJobPayload carries none of them, and a
+           connector's address, branch, filters, credential and its private-network opt-in
+           (ConnectorSettings.AllowPrivateNetwork) live on the saved connector itself, behind
+           IConnectorRegistry. Drawing them on a run form would collect input nothing reads.
+           The screen that adds and edits a saved connector — and that is where the private-network
+           danger alert belongs, with the same honesty AddFromWeb gives the SSRF switch — is the
+           next piece of this hub and is NOT built yet. Until it is, this panel says so rather than
+           offering a run with nothing to run against. Reported to the connector cluster. *@
+        <Card Class="mb-4">
+            <CardHeader>
+                <CardTitle>@Localizer["HubConfigureFor", Localizer[connectorType.DisplayNameKey].Value]</CardTitle>
+                <CardDescription>@Localizer[connectorType.DescriptionKey]</CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                @* A run names a SAVED connector; its address, branch and credential live with that
+                   connector, never on the run. So this is a list of what exists, not a box to type
+                   an opaque key into — and when nothing of this kind has been set up, the form is
+                   replaced rather than left as a control that cannot succeed. *@
+                @if (SavedForSelectedType.Count == 0)
+                {
+                    <Alert Variant="AlertVariant.Info">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["HubNoneOfKindTitle", TypeNameForSentence(connectorType)]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer["HubNoneOfKindBody"]
+                        </AlertDescription>
+                    </Alert>
+
+                    <div>
+                        <Button Href="@AddConnectorHref(connectorType.ConnectorType)">
+                            <LucideIcon aria-hidden="true" Name="plus" Size="16" Class="mr-2" />
+                            <span>@Localizer["HubAddOfKind", TypeNameForSentence(connectorType)]</span>
+                        </Button>
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-2">
+                        <Label For="connector-id">@Localizer["HubSavedConnectorLabel"]</Label>
+                        @* Left unset on purpose so the operator picks: TR-024 — a programmatically
+                           seeded Select renders the raw value in its trigger rather than the item's
+                           text, and the first paint is the state every user sees. *@
+                        @* TR-024: without this the trigger paints the connector's opaque id. *@
+                        <Select @bind-Value="connectorId" TValue="string" Disabled="starting"
+                                DisplayTextSelector="SavedConnectorText">
+                            <SelectTrigger Id="connector-id">
+                                <SelectValue Placeholder="@Localizer["HubChooseConnectorPlaceholder"]" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                @foreach (var saved in SavedForSelectedType)
+                                {
+                                    <SelectItem Value="@saved.ConnectorId" Text="@saved.DisplayName" TValue="string">@saved.DisplayName</SelectItem>
+                                }
+                            </SelectContent>
+                        </Select>
+                        @if (SelectedSaved is { } chosen)
+                        {
+                            <TypographyMuted Class="block text-xs">@chosen.Settings.Describe(chosen.ConnectorType, Localize)</TypographyMuted>
+                        }
+                    </div>
+
+                    @* The one case the contract says the hub must surface: a connector that expects a
+                       token whose token cannot be read on this machine. Left unsaid, it fails at
+                       07:00 on a schedule rather than now, while somebody is watching. *@
+                    @if (SelectedSaved is { HasCredential: true, CredentialResolves: false } broken)
+                    {
+                        <Alert Variant="AlertVariant.Warning">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                            <AlertTitle>@Localizer["HubSelectedBrokenCredTitle", broken.DisplayName]</AlertTitle>
+                            <AlertDescription>
+                                @Localizer["HubSelectedBrokenCredBody"]
+                            </AlertDescription>
+                        </Alert>
+                    }
+
+                    <div class="space-y-2">
+                        <Label For="connector-run-name">@Localizer["HubNameThisRun"]</Label>
+                        <Input Id="connector-run-name" @bind-Value="displayName" Placeholder="@Localizer["HubRunNamePlaceholder"]" Disabled="starting" />
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label For="connector-max-items">@Localizer["HubMaxItems"]</Label>
+                            <Input Id="connector-max-items" Type="InputType.Number" @bind-Value="maxItemsText" Disabled="starting" />
+                            <TypographyMuted Class="block text-xs">@Localizer["HubMaxItemsHint"]</TypographyMuted>
+                        </div>
+                        <div class="space-y-2">
+                            <Label For="connector-max-pages">@Localizer["HubMaxPages"]</Label>
+                            <Input Id="connector-max-pages" Type="InputType.Number" @bind-Value="maxPagesText" Disabled="starting" />
+                            <TypographyMuted Class="block text-xs">@Localizer["HubMaxPagesHint"]</TypographyMuted>
+                        </div>
+                    </div>
+
+                    <Separator />
+
+                    <div class="flex items-center gap-2">
+                        <Switch @bind-Checked="pinned" Id="pin-connector" Disabled="starting" />
+                        <Label For="pin-connector">@Localizer["HubPinLabel"]</Label>
+                    </div>
+
+                    @if (startError is not null)
+                    {
+                        <Alert Variant="AlertVariant.Danger">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+                            <AlertTitle>@Localizer["HubStartErrorTitle"]</AlertTitle>
+                            <AlertDescription>@startError</AlertDescription>
+                        </Alert>
+                    }
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <Button OnClick="StartConnectorAsync" Disabled="@(starting || !canManage)">
+                            <LucideIcon aria-hidden="true" Name="play" Size="16" Class="mr-2" />
+                            <span>@Localizer["HubStartSync"]</span>
+                        </Button>
+                        @if (starting)
+                        {
+                            <Spinner Size="SpinnerSize.Small" />
+                        }
+                    </div>
+                }
+            </CardContent>
+        </Card>
+    }
+
+    @* ── Job monitor ────────────────────────────────────────────────────────────────────────
+       The mockup's Jobs card, split into the two things it actually conflates: runs in flight
+       (live counters and a bar) and runs that are over (an outcome, a duration and every item).
+       IConnectorJobService is explicit that these are different types for that reason. *@
+    @if (jobs is null)
+    {
+        @* Not a crash and not an empty state: the connector job service is not registered in this
+           build's DI container, so run history cannot be read at all. Said plainly rather than
+           rendered as "no runs yet", which would be a lie the operator cannot act on. *@
+        <Alert Variant="AlertVariant.Danger" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["HubNoJobServiceTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["HubNoJobServiceBody"]
+            </AlertDescription>
+        </Alert>
+    }
+    else
+    {
+        <Card Class="mb-4">
+            <CardHeader>
+                <CardTitle>@Localizer["HubRunningNowTitle"]</CardTitle>
+                <CardDescription>@Localizer["HubRunningNowDesc"]</CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                @if (jobs.ActiveRuns.Count == 0)
+                {
+                    <TypographyMuted Class="block text-sm">@Localizer["HubNoRunInFlight"]</TypographyMuted>
+                }
+                else
+                {
+                    @foreach (var run in jobs.ActiveRuns)
+                    {
+                        <div class="space-y-2 rounded-lg border p-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <Spinner Size="SpinnerSize.Small" />
+                                <span class="font-medium">@run.JobName</span>
+                                <Badge Variant="BadgeVariant.Default">@Localizer["HubBadgeRunning"]</Badge>
+                                <span class="ml-auto">
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                            OnClick="@(() => CancelRun(run.ScheduleRunId))">
+                                        <span>@Localizer["HubStop"]</span>
+                                    </Button>
+                                </span>
+                            </div>
+                            @* PercentComplete is null until something has been listed, and the
+                               denominator is "items listed so far", so it can move BACKWARDS when a
+                               new listing page arrives. Rendered exactly that way: no bar at all
+                               until there is a real number, and the compression said out loud rather
+                               than hidden behind an invented total. *@
+                            @if (run.PercentComplete is { } percent)
+                            {
+                                <Progress aria-label="@Localizer["HubRunProgressLabel"]" Value="@Math.Round(percent)" />
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span>@Localizer["HubPercentListed", percent.ToString("0"), run.Total]</span>
+                                    <span>·</span>
+                                    <span>@Localizer["HubRunCounts", run.Processed, run.Failed, run.Skipped]</span>
+                                </div>
+                                <TypographyMuted Class="block text-xs">
+                                    @Localizer["HubPercentHint"]
+                                </TypographyMuted>
+                            }
+                            else
+                            {
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                    <span>@Localizer["HubNothingListedYet"]</span>
+                                    <span>·</span>
+                                    <span>@Localizer["HubRunCounts", run.Processed, run.Failed, run.Skipped]</span>
+                                </div>
+                            }
+                            <TypographyMuted Class="block text-xs">@(run.Message ?? Localizer["HubStarting"].Value)</TypographyMuted>
+                        </div>
+                    }
+                }
+            </CardContent>
+        </Card>
+
+        <Card Class="mb-4 overflow-hidden">
+            <CardHeader>
+                <CardTitle>@Localizer["HubRecentRunsTitle"]</CardTitle>
+                <CardDescription>
+                    @if (historyLoading)
+                    {
+                        <span>@Localizer["HubReadingHistory"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["HubRecentRunsCount", recentRuns.Count]</span>
+                    }
+                </CardDescription>
+            </CardHeader>
+            @if (historyError is not null)
+            {
+                <CardContent>
+                    <Alert Variant="AlertVariant.Danger">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["HubHistoryErrorTitle"]</AlertTitle>
+                        <AlertDescription>@historyError</AlertDescription>
+                    </Alert>
+                </CardContent>
+            }
+            else
+            {
+                @* TR-028: a fixed, already-ordered table still has to be a generic DataTable with the
+                   toolbar and pagination switched off, and the scroll wrapper supplied by hand. *@
+                <div class="relative overflow-x-auto">
+                    <DataTable TData="RunRow" Data="@RunRows" ShowToolbar="false" ShowPagination="false"
+                               AriaLabel="@Localizer["HubRecentRunsTableLabel"]">
+                        <Columns>
+                            <DataTableColumn TData="RunRow" TValue="string" Property="@(row => row.Outcome)" Header="@Localizer["HubColStatus"]">
+                                <CellTemplate Context="row">
+                                    <Badge Variant="@row.OutcomeVariant">@row.Outcome</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="RunRow" TValue="string" Property="@(row => row.Name)" Header="@Localizer["HubColSource"]">
+                                <CellTemplate Context="row">
+                                    <span class="block max-w-xs truncate font-medium">@row.Name</span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="RunRow" TValue="string" Property="@(row => row.Items)" Header="@Localizer["HubItems"]" />
+                            <DataTableColumn TData="RunRow" TValue="string" Property="@(row => row.Started)" Header="@Localizer["HubColStarted"]" />
+                            <DataTableColumn TData="RunRow" TValue="string" Property="@(row => row.Duration)" Header="@Localizer["HubColTook"]" />
+                            <DataTableColumn TData="RunRow" TValue="string" Property="@(row => row.Summary)" Header="@Localizer["HubColResult"]">
+                                <CellTemplate Context="row">
+                                    <span class="flex items-center gap-2">
+                                        <span class="block max-w-md text-xs text-muted-foreground">@row.Summary</span>
+                                        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                                OnClick="@(() => SelectRun(row.Report))">
+                                            <span>@Localizer["HubItems"]</span>
+                                        </Button>
+                                    </span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                        </Columns>
+                        <EmptyTemplate>
+                            <div class="p-6 text-center text-sm text-muted-foreground">
+                                @Localizer["HubNoRunsEver"]
+                            </div>
+                        </EmptyTemplate>
+                    </DataTable>
+                </div>
+            }
+        </Card>
+
+        @if (selectedRun is { } report)
+        {
+            @* Honesty rule, inherited from ConnectorRunReport itself: a run with skips is NEVER
+               shown as a plain success, and every item that did not reach the library is listed
+               with its own reason. Ingested and not-ingested share one table on purpose — two cards
+               let an operator read the first and never scroll to the second, which is how content
+               goes missing unnoticed. *@
+            <Card Class="overflow-hidden">
+                <CardHeader>
+                    <CardTitle>@Localizer["HubRunDetailTitle", report.JobName]</CardTitle>
+                    <CardDescription>
+                        @Localizer["HubIngestedNotIngested", report.Ingested.Count, report.NotIngested.Count]
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Alert Variant="@ReportVariant(report)">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="@ReportIcon(report)" Size="16" /></Alert.Icon>
+                        <AlertTitle>@ReportTitle(report)</AlertTitle>
+                        <AlertDescription>@report.SummaryText(Localize)</AlertDescription>
+                    </Alert>
+                </CardContent>
+                <div class="relative overflow-x-auto">
+                    <DataTable TData="ItemRow" Data="@ItemRows(report)" ShowToolbar="false" ShowPagination="false"
+                               AriaLabel="@Localizer["HubItemsTableLabel"]">
+                        <Columns>
+                            <DataTableColumn TData="ItemRow" TValue="string" Property="@(row => row.Status)" Header="@Localizer["HubColStatus"]">
+                                <CellTemplate Context="row">
+                                    <span class="flex items-center gap-2">
+                                        <LucideIcon aria-hidden="true" Name="@(row.Ingested ? "circle-check" : "circle-x")" Size="15"
+                                                    Class="@(row.Ingested ? "shrink-0 text-muted-foreground" : "shrink-0 text-destructive")" />
+                                        <Badge Variant="@(row.Ingested ? BadgeVariant.Secondary : BadgeVariant.Destructive)">@row.Status</Badge>
+                                    </span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="ItemRow" TValue="string" Property="@(row => row.Name)" Header="@Localizer["HubColItem"]">
+                                <CellTemplate Context="row">
+                                    <span class="block max-w-md truncate font-medium">@row.Name</span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="ItemRow" TValue="string" Property="@(row => row.Reason)" Header="@Localizer["HubColReason"]">
+                                <CellTemplate Context="row">
+                                    <span class="block max-w-md text-xs text-muted-foreground">@row.Reason</span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                        </Columns>
+                        <EmptyTemplate>
+                            <div class="p-6 text-center text-sm text-muted-foreground">
+                                @Localizer["HubRunNoItems"]
+                            </div>
+                        </EmptyTemplate>
+                    </DataTable>
+                </div>
+            </Card>
+        }
+    }
+}
+
+
+@code {
+    /// <summary>How many finished runs the history card asks for.</summary>
+    private const int RecentRunLimit = 25;
+
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The connector job service, or <see langword="null"/> when this build does not register it.
+    /// </summary>
+    /// <remarks>
+    /// Resolved with <see cref="ServiceProviderServiceExtensions.GetService{T}(IServiceProvider)"/>
+    /// rather than injected, on purpose. <c>@@inject</c> is a required resolve: on a build where
+    /// <c>AddTechieDeskConnectorJobs()</c> has not been called, it throws while the component is
+    /// being built, and in a MAUI Blazor Hybrid head an exception there tears down the whole WebView
+    /// — the user gets a blank window, not a message. An optional resolve turns that into the named
+    /// notice above, and costs nothing once the registration lands.
+    /// </remarks>
+    private IConnectorJobService? jobs;
+
+    /// <summary>
+    /// The saved-connector store, or <see langword="null"/> when this build does not register it.
+    /// </summary>
+    /// <remarks>
+    /// Optional for the same reason as <see cref="jobs"/>, and read for exactly one thing: which
+    /// connectors of the chosen kind actually exist. Creating and editing them (address, branch,
+    /// credential, the private-network opt-in that <c>ConnectorSettings.AllowPrivateNetwork</c>
+    /// carries) is a screen of its own and is not built yet — so this one says so instead of
+    /// offering a run that has nothing to run against.
+    /// </remarks>
+    private IConnectorRegistry? registry;
+
+    private IReadOnlyList<ConnectorSummary> savedConnectors = [];
+
+    /// <summary>
+    /// The last "Test connection" answer per connector — a null VALUE means it worked.
+    /// </summary>
+    /// <remarks>
+    /// Keyed by connector rather than held as one field so a second row's test cannot silently
+    /// overwrite the answer the operator is still reading on the first.
+    /// </remarks>
+    private readonly Dictionary<string, string?> testResults = [];
+
+    private string? testingId;
+
+    /// <summary>
+    /// The connector whose delete confirmation is showing, or <see langword="null"/> when none is.
+    /// </summary>
+    /// <remarks>
+    /// The confirmation is a block inside the row rather than an <c>AlertDialog</c>: TrBlazeUI's
+    /// AlertDialog does not open in controlled mode (TR-031), proven on this screen with a live
+    /// probe — the handler ran, <c>@@bind-Open</c> went true, and the component rendered nothing.
+    /// </remarks>
+    private ConnectorSummary? pendingDelete;
+
+    private Workspace? workspace;
+    private bool notFound;
+    private string? loadError;
+    private string? loadedSlug;
+    private bool canManage;
+
+    private IReadOnlyList<ConnectorRunReport> recentRuns = [];
+    private IReadOnlyList<long> activeRunIds = [];
+    private ConnectorRunReport? selectedRun;
+    private bool historyLoading;
+    private string? historyError;
+
+    private string? selectedType;
+    private string? connectorId;
+    private string displayName = string.Empty;
+    private string maxItemsText = ConnectorJobPayload.DefaultMaxItems.ToString();
+    private string maxPagesText = ConnectorJobPayload.DefaultMaxPages.ToString();
+    private bool pinned;
+    private string? startError;
+    private bool starting;
+
+    /// <summary>
+    /// One tile in the source grid.
+    /// </summary>
+    /// <param name="Key">The stable key — a connector type, or a web source kind.</param>
+    /// <param name="Icon">Lucide icon name for the tile.</param>
+    /// <param name="Name">The tile's title, as the mockup names it.</param>
+    /// <param name="Description">The tile's one-line description.</param>
+    /// <param name="Href">Where a web tile navigates, or <see langword="null"/> for a connector type.</param>
+    /// <remarks>
+    /// <c>Href</c> is what tells the two kinds of tile apart, rather than a second flag that could
+    /// disagree with it: a tile that goes somewhere is a link, and a tile that does not is the
+    /// toggle that binds the configuration panel below.
+    /// </remarks>
+    private sealed record SourceTile(
+        string Key, string Icon, string Name, string Description, string? Href);
+
+    /// <summary>One row of the recent-runs table.</summary>
+    /// <param name="Outcome">The status pill's text.</param>
+    /// <param name="OutcomeVariant">The pill's tone.</param>
+    /// <param name="Name">The run's display name.</param>
+    /// <param name="Items">Ingested over attempted, as the mockup writes it.</param>
+    /// <param name="Started">When the run started, in local time.</param>
+    /// <param name="Duration">How long it took, or "—" while it is in flight.</param>
+    /// <param name="Summary">The run's own summary line, which never overstates itself.</param>
+    /// <param name="Report">The report this row was built from.</param>
+    private sealed record RunRow(
+        string Outcome,
+        BadgeVariant OutcomeVariant,
+        string Name,
+        string Items,
+        string Started,
+        string Duration,
+        string Summary,
+        ConnectorRunReport Report);
+
+    /// <summary>One row of a run's per-item table.</summary>
+    /// <param name="Status">"Ingested", "Failed" or "Skipped" — the badge text.</param>
+    /// <param name="Ingested">Whether this item reached the workspace.</param>
+    /// <param name="Name">The item's human-facing name.</param>
+    /// <param name="Reason">Why it was refused, or what was done with it.</param>
+    private sealed record ItemRow(string Status, bool Ingested, string Name, string Reason);
+
+    /// <summary>The two shipped web sources, in the mockup's order (REQ-RAG-016/017).</summary>
+    /// <remarks>
+    /// They are hard-coded rather than resolved because they are not connector jobs: they run
+    /// synchronously through <c>IWebIngestionService</c> on their own screen, which reports per-page
+    /// progress inline. Folding that screen's live crawl into this hub would mean two unrelated
+    /// progress systems on one page and a rewrite of shipped, live-proven code; the hub links to it
+    /// instead, and the run it produces is reported there.
+    /// </remarks>
+    /// <remarks>REQ-UI-051: kind and icon are invariant keys; name and description are localized
+    /// at the point of use in <see cref="SourceTiles"/>.</remarks>
+    private static readonly (string Kind, string Icon)[] WebSources =
+    [
+        ("page", "globe"),
+        ("site", "network"),
+    ];
+
+    /// <summary>
+    /// REQ-UI-051: resolves a service-supplied resource key in the reader's language.
+    /// </summary>
+    /// <remarks>
+    /// The delegate <c>ConnectorRunReport.SummaryText</c> and <c>ConnectorSettings.Describe</c> take.
+    /// Both compose a sentence out of several fragments and out of user data, which is the case
+    /// <see cref="LocalizeText"/> exists for — the composition rule stays in the service that owns
+    /// it, and only the resolution happens here, where a localizer is already injected.
+    /// </remarks>
+    private LocalizeText Localize => (key, arguments) => Localizer[key, arguments!].Value;
+
+    /// <summary>REQ-UI-051: the badge naming a saved connector's kind.</summary>
+    /// <param name="saved">The saved connector.</param>
+    /// <returns>The translated type name, or the stored type key when this build does not know it.</returns>
+    /// <remarks>
+    /// A connector row written by a newer build has a type with no key here. Showing its stored type
+    /// key is the honest answer; substituting another type's label would name the wrong source.
+    /// </remarks>
+    private string TypeBadge(ConnectorSummary saved) =>
+        saved.TypeNameKey is null ? saved.ConnectorType : Localizer[saved.TypeNameKey].Value;
+
+    /// <summary>REQ-UI-051: a connector type's name as it reads mid-sentence.</summary>
+    /// <param name="type">The type descriptor.</param>
+    /// <returns>The translated name, lower-cased where the script has case.</returns>
+    /// <remarks>
+    /// <c>ToLowerInvariant</c> is kept because the English sentence reads "add a repository source".
+    /// Devanagari is caseless, so the call is a no-op there rather than a distortion.
+    /// </remarks>
+    private string TypeNameForSentence(ConnectorTypeDescriptor type) =>
+        Localizer[type.DisplayNameKey].Value.ToLowerInvariant();
+
+    /// <summary>REQ-UI-051: the localized tile name for a shipped web source.</summary>
+    /// <param name="kind">The invariant source kind.</param>
+    /// <returns>The tile's title.</returns>
+    private string WebSourceName(string kind) => kind == "site"
+        ? Localizer["HubWebSourceSiteName"]
+        : Localizer["HubWebSourcePageName"];
+
+    /// <summary>REQ-UI-051: the localized tile description for a shipped web source.</summary>
+    /// <param name="kind">The invariant source kind.</param>
+    /// <returns>The tile's one-line description.</returns>
+    private string WebSourceDescription(string kind) => kind == "site"
+        ? Localizer["HubWebSourceSiteDescription"]
+        : Localizer["HubWebSourcePageDescription"];
+
+    /// <summary>Gets every tile the grid shows: the web sources, then whatever is installed.</summary>
+    private IReadOnlyList<SourceTile> SourceTiles
+    {
+        get
+        {
+            var tiles = new List<SourceTile>(WebSources.Length + 2);
+            tiles.AddRange(WebSources.Select(source => new SourceTile(
+                source.Kind,
+                source.Icon,
+                WebSourceName(source.Kind),
+                WebSourceDescription(source.Kind),
+                $"/workspace/{Slug}/documents/web?source={source.Kind}")));
+
+            tiles.AddRange((jobs?.AvailableTypes ?? []).Select(type => new SourceTile(
+                type.ConnectorType,
+                IconFor(type.ConnectorType),
+                Localizer[type.DisplayNameKey],
+                Localizer[type.DescriptionKey],
+                null)));
+
+            return tiles;
+        }
+    }
+
+    /// <summary>Gets the connector type the configuration panel is bound to, if any.</summary>
+    private ConnectorTypeDescriptor? SelectedConnectorType =>
+        selectedType is null
+            ? null
+            : (jobs?.AvailableTypes ?? []).FirstOrDefault(type => type.ConnectorType == selectedType);
+
+    /// <summary>Gets the saved connectors of the kind the grid currently has selected.</summary>
+    private IReadOnlyList<ConnectorSummary> SavedForSelectedType => selectedType is null
+        ? []
+        : savedConnectors.Where(saved => saved.ConnectorType == selectedType).ToList();
+
+    /// <summary>
+    /// Gets every saved connector that expects a token whose token cannot be read here.
+    /// </summary>
+    /// <remarks>
+    /// The one failure the product can predict in advance, and the reason
+    /// <see cref="ConnectorSummary.CredentialResolves"/> exists at all.
+    /// </remarks>
+    private IReadOnlyList<ConnectorSummary> BrokenCredentials => savedConnectors
+        .Where(saved => saved is { HasCredential: true, CredentialResolves: false })
+        .ToList();
+
+    /// <summary>
+    /// REQ-UI-051 / TR-024: the display text for a saved connector on the Select trigger.
+    /// </summary>
+    /// <param name="id">The bound connector id.</param>
+    /// <returns>The connector's own name, which is user data and is not translated.</returns>
+    private string SavedConnectorText(string id) =>
+        savedConnectors.FirstOrDefault(saved => saved.ConnectorId == id)?.DisplayName ?? string.Empty;
+
+    /// <summary>Gets the saved connector the run form is bound to, if one has been picked.</summary>
+    private ConnectorSummary? SelectedSaved =>
+        SavedForSelectedType.FirstOrDefault(saved => saved.ConnectorId == connectorId);
+
+    /// <summary>Gets the recent-runs table's rows, newest first as the service returns them.</summary>
+    private IReadOnlyList<RunRow> RunRows => recentRuns.Select(report => new RunRow(
+        OutcomeLabel(report),
+        OutcomeBadge(report),
+        report.JobName,
+        $"{report.Ingested.Count}/{report.Ingested.Count + report.NotIngested.Count}",
+        report.StartedUtc.ToLocalTime().ToString("g"),
+        FormatDuration(report.Duration),
+        report.SummaryText(Localize),
+        report)).ToList();
+
+    protected override void OnInitialized()
+    {
+        jobs = Services.GetService<IConnectorJobService>();
+        registry = Services.GetService<IConnectorRegistry>();
+        if (jobs is not null)
+        {
+            jobs.Changed += OnJobsChanged;
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug)
+        {
+            return;
+        }
+
+        loadedSlug = Slug;
+        await LoadAsync();
+        await LoadSavedConnectorsAsync();
+        await LoadHistoryAsync();
+    }
+
+    /// <summary>Reads the saved connectors, so the run form lists what exists rather than asking.</summary>
+    /// <returns>A task that completes when the list is current.</returns>
+    /// <remarks>
+    /// A failure here is deliberately NOT surfaced as a page error: the web sources and the job
+    /// monitor are unaffected by it, and the only consequence is that the run form reports no saved
+    /// connector — which it already phrases as "nothing is set up", the same thing an empty store
+    /// means to the operator.
+    /// </remarks>
+    private async Task LoadSavedConnectorsAsync()
+    {
+        if (registry is null)
+        {
+            return;
+        }
+
+        try
+        {
+            savedConnectors = await registry.ListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to list saved connectors for the connector hub");
+            savedConnectors = [];
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            canManage = Workspaces.CanManageWorkspaces;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load workspace {Slug} for the connector hub", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    /// <summary>Reads the recent-run history, keeping the open detail card pointed at its run.</summary>
+    private async Task LoadHistoryAsync()
+    {
+        if (jobs is null)
+        {
+            return;
+        }
+
+        historyLoading = true;
+        historyError = null;
+        StateHasChanged();
+
+        try
+        {
+            recentRuns = await jobs.ListRecentAsync(RecentRunLimit);
+            if (selectedRun is { } open)
+            {
+                // Re-point at the refreshed report so an open detail card follows the run it is
+                // showing from Running to its final outcome, rather than freezing on first paint.
+                selectedRun = recentRuns.FirstOrDefault(report => report.RunId == open.RunId) ?? open;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to read connector run history");
+            historyError = ex.Message;
+        }
+        finally
+        {
+            historyLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Handles <see cref="IConnectorJobService.Changed"/>, which is raised OFF the dispatcher.
+    /// </summary>
+    /// <remarks>
+    /// Everything it touches is marshalled through <c>InvokeAsync</c>; touching component state on
+    /// the reporting job's own thread is a cross-thread render, not a race that "usually works".
+    /// </remarks>
+    private void OnJobsChanged() => _ = InvokeAsync(HandleChangedAsync);
+
+    /// <summary>Repaints the live counters, and re-reads history only when a run begins or ends.</summary>
+    /// <returns>A task that completes when the screen is up to date.</returns>
+    /// <remarks>
+    /// Progress is reported per item, so re-reading run history on every raise would put a database
+    /// query behind every page of a repository walk. The set of active run ids is the cheap signal
+    /// for the only thing history can have changed by.
+    /// </remarks>
+    private async Task HandleChangedAsync()
+    {
+        var current = jobs?.ActiveRuns.Select(run => run.ScheduleRunId).ToList() ?? [];
+        var setChanged = !current.SequenceEqual(activeRunIds);
+        activeRunIds = current;
+        StateHasChanged();
+
+        if (setChanged)
+        {
+            await LoadHistoryAsync();
+        }
+    }
+
+    /// <summary>Binds the configuration panel below to one installed connector type.</summary>
+    /// <param name="connectorType">The type that was chosen.</param>
+    /// <remarks>
+    /// The chosen connector is cleared with it, not kept: a saved connector belongs to exactly one
+    /// kind of source, so carrying it across would leave the form naming a repository while the
+    /// panel above it says Confluence. The refusal message goes for the same reason — it was written
+    /// about a DIFFERENT connector's rules, and left standing it is worse than no message at all.
+    /// </remarks>
+    private void SelectConnectorType(string connectorType)
+    {
+        selectedType = connectorType;
+        connectorId = null;
+        startError = null;
+    }
+
+    /// <summary>Opens the per-item detail card for one finished run.</summary>
+    /// <param name="report">The run to show, already carrying its items.</param>
+    private void SelectRun(ConnectorRunReport report) =>
+        selectedRun = selectedRun?.RunId == report.RunId ? null : report;
+
+    /// <summary>Asks a run in flight to stop.</summary>
+    /// <param name="runId">The run key.</param>
+    private void CancelRun(long runId)
+    {
+        if (jobs?.Cancel(runId) == true)
+        {
+            // Cooperative, not instant — saying "stopped" here would be a claim the run has not yet
+            // honoured. Everything already ingested stays in the library, and the report says so.
+            ToastService.Show(Localizer["HubStoppingBody"], Localizer["HubStoppingTitle"]);
+            return;
+        }
+
+        ToastService.Error(Localizer["HubNothingToStopBody"], Localizer["HubNothingToStopTitle"]);
+    }
+
+    /// <summary>Builds the payload the configuration panel describes.</summary>
+    /// <returns>The payload for this run.</returns>
+    private ConnectorJobPayload BuildPayload() => new()
+    {
+        ConnectorId = connectorId?.Trim() ?? string.Empty,
+        ConnectorType = selectedType ?? string.Empty,
+        DisplayName = string.IsNullOrWhiteSpace(displayName)
+            ? SelectedSaved?.DisplayName ?? connectorId?.Trim() ?? string.Empty
+            : displayName.Trim(),
+        WorkspaceId = workspace?.WorkspaceId,
+        Pinned = pinned,
+        // A field that will not parse becomes an out-of-range value on purpose, so it fails the SAME
+        // validation message as a number the user typed too large. Silently substituting a default
+        // would start a sync with bounds nobody asked for.
+        MaxItems = int.TryParse(maxItemsText, out var items) ? items : 0,
+        MaxPages = int.TryParse(maxPagesText, out var pages) ? pages : 0,
+    };
+
+    /// <summary>Validates and starts a connector run, then shows it in the monitor.</summary>
+    /// <returns>A task that completes once the run has been accepted or refused.</returns>
+    private async Task StartConnectorAsync()
+    {
+        if (jobs is null || workspace is null || starting || !canManage)
+        {
+            return;
+        }
+
+        var payload = BuildPayload();
+        startError = jobs.Validate(payload);
+        if (startError is not null)
+        {
+            return;
+        }
+
+        starting = true;
+        StateHasChanged();
+
+        try
+        {
+            await jobs.StartAsync(payload);
+            ToastService.Success(Localizer["HubSyncStartedBody"], Localizer["HubSyncStartedTitle"]);
+            await LoadHistoryAsync();
+        }
+        catch (ConnectorException ex)
+        {
+            startError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["HubSyncFailedTitle"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start connector run for {ConnectorId}", payload.ConnectorId);
+            startError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["HubSyncFailedTitle"]);
+        }
+        finally
+        {
+            starting = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Builds the address of the "add a connector of this kind" screen.</summary>
+    /// <param name="connectorType">The stable connector-type key the tile stands for.</param>
+    /// <returns>The add screen's address, already carrying the chosen kind.</returns>
+    /// <remarks>
+    /// The kind travels in the address so the tile the operator pressed survives the navigation —
+    /// otherwise the add screen has to ask the question the grid just answered.
+    /// </remarks>
+    private string AddConnectorHref(string connectorType) =>
+        $"/workspace/{Slug}/connectors/new?type={Uri.EscapeDataString(connectorType)}";
+
+    /// <summary>Builds the address of one saved connector's edit screen.</summary>
+    /// <param name="connectorId">The connector key.</param>
+    /// <returns>The edit screen's address.</returns>
+    private string EditConnectorHref(string connectorId) =>
+        $"/workspace/{Slug}/connectors/{Uri.EscapeDataString(connectorId)}/edit";
+
+    /// <summary>Proves one saved connector can reach its source, by listing its first page.</summary>
+    /// <param name="connectorId">The connector key.</param>
+    /// <returns>A task that completes once the source has answered.</returns>
+    /// <remarks>
+    /// Lists and never fetches, so trying a configuration is not a destructive act. It is also the
+    /// cheapest call that tells a bad base URL, a bad project and a bad token apart — which is the
+    /// only question an operator has when a run fails.
+    /// </remarks>
+    private async Task TestSavedAsync(string connectorId)
+    {
+        if (registry is null || testingId is not null)
+        {
+            return;
+        }
+
+        testingId = connectorId;
+        testResults.Remove(connectorId);
+        StateHasChanged();
+
+        try
+        {
+            var failure = await registry.TestAsync(connectorId);
+            testResults[connectorId] = failure;
+            if (failure is null)
+            {
+                ToastService.Success(Localizer["HubConnectionWorksBody"], Localizer["HubConnectionWorksTitle"]);
+            }
+            else
+            {
+                ToastService.Error(failure, Localizer["HubCouldNotReachTitle"]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Testing connector {ConnectorId} threw", connectorId);
+            testResults[connectorId] = ex.Message;
+            ToastService.Error(ex.Message, Localizer["HubCouldNotReachTitle"]);
+        }
+        finally
+        {
+            testingId = null;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Starts a run of one saved connector with the connector's own defaults.</summary>
+    /// <param name="connectorId">The connector key.</param>
+    /// <returns>A task that completes once the run has been accepted or refused.</returns>
+    /// <remarks>
+    /// The payload is built by the registry rather than here, because a run's bounds and its
+    /// workspace belong to the saved connector; the panel above exists for the rarer case of running
+    /// one with different bounds. A second press is safe — the job service returns the run already in
+    /// flight rather than starting a second one — so the button is never disabled to fake that.
+    /// </remarks>
+    private async Task SyncNowAsync(string connectorId)
+    {
+        if (jobs is null || registry is null || !canManage)
+        {
+            return;
+        }
+
+        try
+        {
+            var payload = await registry.CreatePayloadAsync(connectorId);
+            if (payload is null)
+            {
+                ToastService.Error(Localizer["HubNothingToSyncBody"], Localizer["HubNothingToSyncTitle"]);
+                await LoadSavedConnectorsAsync();
+                StateHasChanged();
+                return;
+            }
+
+            var invalid = jobs.Validate(payload);
+            if (invalid is not null)
+            {
+                ToastService.Error(invalid, Localizer["HubSyncFailedTitle"]);
+                return;
+            }
+
+            await jobs.StartAsync(payload);
+            ToastService.Success(Localizer["HubSyncStartedBody"], Localizer["HubSyncStartedTitle"]);
+            await LoadHistoryAsync();
+        }
+        catch (ConnectorException ex)
+        {
+            ToastService.Error(ex.Message, Localizer["HubSyncFailedTitle"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start connector run for {ConnectorId}", connectorId);
+            ToastService.Error(ex.Message, Localizer["HubSyncFailedTitle"]);
+        }
+    }
+
+    /// <summary>Shows the delete confirmation for one saved connector, in its own row.</summary>
+    /// <param name="saved">The connector the operator pressed Delete on.</param>
+    private void AskToDelete(ConnectorSummary saved) => pendingDelete = saved;
+
+    /// <summary>Withdraws a delete confirmation, leaving the connector alone.</summary>
+    private void CancelDelete() => pendingDelete = null;
+
+    /// <summary>Deletes the confirmed connector, its sync state and its stored token.</summary>
+    /// <returns>A task that completes when the connector is gone and the list is current.</returns>
+    /// <remarks>
+    /// The documents it ingested are deliberately left in the catalogue; the confirmation says so, and
+    /// the toast repeats it rather than reporting a bare "Deleted" the operator has to interpret.
+    /// </remarks>
+    private async Task DeleteConfirmedAsync()
+    {
+        if (registry is null || pendingDelete is null)
+        {
+            return;
+        }
+
+        var target = pendingDelete;
+        pendingDelete = null;
+
+        try
+        {
+            await registry.DeleteAsync(target.ConnectorId);
+            testResults.Remove(target.ConnectorId);
+            if (connectorId == target.ConnectorId)
+            {
+                // The run form was pointed at it. Left alone it would name a connector that no longer
+                // exists and fail at Start with a message about a deletion the operator already knows about.
+                connectorId = null;
+            }
+
+            ToastService.Show(
+                Localizer["HubConnectorDeletedBody", target.DisplayName],
+                Localizer["HubConnectorDeletedTitle"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete connector {ConnectorId}", target.ConnectorId);
+            ToastService.Error(ex.Message, Localizer["HubConnectorNotDeletedTitle"]);
+        }
+        finally
+        {
+            await LoadSavedConnectorsAsync();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Gets a run's status-pill text.</summary>
+    /// <param name="report">The run.</param>
+    /// <returns>The pill's text.</returns>
+    /// <remarks>
+    /// <see cref="RunOutcome.Succeeded"/> is reported as "Partly ingested" whenever items were left
+    /// behind. A run that finished cleanly but dropped twelve items is not a success, and calling it
+    /// one sends the operator looking for content that was never added.
+    /// </remarks>
+    private string OutcomeLabel(ConnectorRunReport report) => report.Outcome switch
+    {
+        RunOutcome.Running => Localizer["HubOutcomeRunning"],
+        RunOutcome.Cancelled => Localizer["HubOutcomeStopped"],
+        RunOutcome.Failed => Localizer["HubOutcomeFailed"],
+        RunOutcome.Skipped => Localizer["HubOutcomeDidNotRun"],
+        RunOutcome.Partial => Localizer["HubOutcomePartlyIngested"],
+        _ => report.IsPartial ? Localizer["HubOutcomePartlyIngested"]
+            : report.Ingested.Count == 0 ? Localizer["HubOutcomeNothingIngested"]
+            : Localizer["HubOutcomeCompleted"],
+    };
+
+    /// <summary>Gets the tone for <see cref="OutcomeLabel"/>.</summary>
+    /// <param name="report">The run.</param>
+    /// <returns>The badge variant.</returns>
+    /// <remarks>
+    /// TR-027 — <c>BadgeVariant</c> has no success or warning tone, so a clean run is Secondary
+    /// rather than green and a partial one cannot be amber. The text carries the distinction.
+    /// </remarks>
+    private static BadgeVariant OutcomeBadge(ConnectorRunReport report) => report.Outcome switch
+    {
+        RunOutcome.Running => BadgeVariant.Default,
+        RunOutcome.Failed => BadgeVariant.Destructive,
+        RunOutcome.Partial => BadgeVariant.Outline,
+        _ when report.Outcome == RunOutcome.Succeeded && report.Ingested.Count == 0 => BadgeVariant.Destructive,
+        _ => BadgeVariant.Secondary,
+    };
+
+    /// <summary>Gets the tone of the detail card's outcome alert.</summary>
+    /// <param name="report">The run being shown.</param>
+    /// <returns>The alert variant.</returns>
+    private static AlertVariant ReportVariant(ConnectorRunReport report) => report switch
+    {
+        { IsRunning: true } => AlertVariant.Default,
+        { Outcome: RunOutcome.Failed } => AlertVariant.Danger,
+        { Ingested.Count: 0 } => AlertVariant.Danger,
+        { IsPartial: true } => AlertVariant.Warning,
+        { Outcome: RunOutcome.Cancelled } => AlertVariant.Warning,
+        _ => AlertVariant.Success,
+    };
+
+    /// <summary>Gets the icon of the detail card's outcome alert.</summary>
+    /// <param name="report">The run being shown.</param>
+    /// <returns>The Lucide icon name.</returns>
+    private static string ReportIcon(ConnectorRunReport report) => ReportVariant(report) switch
+    {
+        AlertVariant.Danger => "circle-x",
+        AlertVariant.Warning => "triangle-alert",
+        AlertVariant.Success => "circle-check",
+        _ => "info",
+    };
+
+    /// <summary>Gets the title of the detail card's outcome alert.</summary>
+    /// <param name="report">The run being shown.</param>
+    /// <returns>The alert title.</returns>
+    private string ReportTitle(ConnectorRunReport report) => report switch
+    {
+        { IsRunning: true } => Localizer["HubReportStillRunning"],
+        { Outcome: RunOutcome.Cancelled } => Localizer["HubOutcomeStopped"],
+        { Ingested.Count: 0 } => Localizer["HubReportNothingWasIngested"],
+        { IsPartial: true } => Localizer["HubOutcomePartlyIngested"],
+        _ => Localizer["HubReportIngested"],
+    };
+
+    /// <summary>
+    /// Gets one run's item rows: everything that was added, then everything that was not.
+    /// </summary>
+    /// <param name="report">The run being shown.</param>
+    /// <returns>The rows, successes first.</returns>
+    /// <remarks>
+    /// Refusals come SECOND rather than being interleaved by arrival order, so the failures are a
+    /// block the operator reads to the end instead of lines to hunt for among successes.
+    /// <c>NotIngested</c> already puts failures ahead of skips, for the same reason.
+    /// </remarks>
+    private IReadOnlyList<ItemRow> ItemRows(ConnectorRunReport report)
+    {
+        var rows = new List<ItemRow>(report.Ingested.Count + report.NotIngested.Count);
+        rows.AddRange(report.Ingested.Select(item => new ItemRow(
+            Localizer["HubReportIngested"], true, item.ItemName,
+            item.Reason ?? Localizer["HubItemAddedToLibrary"].Value)));
+        rows.AddRange(report.NotIngested.Select(item => new ItemRow(
+            item.Status == RunItemStatus.Failed ? Localizer["HubOutcomeFailed"] : Localizer["HubItemSkipped"],
+            false,
+            item.ItemName,
+            item.Reason ?? Localizer["HubItemNoReasonRecorded"].Value)));
+        return rows;
+    }
+
+    /// <summary>Names a connector type's tile icon.</summary>
+    /// <param name="connectorType">The stable connector-type key.</param>
+    /// <returns>A Lucide icon name.</returns>
+    /// <remarks>
+    /// The keys are the ones <c>ConnectorJobPayload.ConnectorType</c> documents. An unknown type
+    /// still gets a tile — an installed connector this screen has no icon for must appear, because
+    /// the alternative is a source the operator can never reach.
+    /// </remarks>
+    private static string IconFor(string connectorType) => connectorType.ToLowerInvariant() switch
+    {
+        "repository" => "git-branch",
+        "confluence" => "book-open",
+        "email" => "mail",
+        _ => "plug-2",
+    };
+
+    /// <summary>Renders a run duration in the coarsest unit that is still true.</summary>
+    /// <param name="duration">How long the run took, or <see langword="null"/> while in flight.</param>
+    /// <returns>The duration, or "—" when the run has not finished.</returns>
+    private string FormatDuration(TimeSpan? duration) => duration switch
+    {
+        null => "—",
+        { TotalSeconds: < 1 } => Localizer["HubDurationUnderASecond"],
+        { TotalMinutes: < 1 } value => Localizer["HubDurationSeconds", value.TotalSeconds.ToString("0")],
+        { TotalHours: < 1 } value => Localizer["HubDurationMinutesSeconds", value.Minutes, value.Seconds],
+        { } value => Localizer["HubDurationHoursMinutes", (int)value.TotalHours, value.Minutes],
+    };
+
+    /// <summary>Stops listening to the job service when the screen is left.</summary>
+    public void Dispose()
+    {
+        if (jobs is not null)
+        {
+            jobs.Changed -= OnJobsChanged;
+        }
+    }
+}

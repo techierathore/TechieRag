@@ -106,264 +106,330 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieDesk — UI Design Spec (Mockups)</h1>
-    <div class="subtitle">The approved visual contract for the new product screens · 16 mockups · Last updated 2026-07-17</div>
-
-    <blockquote><strong>What this is.</strong> The approved visual design for TechieDesk's NEW product screens (Phases 1–4), produced before the build. Each screen has a <strong>rendered mockup</strong> (<code>docs/mockups/{screen}.html</code>, styled to look like TrBlazeUI) and a <strong>component map</strong> that ties every region to a real <strong>TrBlazeUI control</strong>, so the build (<code>/trblazeui</code>) reproduces it 1:1 and the verifier's visual-truth gate diffs the live screen against it. <strong>19 screens are mocked</strong>: 16 new product screens + 3 console screens (Qdrant Admin, LLM Settings, Token Usage) added as <em>reskin previews</em> so the prototype navigation is complete — the console screens' current-behavior baseline remains the DevGuide screenshots (<code>docs/screenshots/TechieRag/</code>); their mockups show the Phase-1 product shell they migrate into. The P5 flow builder is deferred (mocked when Phase 5 is scheduled). The owner APPROVES this before build.</blockquote>
+    <div class="subtitle">UI design spec &amp; mockups · TechieDesk desktop app (MAUI Blazor Hybrid) · 20 live screens + 2 retired · APPROVED 2026-07-26</div>
 
     <div class="toc-inline">
       <div>Contents</div>
       <ol>
         <li><a href="#how-to-use">How to use</a></li>
         <li><a href="#design-system-trblazeui">Design system (TrBlazeUI)</a></li>
-        <li><a href="#screens">Screens</a>
-          <ul>
-            <li><a href="#screen-login-login">Login</a> · <a href="#screen-register-register">Register</a> · <a href="#screen-password-recovery-forgot-password-reset-password">Password recovery</a> · <a href="#screen-profile-profile">Profile</a></li>
-            <li><a href="#screen-workspace-chat-workspace-slug">Workspace chat</a> · <a href="#screen-workspace-settings-workspace-slug-settings">Workspace settings</a> · <a href="#screen-document-library-workspace-slug-documents">Document library</a></li>
-            <li><a href="#screen-first-run-wizard-setup">First-run wizard</a> · <a href="#screen-connectors-workspace-slug-connectors">Connectors</a></li>
-            <li><a href="#screen-pricing-pricing">Pricing</a> · <a href="#screen-billing-billing">Billing</a> · <a href="#screen-support-support">Support</a></li>
-            <li><a href="#screen-admin-users-admin-users">Admin: Users</a> · <a href="#screen-admin-event-log-admin-events">Event log</a> · <a href="#screen-admin-chat-logs-admin-chats">Chat logs</a> · <a href="#screen-admin-instance-settings-admin-settings">Instance settings</a></li>
-          </ul>
-        </li>
+        <li><a href="#screens">Screens</a></li>
       </ol>
     </div>
 
+    <blockquote><p><strong>What this is.</strong> The approved visual design for TechieDesk's NEW product screens (Phases 1–4), produced before the build. Each screen has a <strong>rendered mockup</strong> (<code>docs/mockups/{screen}.html</code>, styled to look like TrBlazeUI) and a <strong>component map</strong> that ties every region to a real <strong>TrBlazeUI control</strong>, so the build (<code>/trblazeui</code>) reproduces it 1:1 and the verifier's visual-truth gate diffs the live screen against it. <strong>20 live screens are mocked</strong> (+ 2 retired kept as record): 17 product screens + 3 console screens (Qdrant Admin, LLM Settings, Token Usage) added as <em>reskin previews</em> so the prototype navigation is complete — the console screens' current-behavior baseline remains the DevGuide screenshots (<code>docs/screenshots/TechieRag/</code>); their mockups show the Phase-1 product shell they migrate into. The P5 flow builder is deferred (mocked when Phase 5 is scheduled). This is a HUMAN document → rendered to HTML. <strong>APPROVED by the owner on 2026-07-26</strong> — these mockups are now the frozen visual contract the build reproduces and the verifier diffs against. Changing a screen after this point goes through <code>*mockups TechieDesk --update</code> and is re-approved, not edited ad hoc.</p></blockquote>
+    <blockquote><p><strong>Updated 2026-07-26 — desktop-only (<code>*mockups TechieDesk --update</code>).</strong> TechieDesk is now a <strong>MAUI Blazor Hybrid desktop app</strong> (BRD-128), so every mockup gained <strong>native window chrome</strong> — a macOS title bar and a real menu bar above the app shell — because the product no longer renders in a browser tab. <strong>Added:</strong> Data &amp; storage (BRD-130/133) and a configurable <strong>Docker daemon</strong> panel on Qdrant Admin (BRD-134). <strong>Retired:</strong> Admin — Users (BRD-72) and Admin — Chat logs (BRD-74); both mockups are kept, banner-marked and greyed, and are unreachable from the nav. <strong>Reframed:</strong> Login and Register are now optional licence activation, never an access gate (BRD-129); the first-run wizard configures providers, not an administrator. The sidebar's "Admin" group is now "Operator", "Instance Settings" is "App Settings", and the footer no longer shows a role — there are no roles (BRD-23/24/25 retired).</p></blockquote>
+    <blockquote><p><strong>Updated 2026-07-26 (second pass) — owner review of the mockups.</strong> Fifteen issues were raised and all are fixed. Four were global: the <strong>menu bar is now live</strong> (seven real dropdowns that navigate and switch theme), the <strong>sidebar follows the theme</strong> instead of being permanently dark, <strong>content fills the window</strong> (the 1180px cap stranded the right half of a desktop window), and the <strong>workspace switcher opens</strong> a real workspace list. Screens gained the interactions that were only described before — thread context menus, a document <strong>View</strong> with preview / chunks / details and an honest "the source file has moved" path, working <strong>tab switching</strong> on Workspace settings and App settings, a real <strong>New issue</strong> dialog plus full issue detail with the comment thread, <strong>event detail</strong> behind every log row, and working <strong>New collection</strong> / <strong>Pull image</strong> on Qdrant Admin. Three raised gaps were <strong>requirement</strong> gaps, not mockup gaps, and were added to the BRD: <strong>BRD-135</strong> email/IMAP connector, <strong>BRD-136</strong> provider-conditional settings with save-time validation. Two screens the BRD already required but that had never been drawn are now mocked: <strong>Agents</strong> (BRD-83…86) and <strong>Automations</strong> (BRD-92/93). One tab was <strong>removed</strong> rather than drawn — Workspace settings › Members, which has no meaning on a single-user desktop.</p></blockquote>
+    <blockquote><p><strong>Updated 2026-07-26 (third pass) — second owner review.</strong> Seven more issues, all fixed and <strong>verified by driving the mockups in a real browser</strong> (18/18 interaction checks pass, zero page errors) rather than by inspection. One was a genuine bug that inspection had missed: a stray <code>&lt;/div&gt;</code> had landed <em>inside</em> <code>workspace-settings.html</code>'s <code>&lt;script&gt;</code>, so <strong>all JavaScript on that page was dead</strong> — which is why its tabs still did not switch after the previous round claimed they did. Every mockup's inline script is now syntax-checked as part of the build. Five of the seven were <strong>requirement</strong> gaps, now in the BRD: <strong>BRD-137</strong> multi-line chat composer with per-turn mode/model/scope · <strong>BRD-138</strong> named user-defined agents · <strong>BRD-139</strong> background scheduler service · <strong>BRD-140</strong> natural-language authoring of schedules and flows · <strong>BRD-141</strong> support attachments and change-priority.</p></blockquote>
     <h2 id="how-to-use">How to use<a class="anchor-link" href="#how-to-use">#</a></h2>
     <ul>
       <li>Every screen links to its rendered mockup in <code>docs/mockups/</code>. Open the <code>.html</code> files in a browser to see the intended layout with realistic placeholder data.</li>
-      <li>The <strong>Component map</strong> is the build contract: <code>region → TrBlazeUI control</code>. Only controls that exist in the TrBlazeUI catalog (<code>docs/TrBlazeUI-AI-Reference.md</code>) are used. Two library gaps were found and logged (see Design system): no Stepper/Wizard control, no Chat-thread control — both composed from existing primitives.</li>
+      <li>The <strong>Component map</strong> is the build contract: <code>region → TrBlazeUI control</code>. Only controls that exist in the TrBlazeUI catalog (<code>.trblazeui/TrBlazeUI-AI-Reference.md</code>) are used. Two library gaps were found and logged (see Design system notes): no Stepper/Wizard control, no Chat-thread control — both composed from existing primitives.</li>
       <li>To change a screen after approval: <code>*mockups TechieDesk --update</code>.</li>
     </ul>
-
     <h2 id="design-system-trblazeui">Design system (TrBlazeUI)<a class="anchor-link" href="#design-system-trblazeui">#</a></h2>
     <ul>
-      <li><strong>Source:</strong> TrBlazeUI component catalog (<code>docs/TrBlazeUI-AI-Reference.md</code>, shadcn-style, OKLCH tokens, Tailwind v4).</li>
-      <li><strong>Layout shell:</strong> <code>SidebarProvider</code> + <code>Sidebar</code> (workspace switcher + grouped icon nav via <code>SidebarMenuButton</code> + <code>LucideIcon</code>: Workspace / Account / Admin / Console groups) + <code>SidebarInset</code> main column with a <code>Breadcrumb</code> topbar (license badge + avatar right). Auth screens use a centered-card layout on a soft gradient backdrop, no sidebar.</li>
+      <li><strong>Source:</strong> TrBlazeUI component catalog (<code>.trblazeui/TrBlazeUI-AI-Reference.md</code>, shadcn-style, OKLCH tokens, Tailwind v4).</li>
+      <li><strong>Host (amended 2026-07-26):</strong> a <strong>MAUI <code>BlazorWebView</code></strong>, not a browser (BRD-128). Every mockup therefore renders inside <strong>native window chrome</strong> — a 34px title bar with traffic lights and a 28px menu bar (<code>TechieDesk · File · Edit · View · Workspace · Window · Help</code>) — drawn <em>above</em> the app shell. That chrome is <strong>MAUI's, not TrBlazeUI's</strong>: it has no component map, it is the OS window the WebView sits in, and the build must not attempt to reproduce it in Razor. Everything below it is TrBlazeUI as before.</li>
+      <li><strong>Window sizing (BRD-97, amended):</strong> minimum <strong>1024 × 720</strong>; the mockups are drawn at ~1280 wide. The old 390px mobile gate is retired with the browser head — a desktop window cannot reach it.</li>
+      <li><strong>Layout shell:</strong> <code>SidebarProvider</code> + <code>Sidebar</code> (workspace switcher + grouped icon nav via <code>SidebarMenuButton</code> + <code>LucideIcon</code>: <strong>Workspace / Account / Operator / Console</strong> groups) + <code>SidebarInset</code> main column with a <code>Breadcrumb</code> topbar (license badge + avatar right). The licence/onboarding screens (<code>/login</code>, <code>/register</code>, <code>/forgot-password</code>, <code>/setup</code>) use a centered-card layout on a soft gradient backdrop, no sidebar — reached from inside the app, never as a gate in front of it.</li>
       <li><strong>Theme:</strong> <strong>indigo accent</strong> (<code>--primary ≈ #4F46E5</code> light / <code>#818CF8</code> dark, applied via TrBlazeUI's OKLCH theme variables / tweakcn shadcn theme). <strong>Permanently dark slate sidebar</strong> (deep <code>#161B2E→#10131F</code> gradient with accent-tinted active item) against a soft <code>#F6F7F9</code> light canvas — white cards + subtle shadows. <strong>Full dark mode</strong> (<code>html[data-theme="dark"]</code> in the mockups ⇔ TrBlazeUI's <code>.dark</code> in the build): every mockup carries a moon-toggle (topbar on shell screens, floating on auth screens) with the choice persisted; deep <code>#0D1017</code> canvas, <code>#151A26</code> cards, re-tinted badges/alerts/inputs/tables. User chat bubbles = accent; agent execution trace + code snippets = dark slate mono panels in both themes.</li>
-      <li><strong>Clickable prototype:</strong> the mockups are interlinked — every sidebar item (including the three Console screens), the topbar avatar/license badge, and cross-screen CTAs (login → chat, pricing → billing, …) navigate to the sibling mockup file, so the whole app can be walked through in a browser in either theme.</li>
-      <li><strong>Controls inventory used:</strong> <code>Sidebar</code>/<code>SidebarProvider</code>/<code>SidebarInset</code>/<code>SidebarMenuButton</code>, <code>Breadcrumb</code>, <code>Card</code>, <code>Tabs</code>, <code>Button</code>, <code>Input</code>, <code>Textarea</code>, <code>Label</code>, <code>Field</code>, <code>Select</code>, <code>Combobox</code>, <code>MultiSelect</code>, <code>RadioGroup</code>, <code>Checkbox</code>, <code>Switch</code>, <code>Slider</code>, <code>NumericInput</code>, <code>InputGroup</code>, <code>FileUpload</code>, <code>DataTable</code>, <code>Badge</code>, <code>Avatar</code>, <code>Progress</code>, <code>Alert</code>, <code>AlertDialog</code>, <code>Dialog</code>, <code>Sheet</code>, <code>Toast</code>, <code>Empty</code>, <code>Skeleton</code>, <code>Spinner</code>, <code>DropdownMenu</code>, <code>DatePicker</code>, <code>Pagination</code>, <code>ColorPicker</code>, <code>ScrollArea</code>, <code>Separator</code>, <code>Kbd</code>, <code>LucideIcon</code>.</li>
-      <li><strong>Library gaps (logged to <code>docs/TechieRag-TrBlazeUI-Feedback.md</code>):</strong>
-        <ul>
-          <li><strong>TR-005 — no Stepper/Wizard component.</strong> The first-run wizard composes <code>Progress</code> + a custom step-label row + <code>Card</code>.</li>
-          <li><strong>TR-006 — no Chat/message-thread component.</strong> Workspace chat composes <code>ScrollArea</code> + styled message blocks + <code>Badge</code> citation chips + a custom composer.</li>
-        </ul>
-      </li>
+      <li><strong>Workspace switcher (2026-07-26):</strong> the sidebar switcher opens a real list (workspaces with chunk counts, <em>New workspace…</em>, <em>Workspace settings…</em>). <strong>New workspace</strong> opens a creation dialog — name, description, start-from (empty / copy settings / copy settings + documents), and an optional system prompt — reachable both there and from <strong>File › New Workspace ⌘N</strong>.</li>
+      <li><strong>Operable prototype (2026-07-26):</strong> the mockups are not just linked, they <em>work</em> for the interactions being reviewed — menu-bar dropdowns, the workspace switcher, row overflow (&amp;hellip;) menus, tab switching, and modal dialogs all respond, and <code>Esc</code> closes whatever is open. This is a shared ~90-line CSS/JS kit in every file. It exists so the design can be <em>reviewed</em> rather than imagined; it is <strong>not</strong> a build artefact and no Razor code should be ported from it.</li>
+      <li><strong>Window chrome is not a component:</strong> the title bar and menu bar are MAUI's. The menu contents (File / Edit / View / Workspace / Window / Help and their items) <em>are</em> a design decision and part of REQ-UI-041; their rendering is not.</li>
+      <li><strong>Clickable prototype:</strong> the mockups are interlinked — every sidebar item (including the three Console screens), the topbar avatar/license badge, and cross-screen CTAs (e.g. login → chat, pricing → billing) navigate to the sibling mockup file, so the whole app can be walked through in a browser in either theme.</li>
+      <li><strong>Controls inventory used:</strong> <code>Sidebar</code>/<code>SidebarProvider</code>/<code>SidebarInset</code>/<code>SidebarMenuButton</code>, <code>Breadcrumb</code>, <code>Card</code>, <code>Tabs</code>, <code>Button</code> (default/outline/ghost/destructive/sm), <code>Input</code>, <code>Textarea</code>, <code>Label</code>, <code>Field</code>, <code>Select</code>, <code>Combobox</code>, <code>MultiSelect</code>, <code>RadioGroup</code>, <code>Checkbox</code>, <code>Switch</code>, <code>Slider</code>, <code>NumericInput</code>, <code>InputGroup</code>, <code>FileUpload</code>, <code>DataTable</code>, <code>Badge</code>, <code>Avatar</code>, <code>Progress</code>, <code>Alert</code>, <code>AlertDialog</code>, <code>Dialog</code>, <code>Sheet</code>, <code>Toast</code>, <code>Empty</code>, <code>Skeleton</code>, <code>Spinner</code>, <code>DropdownMenu</code>, <code>DatePicker</code>, <code>Pagination</code>, <code>ColorPicker</code>, <code>ScrollArea</code>, <code>Separator</code>, <code>Kbd</code>, <code>LucideIcon</code>.</li>
+      <li><strong>Library gaps (logged to <code>docs/TechieRag-TrBlazeUI-Feedback.md</code>):</strong></li>
+      <ul>
+        <li><strong>TR-005 — no Stepper/Wizard component.</strong> The first-run wizard composes <code>Progress</code> + a custom step-label row + <code>Card</code>. A dedicated Stepper would be cleaner.</li>
+        <li><strong>TR-006 — no Chat/message-thread component.</strong> Workspace chat composes <code>ScrollArea</code> + styled message blocks + <code>Badge</code> citation chips + a custom composer (<code>Textarea</code> + <code>Button</code> + <code>Select</code>). A first-class Chat component would serve every RAG consumer.</li>
+      </ul>
       <li><strong>Standing workaround:</strong> every <code>DataTable</code> gets an inline <code>style="overflow-x:auto"</code> wrapper (TR-004 — the library's <code>.overflow-x-auto</code> class is purged from shipped CSS).</li>
     </ul>
-
     <h2 id="screens">Screens<a class="anchor-link" href="#screens">#</a></h2>
-
     <h3 id="screen-login-login">Screen: Login (<code>/login</code>)<a class="anchor-link" href="#screen-login-login">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/login.html">mockups/login.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-13, BRD-26 · <strong>REQ:</strong> REQ-UI-007, REQ-UI-013</p>
-    <p><strong>Layout:</strong> centered card on muted background; wordmark above; error-state specs shown in a second card.</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/login.html">docs/mockups/login.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-13, BRD-26, BRD-129, BRD-132 · <strong>REQ:</strong> REQ-UI-007, REQ-UI-013, REQ-FN-036 · <strong>Reframed 2026-07-26</strong></p>
+    <p><strong>Layout (one line):</strong> centered card on muted background; wordmark above; an "optional" <code>Alert</code> above the form; error-state specs shown in a second card.</p>
+    <blockquote><p><strong>Amended 2026-07-26 — this screen is no longer a gate.</strong> Signing in activates a licence; it never stands between the user and their own documents (BRD-129). The mockup leads with an info <code>Alert</code> saying so, and the form offers <strong>two</strong> primary actions: <em>Sign in &amp; activate licence</em> and <em>Continue without an account</em>. There is no forced redirect to <code>/login</code> at launch and no returnUrl gate to defend.</p></blockquote>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
         <tr><td>Wordmark</td><td>static brand block</td><td>TD mark + name</td><td>—</td></tr>
+        <tr><td>Optional-sign-in notice</td><td><code>Alert</code> info</td><td>"signing in is optional"</td><td>always shown</td></tr>
         <tr><td>Sign-in form</td><td><code>Card</code> + <code>Field</code>/<code>Input</code> ×2 + <code>Button</code></td><td>email, password → <code>POST /AuthSvc/login</code></td><td>invalid creds <code>Alert</code> (danger)</td></tr>
+        <tr><td>Skip action</td><td><code>Button</code> outline (full width)</td><td>→ straight into the workspace, no account</td><td>primary path on first launch</td></tr>
         <tr><td>Forgot link</td><td>link beside password <code>Label</code></td><td>→ <code>/forgot-password</code></td><td>—</td></tr>
-        <tr><td>Error states</td><td><code>Alert</code> danger/warning</td><td>INVALID_CREDENTIALS, ACCOUNT_LOCKED (423), ACCOUNT_DISABLED (403)</td><td>distinct copy per code</td></tr>
+        <tr><td>Error states</td><td><code>Alert</code> danger/warning</td><td>INVALID_CREDENTIALS, ACCOUNT_LOCKED (423), ACCOUNT_DISABLED (403), NO_APP_ACCESS (BRD-26)</td><td>distinct copy per code</td></tr>
       </tbody>
     </table>
-    <p><strong>Notes:</strong> on success → deep-link return route (REQ-FN-003); password RSA-encrypted client-side (REQ-FN-001). Loading: button shows <code>Spinner</code>. Never blank — every AppManager error code maps to a friendly <code>Alert</code>.</p>
-
+    <p><strong>Notes / interactions:</strong> password RSA-encrypted client-side before send (REQ-FN-001). On success the tokens go to the <strong>OS credential store</strong> (BRD-132 / REQ-FN-039), not a cookie — the footer hint says so. Loading: button shows <code>Spinner</code>.</p>
+    <p><strong>Empty / loading / error:</strong> never blank — every AppManager error code maps to a friendly <code>Alert</code>. An AppManager outage does <strong>not</strong> block the app; it falls back to cached licence grace (BRD-51).</p>
     <h3 id="screen-register-register">Screen: Register (<code>/register</code>)<a class="anchor-link" href="#screen-register-register">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/register.html">mockups/register.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-12 · <strong>REQ:</strong> REQ-UI-006</p>
-    <p><strong>Layout:</strong> centered card; 2-col name row; stacked fields; full-width CTA.</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/register.html">docs/mockups/register.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-12 · <strong>REQ:</strong> REQ-UI-006</p>
+    <p><strong>Layout (one line):</strong> centered card; 2-col name row; stacked fields; full-width CTA.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
         <tr><td>Form</td><td><code>Card</code> + <code>Field</code>s: <code>Input</code> ×5</td><td>first/last name, email, mobile (optional), password + confirm → <code>POST /AuthSvc/register</code></td><td>per-field validation errors</td></tr>
-        <tr><td>Password hint</td><td><code>Field</code> description</td><td>AppManager complexity rules</td><td>destructive styling on violation</td></tr>
+        <tr><td>Password hint</td><td><code>Field</code> description</td><td>AppManager complexity rules</td><td>turns destructive on violation</td></tr>
         <tr><td>CTA</td><td><code>Button</code> (full width)</td><td>Create account → auto-login</td><td><code>Spinner</code> while registering</td></tr>
       </tbody>
     </table>
-
+    <p><strong>Empty / loading / error:</strong> duplicate-email and INVALID_PASSWORD map to field-level errors, not a generic banner.</p>
     <h3 id="screen-password-recovery-forgot-password-reset-password">Screen: Password recovery (<code>/forgot-password</code>, <code>/reset-password</code>)<a class="anchor-link" href="#screen-password-recovery-forgot-password-reset-password">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/password-recovery.html">mockups/password-recovery.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-17 · <strong>REQ:</strong> REQ-UI-009</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/password-recovery.html">docs/mockups/password-recovery.html</a> · <strong>Role(s):</strong> public · <strong>BRD:</strong> BRD-17 · <strong>REQ:</strong> REQ-UI-009</p>
+    <p><strong>Layout (one line):</strong> two stacked cards (request + reset), each badged with its route.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
         <tr><td>Forgot form</td><td><code>Card</code> + <code>Input</code> + <code>Button</code></td><td>email → <code>/AuthSvc/forgot-password</code></td><td>always-success <code>Alert</code> (anti-enumeration)</td></tr>
-        <tr><td>Reset form</td><td><code>Card</code> + <code>Input</code> ×2 + <code>Button</code></td><td>token (email link) + new password</td><td>INVALID_RESET_TOKEN / APP_ID_MISMATCH <code>Alert</code> danger</td></tr>
+        <tr><td>Reset form</td><td><code>Card</code> + <code>Input</code> ×2 + <code>Button</code></td><td>token (from email link) + new password</td><td>INVALID_RESET_TOKEN / APP_ID_MISMATCH <code>Alert</code> danger</td></tr>
       </tbody>
     </table>
-
     <h3 id="screen-profile-profile">Screen: Profile (<code>/profile</code>)<a class="anchor-link" href="#screen-profile-profile">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/profile.html">mockups/profile.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-18, BRD-19, BRD-22, BRD-49 · <strong>REQ:</strong> REQ-UI-010, REQ-UI-011, REQ-UI-012</p>
-    <p><strong>Layout:</strong> app shell; header + Save; 2-col card grid (personal + password left; license + GDPR right).</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/profile.html">docs/mockups/profile.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-18, BRD-19, BRD-22, BRD-49 · <strong>REQ:</strong> REQ-UI-010, REQ-UI-011, REQ-UI-012</p>
+    <p><strong>Layout (one line):</strong> app shell; header + Save; 2-col card grid (personal + password left; license + GDPR right).</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Personal info</td><td><code>Card</code> + <code>Avatar</code> + <code>Input</code>s</td><td>name/mobile/avatar URL → <code>PUT /UserSvc/profile</code>; email read-only</td><td>save <code>Toast</code></td></tr>
+        <tr><td>Personal info</td><td><code>Card</code> + <code>Avatar</code> + <code>Input</code>s</td><td>name/mobile/avatar URL → <code>PUT /UserSvc/profile</code>; email read-only ("Managed by AppManager")</td><td>save <code>Toast</code></td></tr>
         <tr><td>Change password</td><td><code>Card</code> + <code>Input</code> ×3 + <code>Button</code> outline</td><td>encrypted current+new → <code>/UserSvc/change-password</code></td><td>INVALID_CURRENT_PASSWORD field error</td></tr>
-        <tr><td>License</td><td><code>Card</code> + <code>Badge</code> success</td><td>plan, expiry, days remaining, devices</td><td>expired → warning + upgrade link</td></tr>
-        <tr><td>GDPR</td><td><code>Card</code> + <code>Button</code> outline/destructive + confirm <code>Input</code></td><td>data-export &amp; delete requests (email confirm)</td><td>EMAIL_MISMATCH error; submitted <code>Alert</code> success</td></tr>
+        <tr><td>License</td><td><code>Card</code> + <code>Badge</code> success</td><td>plan, expiry, days remaining, devices</td><td>expired → warning <code>Badge</code> + upgrade link</td></tr>
+        <tr><td>GDPR</td><td><code>Card</code> + <code>Button</code> outline + <code>Button</code> destructive + confirm <code>Input</code></td><td>data-export &amp; delete requests (email confirm)</td><td>EMAIL_MISMATCH error; request-submitted <code>Alert</code> success</td></tr>
       </tbody>
     </table>
-
     <h3 id="screen-workspace-chat-workspace-slug">Screen: Workspace chat (<code>/workspace/{slug}</code>)<a class="anchor-link" href="#screen-workspace-chat-workspace-slug">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/workspace-chat.html">mockups/workspace-chat.html</a> · <strong>Role(s):</strong> assigned users+ · <strong>BRD:</strong> BRD-30, BRD-34, BRD-38, BRD-39, BRD-83, BRD-85, BRD-87, BRD-88 · <strong>REQ:</strong> REQ-UI-016, REQ-UI-017, REQ-UI-018, REQ-UI-034, REQ-UI-035, REQ-UI-036</p>
-    <p><strong>Layout:</strong> app shell; 260px threads panel + chat column (messages, composer, hint line).</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/workspace-chat.html">docs/mockups/workspace-chat.html</a> · <strong>Role(s):</strong> assigned users+ · <strong>BRD:</strong> BRD-30, BRD-34, BRD-38, BRD-39, BRD-83, BRD-85, BRD-87, BRD-88 · <strong>REQ:</strong> REQ-UI-016, REQ-UI-017, REQ-UI-018, REQ-UI-034, REQ-UI-035, REQ-UI-036</p>
+    <blockquote><p><strong>Amended 2026-07-26 (2nd owner review) — the composer was the weakest thing in the set.</strong> It was a <strong>single-line</strong> input with one dropdown option (<code>Auto-RAG</code>), which meant BRD-48's chat-vs-query modes were specified but unreachable at the point of use. It is now a proper composer (BRD-137 / REQ-UI-044): a <strong>multi-line</strong> input (Return sends, Shift+Return newline, grows to ~12 lines) under a control bar carrying the <strong>answering mode</strong> (Auto-RAG · Query · Chat · Direct-LLM · Agent), a <strong>per-turn model override</strong>, and a <strong>retrieval scope</strong> (whole workspace · pinned only · chosen documents), plus attach and saved-prompts. Thread rows also gained real <strong>⋯ context menus</strong> (open, rename, duplicate, export MD/JSON, copy link, pin, move, delete-with-confirm).</p></blockquote>
+    <p><strong>Layout (one line):</strong> app shell; 260px threads panel + chat column (messages, composer, hint line).</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Threads panel</td><td><code>Card</code> + <code>Button</code> outline sm + list + <code>DropdownMenu</code></td><td>threads newest-first; rename/delete</td><td><code>Empty</code>: "No threads yet"</td></tr>
-        <tr><td>Messages</td><td><code>ScrollArea</code> + styled blocks (TR-006 composition)</td><td>user right/muted; assistant left, markdown</td><td>streaming cursor ▍; loading <code>Skeleton</code></td></tr>
-        <tr><td>Citations</td><td><code>Badge</code> chips + expandable panel</td><td>doc name + score; snippet on expand</td><td>absent in Direct-LLM mode</td></tr>
-        <tr><td>Agent trace</td><td>bordered mono panel (F-TOOLS pattern)</td><td>tool steps with timing</td><td>collapses when done</td></tr>
-        <tr><td>Composer</td><td><code>Select</code> + <code>Textarea</code> + <code>Button</code> ghost (mic) + <code>Button</code> (send)</td><td>message; <code>@agent</code> trigger; Shift+Enter (<code>Kbd</code>)</td><td>disabled while streaming; mic pulses</td></tr>
+        <tr><td>Threads panel</td><td><code>Card</code> + <code>Button</code> outline sm + list items + <code>DropdownMenu</code> (⋯)</td><td>threads newest-first; active highlighted; rename/delete</td><td><code>Empty</code>: "No threads yet"</td></tr>
+        <tr><td>Messages</td><td><code>ScrollArea</code> + styled blocks (TR-006 composition)</td><td>user right/muted; assistant left with markdown</td><td>streaming cursor ▍ + "Streaming…" hint; loading <code>Skeleton</code></td></tr>
+        <tr><td>Citations</td><td><code>Badge</code> chips + expandable panel</td><td>doc name + score; expanded: snippet + relevance</td><td>absent in Direct-LLM mode</td></tr>
+        <tr><td>Agent trace</td><td>bordered mono panel (from F-TOOLS pattern)</td><td>tool steps with timing</td><td>collapses when done</td></tr>
+        <tr><td>Composer</td><td><code>Select</code> (mode) + <code>Textarea</code> + <code>Button</code> ghost (mic <code>LucideIcon</code>) + <code>Button</code> (send)</td><td>message; <code>@agent</code> trigger; Shift+Enter newline (<code>Kbd</code> in hint)</td><td>disabled while streaming; mic pulses while dictating</td></tr>
       </tbody>
     </table>
-    <p><strong>Notes:</strong> mode = Direct-LLM / Auto-RAG; retrieval workspace-scoped; TTS read-aloud (speaker icon) on assistant messages; provider failure surfaces retry/fallback status as warning <code>Alert</code> in-thread.</p>
-
+    <p><strong>Notes / interactions:</strong> mode select = Direct-LLM / Auto-RAG; retrieval always workspace-scoped; TTS read-aloud action on assistant messages (speaker icon, browser synthesis).</p>
+    <p><strong>Empty / loading / error:</strong> new thread shows workspace welcome message; provider failure surfaces the library's retry/fallback status as a warning <code>Alert</code> in-thread.</p>
     <h3 id="screen-workspace-settings-workspace-slug-settings">Screen: Workspace settings (<code>/workspace/{slug}/settings</code>)<a class="anchor-link" href="#screen-workspace-settings-workspace-slug-settings">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/workspace-settings.html">mockups/workspace-settings.html</a> · <strong>Role(s):</strong> Manager/Admin · <strong>BRD:</strong> BRD-28, BRD-29, BRD-47, BRD-48 · <strong>REQ:</strong> REQ-UI-015, REQ-FN-008</p>
-    <p><strong>Layout:</strong> app shell; header + Save; <code>Tabs</code> General / Retrieval / Members / Danger (mockup shows all four stacked, badged).</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/workspace-settings.html">docs/mockups/workspace-settings.html</a> · <strong>Role(s):</strong> Manager/Admin · <strong>BRD:</strong> BRD-28, BRD-29, BRD-47, BRD-48 · <strong>REQ:</strong> REQ-UI-015, REQ-FN-008 (+ REQ-RAG-014/015 behavior)</p>
+    <blockquote><p><strong>Amended 2026-07-26 (owner review).</strong> The tab strip was decorative — all four panels were stacked, so only <em>General</em> appeared to exist. <strong>Tabs now switch.</strong> The <strong>Members</strong> tab is <em>removed</em>, not drawn: a desktop install has one user, so there is no membership to manage (BRD-23/24/25 retired). Remaining tabs: General / Retrieval / Danger.</p></blockquote>
+    <p><strong>Layout (one line):</strong> app shell; header + Save; Tabs (General / Retrieval / Members / Danger) — mockup shows all four stacked with tab badges.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
         <tr><td>General</td><td><code>Card</code> + <code>Input</code> ×2 + <code>Textarea</code> + <code>Select</code> + <code>RadioGroup</code></td><td>name, slug, system prompt, LLM override, chat/query mode</td><td>slug conflict error</td></tr>
-        <tr><td>Retrieval</td><td><code>Card</code> + <code>Slider</code> + <code>NumericInput</code> + <code>Switch</code></td><td>threshold, top-K, rerank toggle</td><td>rerank disabled+hint until REQ-RAG-025 ships</td></tr>
+        <tr><td>Retrieval</td><td><code>Card</code> + <code>Slider</code> + <code>NumericInput</code> + <code>Switch</code></td><td>threshold 0–1, top-K, rerank toggle</td><td>rerank disabled+hint until library reranker (REQ-RAG-025) ships</td></tr>
         <tr><td>Members</td><td><code>Card</code> + <code>DataTable</code> + <code>Combobox</code> + <code>Button</code> sm</td><td>member/role rows; add member</td><td><code>Empty</code>: "Only you so far"</td></tr>
-        <tr><td>Danger</td><td><code>Card</code> (danger border) + <code>Button</code> destructive + <code>AlertDialog</code></td><td>delete workspace with consequences copy</td><td>confirm/cancel</td></tr>
+        <tr><td>Danger</td><td><code>Card</code> (danger border) + <code>Button</code> destructive + <code>AlertDialog</code></td><td>delete workspace w/ consequences copy</td><td>dialog confirm/cancel</td></tr>
       </tbody>
     </table>
-
     <h3 id="screen-document-library-workspace-slug-documents">Screen: Document library (<code>/workspace/{slug}/documents</code>)<a class="anchor-link" href="#screen-document-library-workspace-slug-documents">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/document-library.html">mockups/document-library.html</a> · <strong>Role(s):</strong> Manager/Admin manage, User view · <strong>BRD:</strong> BRD-40…46 · <strong>REQ:</strong> REQ-UI-019, REQ-UI-020, REQ-UI-021</p>
-    <p><strong>Layout:</strong> app shell; header + Upload; dropzone; upload queue; library table; empty-state spec.</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/document-library.html">docs/mockups/document-library.html</a> · <strong>Role(s):</strong> Manager/Admin manage, User view · <strong>BRD:</strong> BRD-40…46 · <strong>REQ:</strong> REQ-UI-019, REQ-UI-020, REQ-UI-021</p>
+    <blockquote><p><strong>Amended 2026-07-26 (owner review) — a document had no way to be <em>viewed</em>.</strong> Every row now carries a <strong>View</strong> action opening a preview dialog with three tabs: <strong>Preview</strong> (paged render + <em>Open in default app</em> / <em>Reveal in Finder</em>), <strong>Extracted chunks</strong> (what the retriever actually stored — the thing citations point at), and <strong>Details</strong> (source path, the copy TechieDesk keeps, content hash, embedding model). A second path matters as much: <strong>the user may have deleted or moved the original after ingesting it.</strong> That View shows an amber <code>Alert</code> naming the last known location and states plainly that retrieval is unaffected — the extracted text and embeddings live in TechieDesk's own store, so the document still answers and still cites — offering <em>Locate file…</em>, <em>View extracted text</em>, and <em>Copy last known path</em>. Missing source ≠ missing document.</p></blockquote>
+    <p><strong>Layout (one line):</strong> app shell; header + Upload; dropzone card; upload queue; library DataTable; empty-state spec.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Dropzone</td><td><code>FileUpload</code> (drag-drop, multi)</td><td>accepted types incl. XLSX/PPTX</td><td>per-file rejection with reason</td></tr>
+        <tr><td>Dropzone</td><td><code>FileUpload</code> (drag-drop + browse, multi)</td><td>accepted types incl. XLSX/PPTX</td><td>reject per-file with reason</td></tr>
         <tr><td>Upload queue</td><td><code>Card</code> + <code>Progress</code> rows</td><td>per-file embed progress</td><td>queued / embedding % / done</td></tr>
-        <tr><td>Library table</td><td><code>DataTable</code> in <code>overflow-x:auto</code> wrapper (TR-004)</td><td>pin, name, type, size, chunks, uploaded, workspaces, status <code>Badge</code>, actions</td><td>embedded / embedding / failed(+reason)</td></tr>
-        <tr><td>Pin</td><td>toggle icon (<code>LucideIcon</code>)</td><td>always-in-context flag</td><td>tooltip</td></tr>
-        <tr><td>Delete</td><td><code>Button</code> ghost sm + <code>AlertDialog</code></td><td>removes vectors everywhere (dedupe)</td><td>confirm shows usage count</td></tr>
+        <tr><td>Library table</td><td><code>DataTable</code> in <code>overflow-x:auto</code> wrapper (TR-004)</td><td>pin, name, type, size, chunks, uploaded, workspaces, status <code>Badge</code>, actions</td><td>statuses: embedded/embedding/failed(+reason)</td></tr>
+        <tr><td>Pin</td><td>toggle icon (<code>LucideIcon</code> pin)</td><td>always-in-context flag</td><td>pinned tooltip</td></tr>
+        <tr><td>Delete</td><td><code>Button</code> ghost sm + <code>AlertDialog</code></td><td>removes vectors everywhere (dedupe note)</td><td>confirmation with usage count</td></tr>
         <tr><td>Empty state</td><td><code>Empty</code></td><td>"No documents yet…"</td><td>—</td></tr>
       </tbody>
     </table>
-
     <h3 id="screen-first-run-wizard-setup">Screen: First-run wizard (<code>/setup</code>)<a class="anchor-link" href="#screen-first-run-wizard-setup">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/setup-wizard.html">mockups/setup-wizard.html</a> · <strong>Role(s):</strong> operator (first run) · <strong>BRD:</strong> BRD-52, BRD-53, BRD-54 · <strong>REQ:</strong> REQ-UI-022, REQ-UI-023, REQ-FN-016</p>
-    <p><strong>Layout:</strong> centered 560px card; <code>Progress</code> + 5 step labels (TR-005 composition); step body; Back/Continue.</p>
+    <p><strong>Mockup:</strong> <a href="./mockups/setup-wizard.html">docs/mockups/setup-wizard.html</a> · <strong>Role(s):</strong> operator (first run only) · <strong>BRD:</strong> BRD-52, BRD-53, BRD-54 · <strong>REQ:</strong> REQ-UI-022, REQ-UI-023, REQ-FN-016</p>
+    <p><strong>Layout (one line):</strong> centered 560px card; Progress + 4 step labels (TR-005 composition); step body; Back/Continue.</p>
+    <blockquote><p><strong>Amended 2026-07-26.</strong> The wizard configures <strong>providers, not administrators</strong>. The old step 4 ("Admin account") is gone with BRD-23/24/25, and step 3 is now explicitly optional — it activates a licence and can be skipped without limiting local use (BRD-129).</p></blockquote>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Step indicator</td><td><code>Progress</code> + custom labels (TR-005 gap)</td><td>Defaults → AI Provider → AppManager → Admin → Workspace</td><td>done/current/pending</td></tr>
+        <tr><td>Step indicator</td><td><code>Progress</code> + custom label row (TR-005 gap)</td><td>Defaults ✓ → AI Provider ● → Licence <em>(optional)</em> → Workspace</td><td>step states done/current/pending</td></tr>
         <tr><td>Defaults notice</td><td><code>Alert</code> success</td><td>BGE-M3 + SqliteVec applied, zero services</td><td>—</td></tr>
-        <tr><td>Ollama detect</td><td><code>Alert</code> success + <code>Select</code></td><td>detected endpoint + models</td><td>not found → info alert + manual URL</td></tr>
+        <tr><td>Ollama detect</td><td><code>Alert</code> success + <code>Select</code></td><td>detected endpoint + model list</td><td>not-found → info alert + manual URL <code>Input</code></td></tr>
         <tr><td>Provider choice</td><td><code>RadioGroup</code> (bordered rows)</td><td>Ollama / LM Studio / OpenAI-compatible / skip</td><td>—</td></tr>
         <tr><td>Nav</td><td><code>Button</code> outline + <code>Button</code></td><td>back / continue</td><td>continue disabled until valid</td></tr>
       </tbody>
     </table>
-    <p><strong>Notes:</strong> step 3 captures AppManager settings or explicit <strong>offline single-user mode</strong>; step 4 bootstraps first Admin; step 5 creates the default workspace.</p>
-
+    <p><strong>Notes:</strong> step 3 (Licence) captures the AppManager base URL + API key/secret, or is skipped entirely — account-free operation is the norm, not a fallback; step 4 creates the default workspace. On first launch the app also resolves and creates its per-user data directory and runs DbUp in-process before this screen paints (BRD-130 / REQ-FN-037).</p>
     <h3 id="screen-connectors-workspace-slug-connectors">Screen: Connectors (<code>/workspace/{slug}/connectors</code>)<a class="anchor-link" href="#screen-connectors-workspace-slug-connectors">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/connectors.html">mockups/connectors.html</a> · <strong>Role(s):</strong> Manager/Admin · <strong>BRD:</strong> BRD-60…65 · <strong>REQ:</strong> REQ-RAG-016…020, REQ-FN-020 · <strong>Phase 2</strong></p>
+    <p><strong>Mockup:</strong> <a href="./mockups/connectors.html">docs/mockups/connectors.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-60…65, <strong>BRD-135</strong> · <strong>REQ:</strong> REQ-RAG-016…020, <strong>REQ-RAG-049</strong>, REQ-FN-020 · <strong>Phase 2</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; source-card grid; config dialog per source; jobs table.</p>
+    <blockquote><p><strong>Amended 2026-07-26 (2nd owner review) — every source now configures.</strong> Only Email had a working Configure button; the other five were dead links beside a single inline "Configure: Website crawler" panel. Each source now opens <strong>its own dialog with its own fields</strong> — URL (single page, strip-chrome, follow-redirect), Crawler (root, depth, max links, include/exclude, robots.txt), YouTube (video/playlist, transcript language, playlist limit, timestamp retention, plus an honest "no transcript → skipped with a reason, we do not transcribe audio"), GitHub/GitLab (host, repo, branch, token, include/exclude globs, re-sync), Confluence (base URL, space key, credentials, label filter, updated-since, child pages, attachments). The shared inline panel is gone; it implied a uniformity these sources do not have.</p></blockquote>
+    <blockquote><p><strong>Amended 2026-07-26 (owner review) — Email added.</strong> The connector set had no email source. For the contracts/approvals/decisions this product targets, the mailbox is frequently where the source of truth lives, so its absence was a <strong>requirements</strong> gap, now closed by <strong>BRD-135</strong>. Its config opens as a three-tab dialog (Account / What to ingest / Schedule) rather than the inline panel, because an IMAP source needs materially more setup than a URL.</p></blockquote>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Source cards</td><td><code>Card</code> ×5 + <code>Button</code> outline sm</td><td>URL / crawler / YouTube / GitHub-GitLab / Confluence</td><td>license-gated <code>CONNECTORS</code> → upgrade prompt</td></tr>
-        <tr><td>Config panel</td><td><code>Card</code> + <code>Field</code>s + <code>Button</code></td><td>per-source params</td><td>validation</td></tr>
-        <tr><td>Jobs</td><td><code>DataTable</code> + <code>Progress</code> + <code>Badge</code></td><td>source, target, progress, status, items, started</td><td>running / completed / failed(+reason)</td></tr>
+        <tr><td>Source cards</td><td><code>Card</code> ×6 + <code>Button</code> outline sm</td><td>URL / crawler / YouTube / GitHub-GitLab / Confluence / <strong>Email</strong></td><td>license-gated <code>CONNECTORS</code> → upgrade prompt</td></tr>
+        <tr><td>Config panel</td><td><code>Card</code> + <code>Field</code>s (<code>Input</code>, <code>NumericInput</code>) + <code>Button</code></td><td>per-source params (root URL, depth, max links, globs)</td><td>validation</td></tr>
+        <tr><td><strong>Email config</strong></td><td><code>Dialog</code> + <code>Tabs</code> ×3 + <code>Select</code> + <code>Input</code> + <code>Switch</code> ×4 + <code>Alert</code></td><td>provider/server/port/address/app-password; folders, from-date, sender + subject filters, attachments, quoted-reply stripping; sync interval + incremental</td><td>connection test; TLS-required <code>Alert</code>; privacy <code>Alert</code></td></tr>
+        <tr><td>Jobs</td><td><code>DataTable</code> + <code>Progress</code> + <code>Badge</code></td><td>source, target, progress, status, items, started</td><td>running/completed/failed(+reason)</td></tr>
       </tbody>
     </table>
-
+    <p><strong>Notes:</strong> IMAP credentials go to the OS credential store (REQ-FN-039), never a settings file, and a plaintext connection is refused rather than warned about. The scope filters and the two off-by-default switches (<em>include messages you sent</em>, <em>ingest spam</em>) are acceptance criteria — a mailbox is the highest-sensitivity source in the product.</p>
+    <h3 id="screen-agents-workspace-slug-agents">Screen: Agents (<code>/workspace/{slug}/agents</code>)<a class="anchor-link" href="#screen-agents-workspace-slug-agents">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/agents.html">docs/mockups/agents.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-83, BRD-84, BRD-85, BRD-86 · <strong>REQ:</strong> REQ-RAG-021, REQ-RAG-022, REQ-RAG-023, REQ-UI-034 · <strong>Phase 4</strong> · <strong>NEW 2026-07-26</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; Tabs (Skills / MCP servers / Run history); skill toggle list, MCP table, run table + trace dialog.</p>
+    <blockquote><p><strong>Added 2026-07-26 (owner review)</strong>, then <strong>substantially reworked on the second review</strong>: the first version showed Skills, MCP servers and Run history but <strong>no agents</strong> — nothing to create, name or configure. That was a requirements gap, not just a drawing gap: BRD-83/84 described <em>one anonymous agent</em> with workspace-level toggles. <strong>BRD-138 / REQ-UI-045</strong> adds a real agent registry, and the page now leads with an <strong>Agents</strong> tab.</p></blockquote>
+    <p><strong>Component map:</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Agent list</strong></td><td><code>DataTable</code> + <code>Badge</code> + <code>DropdownMenu</code></td><td>named agents: handle, model, skills, knowledge scope, last used (BRD-138)</td><td>built-in <code>@agent</code> marked undeletable; row menu = run / duplicate / export / delete</td></tr>
+        <tr><td><strong>Agent editor</strong></td><td><code>Dialog</code> + <code>Tabs</code> ×4 (Identity / Skills / Knowledge / Guardrails) + <code>Input</code> + <code>Textarea</code> + <code>Select</code> + <code>Switch</code></td><td>handle, description, plain-language instructions, model, skill subset, knowledge scope, guardrails</td><td>skills the workspace catalogue forbids render <strong>greyed and marked <em>Blocked</em></strong>, not hidden</td></tr>
+        <tr><td>Skill catalogue</td><td><code>Card</code> + <code>Switch</code> ×6 + <code>Badge</code></td><td>per-workspace skill enable (BRD-84): RAG search, web search, web scrape, SQL query, chart generation, file operations</td><td><code>Badge</code> marks <em>Local</em> / <em>Leaves the machine</em> / <em>Needs review</em>; license-gated <code>AGENTS</code></td></tr>
+        <tr><td>Behaviour</td><td><code>Card</code> + <code>NumericInput</code> ×2 + <code>Switch</code> ×3</td><td>max tool calls per turn, run time limit, show trace, confirm-before-egress, allow self-directed follow-ups</td><td>—</td></tr>
+        <tr><td>MCP servers</td><td><code>DataTable</code> + <code>Badge</code> + <code>DropdownMenu</code> + <code>Dialog</code></td><td>registered servers (BRD-86), transport, tool count, handshake state</td><td><code>Connected</code> / <code>Handshake failed</code> + View error</td></tr>
+        <tr><td>Add MCP server</td><td><code>Dialog</code> + <code>Select</code> + <code>Input</code> ×3 + <code>Textarea</code> + <code>Alert</code></td><td>stdio command or http URL, env/headers</td><td>trust <code>Alert</code> — an MCP server runs with the user's permissions</td></tr>
+        <tr><td>Run history</td><td><code>DataTable</code> + <code>Badge</code></td><td>prompt, tools used, duration, outcome</td><td><code>Completed</code> / <code>Stopped — time limit</code></td></tr>
+        <tr><td>Execution trace</td><td><code>Dialog</code> + step <code>Card</code>s</td><td>per tool call: arguments, timing, result (BRD-85)</td><td>includes the <em>0 chunks above threshold</em> step — the agent moving on rather than inventing</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Notes:</strong> every skill is a library <code>ITool</code>; the app contributes the registry, toggles, trace rendering, and the confirm-before-egress prompt only. Skills that reach outside the workspace default to <strong>off</strong>.</p>
+    <p>⚠ <strong>The permission model is the part to get right.</strong> Two levels: the workspace <strong>skill catalogue</strong> is the outer boundary (what is permitted here at all), and each agent selects from within it. An agent must not be able to enable what the catalogue forbids, and revoking a catalogue skill must take effect for every agent immediately — so the effective set is an intersection computed at run time, not a copy taken when the agent was saved. The editor greys forbidden skills rather than hiding them, so the reason stays legible.</p>
+    <h3 id="screen-automations-automations">Screen: Automations (<code>/automations</code>)<a class="anchor-link" href="#screen-automations-automations">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/automations.html">docs/mockups/automations.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-92, BRD-93 · <strong>REQ:</strong> REQ-UI-040, REQ-FN-028 · <strong>Phase 5</strong> · <strong>NEW 2026-07-26</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; Tabs (Schedules / Flows / Run history); schedule table, flow cards, run table.</p>
+    <blockquote><p><strong>Added 2026-07-26 (owner review)</strong>, then <strong>corrected on the second review — the first version was wrong on the substance.</strong> It asserted that a desktop app "cannot be a background daemon" and made the user live with it. That is false: a per-user OS helper (macOS <strong>launchd</strong> agent, Windows <strong>per-user service</strong>) can host the <em>same in-process scheduler</em> and run schedules with the window closed. <strong>BRD-139 / REQ-FN-042</strong> makes that a configurable feature with run conditions (mains power, named networks, wake-for-run) rather than a limitation to apologise for. <em>(For the record: nothing in this codebase uses Hangfire or any other job framework, and BRD-139 explicitly rules one out — a job server or job database would hand back exactly the operational weight the desktop pivot removed.)</em> <strong>Authoring is now natural language (BRD-140 / REQ-UI-046).</strong> The first version made the user compose a cron expression and hand-assemble flow steps, and showed raw cron (<code>*/30 * * * *</code>) in the grid. A product that ships an LLM should not do that. You now <em>describe</em> what you want; the configured <strong>local</strong> model drafts a reviewable, individually-editable result; you confirm. <strong>Cron is never required</strong> and appears only behind an <em>Advanced</em> disclosure — every list, grid and notification shows plain language ("Every weekday at 07:00"). Flow steps are editable individually and refinable conversationally ("skip anything under £10k").</p></blockquote>
+    <p><strong>Component map:</strong></p>
+    <table>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
+      <tbody>
+        <tr><td>Background-service banner</td><td><code>Alert</code> info + link</td><td>whether schedules run with the window closed, and a link to configure it</td><td>reflects the helper's installed state</td></tr>
+        <tr><td><strong>Background service</strong></td><td><code>Dialog</code> + <code>Switch</code> ×5 + <code>Badge</code></td><td>install/remove the helper; mechanism per platform named explicitly; mains-power-only, named-networks-only, wake-for-run, menu-bar indicator</td><td>states what is installed and where; uninstall must genuinely remove it</td></tr>
+        <tr><td>Schedules</td><td><code>DataTable</code> + <code>Switch</code> + <code>Badge</code> + <code>DropdownMenu</code></td><td>job, action, <strong>plain-language schedule</strong>, last run, next run (BRD-93)</td><td><code>OK</code> / paused. ⚠ <strong>no cron in this column</strong></td></tr>
+        <tr><td>New schedule</td><td><code>Dialog</code> + <code>Textarea</code> + interpreted-result <code>Card</code> + <code>&lt;details&gt;</code> advanced + <code>Switch</code> ×2</td><td>describe it in plain English → interpreted → reviewable steps, each with <em>Change</em></td><td>confidence <code>Badge</code>; next-3-runs preview; cron only inside <em>Advanced</em></td></tr>
+        <tr><td>Flows</td><td><code>Card</code> grid + <code>Badge</code></td><td>saved multi-step agent flows (BRD-92)</td><td>license/phase-gated <code>Badge</code></td></tr>
+        <tr><td>New flow</td><td><code>Dialog</code> + <code>Textarea</code> + drafted-step <code>Card</code>s</td><td>describe the outcome → drafted steps → review</td><td><em>Start from a blank flow instead</em> escape hatch; <em>Refine with a follow-up instruction</em></td></tr>
+        <tr><td>Step editor</td><td><code>Dialog</code> + <code>Input</code> (plain language) + <code>Select</code> + <code>Input</code>s</td><td>edit a step by describing the change, <strong>or</strong> set action/workspace/top-K/threshold/query directly</td><td>both routes always available</td></tr>
+        <tr><td>Run history</td><td><code>DataTable</code> + <code>Badge</code></td><td>started, job, items, duration, outcome (BRD-65 shape)</td><td><code>Succeeded</code> / <code>Partial</code> / <code>Skipped</code> → Details</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Notes:</strong> the helper is a <strong>hosting choice, not a second implementation</strong> — it loads the same <code>SchedulerService</code> and the same data directory. With it off, behaviour falls back to run-while-open plus catch-up at next launch.</p>
+    <p>⚠ <strong>Design the confirm step for the model being wrong.</strong> Natural-language interpretation will sometimes misread an instruction; the confirm panel is the only thing standing between that and a wrong automation running unattended on a schedule. It must therefore show the <strong>full</strong> understood result — trigger, every step, and the delivery action — never a one-line summary.</p>
+    <p>⚠ <strong>Installing the helper is a user-visible OS action</strong> (macOS prompts; Windows may require elevation depending on mechanism). The toggle names what it installs and where, and uninstall must actually remove it.</p>
     <h3 id="screen-pricing-pricing">Screen: Pricing (<code>/pricing</code>)<a class="anchor-link" href="#screen-pricing-pricing">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/pricing.html">mockups/pricing.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-76, BRD-79 · <strong>REQ:</strong> REQ-UI-029, REQ-FN-026 · <strong>Phase 3</strong></p>
+    <p><strong>Mockup:</strong> <a href="./mockups/pricing.html">docs/mockups/pricing.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-76, BRD-79 · <strong>REQ:</strong> REQ-UI-029, REQ-FN-026 · <strong>Phase 3</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; currency select; 3 tier cards (current plan highlighted); promo card.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
         <tr><td>Currency</td><td><code>Select</code></td><td><code>GET /LicenseSvc/types?aCurrency=</code></td><td>—</td></tr>
-        <tr><td>Tier cards</td><td><code>Card</code> ×3 (ring on current) + <code>Badge</code></td><td>features per BRD §5 matrix; CTA per tier</td><td>current-plan state</td></tr>
-        <tr><td>Promo</td><td><code>InputGroup</code> + <code>Button</code> + <code>Alert</code></td><td><code>POST /PaymentSvc/promo-codes/validate</code></td><td>valid / each error code distinct</td></tr>
+        <tr><td>Tier cards</td><td><code>Card</code> ×3 (+ ring on current) + <code>Badge</code></td><td>features per §5 matrix; CTA per tier</td><td>current-plan state</td></tr>
+        <tr><td>Promo</td><td><code>InputGroup</code> + <code>Button</code> + <code>Alert</code></td><td><code>POST /PaymentSvc/promo-codes/validate</code></td><td>valid success / each error code distinct</td></tr>
       </tbody>
     </table>
-
     <h3 id="screen-billing-billing">Screen: Billing (<code>/billing</code>)<a class="anchor-link" href="#screen-billing-billing">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/billing.html">mockups/billing.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-77, BRD-78 · <strong>REQ:</strong> REQ-UI-030, REQ-UI-031 · <strong>Phase 3</strong></p>
+    <p><strong>Mockup:</strong> <a href="./mockups/billing.html">docs/mockups/billing.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-77, BRD-78 · <strong>REQ:</strong> REQ-UI-030, REQ-UI-031 · <strong>Phase 3</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; 2-col (subscription + license); full-width transactions + invoices tables.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Subscription</td><td><code>Card</code> + <code>Badge</code> + <code>Button</code> outline/ghost + <code>AlertDialog</code></td><td>plan, amount, next billing; cancel period-end/immediate</td><td>ALREADY_CANCELLED handled</td></tr>
-        <tr><td>License</td><td><code>Card</code> + mono key + <code>Button</code> ghost sm</td><td>key, status, expiry, devices, deactivate device</td><td>—</td></tr>
-        <tr><td>Transactions</td><td><code>DataTable</code></td><td>number, type, amount, status, date</td><td><code>Pagination</code>; <code>Empty</code></td></tr>
-        <tr><td>Invoices</td><td><code>DataTable</code> + <code>Button</code> outline sm</td><td>download PDF</td><td>PDF_GENERATION_FAILED toast</td></tr>
+        <tr><td>Subscription</td><td><code>Card</code> + <code>Badge</code> + <code>Button</code> outline/ghost</td><td>plan, amount, next billing; cancel period-end/immediate (<code>AlertDialog</code>)</td><td>ALREADY_CANCELLED handled</td></tr>
+        <tr><td>License</td><td><code>Card</code> + mono key + <code>Button</code> ghost sm</td><td>key, status, expiry, devices n/m, deactivate device</td><td>—</td></tr>
+        <tr><td>Transactions</td><td><code>DataTable</code></td><td>number, type, amount, status <code>Badge</code>, date</td><td><code>Pagination</code>; <code>Empty</code></td></tr>
+        <tr><td>Invoices</td><td><code>DataTable</code> + <code>Button</code> outline sm</td><td>download PDF (<code>GET /PaymentSvc/invoices/{id}/download</code>)</td><td>PDF_GENERATION_FAILED toast</td></tr>
       </tbody>
     </table>
-
-    <h3 id="screen-admin-users-admin-users">Screen: Admin — Users (<code>/admin/users</code>)<a class="anchor-link" href="#screen-admin-users-admin-users">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/admin-users.html">mockups/admin-users.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-72, BRD-29 · <strong>REQ:</strong> REQ-UI-025 · <strong>Phase 3</strong></p>
+    <h3 id="screen-data-storage-settings-data">Screen: Data &amp; storage (<code>/settings/data</code>)<a class="anchor-link" href="#screen-data-storage-settings-data">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/data-storage.html">docs/mockups/data-storage.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-130, BRD-133 · <strong>REQ:</strong> REQ-UI-041, REQ-FN-037 · <strong>Phase 1</strong> · <strong>NEW 2026-07-26</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; header with Reveal-in-Finder; four stacked cards — Location, Disk usage, Migration, Backup &amp; reset.</p>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Toolbar</td><td><code>Input</code> (search) + <code>Button</code></td><td>filter; invite</td><td>—</td></tr>
-        <tr><td>Users table</td><td><code>DataTable</code> + <code>Avatar</code> + <code>Badge</code></td><td>name, email, role (read-only from AppManager), workspace chips, status, last login</td><td>disabled users flagged</td></tr>
-        <tr><td>Assignment</td><td><code>Sheet</code> + <code>Checkbox</code> list + <code>Button</code></td><td>per-user workspace membership (App DB)</td><td>save <code>Toast</code></td></tr>
+        <tr><td>Path panel</td><td><code>Card</code> + monospace <code>InputGroup</code> + <code>Button</code> ghost</td><td>the resolved per-user data directory; copy-path</td><td><code>Badge</code> green when writable, red + <code>Alert</code> when not</td></tr>
+        <tr><td>Reveal / change</td><td><code>Button</code> outline ×2</td><td>OS reveal (Finder/Explorer) via MAUI; relocate-and-restart</td><td>change opens <code>AlertDialog</code> (moves data, restarts)</td></tr>
+        <tr><td>Disk usage</td><td><code>Card</code> + <code>Progress</code> + <code>DataTable</code></td><td>per-artefact size and last-written: model, vector store, app DB, RAG store, uploads</td><td><code>Skeleton</code> while measuring; <code>Empty</code> on a fresh install</td></tr>
+        <tr><td>Per-row actions</td><td><code>Button</code> ghost sm</td><td>compact a database, re-download the model, reveal uploads</td><td><code>Spinner</code> inline; result <code>Toast</code></td></tr>
+        <tr><td>Migration notice</td><td><code>Card</code> + <code>Alert</code> green</td><td>one-time relocation of a legacy app-relative <code>data/</code> folder, files named</td><td>hidden when nothing was migrated</td></tr>
+        <tr><td>Backup &amp; reset</td><td><code>Card</code> + <code>Button</code> outline ×2 + <code>Button</code> destructive + <code>Alert</code> amber</td><td>back up, restore, delete all local data</td><td>destructive path requires <code>AlertDialog</code> confirmation</td></tr>
       </tbody>
     </table>
-
-    <h3 id="screen-admin-event-log-admin-events">Screen: Admin — Event log (<code>/admin/events</code>)<a class="anchor-link" href="#screen-admin-event-log-admin-events">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/admin-events.html">mockups/admin-events.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-73 · <strong>REQ:</strong> REQ-UI-026 · <strong>Phase 3</strong></p>
+    <p><strong>Notes / interactions:</strong> the path is <strong>shown, never typed</strong> — it comes from <code>DataDirectory</code> (BRD-130). "Reveal in Finder" and the file pickers are <strong>MAUI platform calls</strong>, not web APIs; the Razor side only raises the intent. Deleting local data never touches the licence.</p>
+    <p><strong>Empty / loading / error:</strong> measuring disk usage shows <code>Skeleton</code> rows; an unwritable directory is a red <code>Alert</code> naming the path and the OS error, never a silent fallback.</p>
+    <h3 id="screen-operator-event-log-admin-events">Screen: Operator — Event log (<code>/admin/events</code>)<a class="anchor-link" href="#screen-operator-event-log-admin-events">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/admin-events.html">docs/mockups/admin-events.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-73 · <strong>REQ:</strong> REQ-UI-026 · <strong>Phase 3</strong> · <em>"admin actions" reworded to "configuration changes" 2026-07-26</em></p>
+    <blockquote><p><strong>Amended 2026-07-26 (owner review).</strong> The grid only ever carried a summary and there was no way to see the record behind it. Every row now has <strong>Details</strong>, opening the full event: a <strong>Summary</strong> tab (outcome, duration, workspace, document, chunk counts, model, store, correlation id), a <strong>Raw record</strong> tab (the actual Serilog JSON — the grid renders a summary <em>of this</em>), and a <strong>Related events</strong> tab keyed on the correlation id, which is what turns a single line into a debuggable job. The <em>Actor</em> column now reads "you" — there are no other actors.</p></blockquote>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
         <tr><td>Filters</td><td><code>DatePicker</code> ×2 + <code>Select</code> + <code>Input</code> + <code>Button</code> outline</td><td>date range, category, text</td><td>—</td></tr>
-        <tr><td>Events</td><td><code>DataTable</code> + <code>Badge</code></td><td>time, category, actor, event, source</td><td><code>Pagination</code>; <code>Empty</code></td></tr>
+        <tr><td>Events</td><td><code>DataTable</code> + <code>Badge</code> (category)</td><td>time, category, actor, event, source</td><td><code>Pagination</code> footer; <code>Empty</code></td></tr>
       </tbody>
     </table>
-
-    <h3 id="screen-admin-chat-logs-admin-chats">Screen: Admin — Chat logs (<code>/admin/chats</code>)<a class="anchor-link" href="#screen-admin-chat-logs-admin-chats">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/admin-chats.html">mockups/admin-chats.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-74 · <strong>REQ:</strong> REQ-UI-027 · <strong>Phase 3</strong></p>
+    <h3 id="screen-operator-app-settings-admin-settings">Screen: Operator — App settings (<code>/admin/settings</code>)<a class="anchor-link" href="#screen-operator-app-settings-admin-settings">#</a></h3>
+    <p><strong>Mockup:</strong> <a href="./mockups/admin-settings.html">docs/mockups/admin-settings.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-75, BRD-89, BRD-90 · <strong>REQ:</strong> REQ-UI-028, REQ-UI-037, REQ-UI-038 · <strong>Phase 3–4</strong> · <strong>Reduced 2026-07-26</strong></p>
+    <p><strong>Layout (one line):</strong> app shell; header + Save; Tabs (Defaults / Branding / Updates) — tabs switch.</p>
+    <blockquote><p><strong>Amended 2026-07-26.</strong> "Instance settings" → "App settings" (BRD-75 reworded — there is no instance, only this install). The <strong>Widget</strong> and <strong>API Keys</strong> tabs and their cards are <strong>removed</strong> with F-WIDGET and F-API (BRD-70/71, BRD-67); the vector-store <code>Select</code> drops its <code>PgVector</code> option with the PostgreSQL path.</p></blockquote>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Filters + export</td><td><code>Select</code> ×2 + <code>Input</code> + <code>Button</code> outline</td><td>workspace, user, text; JSON export</td><td>export logged to event log</td></tr>
-        <tr><td>Compliance note</td><td><code>Alert</code> info</td><td>admin-only visibility notice</td><td>—</td></tr>
-        <tr><td>Threads table</td><td><code>DataTable</code></td><td>workspace, user, thread, counts, last activity</td><td>row → preview</td></tr>
-        <tr><td>Preview</td><td><code>Card</code> + message blocks</td><td>2-bubble excerpt + open-full</td><td>—</td></tr>
+        <tr><td>Defaults</td><td><code>Card</code> + <code>Select</code> ×3 + <code>NumericInput</code></td><td>default LLM/embeddings/vector store (SqliteVec · Qdrant), upload limit</td><td>—</td></tr>
+        <tr><td>Branding</td><td><code>Card</code> + <code>FileUpload</code> (logo) + <code>Input</code>s + <code>ColorPicker</code> swatches + <code>RadioGroup</code> (theme)</td><td>white-label fields</td><td>license-gated <code>WHITE_LABEL</code> <code>Badge</code> + upgrade prompt</td></tr>
+        <tr><td>Updates</td><td><code>Card</code> + <code>Switch</code> ×3 + <code>Button</code> ×2 + <code>Alert</code></td><td>version, auto-check, background install, pre-release channel, release notes (BRD-131)</td><td><strong>added 2026-07-26</strong> — desktop needs an update surface; the <code>Alert</code> states that updates never touch the data directory</td></tr>
+        <tr><td><del>Widget</del></td><td>—</td><td>—</td><td><strong>removed 2026-07-26</strong> (BRD-71)</td></tr>
+        <tr><td><del>API keys</del></td><td>—</td><td>—</td><td><strong>removed 2026-07-26</strong> (BRD-67)</td></tr>
       </tbody>
     </table>
-
-    <h3 id="screen-admin-instance-settings-admin-settings">Screen: Admin — Instance settings (<code>/admin/settings</code>)<a class="anchor-link" href="#screen-admin-instance-settings-admin-settings">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/admin-settings.html">mockups/admin-settings.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-75, BRD-89, BRD-90, BRD-71, BRD-67 · <strong>REQ:</strong> REQ-UI-028, REQ-UI-037, REQ-UI-038, REQ-UI-024, REQ-FN-022 · <strong>Phase 3–4</strong></p>
-    <p><strong>Layout:</strong> app shell; header + Save; <code>Tabs</code> Defaults / Branding / Widget / API Keys (mockup shows all four stacked, badged).</p>
-    <table>
-      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
-      <tbody>
-        <tr><td>Defaults</td><td><code>Card</code> + <code>Select</code> ×3 + <code>NumericInput</code></td><td>default LLM/embeddings/vector store, upload limit</td><td>—</td></tr>
-        <tr><td>Branding</td><td><code>Card</code> + <code>FileUpload</code> + <code>Input</code>s + <code>ColorPicker</code> + <code>RadioGroup</code></td><td>white-label fields, accent, default theme</td><td>gated <code>WHITE_LABEL</code> → upgrade prompt</td></tr>
-        <tr><td>Widget</td><td><code>Card</code> + <code>Select</code>s + <code>Input</code> + code <code>pre</code> + preview pane</td><td>workspace, position, accent, welcome; embed snippet + preview bubble</td><td>gated <code>EMBED_WIDGET</code></td></tr>
-        <tr><td>API keys</td><td><code>Card</code> + <code>Button</code> sm + <code>Alert</code> success + <code>DataTable</code> + <code>Button</code> destructive sm</td><td>create (shown once), hashed-prefix list, revoke</td><td>revoked rows struck</td></tr>
-      </tbody>
-    </table>
-
     <h3 id="screen-support-support">Screen: Support (<code>/support</code>)<a class="anchor-link" href="#screen-support-support">#</a></h3>
-    <p><strong>Mockup:</strong> <a href="./mockups/support.html">mockups/support.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-80, BRD-81, BRD-82 · <strong>REQ:</strong> REQ-UI-032, REQ-UI-033, REQ-FN-027 · <strong>Phase 3</strong></p>
+    <p><strong>Mockup:</strong> <a href="./mockups/support.html">docs/mockups/support.html</a> · <strong>Role(s):</strong> all authenticated · <strong>BRD:</strong> BRD-80, BRD-81, BRD-82 · <strong>REQ:</strong> REQ-UI-032, REQ-UI-033, REQ-FN-027 · <strong>Phase 3</strong></p>
+    <blockquote><p><strong>Amended 2026-07-26 (owner review).</strong> Three fixes. (1) The page showed a <strong>New issue</strong> button <em>and</em> a permanently-open "New issue (Dialog spec)" card — the card is gone and the button opens a real dialog. (2) <strong>Type</strong> and <strong>Priority</strong> listed one value each; both now carry their full sets (Type: Bug / Feature request / Question / Billing &amp;amp; licensing / Data-ingestion problem / Other · Priority: Low / Medium / High / Critical, each with a plain-language qualifier). (3) There was no way to open an issue — every row now has <strong>View</strong>, opening full issue detail: the comment thread, a composer with <em>Comment</em> and <em>Comment &amp;amp; close</em>, and a details sidebar (status, type, priority, raised-by, app version, diagnostics). <strong>Second review (BRD-141 / REQ-UI-047):</strong> comments now take <strong>attachments</strong> — drag, paste a screenshot, or choose from disk (PNG/JPG/PDF/LOG, size-capped), with attachment chips that can be removed before sending. A bug report without a screenshot is materially harder to act on. <strong>Change priority</strong> now opens a real dialog (priority + optional reason recorded on the thread) instead of being a dead button.</p></blockquote>
+    <p><strong>Component map:</strong></p>
     <table>
       <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>New issue</td><td><code>Dialog</code> + <code>Input</code> + <code>Select</code> ×2 + <code>Textarea</code> + <code>Button</code></td><td>title/type/priority/description → <code>POST /IssueSvc</code></td><td>created <code>Toast</code> with ISS number</td></tr>
-        <tr><td>Issues</td><td><code>DataTable</code> + <code>Badge</code></td><td>number, title, type, priority, status, updated</td><td>status filter; <code>Empty</code></td></tr>
-        <tr><td>Issue detail</td><td><code>Card</code> + comment thread + <code>Textarea</code> + <code>Button</code>s</td><td>comments, close issue</td><td>ALREADY_CLOSED handled</td></tr>
+        <tr><td>New issue</td><td><code>Dialog</code> (mocked inline) + <code>Input</code> + <code>Select</code> ×2 + <code>Textarea</code> + <code>Button</code></td><td>title/type/priority/description → <code>POST /IssueSvc</code></td><td>created <code>Toast</code> w/ ISS number</td></tr>
+        <tr><td>Issues</td><td><code>DataTable</code> + <code>Badge</code> (priority, status)</td><td>number, title, type, priority, status, updated</td><td>status filter; <code>Empty</code></td></tr>
+        <tr><td>Issue detail</td><td><code>Card</code> + comment thread + <code>Textarea</code> + <code>Button</code>s</td><td>comments (<code>POST /IssueSvc/{id}/comments</code>), close</td><td>ALREADY_CLOSED handled</td></tr>
       </tbody>
     </table>
-
     <h3 id="screen-console-reskins-qdrant-admin-llm-settings-token-usage-qdrant-admin-llm-settings-token-usage">Screen: Console reskins — Qdrant Admin / LLM Settings / Token Usage (<code>/qdrant-admin</code>, <code>/llm-settings</code>, <code>/token-usage</code>)<a class="anchor-link" href="#screen-console-reskins-qdrant-admin-llm-settings-token-usage-qdrant-admin-llm-settings-token-usage">#</a></h3>
-    <p><strong>Mockups:</strong> <a href="./mockups/qdrant-admin.html">qdrant-admin.html</a> · <a href="./mockups/llm-settings.html">llm-settings.html</a> · <a href="./mockups/token-usage.html">token-usage.html</a> · <strong>Role(s):</strong> Admin · <strong>BRD:</strong> BRD-8, BRD-9, BRD-10 (pre-existing features) · <strong>REQ:</strong> REQ-UI-003, REQ-UI-004, REQ-UI-005 (<code>Done (pre-existing)</code>)</p>
-    <p>These three screens already exist and are Verified — the mockups are <strong>reskin previews</strong> showing them inside the Phase-1 product shell (dark sidebar, Console nav group, new theme), added so the clickable prototype has no dead nav items. Functional baseline stays the DevGuide screenshots; when the Phase-1 shell lands, these screens adopt it with no behavioral change (regression-gated by the existing Playwright specs).</p>
+    <p><strong>Mockups:</strong> <a href="./mockups/qdrant-admin.html">qdrant-admin.html</a> · <a href="./mockups/llm-settings.html">llm-settings.html</a> · <a href="./mockups/token-usage.html">token-usage.html</a> · <strong>Role(s):</strong> the sole user · <strong>BRD:</strong> BRD-8, BRD-9, BRD-10 (pre-existing features), <strong>BRD-134 (new)</strong> · <strong>REQ:</strong> REQ-UI-003, REQ-UI-004, REQ-UI-005 (<code>Done (pre-existing)</code>), <strong>REQ-UI-042 / REQ-FN-040 (new)</strong></p>
+    <p>These three screens already exist and are Verified — the mockups are <strong>reskin previews</strong> showing them inside the Phase-1 product shell (dark sidebar, Console nav group, new theme), added so the clickable prototype has no dead nav items. Functional baseline stays the DevGuide screenshots; when the Phase-1 shell lands, these screens adopt it with no behavioral change.</p>
+    <blockquote><p><strong>Amended 2026-07-26 — Qdrant Admin gains a configurable Docker daemon (BRD-134).</strong> F-QADMIN was explicitly <strong>retained</strong> through the desktop pivot, and extended: the daemon TechieDesk administers is now a <strong>setting</strong>, not an assumption. A new first card on <code>/qdrant-admin</code> selects the endpoint (local socket · network host · remote TCP+TLS), tests the connection, shows daemon version/host/last-checked, and manages TLS material. The container lifecycle card below it acts on <strong>whichever daemon is connected</strong>.</p></blockquote>
     <table>
-      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th></tr></thead>
+      <thead><tr><th>Region</th><th>TrBlazeUI control</th><th>Shows / binds</th><th>States</th></tr></thead>
       <tbody>
-        <tr><td>Qdrant: container / collections / point browser</td><td><code>Card</code> + <code>Badge</code> + <code>DataTable</code> (overflow wrapper) + dark <code>pre</code> payload panel</td><td>existing QdrantAdminService data</td></tr>
-        <tr><td>LLM Settings: chat provider / embeddings / resilience</td><td><code>Card</code> + <code>Field</code>/<code>Select</code>/<code>Input</code> + <code>Slider</code> + <code>Switch</code> + <code>Alert</code></td><td>existing TechieRagConfigService bindings</td></tr>
-        <tr><td>Token Usage: stat tiles / budget / provider + ops tables</td><td><code>Card</code> + icon tiles + <code>Progress</code> + <code>Switch</code> + <code>DataTable</code></td><td>existing token tracker data</td></tr>
+        <tr><td><strong>Docker daemon endpoint</strong> (new)</td><td><code>Card</code> + <code>Select</code> + <code>Input</code> (monospace) + <code>Button</code> outline (Test connection)</td><td>endpoint kind + address; <code>unix:///var/run/docker.sock</code> · <code>npipe://./pipe/docker_engine</code> · <code>tcp://host:2376</code></td><td><code>Badge</code> Connected/Disconnected + TLS-verified; failure → <code>Alert</code> naming the real error, never a blanket "unavailable"</td></tr>
+        <tr><td><strong>Daemon facts</strong> (new)</td><td>3-column <code>Card</code> grid</td><td>daemon version, host OS/arch, last checked</td><td><code>Skeleton</code> while probing</td></tr>
+        <tr><td><strong>TLS &amp; credentials</strong> (new)</td><td><code>Badge</code> ×2 + <code>Button</code> ghost (Manage…)</td><td>CA + client certificate presence</td><td>stored in the OS credential store (BRD-132), never a settings file</td></tr>
+        <tr><td><strong>Security warning</strong> (new)</td><td><code>Alert</code> amber</td><td>a daemon is root on its host; plain <code>tcp://</code> without TLS warns before saving</td><td>always shown</td></tr>
+        <tr><td><strong>New collection</strong></td><td><code>Dialog</code> + <code>Input</code> + <code>Select</code> ×2 + <code>NumericInput</code> ×2 + <code>Switch</code></td><td>name, vector size (pre-filled from the configured embedder), distance, shards, replicas, on-disk payload</td><td><strong>added 2026-07-26</strong> — the button previously did nothing. Vector size is pre-filled because a mismatch is the usual cause of a failed first upsert</td></tr>
+        <tr><td><strong>Delete collection</strong></td><td><code>Dialog</code> + <code>Alert</code> red + type-to-confirm <code>Input</code></td><td>destructive drop on the remote daemon</td><td>type-the-name confirmation</td></tr>
+        <tr><td><strong>Pull image</strong></td><td><code>Dialog</code> + <code>Progress</code> + log <code>pre</code> + <code>Alert</code></td><td>layer progress; pulling does not restart the container</td><td><strong>added 2026-07-26</strong></td></tr>
+        <tr><td>Qdrant: container / collections / point browser</td><td><code>Card</code> + <code>Badge</code> + <code>DataTable</code> (overflow wrapper) + dark <code>pre</code> payload panel</td><td>existing QdrantAdminService data, now against the configured daemon</td><td>—</td></tr>
+        <tr><td>LLM Settings: chat provider / embeddings / resilience</td><td><code>Card</code> + <code>Field</code>/<code>Select</code>/<code>Input</code> + <code>Slider</code> + <code>Switch</code> + <code>Alert</code></td><td>existing TechieRagConfigService bindings</td><td>—</td></tr>
+        <tr><td><strong>LLM Settings: provider-conditional fields</strong> (new)</td><td>conditional <code>Field</code> groups keyed on the Source <code>Select</code></td><td>only what the chosen provider uses — Azure: endpoint + deployment + API version, no model box; Ollama/LM Studio: base URL, optional key; OpenAI: key + optional org, no base URL; None: an <code>Alert</code> explaining Auto-RAG still needs a chat model</td><td>required fields marked; <strong>Save refused while incomplete</strong>, error named on the field (BRD-136 / REQ-UI-043)</td></tr>
+        <tr><td>Token Usage: stat tiles / budget / provider + ops tables</td><td><code>Card</code> + icon tiles + <code>Progress</code> + <code>Switch</code> + <code>DataTable</code></td><td>existing token tracker data</td><td>—</td></tr>
       </tbody>
     </table>
-
+    <h3 id="screen-admin-users-admin-users-retired-2026-07-26"><del>Screen: Admin — Users</del> (<code>/admin/users</code>) — RETIRED 2026-07-26<a class="anchor-link" href="#screen-admin-users-admin-users-retired-2026-07-26">#</a></h3>
+    <p><strong>Mockup (archived):</strong> <a href="./mockups/admin-users.html">docs/mockups/admin-users.html</a> · <strong>BRD:</strong> <del>BRD-72</del> · <strong>REQ:</strong> <del>REQ-UI-025</del></p>
+    <p><strong>Retired</strong> by the desktop-only amendment: one install serves one person, so there is no user list and no workspace assignment. The mockup is kept, banner-marked and greyed, as record of the multi-tenant design — it is <strong>not a build target</strong> and is unreachable from the sidebar.</p>
+    <h3 id="screen-admin-chat-logs-admin-chats-retired-2026-07-26"><del>Screen: Admin — Chat logs</del> (<code>/admin/chats</code>) — RETIRED 2026-07-26<a class="anchor-link" href="#screen-admin-chat-logs-admin-chats-retired-2026-07-26">#</a></h3>
+    <p><strong>Mockup (archived):</strong> <a href="./mockups/admin-chats.html">docs/mockups/admin-chats.html</a> · <strong>BRD:</strong> <del>BRD-74</del> · <strong>REQ:</strong> <del>REQ-UI-027</del></p>
+    <p><strong>Retired</strong> by the desktop-only amendment: a cross-workspace compliance view over one's own chats has no audience. Per-thread export survives on the thread itself (F-HIST). Kept as record, same treatment as above.</p>
     <hr>
-    <p>Last updated: 2026-07-18 · <strong>19 screens mocked</strong> (16 product + 3 console reskin previews) · Dark mode + dark sidebar shipped in all mockups · Flow builder (P5): not yet mocked</p>
+    <p>Last updated: 2026-07-18 · Amended 2026-07-26 (desktop-only, then owner mockup review) · <strong>20 live screens mocked</strong> (17 product + 3 console reskin previews) + 2 retired kept as record · Native window chrome + live menu bar on every mockup · Theme-following sidebar, operable tabs/dialogs/context menus · Agents and Automations now mocked · Second owner review applied and browser-verified (18/18 interaction checks)</p>
   </main>
 </div>
 

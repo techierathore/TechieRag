@@ -4,18 +4,19 @@
 @inject TechieDesk.Services.TechieRagManager TechieRag
 @inject ToastService ToastService
 @implements IDisposable
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Token Usage</PageTitle>
+<PageTitle>@Localizer["TokensPageTitle"]</PageTitle>
 
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Token Usage Dashboard</h1>
-            <TypographyMuted>Monitor token consumption, costs, and budget status.</TypographyMuted>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["TokensHeading"]</h1>
+            <TypographyMuted>@Localizer["TokensSubtitle"]</TypographyMuted>
         </div>
         <Button Variant="ButtonVariant.Outline" OnClick="ResetSession">
             <Button.Icon><LucideIcon aria-hidden="true" Name="rotate-ccw" Size="16" /></Button.Icon>
-            Reset Session
+            @Localizer["TokensResetSession"]
         </Button>
     </div>
 
@@ -23,7 +24,7 @@
     <div class="grid gap-4 md:grid-cols-4">
         <Card>
             <CardHeader Class="pb-2">
-                <CardDescription>Total Tokens</CardDescription>
+                <CardDescription>@Localizer["TokensTotal"]</CardDescription>
             </CardHeader>
             <CardContent>
                 <div class="text-2xl font-bold">@sessionUsage.TotalTokens.ToString("N0")</div>
@@ -31,7 +32,7 @@
         </Card>
         <Card>
             <CardHeader Class="pb-2">
-                <CardDescription>Input / Output</CardDescription>
+                <CardDescription>@Localizer["TokensInputOutput"]</CardDescription>
             </CardHeader>
             <CardContent>
                 <div class="text-2xl font-bold">@sessionUsage.TotalInputTokens.ToString("N0") / @sessionUsage.TotalOutputTokens.ToString("N0")</div>
@@ -39,7 +40,7 @@
         </Card>
         <Card>
             <CardHeader Class="pb-2">
-                <CardDescription>Estimated Cost</CardDescription>
+                <CardDescription>@Localizer["TokensEstimatedCost"]</CardDescription>
             </CardHeader>
             <CardContent>
                 <div class="text-2xl font-bold">$@sessionUsage.TotalEstimatedCostUsd.ToString("F4")</div>
@@ -47,7 +48,7 @@
         </Card>
         <Card>
             <CardHeader Class="pb-2">
-                <CardDescription>Operations</CardDescription>
+                <CardDescription>@Localizer["TokensOperations"]</CardDescription>
             </CardHeader>
             <CardContent>
                 <div class="text-2xl font-bold">@sessionUsage.OperationCount</div>
@@ -60,17 +61,17 @@
     {
         <Card>
             <CardHeader>
-                <CardTitle>Budget Status</CardTitle>
+                <CardTitle>@Localizer["TokensBudgetStatus"]</CardTitle>
             </CardHeader>
             <CardContent Class="space-y-4">
                 @if (budgetStatus.Budget.MaxTotalTokens > 0)
                 {
                     <div class="space-y-1">
                         <div class="flex justify-between text-sm">
-                            <span>Token Budget</span>
+                            <span>@Localizer["TokensTokenBudget"]</span>
                             <span>@sessionUsage.TotalTokens.ToString("N0") / @budgetStatus.Budget.MaxTotalTokens.ToString("N0")</span>
                         </div>
-                        <Progress Value="@((double)(budgetStatus.TokenUtilization * 100))" Class="@GetBudgetClass(budgetStatus.TokenUtilization)" />
+                        <Progress aria-label="@Localizer["TokensTokenBudgetUsed"]" Value="@Math.Round((double)(budgetStatus.TokenUtilization * 100))" Class="@GetBudgetClass(budgetStatus.TokenUtilization)" />
                     </div>
                 }
 
@@ -78,25 +79,25 @@
                 {
                     <div class="space-y-1">
                         <div class="flex justify-between text-sm">
-                            <span>Cost Budget</span>
+                            <span>@Localizer["TokensCostBudget"]</span>
                             <span>$@sessionUsage.TotalEstimatedCostUsd.ToString("F4") / $@budgetStatus.Budget.MaxCostUsd.ToString("F2")</span>
                         </div>
-                        <Progress Value="@((double)(budgetStatus.CostUtilization * 100))" Class="@GetBudgetClass(budgetStatus.CostUtilization)" />
+                        <Progress aria-label="@Localizer["TokensCostBudgetUsed"]" Value="@Math.Round((double)(budgetStatus.CostUtilization * 100))" Class="@GetBudgetClass(budgetStatus.CostUtilization)" />
                     </div>
                 }
 
                 @if (budgetStatus.IsExceeded)
                 {
                     <Alert Variant="AlertVariant.Danger">
-                        <AlertTitle>Budget Exceeded</AlertTitle>
-                        <AlertDescription>One or more budget limits have been exceeded.</AlertDescription>
+                        <AlertTitle>@Localizer["TokensBudgetExceeded"]</AlertTitle>
+                        <AlertDescription>@Localizer["TokensBudgetExceededBody"]</AlertDescription>
                     </Alert>
                 }
                 else if (budgetStatus.IsAlertTriggered)
                 {
                     <Alert Variant="AlertVariant.Warning">
-                        <AlertTitle>Budget Alert</AlertTitle>
-                        <AlertDescription>Usage is approaching configured limits.</AlertDescription>
+                        <AlertTitle>@Localizer["TokensBudgetAlert"]</AlertTitle>
+                        <AlertDescription>@Localizer["TokensBudgetAlertBody"]</AlertDescription>
                     </Alert>
                 }
             </CardContent>
@@ -106,22 +107,22 @@
     <!-- Usage by Model -->
     <Card>
         <CardHeader>
-            <CardTitle>Usage by Model</CardTitle>
+            <CardTitle>@Localizer["TokensUsageByModel"]</CardTitle>
         </CardHeader>
         <CardContent>
             @if (modelUsage.Count == 0)
             {
-                <TypographyMuted>No usage data yet.</TypographyMuted>
+                <TypographyMuted>@Localizer["TokensNoData"]</TypographyMuted>
             }
             else
             {
                 <DataTable TData="ModelUsageRow" Data="@modelUsage" ShowPagination="false" ShowToolbar="false">
                     <Columns>
-                        <DataTableColumn TData="ModelUsageRow" TValue="string" Property="@(r => r.Model)" Header="Model" />
-                        <DataTableColumn TData="ModelUsageRow" TValue="int" Property="@(r => r.Requests)" Header="Requests" />
-                        <DataTableColumn TData="ModelUsageRow" TValue="long" Property="@(r => r.InputTokens)" Header="Input Tokens" />
-                        <DataTableColumn TData="ModelUsageRow" TValue="long" Property="@(r => r.OutputTokens)" Header="Output Tokens" />
-                        <DataTableColumn TData="ModelUsageRow" TValue="string" Property="@(r => r.CostDisplay)" Header="Cost" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="string" Property="@(r => r.Model)" Header="@Localizer["TokensColumnModel"]" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="int" Property="@(r => r.Requests)" Header="@Localizer["TokensColumnRequests"]" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="long" Property="@(r => r.InputTokens)" Header="@Localizer["TokensColumnInput"]" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="long" Property="@(r => r.OutputTokens)" Header="@Localizer["TokensColumnOutput"]" />
+                        <DataTableColumn TData="ModelUsageRow" TValue="string" Property="@(r => r.CostDisplay)" Header="@Localizer["TokensColumnCost"]" />
                     </Columns>
                 </DataTable>
             }
@@ -170,7 +171,7 @@
     {
         tracker.Reset();
         RefreshData();
-        ToastService.Success("Token usage session reset.", "Reset");
+        ToastService.Success(Localizer["TokensResetToastBody"], Localizer["TokensResetToastTitle"]);
     }
 
     public void Dispose()

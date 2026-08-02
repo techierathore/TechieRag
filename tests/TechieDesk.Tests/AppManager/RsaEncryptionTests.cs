@@ -39,7 +39,7 @@ public sealed class RsaEncryptionTests : IDisposable
 
         await client.LoginAsync("jane.doe@example.com", "P@ssw0rd!");
 
-        var loginCall = handler.Calls.Single(call => call.PathAndQuery == "/AuthSvc/login");
+        var loginCall = handler.Calls.Single(call => call.PathAndQuery.Split('?')[0] == "/AuthSvc/login");
         using var document = JsonDocument.Parse(loginCall.Body!);
         Assert.False(document.RootElement.TryGetProperty("password", out _));
         var encrypted = document.RootElement.GetProperty("encryptedPassword").GetString();

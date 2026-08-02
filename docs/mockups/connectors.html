@@ -10,8 +10,8 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-.shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 62px)}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:calc(100vh - 62px);overflow-y:auto}
 .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;padding:6px 8px 14px;letter-spacing:-.01em}
 .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:var(--shadow)}
 .ws-switch{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:9px;background:var(--card);padding:8px 10px;margin:2px 0 10px;font-weight:600;font-size:13px;cursor:pointer;box-shadow:var(--shadow-sm)}
@@ -79,7 +79,7 @@ table.t tr:hover td{background:#fafbff}
 .switch.off:after{right:auto;left:2px}
 .progress{height:8px;border-radius:999px;background:var(--muted);overflow:hidden}
 .progress i{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#4f46e5);border-radius:999px}
-.auth{min-height:100vh;background:linear-gradient(160deg,#eef2ff 0%,#f6f7f9 45%,#f6f7f9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth{min-height:calc(100vh - 62px);background:linear-gradient(160deg,#eef2ff 0%,#f6f7f9 45%,#f6f7f9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
 .auth .box{width:410px;display:flex;flex-direction:column;gap:16px}
 .auth .card{box-shadow:var(--shadow-lg);border-radius:14px;padding:26px}
 .empty{text-align:center;color:var(--muted-fg);padding:36px;border:1.5px dashed var(--border);border-radius:12px;font-size:13px;background:#fafbfc}
@@ -97,20 +97,20 @@ table.t tr:hover td{background:#fafbff}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
 
 /* ===== v3 overrides — dark sidebar + dark mode ===== */
-.sidebar{background:linear-gradient(180deg,#161b2e,#10131f);border-right:1px solid #232941}
-.sidebar .logo{color:#fff}
-.navgroup{color:#5d6480}
-.navitem{color:#a6adc5}
-.navitem svg{stroke:#6f7691}
-.navitem:hover{background:rgba(255,255,255,.06);color:#e6e9f4}
-.navitem:hover svg{stroke:#c3c9dd}
-.navitem.active{background:rgba(99,102,241,.22);color:#c7d2fe}
-.navitem.active svg{stroke:#a5b4fc}
-.ws-switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#e6e9f4;box-shadow:none}
-.ws-switch:hover{border-color:#6366f1}
-.ws-switch .chev{color:#8b92ad}
-.sidebar .foot{border-top-color:rgba(255,255,255,.1);color:#e6e9f4}
-.sidebar .foot .hint{color:#8b92ad}
+html[data-theme="dark"] .sidebar{background:linear-gradient(180deg,#161b2e,#10131f);border-right:1px solid #232941}
+html[data-theme="dark"] .sidebar .logo{color:#fff}
+html[data-theme="dark"] .navgroup{color:#5d6480}
+html[data-theme="dark"] .navitem{color:#a6adc5}
+html[data-theme="dark"] .navitem svg{stroke:#6f7691}
+html[data-theme="dark"] .navitem:hover{background:rgba(255,255,255,.06);color:#e6e9f4}
+html[data-theme="dark"] .navitem:hover svg{stroke:#c3c9dd}
+html[data-theme="dark"] .navitem.active{background:rgba(99,102,241,.22);color:#c7d2fe}
+html[data-theme="dark"] .navitem.active svg{stroke:#a5b4fc}
+html[data-theme="dark"] .ws-switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#e6e9f4;box-shadow:none}
+html[data-theme="dark"] .ws-switch:hover{border-color:#6366f1}
+html[data-theme="dark"] .ws-switch .chev{color:#8b92ad}
+html[data-theme="dark"] .sidebar .foot{border-top-color:rgba(255,255,255,.1);color:#e6e9f4}
+html[data-theme="dark"] .sidebar .foot .hint{color:#8b92ad}
 .theme-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted-fg);cursor:pointer;padding:0}
 .theme-btn:hover{color:var(--accent);border-color:var(--accent-border)}
 .theme-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -149,34 +149,99 @@ html[data-theme="dark"] [style*="#eff4ff"]{background:#122142!important}
 html[data-theme="dark"] [style*="#fef3f2"]{background:#331416!important}
 html[data-theme="dark"] [style*="stroke:#1d4ed8"]{stroke:#93b4fd!important}
 html[data-theme="dark"] [style*="stroke:#dc2626"]{stroke:#f87171!important}
+/* --- desktop window chrome (2026-07-26: MAUI Blazor Hybrid window, not a browser tab) --- */
+.winbar{display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;background:linear-gradient(#f2f3f6,#e9ebef);border-bottom:1px solid var(--border);user-select:none;flex:0 0 auto}
+.traffic{display:flex;gap:7px}
+.traffic i{width:11px;height:11px;border-radius:50%;display:block}
+.traffic .r{background:#ff5f57}.traffic .y{background:#febc2e}.traffic .g{background:#28c840}
+.wintitle{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted-fg);margin-right:46px}
+.menubar{display:flex;align-items:center;gap:17px;height:28px;padding:0 14px;background:var(--card);border-bottom:1px solid var(--border);font-size:12.5px;color:#4b5563;user-select:none;flex:0 0 auto}
+.menubar b{font-weight:700;color:var(--fg)}
+html[data-theme="dark"] .winbar{background:linear-gradient(#20242e,#1a1e27);border-color:#2a3145}
+html[data-theme="dark"] .menubar{background:#151a26;border-color:#2a3145;color:#98a1b3}
+
+/* ===== prototype kit (owner review 2026-07-26) — menus, tabs, dialogs, popovers ===== */
+.menubar{position:relative;z-index:120}
+.mb{position:relative}
+.mb>button{background:none;border:0;font:inherit;color:inherit;cursor:pointer;padding:3px 9px;border-radius:6px;line-height:1.6}
+.mb>button:hover{background:var(--muted)}
+.mb.open>button{background:var(--accent);color:#fff}
+.menu{position:absolute;top:calc(100% + 3px);left:0;min-width:236px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;font-size:13px;color:var(--fg)}
+.mb.open>.menu{display:block}
+.menu a,.menu .mi{display:flex;align-items:center;gap:10px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.menu a:hover,.menu .mi:not(.disabled):hover{background:var(--muted)}
+.menu .mi.disabled{color:var(--muted-fg);cursor:default}
+.menu .sep{height:1px;background:var(--border);margin:4px 2px}
+.menu .k{margin-left:auto;color:var(--muted-fg);font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.menu .grouplbl{padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)}
+
+/* popovers — row overflow menus, workspace switcher, anything anchored */
+.popwrap{position:relative;display:inline-block}
+.pop{position:absolute;top:calc(100% + 5px);right:0;min-width:210px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;z-index:180;font-size:13px;text-align:left;font-weight:400}
+.pop.open{display:block}
+.pop.left{right:auto;left:0}
+.pop a,.pop .mi{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.pop a:hover,.pop .mi:not(.disabled):hover{background:var(--muted)}
+.pop .mi.danger{color:var(--destructive)}
+.pop .mi.disabled{color:var(--muted-fg);cursor:default}
+.pop .sep{height:1px;background:var(--border);margin:4px 2px}
+.dots{border:0;background:none;color:var(--muted-fg);cursor:pointer;font-size:16px;line-height:1;padding:3px 7px;border-radius:6px}
+.dots:hover{background:var(--muted);color:var(--fg)}
+
+/* modal dialogs */
+.modal{position:fixed;inset:0;background:rgba(12,15,23,.5);display:none;align-items:center;justify-content:center;z-index:400;padding:28px}
+.modal.open{display:flex}
+.modal .sheet{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);width:min(700px,100%);max-height:84vh;overflow:auto;padding:22px}
+.modal .sheet.wide{width:min(960px,100%)}
+.modal .mhead{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.modal .mhead h3{font-size:16px;font-weight:680}
+.modal .mhead .sub{color:var(--muted-fg);font-size:12.5px;margin-top:2px}
+.modal .x{margin-left:auto;border:0;background:none;font-size:20px;line-height:1;color:var(--muted-fg);cursor:pointer;padding:0 4px}
+.modal .x:hover{color:var(--fg)}
+.modal .mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+
+/* tab panels — the tab strips were decorative; now they switch */
+.tab{user-select:none}
+.tabpanel{display:none}
+.tabpanel.active{display:block}
+
+/* 3 — fill the window instead of stranding half of it */
+.content{max-width:none !important}
+.content>*{max-width:1560px}
 </style>
 <script>(function(){try{if(localStorage.getItem('td-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}})();function tdTheme(){var r=document.documentElement,d=r.getAttribute('data-theme')==='dark';if(d)r.removeAttribute('data-theme');else r.setAttribute('data-theme','dark');try{localStorage.setItem('td-theme',d?'light':'dark')}catch(e){}}</script>
 </head>
 <body>
+<div class="winbar">
+  <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+  <div class="wintitle">TechieDesk</div>
+</div>
+<div class="menubar"><div class="mb"><button><b>TechieDesk</b></button><div class="menu"><div class="mi">About TechieDesk</div><div class="mi">Check for Updates&hellip;</div><div class="sep"></div><a href="admin-settings.html">Settings<span class="k">&#8984;,</span></a><a href="data-storage.html">Data &amp; Storage</a><a href="billing.html">Licence &amp; Account</a><div class="sep"></div><div class="mi">Quit TechieDesk<span class="k">&#8984;Q</span></div></div></div><div class="mb"><button>File</button><div class="menu"><div class="mi" onclick="tdOpen('dlgNewWs')">New Workspace&hellip;<span class="k">&#8984;N</span></div><div class="mi">New Thread<span class="k">&#8984;T</span></div><div class="sep"></div><a href="document-library.html">Import Documents&hellip;<span class="k">&#8984;O</span></a><a href="connectors.html">Add a Connector&hellip;</a><div class="sep"></div><div class="mi">Export Thread as Markdown&hellip;</div><div class="mi">Reveal Data Folder in Finder</div></div></div><div class="mb"><button>Edit</button><div class="menu"><div class="mi disabled">Undo<span class="k">&#8984;Z</span></div><div class="mi disabled">Redo<span class="k">&#8679;&#8984;Z</span></div><div class="sep"></div><div class="mi">Cut<span class="k">&#8984;X</span></div><div class="mi">Copy<span class="k">&#8984;C</span></div><div class="mi">Paste<span class="k">&#8984;V</span></div><div class="sep"></div><div class="mi">Find in Thread&hellip;<span class="k">&#8984;F</span></div></div></div><div class="mb"><button>View</button><div class="menu"><div class="mi">Toggle Sidebar<span class="k">&#8984;\</span></div><div class="sep"></div><div class="grouplbl">Appearance</div><div class="mi" onclick="tdSetTheme('light')">Light</div><div class="mi" onclick="tdSetTheme('dark')">Dark</div><div class="mi" onclick="tdSetTheme('system')">Match System</div><div class="sep"></div><div class="mi">Zoom In<span class="k">&#8984;+</span></div><div class="mi">Zoom Out<span class="k">&#8984;&minus;</span></div><div class="mi">Actual Size<span class="k">&#8984;0</span></div><div class="mi">Enter Full Screen<span class="k">&#8963;&#8984;F</span></div></div></div><div class="mb"><button>Workspace</button><div class="menu"><a href="workspace-chat.html">Chat</a><a href="document-library.html">Documents</a><a href="connectors.html">Connectors</a><a href="agents.html">Agents</a><a href="automations.html">Automations</a><div class="sep"></div><a href="workspace-settings.html">Workspace Settings&hellip;</a><div class="sep"></div><div class="grouplbl">Switch to</div><a href="workspace-chat.html">Contracts</a><a href="workspace-chat.html">HR Docs</a><a href="workspace-chat.html">Legal Archive</a></div></div><div class="mb"><button>Window</button><div class="menu"><div class="mi">Minimise<span class="k">&#8984;M</span></div><div class="mi">Zoom</div><div class="sep"></div><div class="mi">Bring All to Front</div></div></div><div class="mb"><button>Help</button><div class="menu"><div class="mi">TechieDesk Help<span class="k">&#8984;?</span></div><div class="mi">Keyboard Shortcuts</div><div class="sep"></div><a href="support.html">Support&hellip;</a><a href="admin-events.html">Event Log</a><div class="mi">Reveal Logs in Finder</div></div></div></div>
 <div class="shell">
   <aside class="sidebar">
     <a class="logo" href="workspace-chat.html"><span class="mark">TD</span> TechieDesk</a>
-    <div class="ws-switch"><span class="dot">C</span> Contracts <span class="chev">▾</span></div>
+    <div class="popwrap" style="display:block"><div class="ws-switch" data-pop="wsPop"><span class="dot">C</span> Contracts <span class="chev">&#9662;</span></div><div class="pop left" id="wsPop" style="min-width:236px"><div class="grouplbl" style="padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)">Workspaces</div><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">C</span> Contracts <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">1,043</span></a><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">H</span> HR Docs <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">412</span></a><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">L</span> Legal Archive <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">8,201</span></a><div class="sep"></div><div class="mi" onclick="tdOpen('dlgNewWs')">New workspace&hellip;</div><a href="workspace-settings.html">Workspace settings&hellip;</a></div></div>
     <div class="navgroup">Workspace</div>
     <a class="navitem" href="workspace-chat.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</a>
     <a class="navitem" href="document-library.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Documents</a>
     <a class="navitem active" href="connectors.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Connectors</a>
+    <a class="navitem" href="agents.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg>Agents</a>
+    <a class="navitem" href="automations.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Automations</a>
     <a class="navitem" href="workspace-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>Workspace Settings</a>
     <div class="navgroup">Account</div>
     <a class="navitem" href="profile.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</a>
     <a class="navitem" href="pricing.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></svg>Pricing</a>
     <a class="navitem" href="billing.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>Billing</a>
     <a class="navitem" href="support.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/></svg>Support</a>
-    <div class="navgroup">Admin</div>
-    <a class="navitem" href="admin-users.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Users</a>
+    <div class="navgroup">Operator</div>
     <a class="navitem" href="admin-events.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>Event Log</a>
-    <a class="navitem" href="admin-chats.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"/><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"/></svg>Chat Logs</a>
-    <a class="navitem" href="admin-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4"/><path d="M12 19v4"/><path d="m4.22 4.22 2.83 2.83"/><path d="m16.95 16.95 2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="m4.22 19.78 2.83-2.83"/><path d="m16.95 7.05 2.83-2.83"/></svg>Instance Settings</a>
+    <a class="navitem" href="admin-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4"/><path d="M12 19v4"/><path d="m4.22 4.22 2.83 2.83"/><path d="m16.95 16.95 2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="m4.22 19.78 2.83-2.83"/><path d="m16.95 7.05 2.83-2.83"/></svg>App Settings</a>
+    <a class="navitem" href="data-storage.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Data &amp; Storage</a>
     <div class="navgroup">Console</div>
     <a class="navitem" href="qdrant-admin.html" title="Qdrant Admin (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Qdrant Admin</a>
     <a class="navitem" href="llm-settings.html" title="LLM Settings (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg>LLM Settings</a>
     <a class="navitem" href="token-usage.html" title="Token Usage (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>Token Usage</a>
-    <div class="foot"><span class="avatar">RK</span><div style="font-size:13px;line-height:1.25"><div style="font-weight:650">Ravi Kumar</div><div class="hint">Admin</div></div><span class="badge violet" style="margin-left:auto">Pro</span></div>
+    <div class="foot"><span class="avatar">RK</span><div style="font-size:13px;line-height:1.25"><div style="font-weight:650">Ravi Kumar</div><div class="hint">This Mac</div></div><span class="badge violet" style="margin-left:auto">Pro</span></div>
   </aside>
   <div class="main">
     <div class="topbar"><span class="crumb">Workspace: Contracts / <b>Connectors</b></span><div class="right"><button class="theme-btn" onclick="tdTheme()" title="Toggle dark mode"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></button><a class="badge green" href="billing.html">Professional</a><a class="avatar" href="profile.html">RK</a></div></div>
@@ -189,59 +254,39 @@ html[data-theme="dark"] [style*="stroke:#dc2626"]{stroke:#f87171!important}
           <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
           <div class="name">Web page (URL)</div>
           <div class="desc">Scrape a single page into this workspace</div>
-          <a class="btn outline sm" href="#">Configure</a>
+          <a class="btn outline sm" href="#" onclick="tdOpen('dlgUrl');return false">Configure</a>
         </div>
         <div class="card src-card">
           <div class="tile" style="background:#eff4ff"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:#1d4ed8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
           <div class="name">Website crawler</div>
           <div class="desc">Crawl a site with depth &amp; link limits</div>
-          <a class="btn outline sm" href="#">Configure</a>
+          <a class="btn outline sm" href="#" onclick="tdOpen('dlgCrawl');return false">Configure</a>
         </div>
         <div class="card src-card">
           <div class="tile" style="background:#fef3f2"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:#dc2626"><polygon points="6 3 20 12 6 21 6 3"/></svg></div>
           <div class="name">YouTube</div>
           <div class="desc">Ingest a video's transcript</div>
-          <a class="btn outline sm" href="#">Configure</a>
+          <a class="btn outline sm" href="#" onclick="tdOpen('dlgYt');return false">Configure</a>
         </div>
         <div class="card src-card">
           <div class="tile"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg></div>
           <div class="name">GitHub / GitLab</div>
           <div class="desc">Ingest a repository (branch + glob filters)</div>
-          <a class="btn outline sm" href="#">Configure</a>
+          <a class="btn outline sm" href="#" onclick="tdOpen('dlgGit');return false">Configure</a>
         </div>
         <div class="card src-card">
           <div class="tile" style="background:#eff4ff"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:#1d4ed8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
           <div class="name">Confluence</div>
           <div class="desc">Ingest a space's pages</div>
-          <a class="btn outline sm" href="#">Configure</a>
+          <a class="btn outline sm" href="#" onclick="tdOpen('dlgConf');return false">Configure</a>
+        </div>
+        <div class="card src-card">
+          <div class="tile" style="background:#fffaeb"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="stroke:#b54708"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></div>
+          <div class="name">Email <span class="badge violet" style="margin-left:4px">New</span></div>
+          <div class="desc">Ingest a mailbox or folder over IMAP &mdash; messages and attachments</div>
+          <a class="btn outline sm" href="#" onclick="tdOpen('dlgEmail');return false">Configure</a>
         </div>
         <a class="card src-more" href="support.html">More connectors coming — request via Support</a>
-      </div>
-      <div class="card">
-        <h3>Configure: Website crawler</h3>
-        <div class="desc">Crawl a site with depth &amp; link limits</div>
-        <div class="form-grid">
-          <div class="field">
-            <label class="label">Root URL</label>
-            <input class="input" value="https://docs.acme.com">
-          </div>
-          <div class="field">
-            <label class="label">Depth</label>
-            <input class="input" type="number" value="2">
-          </div>
-          <div class="field">
-            <label class="label">Max links</label>
-            <input class="input" type="number" value="50">
-          </div>
-          <div class="field">
-            <label class="label">Include pattern</label>
-            <input class="input" value="/docs/*">
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <button class="btn">Run crawl</button>
-          <span class="hint">Runs in background — progress below</span>
-        </div>
       </div>
       <div class="card">
         <h3>Jobs</h3>
@@ -281,5 +326,190 @@ html[data-theme="dark"] [style*="stroke:#dc2626"]{stroke:#f87171!important}
     </div>
   </div>
 </div>
+<script>
+/* prototype kit — menus, popovers, tabs, dialogs (owner review 2026-07-26) */
+(function(){
+  function closeAll(except){
+    document.querySelectorAll('.mb.open').forEach(function(m){ if(m!==except) m.classList.remove('open'); });
+    document.querySelectorAll('.pop.open').forEach(function(p){ if(p!==except) p.classList.remove('open'); });
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var trigger = t.closest('.mb>button');
+    if(trigger){ var mb = trigger.parentElement; var was = mb.classList.contains('open'); closeAll(); if(!was) mb.classList.add('open'); e.preventDefault(); return; }
+    var popBtn = t.closest('[data-pop]');
+    if(popBtn){ var p = document.getElementById(popBtn.getAttribute('data-pop')); var open = p && p.classList.contains('open'); closeAll(); if(p && !open) p.classList.add('open'); e.preventDefault(); return; }
+    if(t.closest('.menu') || t.closest('.pop')){ if(!t.closest('a')) { closeAll(); } return; }
+    closeAll();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeAll(); document.querySelectorAll('.modal.open').forEach(function(m){ m.classList.remove('open'); }); }
+  });
+  /* tabs: .tab[data-tab] switches the sibling [data-panel] of the same name */
+  document.addEventListener('click', function(e){
+    var tab = e.target.closest('.tab[data-tab]');
+    if(!tab) return;
+    var strip = tab.closest('.tabs');
+    var scope = strip.closest('.content') || document;
+    strip.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+    tab.classList.add('active');
+    var want = tab.getAttribute('data-tab');
+    scope.querySelectorAll('[data-panel]').forEach(function(p){
+      p.classList.toggle('active', p.getAttribute('data-panel') === want);
+    });
+  });
+})();
+function tdOpen(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
+function tdClose(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+function tdSetTheme(m){var r=document.documentElement;if(m==='system'){try{localStorage.removeItem('td-theme')}catch(e){}r.removeAttribute('data-theme');if(window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)r.setAttribute('data-theme','dark');return}if(m==='dark')r.setAttribute('data-theme','dark');else r.removeAttribute('data-theme');try{localStorage.setItem('td-theme',m)}catch(e){}}
+</script>
+
+<!-- 7 — Email connector (owner-requested; requirements gap closed by BRD-135) -->
+<div class="modal" id="dlgEmail">
+  <div class="sheet wide">
+    <div class="mhead">
+      <div><h3>Configure: Email</h3>
+        <div class="sub">Ingest a mailbox or folder over IMAP into the <b>Contracts</b> workspace</div></div>
+      <button class="x" onclick="tdClose('dlgEmail')">&times;</button>
+    </div>
+
+    <div class="tabs" style="margin-bottom:14px">
+      <div class="tab active" data-tab="acct">Account</div>
+      <div class="tab" data-tab="scope">What to ingest</div>
+      <div class="tab" data-tab="sched">Schedule</div>
+    </div>
+
+    <div class="tabpanel active" data-panel="acct">
+      <div class="field">
+        <label class="label">Provider</label>
+        <select class="input"><option>IMAP (generic)</option><option>Gmail / Google Workspace</option><option>Outlook / Microsoft 365</option><option>Local mailbox file (.mbox)</option></select>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label class="label">Server</label><input class="input" value="imap.acme.com"></div>
+        <div class="field"><label class="label">Port</label><input class="input" type="number" value="993"></div>
+        <div class="field"><label class="label">Email address</label><input class="input" value="ravi@acme.com"></div>
+        <div class="field"><label class="label">App password / token</label><input class="input" type="password" value="................"></div>
+      </div>
+      <div class="alert blue" style="margin-bottom:12px">Credentials are stored in the macOS Keychain (BRD-132), never in a settings file. TLS is required; a plaintext connection is refused.</div>
+      <button class="btn outline sm">Test connection</button>
+    </div>
+
+    <div class="tabpanel" data-panel="scope">
+      <div class="field">
+        <label class="label">Folders</label>
+        <select class="input"><option>Inbox + Archive (selected)</option><option>All folders</option><option>Choose folders&hellip;</option></select>
+      </div>
+      <div class="form-grid">
+        <div class="field"><label class="label">From date</label><input class="input" value="2026-01-01"></div>
+        <div class="field"><label class="label">Sender filter (optional)</label><input class="input" placeholder="*@acme-legal.com"></div>
+        <div class="field"><label class="label">Subject contains (optional)</label><input class="input" placeholder="MSA, SOW"></div>
+        <div class="field"><label class="label">Max message size</label><input class="input" type="number" value="25"> <span class="hint">MB</span></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Ingest attachments (PDF, DOCX, XLSX, PPTX)</div>
+        <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Strip quoted reply chains and signatures</div>
+        <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Include messages you sent</div>
+        <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Ingest spam / junk folders</div>
+      </div>
+      <div class="alert amber" style="margin-top:12px">A mailbox is the most privacy-sensitive source in the product. Nothing is uploaded anywhere &mdash; messages are embedded locally &mdash; but everything ingested becomes answerable in this workspace, so scope it deliberately.</div>
+    </div>
+
+    <div class="tabpanel" data-panel="sched">
+      <div class="field">
+        <label class="label">Sync</label>
+        <select class="input"><option>Every 30 minutes</option><option>Hourly</option><option>Daily at 07:00</option><option>Manually only</option></select>
+      </div>
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px"><span class="switch"></span> Only fetch messages new since the last run (incremental)</div>
+      <div class="hint">Runs appear in the Jobs table below with per-message results and failure reasons, like every other connector (BRD-65), and can also be managed from <a href="automations.html" style="text-decoration:underline">Automations</a>.</div>
+    </div>
+
+    <div class="mfoot">
+      <button class="btn outline" onclick="tdClose('dlgEmail')">Cancel</button>
+      <button class="btn" onclick="tdClose('dlgEmail')">Save &amp; run now</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="dlgUrl"><div class="sheet">
+  <div class="mhead"><div><h3>Configure: Web page (URL)</h3><div class="sub">Scrape one page into <b>Contracts</b></div></div><button class="x" onclick="tdClose('dlgUrl')">&times;</button></div>
+  <div class="field"><label class="label">URL</label><input class="input" value="https://docs.acme.com/msa/2026"></div>
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:4px">
+    <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Strip navigation, headers and footers</div>
+    <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Follow one redirect</div>
+    <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Re-fetch on a schedule</div>
+  </div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgUrl')">Cancel</button><button class="btn" onclick="tdClose('dlgUrl')">Ingest page</button></div>
+</div></div>
+
+<div class="modal" id="dlgCrawl"><div class="sheet">
+  <div class="mhead"><div><h3>Configure: Website crawler</h3><div class="sub">Crawl a site with depth and link limits</div></div><button class="x" onclick="tdClose('dlgCrawl')">&times;</button></div>
+  <div class="field"><label class="label">Root URL</label><input class="input" value="https://docs.acme.com"></div>
+  <div class="form-grid">
+    <div class="field"><label class="label">Depth</label><input class="input" type="number" value="2"></div>
+    <div class="field"><label class="label">Max links</label><input class="input" type="number" value="200"></div>
+    <div class="field"><label class="label">Include pattern</label><input class="input" placeholder="/docs/*"></div>
+    <div class="field"><label class="label">Exclude pattern</label><input class="input" placeholder="/blog/*"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:9px;margin-bottom:4px"><span class="switch"></span> Respect robots.txt</div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgCrawl')">Cancel</button><button class="btn" onclick="tdClose('dlgCrawl')">Start crawl</button></div>
+</div></div>
+
+<div class="modal" id="dlgYt"><div class="sheet">
+  <div class="mhead"><div><h3>Configure: YouTube</h3><div class="sub">Ingest a video&rsquo;s transcript</div></div><button class="x" onclick="tdClose('dlgYt')">&times;</button></div>
+  <div class="field"><label class="label">Video or playlist URL</label><input class="input" value="https://youtube.com/watch?v=&hellip;"></div>
+  <div class="form-grid">
+    <div class="field"><label class="label">Transcript language</label><select class="input"><option>English (auto)</option><option>English (manual)</option><option>Any available</option></select></div>
+    <div class="field"><label class="label">Playlist limit</label><input class="input" type="number" value="25"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Keep timestamps in the chunk text</div>
+  <div class="alert amber" style="margin-top:12px">A video with no transcript is skipped with a reason rather than failing the run &mdash; TechieDesk does not transcribe audio itself.</div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgYt')">Cancel</button><button class="btn" onclick="tdClose('dlgYt')">Ingest transcript</button></div>
+</div></div>
+
+<div class="modal" id="dlgGit"><div class="sheet">
+  <div class="mhead"><div><h3>Configure: GitHub / GitLab</h3><div class="sub">Ingest a repository&rsquo;s files</div></div><button class="x" onclick="tdClose('dlgGit')">&times;</button></div>
+  <div class="form-grid">
+    <div class="field"><label class="label">Host</label><select class="input"><option>github.com</option><option>gitlab.com</option><option>Self-hosted&hellip;</option></select></div>
+    <div class="field"><label class="label">Repository</label><input class="input" value="acme/contracts-templates"></div>
+    <div class="field"><label class="label">Branch</label><input class="input" value="main"></div>
+    <div class="field"><label class="label">Access token</label><input class="input" type="password" placeholder="required for private repos"></div>
+    <div class="field"><label class="label">Include globs</label><input class="input" value="**/*.md, **/*.adoc"></div>
+    <div class="field"><label class="label">Exclude globs</label><input class="input" value="node_modules/**, dist/**"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Re-sync when the branch moves</div>
+  <div class="hint" style="margin-top:8px">The token is stored in the macOS Keychain (BRD-132).</div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgGit')">Cancel</button><button class="btn" onclick="tdClose('dlgGit')">Connect &amp; ingest</button></div>
+</div></div>
+
+<div class="modal" id="dlgConf"><div class="sheet">
+  <div class="mhead"><div><h3>Configure: Confluence</h3><div class="sub">Ingest a space&rsquo;s pages</div></div><button class="x" onclick="tdClose('dlgConf')">&times;</button></div>
+  <div class="form-grid">
+    <div class="field"><label class="label">Base URL</label><input class="input" value="https://acme.atlassian.net/wiki"></div>
+    <div class="field"><label class="label">Space key</label><input class="input" value="LEGAL"></div>
+    <div class="field"><label class="label">Email</label><input class="input" value="ravi@acme.com"></div>
+    <div class="field"><label class="label">API token</label><input class="input" type="password" value="&middot;&middot;&middot;&middot;&middot;&middot;&middot;&middot;"></div>
+    <div class="field"><label class="label">Page label filter</label><input class="input" placeholder="contract, policy (optional)"></div>
+    <div class="field"><label class="label">Updated since</label><input class="input" placeholder="2026-01-01 (optional)"></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Include child pages</div>
+    <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Include page attachments</div>
+  </div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgConf')">Cancel</button><button class="btn" onclick="tdClose('dlgConf')">Connect &amp; ingest</button></div>
+</div></div>
+
+<div class="modal" id="dlgNewWs"><div class="sheet">
+  <div class="mhead"><div><h3>New workspace</h3><div class="sub">A workspace is an isolated set of documents, threads and retrieval settings</div></div>
+    <button class="x" onclick="tdClose('dlgNewWs')">&times;</button></div>
+  <div class="field"><label class="label">Name</label><input class="input" placeholder="Vendor agreements"></div>
+  <div class="field"><label class="label">Description <span class="hint">optional</span></label><textarea class="input" rows="2" placeholder="What lives in here, and what it is for"></textarea></div>
+  <div class="field"><label class="label">Start from</label>
+    <select class="input"><option>Empty workspace</option><option>Copy settings from &ldquo;Contracts&rdquo;</option><option>Copy settings and documents from &ldquo;Contracts&rdquo;</option></select></div>
+  <div class="field"><label class="label">System prompt <span class="hint">optional &mdash; how the assistant should behave here</span></label>
+    <textarea class="input" rows="2" placeholder="You are a contracts analyst. Always cite the clause you relied on."></textarea></div>
+  <div class="hint">Retrieval settings (Top-K, threshold, reranking) can be tuned later in Workspace settings &rarr; Retrieval.</div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgNewWs')">Cancel</button>
+    <button class="btn" onclick="tdClose('dlgNewWs')">Create workspace</button></div>
+</div></div>
 </body>
 </html>

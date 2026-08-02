@@ -168,16 +168,20 @@ public static class ServiceCollectionExtensions
             // Configure telemetry
             builder.WithTelemetry(config.EnableTelemetry);
 
-            // Configure reranking (if specified)
-            if (config.Rerank.Enabled && config.Rerank.Source is RerankSource.Cohere or RerankSource.Jina)
+            // Configure reranking (if specified). The reranker is registered whenever credentials
+            // exist, even with Rerank.Enabled false, so a workspace with RerankEnabled = true can
+            // still opt in per call (REQ-RAG-047); Enabled is then restored as the global default.
+            if (config.Rerank.Source is RerankSource.Cohere or RerankSource.Jina
+                && !string.IsNullOrEmpty(config.Rerank.ApiKey))
             {
                 builder.WithReranker(
                     config.Rerank.Source,
-                    config.Rerank.ApiKey ?? string.Empty,
+                    config.Rerank.ApiKey,
                     config.Rerank.Model,
                     config.Rerank.Endpoint,
                     config.Rerank.TopN,
                     config.Rerank.CandidateCount);
+                builder.WithRerankEnabledByDefault(config.Rerank.Enabled);
             }
 
             // Configure persistence (if specified)

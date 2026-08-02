@@ -1,222 +1,213 @@
 @page "/register"
 @layout AuthLayout
-@inject IAppManagerClient AppManager
-@inject TechieDeskAuthenticationStateProvider AuthProvider
 @inject ITechieDeskAuthModeProvider AuthMode
+@inject IDesktopSignInService SignIn
+@inject TechieDeskAuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
-@inject ILogger<Register> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>TechieDesk — Create account</PageTitle>
+<PageTitle>@Localizer["RegisterPageTitle"]</PageTitle>
+
+@* REQ-FN-039 / REQ-UI-007: registration signs the new account straight in, so it goes through the
+   same in-process path as /login. It posted to /auth/register until now — an endpoint that went
+   with the web host in REQ-FN-035, leaving this screen inert. Complexity rules are still enforced
+   before anything leaves the machine (PasswordPolicy, inside IDesktopSignInService), and the
+   browser's own required/minlength checks catch the obvious cases first. *@
 
 <Card Class="rounded-2xl p-2 shadow-lg">
     <CardHeader>
-        <h1 class="text-2xl font-semibold leading-none tracking-tight">Create your account</h1>
-        <CardDescription>Get started with your TechieDesk instance</CardDescription>
+        <h1 class="text-2xl font-semibold leading-none tracking-tight">@Localizer["RegisterHeading"]</h1>
+        <CardDescription>@Localizer["RegisterSubheading"]</CardDescription>
     </CardHeader>
     <CardContent Class="space-y-4">
-        @if (errorMessage is not null)
+        @if (Banner is not null)
         {
-            <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert Variant="@Banner.Value.Variant" AccentBorder="true">
                 <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-                <AlertDescription>@errorMessage</AlertDescription>
+                <AlertDescription>@Banner.Value.Message</AlertDescription>
             </Alert>
         }
 
-        <div class="td-grid-2">
-            <Field IsInvalid="@(firstNameError is not null)">
-                <FieldLabel>First name</FieldLabel>
+        <form class="space-y-4" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+            <div class="td-grid-2">
+                <Field>
+                    <FieldLabel>@Localizer["RegisterFirstNameLabel"]</FieldLabel>
+                    <FieldContent>
+                        <input name="firstName" type="text" required autocomplete="given-name"
+                               placeholder="@Localizer["RegisterFirstNamePlaceholder"]" aria-label="@Localizer["RegisterFirstNameLabel"]" class="@InputClass"
+                               disabled="@Busy" value="@FirstName"
+                               @oninput="@(args => FirstName = args.Value?.ToString() ?? string.Empty)" />
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>@Localizer["RegisterLastNameLabel"]</FieldLabel>
+                    <FieldContent>
+                        <input name="lastName" type="text" required autocomplete="family-name"
+                               placeholder="@Localizer["RegisterLastNamePlaceholder"]" aria-label="@Localizer["RegisterLastNameLabel"]" class="@InputClass"
+                               disabled="@Busy" value="@LastName"
+                               @oninput="@(args => LastName = args.Value?.ToString() ?? string.Empty)" />
+                    </FieldContent>
+                </Field>
+            </div>
+
+            <Field>
+                <FieldLabel>@Localizer["AuthEmailLabel"]</FieldLabel>
                 <FieldContent>
-                    <Input @bind-Value="firstName" Placeholder="Ravi" AriaInvalid="@(firstNameError is not null)" />
-                    @if (firstNameError is not null)
-                    {
-                        <FieldError>@firstNameError</FieldError>
-                    }
+                    <input name="email" type="email" required autocomplete="email"
+                           placeholder="@Localizer["AuthEmailPlaceholder"]" aria-label="@Localizer["AuthEmailLabel"]" class="@InputClass"
+                           disabled="@Busy" value="@Email"
+                           @oninput="@(args => Email = args.Value?.ToString() ?? string.Empty)" />
                 </FieldContent>
             </Field>
-            <Field IsInvalid="@(lastNameError is not null)">
-                <FieldLabel>Last name</FieldLabel>
+
+            <Field>
+                <FieldLabel>@Localizer["RegisterMobileLabel"]</FieldLabel>
                 <FieldContent>
-                    <Input @bind-Value="lastName" Placeholder="Kumar" AriaInvalid="@(lastNameError is not null)" />
-                    @if (lastNameError is not null)
-                    {
-                        <FieldError>@lastNameError</FieldError>
-                    }
+                    <input name="mobile" type="tel" autocomplete="tel"
+                           placeholder="+91 98765 43210" aria-label="@Localizer["RegisterMobileAria"]" class="@InputClass"
+                           disabled="@Busy" value="@Mobile"
+                           @oninput="@(args => Mobile = args.Value?.ToString() ?? string.Empty)" />
                 </FieldContent>
             </Field>
-        </div>
 
-        <Field IsInvalid="@(emailError is not null)">
-            <FieldLabel>Email</FieldLabel>
-            <FieldContent>
-                <Input Type="InputType.Email" @bind-Value="email" Placeholder="you@company.com" AriaInvalid="@(emailError is not null)" />
-                @if (emailError is not null)
-                {
-                    <FieldError>@emailError</FieldError>
-                }
-            </FieldContent>
-        </Field>
+            <Field>
+                <FieldLabel>@Localizer["AuthPasswordLabel"]</FieldLabel>
+                <FieldContent>
+                    <input name="password" type="password" required minlength="8" autocomplete="new-password"
+                           placeholder="••••••••" aria-label="@Localizer["AuthPasswordLabel"]" class="@InputClass"
+                           disabled="@Busy" value="@Password"
+                           @oninput="@(args => Password = args.Value?.ToString() ?? string.Empty)" />
+                    @* REQ-UI-052: was @PasswordPolicy.Requirement — a Core constant, which cannot be
+                       translated from here and rendered English inside a Hindi screen. The policy
+                       itself still ENFORCES the rule (PasswordPolicy.IsValid, inside
+                       IDesktopSignInService); this is only how it is stated to the user. *@
+                    <FieldDescription>@Localizer["AuthPasswordRequirement"]</FieldDescription>
+                </FieldContent>
+            </Field>
 
-        <Field>
-            <FieldLabel>Mobile number (optional)</FieldLabel>
-            <FieldContent>
-                <Input Type="InputType.Tel" @bind-Value="mobile" Placeholder="+91 98765 43210" />
-            </FieldContent>
-        </Field>
+            <Field>
+                <FieldLabel>@Localizer["RegisterConfirmPasswordLabel"]</FieldLabel>
+                <FieldContent>
+                    <input name="confirmPassword" type="password" required minlength="8" autocomplete="new-password"
+                           placeholder="••••••••" aria-label="@Localizer["RegisterConfirmPasswordLabel"]" class="@InputClass"
+                           disabled="@Busy" value="@ConfirmPassword"
+                           @oninput="@(args => ConfirmPassword = args.Value?.ToString() ?? string.Empty)" />
+                </FieldContent>
+            </Field>
 
-        <Field IsInvalid="@(passwordError is not null)">
-            <FieldLabel>Password</FieldLabel>
-            <FieldContent>
-                <Input Type="InputType.Password" @bind-Value="password" Placeholder="••••••••" AriaInvalid="@(passwordError is not null)" />
-                @if (passwordError is not null)
-                {
-                    <FieldError>@passwordError</FieldError>
-                }
-                else
-                {
-                    <FieldDescription>Min 8 chars, 1 uppercase, 1 number, 1 special character</FieldDescription>
-                }
-            </FieldContent>
-        </Field>
-
-        <Field IsInvalid="@(confirmError is not null)">
-            <FieldLabel>Confirm password</FieldLabel>
-            <FieldContent>
-                <Input Type="InputType.Password" @bind-Value="confirmPassword" Placeholder="••••••••" AriaInvalid="@(confirmError is not null)" />
-                @if (confirmError is not null)
-                {
-                    <FieldError>@confirmError</FieldError>
-                }
-            </FieldContent>
-        </Field>
-
-        <Button Class="w-full" OnClick="CreateAccountAsync" Disabled="isBusy" Type="ButtonType.Submit">
-            @if (isBusy)
-            {
-                <Spinner Size="SpinnerSize.Small" Class="mr-2" />
-                <span>Creating account…</span>
-            }
-            else
-            {
-                <span>Create account</span>
-            }
-        </Button>
+            <button type="submit" class="@SubmitClass" disabled="@Busy">@SubmitLabel</button>
+        </form>
 
         <div class="text-center text-sm text-muted-foreground">
-            Already have an account? <a href="/login" class="font-semibold text-primary hover:underline">Sign in</a>
+            @Localizer["RegisterHaveAccount"] <a href="/login" class="font-semibold text-primary hover:underline">@Localizer["RegisterSignIn"]</a>
+        </div>
+
+        @* REQ-FN-036 / BRD-129: registration is an offer, not a wall — the way back into the app
+           is always on the screen. *@
+        <div class="text-center text-sm">
+            <a href="/" class="font-semibold text-primary hover:underline">@Localizer["AuthContinueWithoutAccount"]</a>
         </div>
     </CardContent>
 </Card>
 
 @code {
-    private string firstName = string.Empty;
-    private string lastName = string.Empty;
-    private string email = string.Empty;
-    private string? mobile;
-    private string password = string.Empty;
-    private string confirmPassword = string.Empty;
+    [SupplyParameterFromQuery(Name = "error")]
+    private string? ErrorCode { get; set; }
 
-    private string? firstNameError;
-    private string? lastNameError;
-    private string? emailError;
-    private string? passwordError;
-    private string? confirmError;
-    private string? errorMessage;
-    private bool isBusy;
+    private const string InputClass =
+        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background " +
+        "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground " +
+        "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+        "focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 " +
+        "aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive transition-colors md:text-sm";
 
-    private async Task CreateAccountAsync()
+    private const string SubmitClass =
+        "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors " +
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 " +
+        "disabled:opacity-50 disabled:pointer-events-none bg-primary text-primary-foreground hover:bg-primary/90 " +
+        "h-10 px-4 py-2 w-full";
+
+    private string FirstName { get; set; } = string.Empty;
+
+    private string LastName { get; set; } = string.Empty;
+
+    private string Email { get; set; } = string.Empty;
+
+    private string Mobile { get; set; } = string.Empty;
+
+    private string Password { get; set; } = string.Empty;
+
+    private string ConfirmPassword { get; set; } = string.Empty;
+
+    private bool Busy { get; set; }
+
+    // REQ-UI-052: see Login.razor — a C# literal behind one markup position is invisible to the
+    // coverage counter and just as English on a Hindi screen.
+    private string SubmitLabel => Busy ? Localizer["RegisterSubmitBusy"] : Localizer["RegisterSubmit"];
+
+    private (AlertVariant Variant, string Message)? Banner => BuildBanner();
+
+    // Creates the account and signs it straight in, all in-process.
+    private async Task SubmitAsync()
     {
-        if (!Validate())
+        if (Busy)
         {
             return;
         }
 
-        if (!AuthMode.IsAppManagerEnabled)
-        {
-            errorMessage = "This instance runs in offline single-user mode — registration is managed by AppManager and is not available.";
-            return;
-        }
-
-        isBusy = true;
+        Busy = true;
         try
         {
+            var mobile = Mobile.Trim();
             var request = new RegisterRequest
             {
-                Email = email.Trim(),
-                FirstName = firstName.Trim(),
-                LastName = lastName.Trim(),
-                MobileNumber = string.IsNullOrWhiteSpace(mobile) ? null : mobile.Trim()
+                Email = Email.Trim(),
+                FirstName = FirstName.Trim(),
+                LastName = LastName.Trim(),
+                MobileNumber = mobile.Length == 0 ? null : mobile
             };
 
-            var auth = await AppManager.RegisterAsync(request, password);
-            AuthProvider.SignIn(auth);
-            Logger.LogInformation("Registration succeeded for {Email}", request.Email);
-            Nav.NavigateTo("/", forceLoad: true);
-        }
-        catch (AppManagerException ex)
-        {
-            Logger.LogWarning("Registration failed for {Email} ({ErrorCode})", email.Trim(), ex.ErrorCode);
-            MapError(ex);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Unexpected error during registration for {Email}", email.Trim());
-            errorMessage = "Something went wrong while creating your account. Please try again.";
+            var outcome = await SignIn.RegisterAsync(request, Password, ConfirmPassword);
+            ErrorCode = outcome.ErrorCode;
+            if (!outcome.Succeeded)
+            {
+                return;
+            }
+
+            Password = string.Empty;
+            ConfirmPassword = string.Empty;
+
+            AuthProvider.NotifySessionChanged();
+            Nav.NavigateTo("/");
         }
         finally
         {
-            isBusy = false;
+            Busy = false;
         }
     }
 
-    private bool Validate()
+    private (AlertVariant, string)? BuildBanner()
     {
-        firstNameError = lastNameError = emailError = passwordError = confirmError = errorMessage = null;
-
-        if (string.IsNullOrWhiteSpace(firstName))
+        // REQ-FN-036 / BRD-129: an account is a licensing artefact, so with no licence server
+        // configured there is nothing to register against — and nothing is lost by that.
+        if (!AuthMode.IsAppManagerEnabled)
         {
-            firstNameError = "First name is required.";
+            return (AlertVariant.Info, Localizer["RegisterBannerNoLicenceServer"]);
         }
 
-        if (string.IsNullOrWhiteSpace(lastName))
+        return ErrorCode switch
         {
-            lastNameError = "Last name is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@'))
-        {
-            emailError = "A valid email is required.";
-        }
-
-        if (!PasswordPolicy.IsValid(password))
-        {
-            passwordError = "Min 8 chars, 1 uppercase, 1 number, 1 special character.";
-        }
-
-        if (confirmPassword != password)
-        {
-            confirmError = "Passwords do not match.";
-        }
-
-        return firstNameError is null && lastNameError is null && emailError is null
-            && passwordError is null && confirmError is null;
-    }
-
-    private void MapError(AppManagerException ex)
-    {
-        switch (ex.Error)
-        {
-            case AppManagerError.EmailExists:
-                emailError = "An account with this email already exists.";
-                break;
-            case AppManagerError.InvalidPassword:
-                passwordError = "Password does not meet the complexity requirements.";
-                break;
-            case AppManagerError.ValidationError:
-                errorMessage = "Please check your details and try again.";
-                break;
-            default:
-                errorMessage = "Unable to create your account right now. Please try again later.";
-                break;
-        }
+            null or "" => null,
+            "EMAIL_EXISTS" => (AlertVariant.Danger, Localizer["RegisterErrorEmailExists"]),
+            "INVALID_PASSWORD" or AuthScreenCodes.WeakPassword =>
+                (AlertVariant.Danger, Localizer["AuthErrorWeakPassword"]),
+            AuthScreenCodes.PasswordMismatch => (AlertVariant.Danger, Localizer["AuthErrorPasswordMismatch"]),
+            AuthScreenCodes.MissingFields or "VALIDATION_ERROR" =>
+                (AlertVariant.Danger, Localizer["RegisterErrorValidation"]),
+            AuthScreenCodes.NoLicenceServer => (AlertVariant.Info, Localizer["RegisterErrorNoLicenceServer"]),
+            @* REQ-FN-035: the ANTIFORGERY_FAILED banner is gone with the HTML form post it
+               protected. A desktop app has no cross-site request to forge. *@
+            _ => (AlertVariant.Danger, Localizer["RegisterErrorGeneric"])
+        };
     }
 }

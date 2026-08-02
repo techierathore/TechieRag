@@ -4,24 +4,25 @@
 @inject TechieDesk.Services.TechieRagManager TechieRag
 @inject ToastService ToastService
 @inject ILogger<Chat> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>RAG Chat</PageTitle>
+<PageTitle>@Localizer["RagChatPageTitle"]</PageTitle>
 
 <div class="flex flex-col h-[calc(100vh-8rem)]">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">RAG Chat</h1>
-            <TypographyMuted>Ask questions and get AI-generated answers using your documents.</TypographyMuted>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["RagChatHeading"]</h1>
+            <TypographyMuted>@Localizer["RagChatSubtitle"]</TypographyMuted>
         </div>
         <div class="flex gap-2">
             <Button Variant="ButtonVariant.Outline" OnClick="ClearChat">
                 <Button.Icon><LucideIcon aria-hidden="true" Name="trash-2" Size="16" /></Button.Icon>
-                Clear Chat
+                @Localizer["RagChatClear"]
             </Button>
             <Button Variant="ButtonVariant.Outline" OnClick="NewConversation">
                 <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
-                New Conversation
+                @Localizer["RagChatNewConversation"]
             </Button>
         </div>
     </div>
@@ -32,7 +33,7 @@
             <CardHeader Class="py-2 cursor-pointer">
                 <CollapsibleTrigger Class="flex items-center gap-2 w-full">
                     <LucideIcon aria-hidden="true" Name="settings-2" Size="16" />
-                    <span class="text-sm font-medium">Chat Configuration</span>
+                    <span class="text-sm font-medium">@Localizer["RagChatConfiguration"]</span>
                     <LucideIcon aria-hidden="true" Name="@(configOpen ? "chevron-up" : "chevron-down")" Size="16" Class="ml-auto" />
                 </CollapsibleTrigger>
             </CardHeader>
@@ -40,25 +41,25 @@
                 <CardContent Class="pt-0">
                     <div class="grid grid-cols-4 gap-4">
                         <Field>
-                            <FieldLabel>Mode</FieldLabel>
+                            <FieldLabel>@Localizer["RagChatMode"]</FieldLabel>
                             <FieldContent>
-                                <Select @bind-Value="chatMode" TValue="string">
-                                    <SelectTrigger>
-                                        <SelectValue Placeholder="Mode" /></SelectTrigger>
+                                <Select @bind-Value="chatMode" TValue="string" DisplayTextSelector="ModeTextFor">
+                                    <SelectTrigger aria-label="@Localizer["RagChatModeLabel"]">
+                                        <SelectValue Placeholder="@Localizer["RagChatMode"]" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem Value="@("auto-rag")" Text="Auto-RAG" TValue="string">Auto-RAG</SelectItem>
-                                        <SelectItem Value="@("direct-llm")" Text="Direct LLM" TValue="string">Direct LLM</SelectItem>
-                                        <SelectItem Value="@("search-only")" Text="Search Only" TValue="string">Search Only</SelectItem>
+                                        <SelectItem Value="@("auto-rag")" Text="@Localizer["RagChatModeAutoRag"]" TValue="string">@Localizer["RagChatModeAutoRag"]</SelectItem>
+                                        <SelectItem Value="@("direct-llm")" Text="@Localizer["RagChatModeDirectLlm"]" TValue="string">@Localizer["RagChatModeDirectLlm"]</SelectItem>
+                                        <SelectItem Value="@("search-only")" Text="@Localizer["RagChatModeSearchOnly"]" TValue="string">@Localizer["RagChatModeSearchOnly"]</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FieldContent>
                         </Field>
                         <Field>
-                            <FieldLabel>Top K</FieldLabel>
+                            <FieldLabel>@Localizer["RagChatTopK"]</FieldLabel>
                             <FieldContent>
                                 <Select @bind-Value="topKString" TValue="string">
-                                    <SelectTrigger>
-                                        <SelectValue Placeholder="Top K" /></SelectTrigger>
+                                    <SelectTrigger aria-label="@Localizer["RagChatTopKLabel"]">
+                                        <SelectValue Placeholder="@Localizer["RagChatTopK"]" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem Value="@("3")" Text="3" TValue="string">3</SelectItem>
                                         <SelectItem Value="@("5")" Text="5" TValue="string">5</SelectItem>
@@ -68,17 +69,17 @@
                             </FieldContent>
                         </Field>
                         <Field>
-                            <FieldLabel>Doc Filter</FieldLabel>
+                            <FieldLabel>@Localizer["RagChatDocFilter"]</FieldLabel>
                             <FieldContent>
-                                <Input @bind-Value="documentFilter" Placeholder="All Documents" />
+                                <Input @bind-Value="documentFilter" Placeholder="@Localizer["RagChatAllDocuments"]" />
                             </FieldContent>
                         </Field>
                         <Field>
-                            <FieldLabel>Streaming</FieldLabel>
+                            <FieldLabel>@Localizer["RagChatStreaming"]</FieldLabel>
                             <FieldContent>
                                 <div class="flex items-center space-x-2 pt-2">
                                     <Switch @bind-Checked="useStreaming" Id="streaming" />
-                                    <Label For="streaming">@(useStreaming ? "On" : "Off")</Label>
+                                    <Label For="streaming">@(useStreaming ? Localizer["RagChatOn"] : Localizer["RagChatOff"])</Label>
                                 </div>
                             </FieldContent>
                         </Field>
@@ -96,7 +97,7 @@
                 <div class="flex items-center justify-center h-full">
                     <div class="text-center space-y-2">
                         <LucideIcon aria-hidden="true" Name="message-square" Size="48" Class="mx-auto text-muted-foreground" />
-                        <TypographyMuted>Start a conversation by typing a question below.</TypographyMuted>
+                        <TypographyMuted>@Localizer["RagChatEmpty"]</TypographyMuted>
                     </div>
                 </div>
             }
@@ -112,7 +113,7 @@
                             <Collapsible Class="mt-2">
                                 <CollapsibleTrigger Class="flex items-center gap-1 text-xs opacity-70">
                                     <LucideIcon aria-hidden="true" Name="file-text" Size="12" />
-                                    <span>Sources Used (@msg.Sources.Count)</span>
+                                    <span>@Localizer["RagChatSourcesUsed", msg.Sources.Count]</span>
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
                                     <div class="mt-2 space-y-1 text-xs opacity-70">
@@ -143,7 +144,7 @@
                         {
                             <div class="flex items-center gap-2">
                                 <Spinner Size="SpinnerSize.Small" />
-                                <span class="text-sm text-muted-foreground">Thinking...</span>
+                                <span class="text-sm text-muted-foreground">@Localizer["RagChatThinking"]</span>
                             </div>
                         }
                     </div>
@@ -154,20 +155,20 @@
 
     <!-- Input Area -->
     <div class="mt-4 flex gap-2" @onkeydown="HandleKeyDown">
-        <Textarea @bind-Value="userInput" Placeholder="Ask a question..." Class="flex-1 min-h-[44px] max-h-[120px]" />
+        <Textarea @bind-Value="userInput" Placeholder="@Localizer["RagChatAskPlaceholder"]" Class="flex-1 min-h-[44px] max-h-[120px]" />
         @* REQ-NFR-005: icon-only control — the paper-plane glyph is decorative, so the button
            needs its own text alternative (axe button-name, critical). *@
         <Button OnClick="SendMessage" Disabled="@(isProcessing || string.IsNullOrWhiteSpace(userInput))">
             <LucideIcon aria-hidden="true" Name="send" Size="16" />
-            <span class="sr-only">Send message</span>
+            <span class="sr-only">@Localizer["RagChatSend"]</span>
         </Button>
     </div>
 
     <!-- Footer Stats -->
     <div class="mt-2 flex justify-center gap-4">
-        <TypographyMuted>Session: @totalTokens.ToString("N0") tokens</TypographyMuted>
+        <TypographyMuted>@Localizer["RagChatSessionTokens", totalTokens.ToString("N0")]</TypographyMuted>
         <TypographyMuted>$@totalCost.ToString("F4")</TypographyMuted>
-        <TypographyMuted>@messages.Count messages</TypographyMuted>
+        <TypographyMuted>@Localizer["RagChatMessageCount", messages.Count]</TypographyMuted>
     </div>
 </div>
 
@@ -185,6 +186,23 @@
     private decimal totalCost;
 
     private int topK => int.TryParse(topKString, out var k) ? k : 5;
+
+    /// <summary>
+    /// Paints the answering mode's TRANSLATED label on the closed Select trigger (TR-024).
+    /// </summary>
+    /// <param name="value">The bound, culture-invariant mode key.</param>
+    /// <returns>The label to draw.</returns>
+    /// <remarks>
+    /// Without this the trigger paints the raw bound value — "auto-rag" — in every language. The
+    /// bound value stays the invariant key on purpose: a translated string must never be what the
+    /// page stores or sends.
+    /// </remarks>
+    private string ModeTextFor(string? value) => value switch
+    {
+        "direct-llm" => Localizer["RagChatModeDirectLlm"].Value,
+        "search-only" => Localizer["RagChatModeSearchOnly"].Value,
+        _ => Localizer["RagChatModeAutoRag"].Value
+    };
 
     private async Task HandleKeyDown(KeyboardEventArgs e)
     {
@@ -225,7 +243,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Chat error");
-            messages.Add(new ChatDisplayMessage("assistant", $"Error: {ex.Message}"));
+            messages.Add(new ChatDisplayMessage("assistant", Localizer["RagChatError", ex.Message]));
         }
         finally
         {
@@ -239,9 +257,9 @@
     {
         var results = await TechieRag.SearchAsync(question, topK, documentFilter);
         var content = results.Count == 0
-            ? "No results found."
+            ? Localizer["RagChatNoResults"].Value
             : string.Join("\n\n", results.Select((r, i) =>
-                $"Result {i + 1} ({r.Score:P0} match)\n{r.Chunk.Text}\nSource: {r.Chunk.DocumentId}"));
+                Localizer["RagChatSearchResult", i + 1, r.Score.ToString("P0"), r.Chunk.Text, r.Chunk.DocumentId].Value));
 
         var sources = results.Select(r => new SourceInfo(r.Chunk.DocumentId, r.Score)).ToList();
         messages.Add(new ChatDisplayMessage("assistant", content) { Sources = sources });
@@ -252,7 +270,7 @@
         var provider = await TechieRag.GetLlmProviderAsync();
         if (provider is null)
         {
-            messages.Add(new ChatDisplayMessage("assistant", "No LLM provider configured. Go to LLM Settings to configure one."));
+            messages.Add(new ChatDisplayMessage("assistant", Localizer["RagChatNoProvider"]));
             return;
         }
 
@@ -296,7 +314,7 @@
             var provider = await TechieRag.GetLlmProviderAsync();
             if (provider is null)
             {
-                messages.Add(new ChatDisplayMessage("assistant", "No LLM provider configured. Go to LLM Settings to configure one."));
+                messages.Add(new ChatDisplayMessage("assistant", Localizer["RagChatNoProvider"]));
                 return;
             }
 

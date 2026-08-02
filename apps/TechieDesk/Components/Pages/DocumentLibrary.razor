@@ -1,7 +1,7 @@
 @page "/workspace/{Slug}/documents"
 @using System.Security.Cryptography
 @using TechieRag.Embedded
-@using TrBlazeUI.Components.FileUpload
+@using Microsoft.Maui.Storage
 @using TrBlazeUI.Components.Empty
 @implements IDisposable
 @inject TechieRagManager Rag
@@ -9,8 +9,9 @@
 @inject ToastService ToastService
 @inject NavigationManager Nav
 @inject ILogger<DocumentLibrary> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>@(workspace?.Name ?? "Workspace") — Documents</PageTitle>
+<PageTitle>@Localizer["DocsPageTitle", workspace?.Name ?? Localizer["DocsWorkspaceFallback"].Value]</PageTitle>
 
 @* REQ-NFR-010/BRD-101: a backend outage (vector store, persistence store) must not be reported
    as "this workspace does not exist or you are not assigned to it" — that sends the user to the
@@ -19,10 +20,9 @@
 {
     <Alert Variant="AlertVariant.Danger">
         <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-        <AlertTitle>Workspace data is unavailable</AlertTitle>
+        <AlertTitle>@Localizer["DocsLoadErrorTitle"]</AlertTitle>
         <AlertDescription>
-            The document store could not be reached, so this workspace cannot be opened right now.
-            Check the vector store and embedding configuration, then reload. Details: @loadError
+            @Localizer["DocsLoadErrorBody", loadError]
         </AlertDescription>
     </Alert>
 }
@@ -30,28 +30,28 @@ else if (notFound)
 {
     <Alert Variant="AlertVariant.Danger">
         <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-        <AlertTitle>Workspace not available</AlertTitle>
-        <AlertDescription>This workspace does not exist or you are not assigned to it.</AlertDescription>
+        <AlertTitle>@Localizer["DocsNotFoundTitle"]</AlertTitle>
+        <AlertDescription>@Localizer["DocsNotFoundBody"]</AlertDescription>
     </Alert>
 }
 else if (workspace is null)
 {
     <div class="flex items-center gap-2 text-muted-foreground">
-        <Spinner Size="SpinnerSize.Small" /> <span>Loading documents…</span>
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["DocsLoadingDocuments"]</span>
     </div>
 }
 else
 {
     <div class="mb-4 flex items-center gap-3">
         <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Documents — @workspace.Name</h1>
-            <TypographyMuted>Files chunked, embedded, and scoped to this workspace's knowledge.</TypographyMuted>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["DocsHeading", workspace.Name]</h1>
+            <TypographyMuted>@Localizer["DocsSubtitle"]</TypographyMuted>
         </div>
         @if (canManage)
         {
             <div class="ml-auto flex items-center gap-2">
                 <Switch @bind-Checked="pinOnUpload" Id="pin-on-upload" />
-                <Label For="pin-on-upload">Pin new uploads</Label>
+                <Label For="pin-on-upload">@Localizer["DocsPinNewUploads"]</Label>
             </div>
         }
     </div>
@@ -61,24 +61,37 @@ else
     {
         <Alert Variant="AlertVariant.Warning" Class="mb-4">
             <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
-            <AlertTitle>Preparing embedding model (BGE-M3)</AlertTitle>
-            <AlertDescription>@downloadProgress?.StatusMessage</AlertDescription>
+            <AlertTitle>@Localizer["DocsPreparingModelTitle"]</AlertTitle>
+            <AlertDescription>@(downloadProgress?.StatusMessage)</AlertDescription>
         </Alert>
     }
 
-    @* REQ-UI-019: drag-drop + file-picker multi-upload. *@
+    @* REQ-UI-019, reworked by REQ-UI-041 (BRD-133): the browser drag-drop <FileUpload> is replaced
+       by the OS file and folder pickers. On a desktop head the browser control was a copy of the
+       file through a JS stream into a temp file — the app can simply read the path the user picked,
+       and a folder can be added in one action instead of a drag per file. *@
     @if (canManage)
     {
         <Card Class="mb-4">
-            <CardContent Class="p-4">
-                <FileUpload Multiple="true"
-                            MaxFileSize="67108864"
-                            Accept="@acceptTypes"
-                            Files="uploadFiles"
-                            FilesChanged="OnFilesChangedAsync"
-                            Disabled="isUploading" />
-                <TypographyMuted Class="mt-2 block">
-                    Drag &amp; drop or browse — PDF, DOCX, XLSX, PPTX, MD, TXT, HTML, CSV, JSON + 70 code types.
+            <CardContent Class="space-y-3 p-4">
+                <div class="flex flex-wrap gap-2">
+                    <Button OnClick="PickFilesAsync" Disabled="isUploading">
+                        <LucideIcon aria-hidden="true" Name="file-plus" Size="16" Class="mr-2" />
+                        <span>@Localizer["DocsAddFiles"]</span>
+                    </Button>
+                    <Button Variant="ButtonVariant.Outline" OnClick="PickFolderAsync" Disabled="isUploading">
+                        <LucideIcon aria-hidden="true" Name="folder-open" Size="16" Class="mr-2" />
+                        <span>@Localizer["DocsAddFolder"]</span>
+                    </Button>
+                    @* REQ-RAG-016/017/018: one surface for page, site crawl and YouTube transcript. *@
+                    <Button Variant="ButtonVariant.Outline" OnClick="GoToWebIngestion" Disabled="isUploading">
+                        <LucideIcon aria-hidden="true" Name="globe" Size="16" Class="mr-2" />
+                        <span>@Localizer["DocsAddFromWebAction"]</span>
+                    </Button>
+                </div>
+                <TypographyMuted Class="block">
+                    @Localizer["DocsPickerHint", PickerName]
+                    <b>@Localizer["DocsAddFromWeb"]</b> @Localizer["DocsAddFromWebHint"]
                 </TypographyMuted>
             </CardContent>
         </Card>
@@ -90,8 +103,8 @@ else
         <Card Class="mb-4">
             <CardHeader>
                 <div class="flex items-center justify-between">
-                    <CardTitle>Uploads (@uploadQueue.Count)</CardTitle>
-                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearFinishedUploads" Disabled="isUploading">Clear finished</Button>
+                    <CardTitle>@Localizer["DocsUploadsTitle", uploadQueue.Count]</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearFinishedUploads" Disabled="isUploading">@Localizer["DocsClearFinished"]</Button>
                 </div>
             </CardHeader>
             <CardContent Class="space-y-3">
@@ -100,28 +113,28 @@ else
                     <div class="flex items-center gap-3">
                         <div class="w-48 shrink-0 truncate text-sm" title="@item.Name">@item.Name</div>
                         <div class="flex-1">
-                            <Progress Value="@item.Progress" />
+                            <Progress aria-label="@Localizer["DocsUploadProgress"]" Value="@Math.Round((double)item.Progress)" />
                         </div>
                         <div class="w-40 shrink-0 text-right text-xs">
                             @switch (item.Status)
                             {
                                 case UploadStatus.Queued:
-                                    <span class="text-muted-foreground">Queued</span>
+                                    <span class="text-muted-foreground">@Localizer["DocsStatusQueued"]</span>
                                     break;
                                 case UploadStatus.Embedding:
-                                    <Badge Variant="BadgeVariant.Secondary">Embedding…</Badge>
+                                    <Badge Variant="BadgeVariant.Secondary">@Localizer["DocsStatusEmbedding"]</Badge>
                                     break;
                                 case UploadStatus.Embedded:
-                                    <Badge>Embedded</Badge>
+                                    <Badge>@Localizer["DocsStatusEmbedded"]</Badge>
                                     break;
                                 case UploadStatus.Duplicate:
-                                    <Badge Variant="BadgeVariant.Outline">Reused (dedupe)</Badge>
+                                    <Badge Variant="BadgeVariant.Outline">@Localizer["DocsStatusDuplicate"]</Badge>
                                     break;
                                 case UploadStatus.Rejected:
-                                    <Badge Variant="BadgeVariant.Destructive">Rejected</Badge>
+                                    <Badge Variant="BadgeVariant.Destructive">@Localizer["DocsStatusRejected"]</Badge>
                                     break;
                                 case UploadStatus.Failed:
-                                    <Badge Variant="BadgeVariant.Destructive">Failed</Badge>
+                                    <Badge Variant="BadgeVariant.Destructive">@Localizer["DocsStatusFailed"]</Badge>
                                     break;
                             }
                         </div>
@@ -138,20 +151,20 @@ else
     @* REQ-UI-021: library table (pin, name, type, size, chunks, uploaded, workspaces, status, actions). *@
     <Card>
         <CardHeader>
-            <CardTitle>Library (@rows.Count document@(rows.Count == 1 ? "" : "s"))</CardTitle>
-            <CardDescription>All documents embedded in this workspace.</CardDescription>
+            <CardTitle>@(rows.Count == 1 ? Localizer["DocsLibraryTitleOne", rows.Count] : Localizer["DocsLibraryTitleMany", rows.Count])</CardTitle>
+            <CardDescription>@Localizer["DocsLibraryDescription"]</CardDescription>
         </CardHeader>
         <CardContent>
             @if (isLoadingRows)
             {
                 <div class="flex items-center gap-2 text-muted-foreground">
-                    <Spinner Size="SpinnerSize.Small" /> <span>Loading library…</span>
+                    <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["DocsLoadingLibrary"]</span>
                 </div>
             }
             else if (rows.Count == 0)
             {
-                <Empty Title="No documents yet"
-                       Description="Upload files above to give this workspace knowledge.">
+                <Empty Title="@Localizer["DocsEmptyTitle"]"
+                       Description="@Localizer["DocsEmptyDescription"]">
                     <Icon><LucideIcon aria-hidden="true" Name="file-text" Size="28" /></Icon>
                 </Empty>
             }
@@ -161,49 +174,49 @@ else
                 <div style="overflow-x:auto">
                     <DataTable TData="DocRow" Data="@rows" ShowToolbar="false" ShowPagination="false">
                         <Columns>
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "")" Header="" Width="44px">
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "")" Header="@Localizer["DocsColumnSelect"]" HeaderClass="td-th-label-hidden" Width="44px">
                                 <CellTemplate Context="row">
                                     <button type="button" class="rounded p-1 hover:bg-muted @(row.IsPinned ? "text-primary" : "text-muted-foreground")"
-                                            title="@(row.IsPinned ? "Pinned — always in workspace context" : "Pin — keep in context")"
+                                            title="@(row.IsPinned ? Localizer["DocsPinTooltipPinned"].Value : Localizer["DocsPinTooltipUnpinned"].Value)"
                                             disabled="@(!canManage || busyDocId == row.DocumentId)"
                                             @onclick="@(() => TogglePinAsync(row))">
                                         <LucideIcon aria-hidden="true" Name="pin" Size="15" />
                                     </button>
                                 </CellTemplate>
                             </DataTableColumn>
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Name)" Header="Name" />
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Type)" Header="Type">
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Name)" Header="@Localizer["DocsColumnName"]" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Type)" Header="@Localizer["DocsColumnType"]">
                                 <CellTemplate Context="row">
                                     <Badge Variant="BadgeVariant.Secondary">@row.Type</Badge>
                                 </CellTemplate>
                             </DataTableColumn>
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.SizeDisplay)" Header="Size" />
-                            <DataTableColumn TData="DocRow" TValue="int" Property="@(r => r.ChunkCount)" Header="Chunks" />
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Uploaded)" Header="Uploaded" />
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.WorkspacesUsing)" Header="Workspaces" />
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "Embedded")" Header="Status">
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.SizeDisplay)" Header="@Localizer["DocsColumnSize"]" />
+                            <DataTableColumn TData="DocRow" TValue="int" Property="@(r => r.ChunkCount)" Header="@Localizer["DocsColumnChunks"]" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.Uploaded)" Header="@Localizer["DocsColumnUploaded"]" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => r.WorkspacesUsing)" Header="@Localizer["DocsColumnWorkspaces"]" />
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "Embedded")" Header="@Localizer["DocsColumnStatus"]">
                                 <CellTemplate Context="row">
-                                    <Badge>Embedded</Badge>
+                                    <Badge>@Localizer["DocsStatusEmbedded"]</Badge>
                                 </CellTemplate>
                             </DataTableColumn>
-                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "")" Header="" MinWidth="150px">
+                            <DataTableColumn TData="DocRow" TValue="string" Property="@(r => "")" Header="@Localizer["DocsColumnActions"]" HeaderClass="td-th-label-hidden" MinWidth="150px">
                                 <CellTemplate Context="row">
                                     <div class="flex justify-end gap-1">
                                         @if (canManage)
                                         {
                                             <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
                                                     OnClick="@(() => UnembedAsync(row))" Disabled="@(busyDocId == row.DocumentId)"
-                                                    title="Remove from this workspace (vectors kept for reuse)">
-                                                Unembed
+                                                    title="@Localizer["DocsUnembedTooltip"]">
+                                                @Localizer["DocsUnembed"]
                                             </Button>
                                             <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
                                                     OnClick="@(() => BeginDelete(row))" Disabled="@(busyDocId == row.DocumentId)">
-                                                Delete
+                                                @Localizer["DocsDelete"]
                                             </Button>
                                         }
                                         else
                                         {
-                                            <span class="text-xs text-muted-foreground">View only</span>
+                                            <span class="text-xs text-muted-foreground">@Localizer["DocsViewOnly"]</span>
                                         }
                                     </div>
                                 </CellTemplate>
@@ -216,8 +229,8 @@ else
     </Card>
 
     <div class="mt-4 text-xs text-muted-foreground">
-        A document embedded once is reused across workspaces (content-hash dedupe). <b>Unembed</b> removes it from this
-        workspace only; <b>Delete</b> removes its vectors from every workspace.
+        @Localizer["DocsFootnoteDedupe"] <b>@Localizer["DocsUnembed"]</b> @Localizer["DocsFootnoteUnembed"]
+        <b>@Localizer["DocsDelete"]</b> @Localizer["DocsFootnoteDelete"]
     </div>
 }
 
@@ -225,15 +238,14 @@ else
 <Dialog @bind-Open="showDeleteDialog">
     <DialogContent>
         <DialogHeader>
-            <DialogTitle>Delete '@pendingDelete?.Name'?</DialogTitle>
+            <DialogTitle>@Localizer["DocsDeleteTitle", pendingDelete?.Name ?? string.Empty]</DialogTitle>
             <DialogDescription>
-                This permanently removes the document and its embeddings from
-                @(pendingDelete is null ? "this workspace" : $"{pendingDelete.UsageCount} workspace{(pendingDelete.UsageCount == 1 ? "" : "s")}") that use it. This cannot be undone.
+                @Localizer["DocsDeleteBody", pendingDelete is null ? Localizer["DocsDeleteScopeThis"].Value : (pendingDelete.UsageCount == 1 ? Localizer["DocsDeleteScopeOne", pendingDelete.UsageCount].Value : Localizer["DocsDeleteScopeMany", pendingDelete.UsageCount].Value)]
             </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
-            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">Delete everywhere</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">@Localizer["DocsDeleteEverywhere"]</Button>
         </DialogFooter>
     </DialogContent>
 </Dialog>
@@ -253,7 +265,6 @@ else
     private bool isLoadingRows;
     private readonly List<DocRow> rows = new();
 
-    private IReadOnlyList<FileUploadItem> uploadFiles = Array.Empty<FileUploadItem>();
     private readonly List<UploadItem> uploadQueue = new();
     private bool isUploading;
     private bool pinOnUpload;
@@ -268,8 +279,15 @@ else
     // REQ-RAG-033 landed XLSX/PPTX/CSV processors, so those types are now accepted alongside the
     // original nine. Everything else falls through to a supported processor or a clean per-file
     // rejection (REQ-RAG-011).
-    // The accept/reject matrix lives in UploadTypePolicy so it can be unit-tested directly.
-    private const string acceptTypes = TechieDesk.Services.Data.UploadTypePolicy.AcceptTypes;
+    // The accept/reject matrix lives in UploadTypePolicy so it can be unit-tested directly. It is
+    // no longer handed to a browser `accept` attribute (REQ-UI-041 replaced the drag-drop control):
+    // it is now applied per file, AFTER the OS picker, which is the only place it can produce a
+    // reason the user can read.
+    //
+    // Ceiling carried over from the retired <FileUpload MaxFileSize="67108864">: a 64 MB document
+    // is already far past what one embedding pass should hold, and the limit disappearing with the
+    // control would have made the failure an out-of-memory instead of a rejection.
+    private const long MaxUploadBytes = 67108864;
 
     protected override void OnInitialized()
     {
@@ -400,7 +418,7 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to reload workspace library");
-            ToastService.Error(ex.Message, "Library load failed");
+            ToastService.Error(ex.Message, Localizer["DocsLibraryLoadFailed"].Value);
         }
         finally
         {
@@ -409,16 +427,81 @@ else
         }
     }
 
-    // REQ-UI-019: multi-file upload handler — validates, dedupes, and embeds each queued file.
-    private async Task OnFilesChangedAsync(IReadOnlyList<FileUploadItem> files)
+    /// <summary>Name of the host's file chooser, for the affordance copy (REQ-UI-041).</summary>
+    private string PickerName => OperatingSystem.IsWindows() ? Localizer["DocsPickerNameWindows"] : Localizer["DocsPickerNameMac"];
+
+    /// <summary>
+    /// Opens the web-ingestion surface for this workspace (REQ-RAG-016/017/018).
+    /// </summary>
+    /// <remarks>
+    /// A page, not a dialog. A crawl runs for minutes and reports per-page progress, and a modal
+    /// that cannot be left without abandoning the run is the wrong container for that.
+    /// </remarks>
+    private void GoToWebIngestion() => Nav.NavigateTo($"/workspace/{Slug}/documents/web");
+
+    /// <summary>Adds documents chosen in the OS file picker (REQ-UI-041).</summary>
+    private async Task PickFilesAsync()
     {
-        uploadFiles = files;
-        if (workspace is null || files.Count == 0 || isUploading)
+        try
+        {
+            // No FileTypes filter: UploadTypePolicy owns the accept/reject matrix and produces a
+            // per-file reason. A picker that hides a supported file the user can see in Finder is a
+            // worse failure than one that lets an unsupported file through to a clear rejection.
+            var picked = await FilePicker.Default.PickMultipleAsync(
+                new PickOptions { PickerTitle = Localizer["DocsPickerTitle"] });
+            var paths = picked?.Select(result => result.FullPath).Where(File.Exists).ToArray() ?? [];
+            await UploadPathsAsync(paths);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "The OS file picker failed");
+            ToastService.Error(Localizer["DocsPickerFailedBody", ex.Message].Value, Localizer["DocsPickerUnavailableTitle"].Value);
+        }
+    }
+
+    /// <summary>Adds every file in a folder chosen in the OS folder picker (REQ-UI-041).</summary>
+    private async Task PickFolderAsync()
+    {
+        if (!DesktopFolderPicker.IsSupported)
+        {
+            ToastService.Error(Localizer["DocsNoFolderPickerBody"].Value, Localizer["DocsPickerUnavailableTitle"].Value);
+            return;
+        }
+
+        try
+        {
+            // Cancelling returns null and is not a failure; it must not raise an error toast.
+            var folder = await DesktopFolderPicker.PickAsync();
+            if (string.IsNullOrEmpty(folder))
+            {
+                return;
+            }
+
+            var paths = Directory.GetFiles(folder, "*", SearchOption.AllDirectories);
+            if (paths.Length == 0)
+            {
+                ToastService.Error(Localizer["DocsFolderEmptyBody", folder].Value, Localizer["DocsNothingToAddTitle"].Value);
+                return;
+            }
+
+            await UploadPathsAsync(paths);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "The OS folder picker failed");
+            ToastService.Error(Localizer["DocsFolderPickerFailedBody", ex.Message].Value, Localizer["DocsPickerUnavailableTitle"].Value);
+        }
+    }
+
+    // REQ-UI-019 / REQ-UI-041: multi-file upload — validates, dedupes, and embeds each queued file.
+    private async Task UploadPathsAsync(IReadOnlyList<string> paths)
+    {
+        if (workspace is null || paths.Count == 0 || isUploading)
         {
             return;
         }
 
-        var batch = files.Select(f => new UploadItem(f)).ToList();
+        var batch = paths.Select(path => new UploadItem(path)).ToList();
         uploadQueue.InsertRange(0, batch);
         isUploading = true;
         StateHasChanged();
@@ -428,7 +511,7 @@ else
         {
             foreach (var item in batch)
             {
-                item.Fail("Workspace persistence is not configured.");
+                item.Fail(Localizer["DocsPersistenceMissing"]);
             }
             isUploading = false;
             StateHasChanged();
@@ -441,10 +524,25 @@ else
         foreach (var item in batch)
         {
             // REQ-RAG-011: clear per-file rejection for genuinely unsupported types (no crash).
-            var rejection = TechieDesk.Services.Data.UploadTypePolicy.GetRejectionReason(item.Name);
+            var rejection = TechieDesk.Services.Data.UploadTypePolicy.GetRejection(item.Name);
             if (rejection is not null)
             {
-                item.Reject(rejection);
+                // REQ-UI-055: the policy returns a KEY; this page owns the language.
+                item.Reject(Localizer[rejection.MessageKey, rejection.Arguments].Value);
+                StateHasChanged();
+                continue;
+            }
+
+            if (!File.Exists(item.Path))
+            {
+                item.Fail(Localizer["DocsFileNoLongerThere"]);
+                StateHasChanged();
+                continue;
+            }
+
+            if (new FileInfo(item.Path).Length > MaxUploadBytes)
+            {
+                item.Reject(Localizer["DocsTooLarge", MaxUploadBytes / (1024 * 1024)]);
                 StateHasChanged();
                 continue;
             }
@@ -453,34 +551,22 @@ else
             item.Progress = 55;
             StateHasChanged();
 
-            string? tempDir = null;
             try
             {
-                byte[] bytes;
-                await using (var readStream = item.Source.File.OpenReadStream(67108864))
-                await using (var buffer = new MemoryStream())
-                {
-                    await readStream.CopyToAsync(buffer);
-                    bytes = buffer.ToArray();
-                }
-
                 // REQ-RAG-012: content-hash dedupe pre-check so the UI can surface "reused".
+                var bytes = await File.ReadAllBytesAsync(item.Path);
                 var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
                 var existing = await store.FindDocumentIdByHashAsync(hash);
 
-                // IngestFileAsync derives the document name from the file name, so stage the upload
-                // under its original name inside a unique temp directory (keeps the display name clean).
-                tempDir = Path.Combine(Path.GetTempPath(), "techiedesk-uploads", Guid.NewGuid().ToString("N"));
-                Directory.CreateDirectory(tempDir);
-                var tempPath = Path.Combine(tempDir, Path.GetFileName(item.Name));
-                await File.WriteAllBytesAsync(tempPath, bytes);
-
-                await manager.IngestFileAsync(workspace.WorkspaceId, tempPath, pinOnUpload);
+                // REQ-UI-041: the OS picker hands over the real path, so the file is ingested where
+                // it already lives. The previous browser upload had to be streamed out of the
+                // WebView and re-staged in a temp directory purely to recover its original name.
+                await manager.IngestFileAsync(workspace.WorkspaceId, item.Path, pinOnUpload);
 
                 if (existing is not null)
                 {
                     item.Status = UploadStatus.Duplicate;
-                    item.Message = "Already embedded — reused across workspaces (no re-embed).";
+                    item.Message = Localizer["DocsAlreadyEmbedded"];
                 }
                 else
                 {
@@ -496,16 +582,11 @@ else
             }
             finally
             {
-                if (tempDir is not null && Directory.Exists(tempDir))
-                {
-                    try { Directory.Delete(tempDir, recursive: true); } catch { /* best-effort temp cleanup */ }
-                }
                 StateHasChanged();
             }
         }
 
         isUploading = false;
-        uploadFiles = Array.Empty<FileUploadItem>();
         if (embeddedAny)
         {
             await ReloadLibraryAsync();
@@ -537,12 +618,12 @@ else
             var next = !row.IsPinned;
             await manager.SetPinnedAsync(workspace.WorkspaceId, row.DocumentId, next);
             row.IsPinned = next;
-            ToastService.Success(next ? "Pinned — always kept in workspace context." : "Unpinned.", "Updated");
+            ToastService.Success(next ? Localizer["DocsPinnedToast"].Value : Localizer["DocsUnpinnedToast"].Value, Localizer["DocsUpdatedTitle"].Value);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to toggle pin");
-            ToastService.Error(ex.Message, "Pin failed");
+            ToastService.Error(ex.Message, Localizer["DocsPinFailedTitle"].Value);
         }
         finally
         {
@@ -567,13 +648,13 @@ else
                 return;
             }
             await manager.GetStore().RemoveDocumentAsync(workspace.WorkspaceId, row.DocumentId);
-            ToastService.Success("Removed from this workspace. Vectors kept for reuse elsewhere.", "Unembedded");
+            ToastService.Success(Localizer["DocsUnembeddedBody"].Value, Localizer["DocsUnembeddedTitle"].Value);
             await ReloadLibraryAsync();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to unembed document");
-            ToastService.Error(ex.Message, "Unembed failed");
+            ToastService.Error(ex.Message, Localizer["DocsUnembedFailedTitle"].Value);
         }
         finally
         {
@@ -613,7 +694,7 @@ else
             }
             await Rag.DeleteDocumentAsync(target.DocumentId);
 
-            ToastService.Success("Document and its embeddings were removed from all workspaces.", "Deleted");
+            ToastService.Success(Localizer["DocsDeletedBody"].Value, Localizer["DocsDeletedTitle"].Value);
             showDeleteDialog = false;
             pendingDelete = null;
             await ReloadLibraryAsync();
@@ -621,7 +702,7 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to delete document everywhere");
-            ToastService.Error(ex.Message, "Delete failed");
+            ToastService.Error(ex.Message, Localizer["DocsDeleteFailedTitle"].Value);
         }
         finally
         {
@@ -650,43 +731,14 @@ else
         return string.IsNullOrEmpty(ext) ? "FILE" : ext.TrimStart('.').ToUpperInvariant();
     }
 
-    private static string SizeFromMetadata(Document? doc)
-    {
-        if (doc is null)
-        {
-            return "—";
-        }
-        foreach (var key in new[] { "FileSize", "Size", "fileSize", "size", "ByteSize" })
-        {
-            if (doc.Metadata.TryGetValue(key, out var value) && TryToLong(value, out var bytes) && bytes > 0)
-            {
-                return FormatSize(bytes);
-            }
-        }
-        return "—";
-    }
-
-    private static bool TryToLong(object value, out long result)
-    {
-        try
-        {
-            result = Convert.ToInt64(value);
-            return true;
-        }
-        catch
-        {
-            result = 0;
-            return false;
-        }
-    }
-
-    private static string FormatSize(long bytes) => bytes switch
-    {
-        >= 1024L * 1024 * 1024 => $"{bytes / (double)(1024 * 1024 * 1024):F1} GB",
-        >= 1024 * 1024 => $"{bytes / (double)(1024 * 1024):F1} MB",
-        >= 1024 => $"{bytes / (double)1024:F1} KB",
-        _ => $"{bytes} B"
-    };
+    // REQ-UI-021: the probe itself now lives in TechieDesk.Core so it can be tested against a
+    // document that survived a real vector-store round trip. The behaviour is unchanged — the same
+    // keys, the same formatting and the same em-dash fallback for a document ingested before the
+    // pipeline recorded a size. Only the writer changed: TechieRagClient now records
+    // DocumentMetadataKeys.FileSize, and SqliteVecStore lifts it onto the document row instead of
+    // persisting a literal "{}".
+    private static string SizeFromMetadata(Document? doc) =>
+        TechieDesk.Services.Workspaces.DocumentSizeDisplay.FromMetadata(doc);
 
     /// <summary>A joined, display-ready library row (membership + catalog + usage).</summary>
     private sealed class DocRow
@@ -708,13 +760,15 @@ else
     /// <summary>A per-file upload with live status for the queue (REQ-UI-020).</summary>
     private sealed class UploadItem
     {
-        public UploadItem(FileUploadItem source)
+        public UploadItem(string path)
         {
-            Source = source;
-            Name = source.Name;
+            Path = path;
+            Name = System.IO.Path.GetFileName(path);
         }
 
-        public FileUploadItem Source { get; }
+        /// <summary>Absolute path on disk, straight from the OS picker (REQ-UI-041).</summary>
+        public string Path { get; }
+
         public string Name { get; }
         public UploadStatus Status { get; set; } = UploadStatus.Queued;
         public int Progress { get; set; }

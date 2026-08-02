@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
 using TechieRag.Models;
 
@@ -39,6 +41,8 @@ public class WorkspaceManager
     private readonly ITechieRag rag;
     private readonly IWorkspaceStore store;
     private readonly IPromptTemplate promptTemplate;
+    private readonly PromptConfig promptConfig;
+    private readonly ILogger logger;
 
     /// <summary>
     /// Creates a new workspace manager.
@@ -46,8 +50,24 @@ public class WorkspaceManager
     /// <param name="rag">The TechieRag client used for ingestion, retrieval, and generation.</param>
     /// <param name="store">The persistent workspace store.</param>
     /// <param name="promptTemplate">The prompt template used to build workspace RAG prompts.</param>
-    /// <exception cref="ArgumentNullException">Thrown when any argument is null.</exception>
-    public WorkspaceManager(ITechieRag rag, IWorkspaceStore store, IPromptTemplate promptTemplate)
+    /// <param name="promptConfig">Prompt configuration supplying the context budget
+    /// (<c>MaxContextChunks</c>). When null, library defaults are used.</param>
+    /// <param name="logger">Optional logger used to report context truncation. When null,
+    /// truncation is still observable via <see cref="ContextTruncated"/> and
+    /// <see cref="WorkspaceContext.WasTruncated"/>.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="rag"/>,
+    /// <paramref name="store"/>, or <paramref name="promptTemplate"/> is null.</exception>
+    /// <remarks>
+    /// <para><b>Back-compat:</b> <paramref name="promptConfig"/> and <paramref name="logger"/> were
+    /// added for REQ-RAG-048 and are optional, so the original three-argument construction still
+    /// compiles and behaves identically.</para>
+    /// </remarks>
+    public WorkspaceManager(
+        ITechieRag rag,
+        IWorkspaceStore store,
+        IPromptTemplate promptTemplate,
+        PromptConfig? promptConfig = null,
+        ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(rag);
         ArgumentNullException.ThrowIfNull(store);
@@ -56,7 +76,23 @@ public class WorkspaceManager
         this.rag = rag;
         this.store = store;
         this.promptTemplate = promptTemplate;
+        this.promptConfig = promptConfig ?? new PromptConfig();
+        this.logger = logger ?? NullLogger.Instance;
     }
+
+    /// <summary>
+    /// Raised when a composed workspace context did not fit <c>PromptConfig.MaxContextChunks</c>
+    /// and one or more chunks were evicted before the prompt was built.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Purpose:</b> REQ-RAG-048 (TR-RAG-006) — the push-based truncation signal. Every
+    /// workspace retrieval path raises it: <see cref="AskAsync"/>,
+    /// <see cref="AskStreamWithSourcesAsync(string, string, IReadOnlyList{ChatMessage}, LlmCompletionOptions, CancellationToken)"/>,
+    /// <see cref="BuildContextAsync"/>, and <see cref="BuildContextWithDiagnosticsAsync"/>.</para>
+    /// <para><b>Threading:</b> Raised synchronously on the retrieving task before generation
+    /// starts; handlers should be fast and must not throw.</para>
+    /// </remarks>
+    public event EventHandler<ContextTruncatedEventArgs>? ContextTruncated;
 
     /// <summary>
     /// Gets the underlying workspace store for direct access.
@@ -242,9 +278,40 @@ public class WorkspaceManager
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>Ranked results restricted to the workspace's documents.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the workspace does not exist.</exception>
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+    /// <remarks>
+    /// <para><b>Reranking (REQ-RAG-047):</b> The workspace's <see cref="Workspace.RerankEnabled"/>
+    /// flag is passed down as <see cref="SearchOptions.Rerank"/>, so it decides reranking for this
+    /// workspace and overrides the library-wide <c>Rerank.Enabled</c> setting in both directions.
+    /// Two workspaces backed by the same vector store therefore get different result ordering when
+    /// their flags differ, and changing one workspace's flag never affects another's.</para>
+    /// </remarks>
+    public Task<IReadOnlyList<SearchResult>> SearchAsync(
         string workspaceId,
         string query,
+        int? topK = null,
+        CancellationToken cancellationToken = default) =>
+        SearchScopedAsync(workspaceId, query, null, topK, cancellationToken);
+
+    /// <summary>
+    /// Performs semantic search scoped to a workspace's documents and further narrowed by a
+    /// per-turn retrieval scope (whole workspace, pinned documents only, or a chosen subset).
+    /// </summary>
+    /// <param name="workspaceId">The workspace identifier.</param>
+    /// <param name="query">The natural language query.</param>
+    /// <param name="overrides">Per-turn overrides supplying the retrieval scope; null means the
+    /// whole workspace.</param>
+    /// <param name="topK">Optional topK override; defaults to the workspace setting or 5.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked results restricted to the in-scope documents.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the workspace does not exist.</exception>
+    /// <remarks>
+    /// <para><b>Purpose:</b> BRD-137 / REQ-UI-044. The scope can only ever narrow the workspace's
+    /// own document set, so workspace isolation stays the outer boundary.</para>
+    /// </remarks>
+    public async Task<IReadOnlyList<SearchResult>> SearchScopedAsync(
+        string workspaceId,
+        string query,
+        WorkspaceTurnOverrides? overrides,
         int? topK = null,
         CancellationToken cancellationToken = default)
     {
@@ -252,25 +319,90 @@ public class WorkspaceManager
         ArgumentException.ThrowIfNullOrEmpty(query);
 
         var workspace = await RequireWorkspaceAsync(workspaceId, cancellationToken).ConfigureAwait(false);
-        var documents = await store.ListDocumentsAsync(workspaceId, cancellationToken).ConfigureAwait(false);
-        if (documents.Count == 0) return [];
+        var scope = await ResolveScopeAsync(workspaceId, overrides, cancellationToken).ConfigureAwait(false);
+        return await SearchInScopeAsync(workspace, query, scope, topK, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Runs the oversampled vector search and filters it down to the documents already resolved
+    /// as in scope for this call.
+    /// </summary>
+    /// <param name="workspace">The workspace supplying topK, threshold and rerank settings.</param>
+    /// <param name="query">The natural language query.</param>
+    /// <param name="scope">The resolved in-scope document set.</param>
+    /// <param name="topK">Optional topK override.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked results restricted to <paramref name="scope"/>.</returns>
+    private async Task<IReadOnlyList<SearchResult>> SearchInScopeAsync(
+        Workspace workspace,
+        string query,
+        ScopedDocuments scope,
+        int? topK,
+        CancellationToken cancellationToken)
+    {
+        if (scope.DocumentIds.Count == 0) return [];
 
         var effectiveTopK = topK ?? workspace.TopK ?? 5;
-        var documentIds = documents.Select(d => d.DocumentId).ToHashSet(StringComparer.Ordinal);
 
         var candidates = await rag.SearchAsync(
             query,
-            effectiveTopK * OversampleFactor,
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+            new SearchOptions
+            {
+                TopK = effectiveTopK * OversampleFactor,
+                Rerank = workspace.RerankEnabled
+            },
+            cancellationToken).ConfigureAwait(false);
 
         var scoped = candidates
-            .Where(r => documentIds.Contains(r.Chunk.DocumentId))
+            .Where(r => scope.DocumentIds.Contains(r.Chunk.DocumentId))
             .Where(r => workspace.SimilarityThreshold is null || r.Score >= workspace.SimilarityThreshold.Value)
             .Take(effectiveTopK)
             .ToList();
 
         return scoped;
     }
+
+    /// <summary>
+    /// Resolves which of the workspace's documents this call may retrieve from, applying the
+    /// per-turn retrieval scope.
+    /// </summary>
+    /// <param name="workspaceId">The workspace identifier.</param>
+    /// <param name="overrides">Per-turn overrides; null means the whole workspace.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The in-scope document ids together with the in-scope pinned documents.</returns>
+    private async Task<ScopedDocuments> ResolveScopeAsync(
+        string workspaceId,
+        WorkspaceTurnOverrides? overrides,
+        CancellationToken cancellationToken)
+    {
+        var documents = await store.ListDocumentsAsync(workspaceId, cancellationToken).ConfigureAwait(false);
+        var scope = overrides?.Scope ?? WorkspaceRetrievalScope.WholeWorkspace;
+
+        IEnumerable<WorkspaceDocument> inScope = documents;
+        if (scope == WorkspaceRetrievalScope.PinnedOnly)
+        {
+            inScope = documents.Where(d => d.IsPinned);
+        }
+        else if (scope == WorkspaceRetrievalScope.SelectedDocuments)
+        {
+            var chosen = (overrides?.DocumentIds ?? []).ToHashSet(StringComparer.Ordinal);
+            inScope = documents.Where(d => chosen.Contains(d.DocumentId));
+        }
+
+        var materialized = inScope.ToList();
+        return new ScopedDocuments(
+            materialized.Select(d => d.DocumentId).ToHashSet(StringComparer.Ordinal),
+            materialized.Where(d => d.IsPinned).ToList());
+    }
+
+    /// <summary>
+    /// The workspace documents a single retrieval call is allowed to use.
+    /// </summary>
+    /// <param name="DocumentIds">Every in-scope document identifier.</param>
+    /// <param name="Pinned">The in-scope documents that are pinned.</param>
+    private sealed record ScopedDocuments(
+        HashSet<string> DocumentIds,
+        IReadOnlyList<WorkspaceDocument> Pinned);
 
     /// <summary>
     /// Performs a complete workspace-scoped RAG operation, applying the workspace's system
@@ -303,7 +435,8 @@ public class WorkspaceManager
             ?? throw new InvalidOperationException(NoLlmProviderMessage);
 
         var workspace = await RequireWorkspaceAsync(workspaceId, cancellationToken).ConfigureAwait(false);
-        var sources = await ComposeContextAsync(workspace, question, cancellationToken).ConfigureAwait(false);
+        var context = await ComposeContextAsync(workspace, question, null, cancellationToken).ConfigureAwait(false);
+        var sources = context.Results;
 
         if (workspace.ChatMode == WorkspaceChatMode.Query && sources.Count == 0)
         {
@@ -317,8 +450,8 @@ public class WorkspaceManager
             };
         }
 
-        var systemPrompt = BuildSystemPrompt(workspace);
-        var effectiveOptions = ApplyWorkspaceOptions(workspace, options);
+        var systemPrompt = BuildSystemPrompt(workspace, null);
+        var effectiveOptions = ApplyWorkspaceOptions(workspace, options, null);
         var messages = promptTemplate.BuildRagPrompt(question, sources, systemPrompt);
         var response = await llmProvider.ChatAsync(messages, effectiveOptions, cancellationToken).ConfigureAwait(false);
 
@@ -360,9 +493,42 @@ public class WorkspaceManager
     /// deterministic "not covered" answer is emitted as a single token followed by Completed,
     /// without calling — or even requiring — an LLM provider.</para>
     /// </remarks>
-    public async IAsyncEnumerable<RagStreamEvent> AskStreamWithSourcesAsync(
+    public IAsyncEnumerable<RagStreamEvent> AskStreamWithSourcesAsync(
         string workspaceId,
         string question,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        AskTurnStreamAsync(workspaceId, question, null, conversationHistory, options, cancellationToken);
+
+    /// <summary>
+    /// Streams a workspace-scoped RAG answer for a single turn, applying per-turn overrides for
+    /// the answer mode, the model, and the retrieval scope on top of the workspace's settings.
+    /// </summary>
+    /// <param name="workspaceId">The workspace identifier.</param>
+    /// <param name="question">The user's question.</param>
+    /// <param name="overrides">Per-turn overrides; null behaves exactly like
+    /// <see cref="AskStreamWithSourcesAsync(string, string, IReadOnlyList{ChatMessage}, LlmCompletionOptions, CancellationToken)"/>.</param>
+    /// <param name="conversationHistory">Optional prior turns; must not already contain
+    /// <paramref name="question"/> as a trailing user turn.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>An async sequence of <see cref="RagStreamEvent"/> in the order
+    /// Sources → Token(s) → Completed.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the workspace does not exist
+    /// or no LLM provider is configured.</exception>
+    /// <remarks>
+    /// <para><b>Purpose:</b> BRD-137 / REQ-UI-044 — the composer chooses the answer mode, model and
+    /// retrieval scope per turn. BRD-48's chat-vs-query modes were previously reachable only by
+    /// editing the workspace, so they could not be applied to a single question.</para>
+    /// <para><b>No leakage:</b> <paramref name="overrides"/> is read for this call only and is
+    /// never written back to the workspace store, and <paramref name="options"/> is copied rather
+    /// than mutated, so a per-turn model cannot survive into the next turn.</para>
+    /// </remarks>
+    public async IAsyncEnumerable<RagStreamEvent> AskTurnStreamAsync(
+        string workspaceId,
+        string question,
+        WorkspaceTurnOverrides? overrides,
         IReadOnlyList<ChatMessage>? conversationHistory = null,
         LlmCompletionOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -371,11 +537,12 @@ public class WorkspaceManager
         ArgumentException.ThrowIfNullOrEmpty(question);
 
         var workspace = await RequireWorkspaceAsync(workspaceId, cancellationToken).ConfigureAwait(false);
-        var sources = await ComposeContextAsync(workspace, question, cancellationToken).ConfigureAwait(false);
+        var context = await ComposeContextAsync(workspace, question, overrides, cancellationToken).ConfigureAwait(false);
+        var sources = context.Results;
 
         yield return RagStreamEvent.FromSources(sources);
 
-        if (workspace.ChatMode == WorkspaceChatMode.Query && sources.Count == 0)
+        if (EffectiveChatMode(workspace, overrides) == WorkspaceChatMode.Query && sources.Count == 0)
         {
             yield return RagStreamEvent.FromToken(QueryModeNoContextAnswer);
             yield return RagStreamEvent.FromCompleted(QueryModeNoContextAnswer);
@@ -383,8 +550,8 @@ public class WorkspaceManager
         }
 
         var llmProvider = rag.GetLlmProvider() ?? throw new InvalidOperationException(NoLlmProviderMessage);
-        var messages = BuildStreamPrompt(workspace, question, sources, conversationHistory);
-        var effectiveOptions = ApplyWorkspaceOptions(workspace, options);
+        var messages = BuildStreamPrompt(workspace, question, sources, conversationHistory, overrides);
+        var effectiveOptions = ApplyWorkspaceOptions(workspace, options, overrides);
         var answer = new StringBuilder();
 
         await foreach (var token in llmProvider.ChatStreamAsync(messages, effectiveOptions, cancellationToken).ConfigureAwait(false))
@@ -403,7 +570,8 @@ public class WorkspaceManager
     /// <param name="workspaceId">The workspace identifier.</param>
     /// <param name="question">The question to retrieve context for.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>The composed context, pinned chunks first, de-duplicated by chunk id.</returns>
+    /// <returns>The composed context, pinned chunks first, de-duplicated by chunk id, and already
+    /// trimmed to <c>PromptConfig.MaxContextChunks</c>.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the workspace does not exist.</exception>
     /// <remarks>
     /// <para><b>Purpose:</b> The reusable seam shared by <see cref="AskAsync"/> and
@@ -411,8 +579,38 @@ public class WorkspaceManager
     /// and exposed so callers building their own generation loop can reproduce the exact
     /// context TechieRag would use — including pinned documents that do not pass the
     /// similarity threshold.</para>
+    /// <para><b>Truncation:</b> Use <see cref="BuildContextWithDiagnosticsAsync"/> or subscribe to
+    /// <see cref="ContextTruncated"/> when you need to know that chunks were dropped to fit the
+    /// context budget (REQ-RAG-048); this overload returns only the surviving chunks.</para>
     /// </remarks>
     public async Task<IReadOnlyList<SearchResult>> BuildContextAsync(
+        string workspaceId,
+        string question,
+        CancellationToken cancellationToken = default)
+    {
+        var context = await BuildContextWithDiagnosticsAsync(workspaceId, question, cancellationToken)
+            .ConfigureAwait(false);
+        return context.Results;
+    }
+
+    /// <summary>
+    /// Composes the workspace context for a question and reports whether the configured context
+    /// budget forced any chunk to be evicted.
+    /// </summary>
+    /// <param name="workspaceId">The workspace identifier.</param>
+    /// <param name="question">The question to retrieve context for.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The composed context together with pinned/retrieved inclusion and eviction counts.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the workspace does not exist.</exception>
+    /// <remarks>
+    /// <para><b>Purpose:</b> REQ-RAG-048 (TR-RAG-006). <c>PromptConfig.MaxContextChunks</c>
+    /// (default 5) used to truncate the merged pinned + retrieved context silently inside the
+    /// prompt template, so more than five pinned documents evicted every retrieved result with no
+    /// signal. Truncation is now applied here, deliberately, and reported.</para>
+    /// <para><b>Eviction policy:</b> Pinned chunks keep their slots; retrieved chunks are dropped
+    /// from the tail first. Pinned chunks are dropped only when they alone exceed the budget.</para>
+    /// </remarks>
+    public async Task<WorkspaceContext> BuildContextWithDiagnosticsAsync(
         string workspaceId,
         string question,
         CancellationToken cancellationToken = default)
@@ -421,83 +619,208 @@ public class WorkspaceManager
         ArgumentException.ThrowIfNullOrEmpty(question);
 
         var workspace = await RequireWorkspaceAsync(workspaceId, cancellationToken).ConfigureAwait(false);
-        return await ComposeContextAsync(workspace, question, cancellationToken).ConfigureAwait(false);
+        return await ComposeContextAsync(workspace, question, null, cancellationToken).ConfigureAwait(false);
     }
 
     private IReadOnlyList<ChatMessage> BuildStreamPrompt(
         Workspace workspace,
         string question,
         IReadOnlyList<SearchResult> sources,
-        IReadOnlyList<ChatMessage>? conversationHistory)
+        IReadOnlyList<ChatMessage>? conversationHistory,
+        WorkspaceTurnOverrides? overrides)
     {
-        var systemPrompt = BuildSystemPrompt(workspace);
+        var systemPrompt = BuildSystemPrompt(workspace, overrides);
 
         return conversationHistory is null || conversationHistory.Count == 0
             ? promptTemplate.BuildRagPrompt(question, sources, systemPrompt)
             : promptTemplate.BuildRagChatPrompt(question, sources, conversationHistory, systemPrompt);
     }
 
-    private async Task<IReadOnlyList<SearchResult>> ComposeContextAsync(
+    /// <summary>
+    /// Merges the workspace's pinned chunks ahead of its retrieved chunks, de-duplicates by chunk
+    /// id, applies the context budget, and signals truncation.
+    /// </summary>
+    /// <param name="workspace">The workspace being queried.</param>
+    /// <param name="question">The question to retrieve context for.</param>
+    /// <param name="overrides">Per-turn overrides supplying the retrieval scope; null means the
+    /// whole workspace.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The budgeted context with its truncation diagnostics.</returns>
+    private async Task<WorkspaceContext> ComposeContextAsync(
         Workspace workspace,
         string question,
+        WorkspaceTurnOverrides? overrides,
         CancellationToken cancellationToken)
     {
-        var results = await SearchAsync(workspace.WorkspaceId, question, cancellationToken: cancellationToken)
+        var scope = await ResolveScopeAsync(workspace.WorkspaceId, overrides, cancellationToken).ConfigureAwait(false);
+        var retrieved = await SearchInScopeAsync(workspace, question, scope, null, cancellationToken)
+            .ConfigureAwait(false);
+        var pinned = await CollectPinnedChunksAsync(question, scope, cancellationToken)
             .ConfigureAwait(false);
 
-        var documents = await store.ListDocumentsAsync(workspace.WorkspaceId, cancellationToken).ConfigureAwait(false);
-        var pinnedDocuments = documents.Where(d => d.IsPinned).ToList();
-        if (pinnedDocuments.Count == 0) return results;
-
-        var merged = new List<SearchResult>();
         var seenChunks = new HashSet<string>(StringComparer.Ordinal);
+        var pinnedUnique = pinned.Where(r => seenChunks.Add(r.Chunk.Id)).ToList();
+        var retrievedUnique = retrieved.Where(r => seenChunks.Add(r.Chunk.Id)).ToList();
 
-        foreach (var pinned in pinnedDocuments)
+        var context = ApplyContextBudget(pinnedUnique, retrievedUnique);
+        SignalTruncation(workspace.WorkspaceId, question, context);
+        return context;
+    }
+
+    /// <summary>
+    /// Retrieves the most relevant chunks of every in-scope pinned document.
+    /// </summary>
+    /// <param name="question">The question the chunks are scored against.</param>
+    /// <param name="scope">The resolved in-scope document set for this call.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Pinned chunks in pinned-document order, at most
+    /// <see cref="PinnedChunksPerDocument"/> per document, not yet de-duplicated.</returns>
+    private async Task<List<SearchResult>> CollectPinnedChunksAsync(
+        string question,
+        ScopedDocuments scope,
+        CancellationToken cancellationToken)
+    {
+        var chunks = new List<SearchResult>();
+
+        foreach (var pinned in scope.Pinned)
         {
             var pinnedChunks = await rag.SearchAsync(
                 question,
                 PinnedChunksPerDocument,
                 pinned.DocumentId,
                 cancellationToken).ConfigureAwait(false);
-
-            foreach (var result in pinnedChunks)
-            {
-                if (seenChunks.Add(result.Chunk.Id))
-                {
-                    merged.Add(result);
-                }
-            }
+            chunks.AddRange(pinnedChunks);
         }
 
-        foreach (var result in results)
-        {
-            if (seenChunks.Add(result.Chunk.Id))
-            {
-                merged.Add(result);
-            }
-        }
-
-        return merged;
+        return chunks;
     }
 
-    private static string? BuildSystemPrompt(Workspace workspace)
+    /// <summary>
+    /// Trims the merged context to <c>PromptConfig.MaxContextChunks</c> using an explicit
+    /// pinned-before-retrieved eviction order.
+    /// </summary>
+    /// <param name="pinned">Pinned chunks, highest priority first.</param>
+    /// <param name="retrieved">Retrieved chunks, most relevant first.</param>
+    /// <returns>The budgeted context with per-category inclusion and eviction counts.</returns>
+    /// <remarks>
+    /// <para><b>Policy (REQ-RAG-048):</b> Retrieved chunks are evicted from the tail before any
+    /// pinned chunk is touched. Pinned chunks are evicted, lowest-priority first, only when the
+    /// pinned set alone exceeds the budget — the "more than five pinned documents" case. A budget
+    /// of zero or less disables trimming entirely.</para>
+    /// </remarks>
+    private WorkspaceContext ApplyContextBudget(
+        IReadOnlyList<SearchResult> pinned,
+        IReadOnlyList<SearchResult> retrieved)
+    {
+        var limit = promptConfig.MaxContextChunks;
+        var unlimited = limit <= 0;
+
+        var pinnedKept = unlimited ? pinned.Count : Math.Min(pinned.Count, limit);
+        var retrievedKept = unlimited
+            ? retrieved.Count
+            : Math.Max(0, Math.Min(retrieved.Count, limit - pinnedKept));
+
+        return new WorkspaceContext
+        {
+            Results = pinned.Take(pinnedKept).Concat(retrieved.Take(retrievedKept)).ToList(),
+            PinnedIncluded = pinnedKept,
+            RetrievedIncluded = retrievedKept,
+            PinnedEvicted = pinned.Count - pinnedKept,
+            RetrievedEvicted = retrieved.Count - retrievedKept,
+            MaxContextChunks = limit
+        };
+    }
+
+    /// <summary>
+    /// Logs and raises <see cref="ContextTruncated"/> when the context budget dropped chunks.
+    /// </summary>
+    /// <param name="workspaceId">The workspace whose context was composed.</param>
+    /// <param name="question">The question the context was composed for.</param>
+    /// <param name="context">The budgeted context.</param>
+    private void SignalTruncation(string workspaceId, string question, WorkspaceContext context)
+    {
+        if (!context.WasTruncated) return;
+
+        logger.LogWarning(
+            "Workspace {WorkspaceId} context truncated to MaxContextChunks={Limit}: dropped {PinnedEvicted} pinned and {RetrievedEvicted} retrieved chunk(s).",
+            workspaceId, context.MaxContextChunks, context.PinnedEvicted, context.RetrievedEvicted);
+
+        ContextTruncated?.Invoke(this, new ContextTruncatedEventArgs
+        {
+            WorkspaceId = workspaceId,
+            Question = question,
+            Context = context
+        });
+    }
+
+    /// <summary>
+    /// Resolves the answer mode for a call: the per-turn override when supplied, otherwise the
+    /// workspace's stored mode (BRD-137 / REQ-UI-044).
+    /// </summary>
+    /// <param name="workspace">The workspace being queried.</param>
+    /// <param name="overrides">Per-turn overrides, or null.</param>
+    /// <returns>The mode that governs this call.</returns>
+    private static WorkspaceChatMode EffectiveChatMode(Workspace workspace, WorkspaceTurnOverrides? overrides) =>
+        overrides?.ChatMode ?? workspace.ChatMode;
+
+    private static string? BuildSystemPrompt(Workspace workspace, WorkspaceTurnOverrides? overrides)
     {
         var basePrompt = workspace.SystemPrompt;
-        if (workspace.ChatMode != WorkspaceChatMode.Query) return basePrompt;
+        if (EffectiveChatMode(workspace, overrides) != WorkspaceChatMode.Query) return basePrompt;
 
         return string.IsNullOrEmpty(basePrompt)
             ? QueryModeInstruction
             : $"{basePrompt}\n\n{QueryModeInstruction}";
     }
 
-    private static LlmCompletionOptions? ApplyWorkspaceOptions(Workspace workspace, LlmCompletionOptions? options)
+    /// <summary>
+    /// Produces the completion options for a call by layering the per-turn model over the
+    /// workspace model, without mutating the caller's instance.
+    /// </summary>
+    /// <param name="workspace">The workspace supplying the default model override.</param>
+    /// <param name="options">The caller's options, or null.</param>
+    /// <param name="overrides">Per-turn overrides whose model wins when set.</param>
+    /// <returns>Options carrying the effective model, or the caller's options unchanged when no
+    /// model override applies.</returns>
+    /// <remarks>
+    /// <para><b>No leakage (REQ-UI-044):</b> a copy is returned rather than the caller's instance.
+    /// The previous in-place assignment stamped the model onto a caller-owned object, so a UI that
+    /// reused one options instance carried a one-turn model choice into every later turn.</para>
+    /// </remarks>
+    private static LlmCompletionOptions? ApplyWorkspaceOptions(
+        Workspace workspace,
+        LlmCompletionOptions? options,
+        WorkspaceTurnOverrides? overrides)
     {
-        if (string.IsNullOrEmpty(workspace.LlmModel)) return options;
+        var model = !string.IsNullOrEmpty(overrides?.LlmModel) ? overrides.LlmModel : workspace.LlmModel;
+        if (string.IsNullOrEmpty(model)) return options;
 
-        options ??= new LlmCompletionOptions();
-        options.Model = workspace.LlmModel;
-        return options;
+        return Copy(options, model);
     }
+
+    /// <summary>
+    /// Shallow-copies completion options, replacing the model.
+    /// </summary>
+    /// <param name="options">The options to copy; null yields a fresh instance.</param>
+    /// <param name="model">The model to stamp on the copy.</param>
+    /// <returns>A new options instance the caller does not own.</returns>
+    private static LlmCompletionOptions Copy(LlmCompletionOptions? options, string model) =>
+        new()
+        {
+            Temperature = options?.Temperature,
+            MaxTokens = options?.MaxTokens,
+            TopP = options?.TopP,
+            FrequencyPenalty = options?.FrequencyPenalty,
+            PresencePenalty = options?.PresencePenalty,
+            StopSequences = options?.StopSequences,
+            SystemPrompt = options?.SystemPrompt,
+            JsonMode = options?.JsonMode ?? false,
+            JsonSchema = options?.JsonSchema,
+            Tools = options?.Tools,
+            ToolChoice = options?.ToolChoice,
+            Seed = options?.Seed,
+            Model = model
+        };
 
     private async Task<Workspace> RequireWorkspaceAsync(string workspaceId, CancellationToken cancellationToken)
     {

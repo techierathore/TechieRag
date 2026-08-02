@@ -85,6 +85,24 @@ public sealed class WireContractTests : IDisposable
     }
 
     /// <summary>
+    /// Login carries the v1.4 a-prefixed aApplicationId query parameter when an explicit
+    /// ApplicationId is configured. Without it AppManager cannot resolve which application the
+    /// caller is authenticating against and returns an empty applicationRole, which silently
+    /// degrades every signed-in user to the User role (REQ-UI-007 / REQ-FN-005).
+    /// </summary>
+    [Fact]
+    public async Task LoginUsesAPrefixedApplicationIdParam()
+    {
+        var handler = OkHandler();
+        var client = TestFactory.Client(handler);
+
+        await client.LoginAsync("jane.doe@example.com", "P@ssw0rd!");
+
+        var call = handler.Calls.Single(recorded => recorded.PathAndQuery.StartsWith("/AuthSvc/login"));
+        Assert.Equal("/AuthSvc/login?aApplicationId=7", call.PathAndQuery);
+    }
+
+    /// <summary>
     /// Feature checks hit the a-prefixed route template GET /FeatureSvc/{aFeatureCode} with the
     /// code substituted into the path.
     /// </summary>

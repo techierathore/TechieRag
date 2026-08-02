@@ -43,6 +43,17 @@ public class Workspace
     public int? TopK { get; set; }
 
     /// <summary>Gets or sets whether the rerank stage is applied for this workspace's retrieval.</summary>
+    /// <remarks>
+    /// <para><b>Authoritative:</b> This flag decides reranking for every workspace-scoped
+    /// retrieval — it overrides the library-wide <c>TechieRagConfig.Rerank.Enabled</c> setting in
+    /// both directions. True forces reranking on even when the global flag is off; false forces it
+    /// off even when the global flag is on.</para>
+    /// <para><b>Requires a reranker:</b> Setting this to true has no effect unless an
+    /// <c>IReranker</c> is configured (TechieRagBuilder.WithReranker or the <c>TechieRag:Rerank</c>
+    /// configuration section); the library logs a warning and returns vector-similarity order.</para>
+    /// <para><b>History:</b> Before REQ-RAG-047 (TR-RAG-005) this property round-tripped through
+    /// the store but nothing read it, so reranking was global configuration only.</para>
+    /// </remarks>
     public bool RerankEnabled { get; set; }
 
     /// <summary>Gets or sets the answer mode (chat vs context-only query).</summary>

@@ -1,17 +1,19 @@
 @page "/ingestion"
 @using TechieRag.Models
 @using TechieRag.Embedded
+@using Microsoft.Maui.Storage
 @implements IDisposable
 @inject ITechieRag Rag
 @inject ToastService ToastService
 @inject ILogger<Ingestion> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>Document Ingestion - TechieRag</PageTitle>
+<PageTitle>@Localizer["IngestPageTitle"]</PageTitle>
 
 <div class="space-y-6">
     <div>
-        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">Document Ingestion</h1>
-        <TypographyMuted>Ingest files from a directory into the vector store for semantic search.</TypographyMuted>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["IngestTitle"]</h1>
+        <TypographyMuted>@Localizer["IngestSubtitle"]</TypographyMuted>
     </div>
 
     <!-- Model Download Progress -->
@@ -19,13 +21,13 @@
     {
         <Alert Variant="AlertVariant.Warning">
             <Alert.Icon><Spinner Size="SpinnerSize.Small" /></Alert.Icon>
-            <AlertTitle>Downloading BGE-M3 Model</AlertTitle>
+            <AlertTitle>@Localizer["IngestDownloadingModelTitle"]</AlertTitle>
             <AlertDescription>
-                @downloadProgress?.StatusMessage
-                <Progress Value="@(downloadProgress?.CurrentFileProgressPercent ?? 0)" Class="mt-2" />
+                @(downloadProgress?.StatusMessage)
+                <Progress aria-label="@Localizer["IngestModelDownloadProgressAria"]" Value="@Math.Round((double)(downloadProgress?.CurrentFileProgressPercent ?? 0))" Class="mt-2" />
                 <div class="flex justify-between text-xs mt-1">
                     <span>@FormatBytes(downloadProgress?.CurrentFileBytesDownloaded ?? 0) / @FormatBytes(downloadProgress?.CurrentFileTotalBytes ?? 0)</span>
-                    <span>File @((downloadProgress?.CompletedFiles ?? 0) + 1) of @(downloadProgress?.TotalFiles ?? 5)</span>
+                    <span>@Localizer["IngestFileNOfM", (downloadProgress?.CompletedFiles ?? 0) + 1, downloadProgress?.TotalFiles ?? 5]</span>
                 </div>
             </AlertDescription>
         </Alert>
@@ -34,44 +36,60 @@
     <!-- Ingestion Controls -->
     <Card>
         <CardHeader>
-            <CardTitle>Ingest Documents</CardTitle>
+            <CardTitle>@Localizer["IngestDocumentsHeading"]</CardTitle>
         </CardHeader>
         <CardContent Class="space-y-4">
+            @* REQ-UI-041 / BRD-133: the OS pickers are the primary way in. Typing a path is kept as
+               the secondary route — it is the only one available to a scripted or remote folder the
+               sandboxed picker will not show — but the desktop head never asks the user to
+               hand-transcribe a path they can point at. *@
+            <div class="flex flex-wrap gap-2">
+                <Button OnClick="ChooseFilesAsync" Disabled="isIngesting">
+                    <LucideIcon aria-hidden="true" Name="file-plus" Size="16" Class="mr-2" />
+                    <span>@Localizer["IngestChooseFiles"]</span>
+                </Button>
+                <Button Variant="ButtonVariant.Outline" OnClick="ChooseFolderAsync" Disabled="isIngesting">
+                    <LucideIcon aria-hidden="true" Name="folder-open" Size="16" Class="mr-2" />
+                    <span>@Localizer["IngestChooseFolder"]</span>
+                </Button>
+            </div>
+
             <Field>
-                <FieldLabel>Documents Folder Path</FieldLabel>
+                <FieldLabel>@Localizer["IngestFolderPathLabel"]</FieldLabel>
                 <FieldContent>
-                    <Input @bind-Value="documentsPath" Placeholder="C:\Documents\RAGData" />
+                    <Input @bind-Value="documentsPath" Placeholder="@FolderPlaceholder" />
+                    <FieldDescription>@Localizer["IngestFolderPathHelp"]</FieldDescription>
                 </FieldContent>
             </Field>
 
             <Field>
-                <FieldLabel>File Pattern</FieldLabel>
+                <FieldLabel>@Localizer["IngestFilePatternLabel"]</FieldLabel>
                 <FieldContent>
                     <Input @bind-Value="filePattern" Placeholder="*.*" />
-                    <FieldDescription>Supported: PDF, DOCX, TXT, MD, HTML, JSON, TOML, and 70+ code file types. Use *.* for all.</FieldDescription>
+                    <FieldDescription>@Localizer["IngestFilePatternHelp"]</FieldDescription>
                 </FieldContent>
             </Field>
 
             <div class="flex gap-3">
                 <Button OnClick="IngestDocumentsAsync" Disabled="isIngesting">
-                    @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Ingesting...</span> }
-                    else { <span>Ingest Now</span> }
+                    @if (isIngesting) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["IngestIngesting"]</span> }
+                    else { <span>@Localizer["IngestNow"]</span> }
                 </Button>
                 @if (isIngesting)
                 {
                     <Button Variant="ButtonVariant.Outline" OnClick="StopIngestion" Disabled="isCancelling">
-                        @(isCancelling ? "Stopping..." : "Stop Ingestion")
+                        @(isCancelling ? Localizer["IngestStopping"].Value : Localizer["IngestStopIngestion"].Value)
                     </Button>
                 }
                 <Button Variant="ButtonVariant.Destructive" OnClick="ClearVectorStoreAsync" Disabled="isIngesting">
-                    Clear All Data
+                    @Localizer["IngestClearAllData"]
                 </Button>
             </div>
 
             @if (isIngesting)
             {
                 <div class="space-y-2">
-                    <Progress Value="@progress" />
+                    <Progress aria-label="@Localizer["IngestProgressAria"]" Value="@Math.Round((double)progress)" />
                     <TypographyMuted>@progressMessage</TypographyMuted>
                 </div>
             }
@@ -84,17 +102,17 @@
         <Card>
             <CardHeader>
                 <div class="flex items-center justify-between">
-                    <CardTitle>Ingestion Results</CardTitle>
-                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearResults">Clear</Button>
+                    <CardTitle>@Localizer["IngestResultsHeading"]</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearResults">@Localizer["IngestClear"]</Button>
                 </div>
             </CardHeader>
             <CardContent>
                 <div class="relative overflow-x-auto">
                 <DataTable TData="IngestionResult" Data="@ingestionResults" ShowToolbar="false">
                     <Columns>
-                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.FileName)" Header="File" />
-                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? "Success" : "Failed")" Header="Status" />
-                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? r.DocumentId ?? "" : r.ErrorMessage ?? "")" Header="ID / Error" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.FileName)" Header="@Localizer["IngestFile"]" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? "Success" : "Failed")" Header="@Localizer["IngestStatus"]" />
+                        <DataTableColumn TData="IngestionResult" TValue="string" Property="@(r => r.Success ? r.DocumentId ?? "" : r.ErrorMessage ?? "")" Header="@Localizer["IngestIdError"]" />
                     </Columns>
                 </DataTable>
                 </div>
@@ -108,25 +126,25 @@
         {
             <Card Class="min-w-0">
                 <CardHeader>
-                    <CardTitle>Vector Store Statistics</CardTitle>
+                    <CardTitle>@Localizer["IngestStatsHeading"]</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <TypographyMuted>Documents</TypographyMuted>
+                            <TypographyMuted>@Localizer["IngestDocuments"]</TypographyMuted>
                             <div class="text-xl font-bold">@stats.TotalDocuments</div>
                         </div>
                         <div>
-                            <TypographyMuted>Chunks</TypographyMuted>
+                            <TypographyMuted>@Localizer["IngestChunks"]</TypographyMuted>
                             <div class="text-xl font-bold">@stats.TotalChunks</div>
                         </div>
                         <div>
-                            <TypographyMuted>Storage Size</TypographyMuted>
+                            <TypographyMuted>@Localizer["IngestStorageSize"]</TypographyMuted>
                             <div class="text-xl font-bold">@FormatSize(stats.VectorStoreSizeBytes)</div>
                         </div>
                         <div>
-                            <TypographyMuted>Last Ingestion</TypographyMuted>
-                            <div class="text-xl font-bold">@(stats.LastIngestionTime?.ToString("g") ?? "Never")</div>
+                            <TypographyMuted>@Localizer["IngestLastIngestion"]</TypographyMuted>
+                            <div class="text-xl font-bold">@(stats.LastIngestionTime?.ToString("g") ?? Localizer["IngestNever"].Value)</div>
                         </div>
                     </div>
                 </CardContent>
@@ -135,20 +153,20 @@
 
         <Card Class="min-w-0">
             <CardHeader>
-                <CardTitle>Ingested Documents</CardTitle>
+                <CardTitle>@Localizer["IngestIngestedDocuments"]</CardTitle>
             </CardHeader>
             <CardContent>
                 @if (documents.Count == 0)
                 {
-                    <TypographyMuted>No documents ingested yet.</TypographyMuted>
+                    <TypographyMuted>@Localizer["IngestNoDocuments"]</TypographyMuted>
                 }
                 else
                 {
                     <div class="relative overflow-x-auto">
                     <DataTable TData="Document" Data="@documents" ShowToolbar="false">
                         <Columns>
-                            <DataTableColumn TData="Document" TValue="string" Property="@(d => d.Name)" Header="Name" />
-                            <DataTableColumn TData="Document" TValue="int" Property="@(d => d.ChunkCount)" Header="Chunks" />
+                            <DataTableColumn TData="Document" TValue="string" Property="@(d => d.Name)" Header="@Localizer["IngestName"]" />
+                            <DataTableColumn TData="Document" TValue="int" Property="@(d => d.ChunkCount)" Header="@Localizer["IngestChunks"]" />
                         </Columns>
                     </DataTable>
                     </div>
@@ -174,10 +192,21 @@
 
     private record IngestionResult(string FileName, bool Success, string? ErrorMessage, string? DocumentId);
 
+    // REQ-UI-041: a desktop placeholder, not "C:\Documents\RAGData" — the previous value named a
+    // Windows drive letter on a Mac-only head, which reads as an app that does not know its host.
+    private static string FolderPlaceholder => OperatingSystem.IsWindows()
+        ? @"C:\Users\you\Documents"
+        : "/Users/you/Documents";
+
     protected override async Task OnInitializedAsync()
     {
         ModelDownloadService.Instance.ProgressChanged += OnDownloadProgressChanged;
         downloadProgress = ModelDownloadService.Instance.Progress;
+
+        // REQ-UI-041: the File menu's OS pickers run on the native side and leave their selection
+        // here. Subscribing as well as draining matters because re-navigating to this route while
+        // it is already open does not re-initialise the component.
+        DesktopImportQueue.SelectionAdded += OnImportSelectionAdded;
 
         try
         {
@@ -190,7 +219,82 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to initialize ingestion page");
-            ToastService.Error($"Initialization error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["IngestInitErrorBody", ex.Message], Localizer["IngestErrorTitle"]);
+        }
+
+        await DrainImportQueueAsync();
+    }
+
+    private void OnImportSelectionAdded() => _ = InvokeAsync(DrainImportQueueAsync);
+
+    /// <summary>Applies whatever the native File menu queued, then ingests it.</summary>
+    private async Task DrainImportQueueAsync()
+    {
+        var folder = DesktopImportQueue.TakeFolder();
+        if (folder is not null)
+        {
+            documentsPath = folder;
+            StateHasChanged();
+            await IngestDocumentsAsync();
+        }
+
+        var files = DesktopImportQueue.TakeFiles();
+        if (files.Count > 0)
+        {
+            await IngestFilesAsync(files);
+        }
+    }
+
+    /// <summary>Opens the OS file picker and ingests the chosen documents (REQ-UI-041).</summary>
+    private async Task ChooseFilesAsync()
+    {
+        try
+        {
+            // No FileTypes filter: unsupported types get a clear per-file failure row, which is more
+            // useful than a picker that silently refuses to show a file the user can see in Finder.
+            var picked = await FilePicker.Default.PickMultipleAsync(
+                new PickOptions { PickerTitle = Localizer["IngestPickerTitle"] });
+            var paths = picked?.Select(result => result.FullPath).Where(File.Exists).ToArray() ?? [];
+            if (paths.Length == 0)
+            {
+                return;
+            }
+
+            await IngestFilesAsync(paths);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "The OS file picker failed");
+            ToastService.Error(Localizer["IngestFilePickerFailedBody", ex.Message], Localizer["IngestPickerUnavailableTitle"]);
+        }
+    }
+
+    /// <summary>Opens the OS folder picker and ingests the chosen folder (REQ-UI-041).</summary>
+    private async Task ChooseFolderAsync()
+    {
+        if (!DesktopFolderPicker.IsSupported)
+        {
+            ToastService.Error(Localizer["IngestNoFolderChooserBody"], Localizer["IngestPickerUnavailableTitle"]);
+            return;
+        }
+
+        try
+        {
+            // Cancelling returns null and is not a failure; it must not raise an error toast.
+            var folder = await DesktopFolderPicker.PickAsync();
+            if (string.IsNullOrEmpty(folder))
+            {
+                return;
+            }
+
+            documentsPath = folder;
+            StateHasChanged();
+            await IngestDocumentsAsync();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.LogError(ex, "The OS folder picker failed");
+            ToastService.Error(Localizer["IngestFolderPickerFailedBody", ex.Message], Localizer["IngestPickerUnavailableTitle"]);
         }
     }
 
@@ -210,6 +314,7 @@
     public void Dispose()
     {
         ModelDownloadService.Instance.ProgressChanged -= OnDownloadProgressChanged;
+        DesktopImportQueue.SelectionAdded -= OnImportSelectionAdded;
         ingestionCts?.Cancel();
         ingestionCts?.Dispose();
     }
@@ -220,7 +325,7 @@
         {
             isCancelling = true;
             ingestionCts.Cancel();
-            progressMessage = "Stopping ingestion...";
+            progressMessage = Localizer["IngestProgressStopping"];
             StateHasChanged();
         }
     }
@@ -229,13 +334,46 @@
     {
         if (string.IsNullOrWhiteSpace(documentsPath))
         {
-            ToastService.Error("Please enter a documents folder path.", "Validation");
+            ToastService.Error(Localizer["IngestFolderPathRequiredBody"], Localizer["IngestValidationTitle"]);
             return;
         }
 
         if (!Directory.Exists(documentsPath))
         {
-            ToastService.Error("The specified folder does not exist.", "Validation");
+            ToastService.Error(Localizer["IngestFolderMissingBody"], Localizer["IngestValidationTitle"]);
+            return;
+        }
+
+        string[] files;
+        try
+        {
+            files = Directory.GetFiles(documentsPath, filePattern, SearchOption.AllDirectories);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to scan {Folder}", documentsPath);
+            ToastService.Error(Localizer["IngestScanFailedBody", documentsPath, ex.Message], Localizer["IngestScanFailedTitle"]);
+            return;
+        }
+
+        if (files.Length == 0)
+        {
+            ToastService.Error(Localizer["IngestNoFilesMatchedBody", filePattern], Localizer["IngestNoFilesTitle"]);
+            return;
+        }
+
+        await IngestFilesAsync(files);
+    }
+
+    /// <summary>
+    /// Ingests an explicit set of files — the one path every entry point funnels through
+    /// (the folder scan above, the OS pickers, and the native File menu; REQ-UI-041).
+    /// </summary>
+    /// <param name="files">Absolute paths to ingest, in order.</param>
+    private async Task IngestFilesAsync(IReadOnlyList<string> files)
+    {
+        if (isIngesting || files.Count == 0)
+        {
             return;
         }
 
@@ -251,37 +389,25 @@
 
         try
         {
-            progressMessage = "Scanning folder...";
-            StateHasChanged();
-
-            var files = Directory.GetFiles(documentsPath, filePattern, SearchOption.AllDirectories);
-
-            if (files.Length == 0)
-            {
-                ToastService.Error($"No files matching '{filePattern}' found.", "No Files");
-                isIngesting = false;
-                return;
-            }
-
             progress = 5;
-            progressMessage = $"Found {files.Length} file(s). Starting ingestion...";
+            progressMessage = Localizer["IngestProgressFound", files.Count];
             StateHasChanged();
 
             int successCount = 0, failedCount = 0, skippedCount = 0;
 
-            for (int i = 0; i < files.Length; i++)
+            for (int i = 0; i < files.Count; i++)
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    skippedCount = files.Length - i;
-                    progressMessage = "Ingestion stopped by user.";
+                    skippedCount = files.Count - i;
+                    progressMessage = Localizer["IngestProgressStopped"];
                     break;
                 }
 
                 var file = files[i];
                 var fileName = Path.GetFileName(file);
-                progressMessage = $"Processing ({i + 1}/{files.Length}): {fileName}";
-                progress = 5 + (int)((i / (double)files.Length) * 90);
+                progressMessage = Localizer["IngestProgressProcessing", i + 1, files.Count, fileName];
+                progress = 5 + (int)((i / (double)files.Count) * 90);
                 StateHasChanged();
                 await Task.Delay(10);
 
@@ -293,8 +419,8 @@
                 }
                 catch (OperationCanceledException)
                 {
-                    skippedCount = files.Length - i;
-                    progressMessage = "Ingestion stopped by user.";
+                    skippedCount = files.Count - i;
+                    progressMessage = Localizer["IngestProgressStopped"];
                     break;
                 }
                 catch (Exception ex)
@@ -305,12 +431,14 @@
             }
 
             progress = 100;
-            progressMessage = "Complete!";
+            progressMessage = Localizer["IngestProgressComplete"];
 
             if (successCount > 0)
-                ToastService.Success($"Ingested {successCount} document(s). {(failedCount > 0 ? $"{failedCount} failed." : "")}", "Done");
+                ToastService.Success(failedCount > 0
+                    ? Localizer["IngestDoneWithFailuresBody", successCount, failedCount].Value
+                    : Localizer["IngestDoneBody", successCount].Value, Localizer["IngestDoneTitle"]);
             else
-                ToastService.Error($"All {failedCount} file(s) failed to ingest.", "Failed");
+                ToastService.Error(Localizer["IngestAllFailedBody", failedCount], Localizer["IngestFailedTitle"]);
 
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
@@ -318,7 +446,7 @@
         catch (Exception ex)
         {
             Logger.LogError(ex, "Ingestion failed");
-            ToastService.Error($"Error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["IngestErrorBody", ex.Message], Localizer["IngestErrorTitle"]);
         }
         finally
         {
@@ -338,11 +466,11 @@
             ingestionResults.Clear();
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-            ToastService.Success("All data cleared.", "Cleared");
+            ToastService.Success(Localizer["IngestAllDataClearedBody"], Localizer["IngestClearedTitle"]);
         }
         catch (Exception ex)
         {
-            ToastService.Error($"Error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["IngestErrorBody", ex.Message], Localizer["IngestErrorTitle"]);
         }
     }
 
@@ -353,11 +481,11 @@
             await Rag.DeleteDocumentAsync(documentId);
             await RefreshStatsAsync();
             await RefreshDocumentsAsync();
-            ToastService.Success("Document deleted.", "Deleted");
+            ToastService.Success(Localizer["IngestDocumentDeletedBody"], Localizer["IngestDeletedTitle"]);
         }
         catch (Exception ex)
         {
-            ToastService.Error($"Error: {ex.Message}", "Error");
+            ToastService.Error(Localizer["IngestErrorBody", ex.Message], Localizer["IngestErrorTitle"]);
         }
     }
 

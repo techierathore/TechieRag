@@ -28,11 +28,25 @@ public sealed class FakeAppManagerClient : IAppManagerClient
 
     public Func<string, string, CancellationToken, Task<FeatureAccessData>>? OnCheckFeature { get; set; }
 
+    /// <summary>Scripts <c>POST /AuthSvc/login</c> for the REQ-FN-039 sign-in tests.</summary>
+    public Func<string, string, Task<AuthResponseData>>? OnLogin { get; set; }
+
+    /// <summary>Scripts <c>POST /AuthSvc/register</c> for the REQ-FN-039 sign-in tests.</summary>
+    public Func<RegisterRequest, string, Task<AuthResponseData>>? OnRegister { get; set; }
+
     public int ValidateLicenseCalls { get; private set; }
 
-    public Task<LicenseValidationData> ValidateLicenseAsync(string accessToken, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// The install identity presented on the LAST validation call (REQ-FN-051 clause 2), or null
+    /// when none was sent.
+    /// </summary>
+    public string? LastInstallId { get; private set; }
+
+    public Task<LicenseValidationData> ValidateLicenseAsync(
+        string accessToken, string? installId = null, CancellationToken cancellationToken = default)
     {
         ValidateLicenseCalls++;
+        LastInstallId = installId;
         return OnValidateLicense?.Invoke(accessToken, cancellationToken)
             ?? throw new InvalidOperationException("OnValidateLicense not configured");
     }
@@ -43,8 +57,10 @@ public sealed class FakeAppManagerClient : IAppManagerClient
 
     // Unused members — never called by the licensing services.
     public Task<string> GetPublicKeyAsync(CancellationToken ct = default) => throw new NotSupportedException();
-    public Task<AuthResponseData> RegisterAsync(RegisterRequest r, string p, CancellationToken ct = default) => throw new NotSupportedException();
-    public Task<AuthResponseData> LoginAsync(string e, string p, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<AuthResponseData> RegisterAsync(RegisterRequest r, string p, CancellationToken ct = default)
+        => OnRegister?.Invoke(r, p) ?? throw new NotSupportedException();
+    public Task<AuthResponseData> LoginAsync(string e, string p, CancellationToken ct = default)
+        => OnLogin?.Invoke(e, p) ?? throw new NotSupportedException();
     public Task<TokenRefreshData> RefreshAsync(string r, CancellationToken ct = default) => throw new NotSupportedException();
     public Task LogoutAsync(string a, string? r, bool all = false, CancellationToken ct = default) => throw new NotSupportedException();
     public Task ForgotPasswordAsync(string e, CancellationToken ct = default) => throw new NotSupportedException();
@@ -54,6 +70,28 @@ public sealed class FakeAppManagerClient : IAppManagerClient
     public Task UpdateProfileAsync(string a, UpdateProfileRequest r, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<GdprRequestData> RequestDataExportAsync(string a, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<GdprRequestData> RequestAccountDeletionAsync(string a, string e, string? reason = null, CancellationToken ct = default) => throw new NotSupportedException();
+
+    // IssueSvc (REQ-UI-032/033/047, REQ-FN-027) — the licensing units never raise a support issue,
+    // so these stay in the "must never be called" group. SupportWireContractTests drives the real
+    // client over StubHttpMessageHandler instead of scripting a fake.
+    public Task<IReadOnlyList<SupportIssueData>> ListIssuesAsync(string a, string? status = null, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<SupportIssueData> GetIssueAsync(string a, int issueId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<CreatedIssueData> CreateIssueAsync(string a, CreateIssueRequest r, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task AddIssueCommentAsync(string a, int issueId, string comment, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task CloseIssueAsync(string a, int issueId, CancellationToken ct = default) => throw new NotSupportedException();
+
+    // LicenseSvc catalogue and PaymentSvc billing (REQ-UI-029/030/031, REQ-FN-026) — the licensing
+    // units never read the price list or the payment history, so these stay in the "must never be
+    // called" group. BillingWireContractTests drives the real client over StubHttpMessageHandler.
+    public Task<IReadOnlyList<LicenseTypeData>> GetLicenseTypesAsync(string? currency = null, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<UserLicenseData>> GetLicensesAsync(string a, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task DeactivateDeviceAsync(string a, int licenseId, int deviceId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<SubscriptionData>> GetSubscriptionsAsync(string a, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task CancelSubscriptionAsync(string a, int subscriptionId, bool immediate = false, string? reason = null, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<PagedResultData<TransactionData>> GetTransactionsAsync(string a, int page = 1, int pageSize = 20, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<PagedResultData<InvoiceData>> GetInvoicesAsync(string a, int page = 1, int pageSize = 20, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<InvoiceDownloadData> DownloadInvoiceAsync(string a, int invoiceId, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<PromoCodeData> ValidatePromoCodeAsync(string code, CancellationToken ct = default) => throw new NotSupportedException();
 }
 
 /// <summary>In-memory <see cref="ILicenseCacheRepository"/> for grace-window tests.</summary>

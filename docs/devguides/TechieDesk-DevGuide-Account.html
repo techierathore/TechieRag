@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk DevGuide — Account</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieDesk DevGuide — Account</h1>
+    <div class="sub">Last rendered: 2026-07-29</div>
+    <div class="group">Contents</div>
+      <ol>
+        <li><a href="#profile-profile"><code>/profile</code> — Profile</a></li>
+        <li class="h3"><a href="#controls">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service">Data lineage — Razor → injected service</a></li>
+        <li><a href="#pricing-pricing"><code>/pricing</code> — Pricing</a></li>
+        <li class="h3"><a href="#controls-2">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-2">Data lineage — Razor → injected service</a></li>
+        <li><a href="#billing-billing"><code>/billing</code> — Billing</a></li>
+        <li class="h3"><a href="#controls-3">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-3">Data lineage — Razor → injected service</a></li>
+        <li><a href="#support-support"><code>/support</code> — Support</a></li>
+        <li class="h3"><a href="#controls-4">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-4">Data lineage — Razor → injected service</a></li>
+        <li><a href="#login-login"><code>/login</code> — Login</a></li>
+        <li class="h3"><a href="#controls-5">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-5">Data lineage — Razor → injected service</a></li>
+        <li><a href="#register-register"><code>/register</code> — Register</a></li>
+        <li class="h3"><a href="#controls-6">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-6">Data lineage — Razor → injected service</a></li>
+        <li><a href="#forgot-password-forgotpassword"><code>/forgot-password</code> — ForgotPassword</a></li>
+        <li class="h3"><a href="#controls-7">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-7">Data lineage — Razor → injected service</a></li>
+        <li><a href="#reset-password-resetpassword"><code>/reset-password</code> — ResetPassword</a></li>
+        <li class="h3"><a href="#controls-8">Controls</a></li>
+        <li class="h3"><a href="#data-lineage-razor-injected-service-8">Data lineage — Razor → injected service</a></li>
+      </ol>
+  </nav>
+  <main>
+    <h1>TechieDesk DevGuide — Account</h1>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#profile-profile"><code>/profile</code> — Profile</a>
+          <ul>
+            <li><a href="#controls">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#pricing-pricing"><code>/pricing</code> — Pricing</a>
+          <ul>
+            <li><a href="#controls-2">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-2">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#billing-billing"><code>/billing</code> — Billing</a>
+          <ul>
+            <li><a href="#controls-3">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-3">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#support-support"><code>/support</code> — Support</a>
+          <ul>
+            <li><a href="#controls-4">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-4">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#login-login"><code>/login</code> — Login</a>
+          <ul>
+            <li><a href="#controls-5">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-5">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#register-register"><code>/register</code> — Register</a>
+          <ul>
+            <li><a href="#controls-6">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-6">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#forgot-password-forgotpassword"><code>/forgot-password</code> — ForgotPassword</a>
+          <ul>
+            <li><a href="#controls-7">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-7">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#reset-password-resetpassword"><code>/reset-password</code> — ResetPassword</a>
+          <ul>
+            <li><a href="#controls-8">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-8">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <p><em>Generated 2026-07-28 · reflects code as built.</em> <a href="./TechieDesk-DevGuide.md">← index</a></p>
+    <blockquote>
+      <p>✅ <strong>Runtime-verified 2026-07-29</strong> — re-swept on the live <strong>Mac Catalyst</strong> head over Appium (<code>mac2</code>), bound by <code>appPath</code> to the universal Release bundle, driving <strong>28 of the 30 screens</strong> at <strong>1600×1240</strong> and <strong>1024×720</strong> (the REQ-UI-041 floor). Every <code>Observed</code> line below is what the running app did; <code>Visual (§4b)</code> is the overlap / zero-size / off-viewport geometry check plus a human look at the screenshot. Screens that could not be reached say so and are <strong>not</strong> claimed as verified. Screenshots: <code>test-results/ui-verify/</code>.</p>
+    </blockquote>
+    <p>8 screen(s) in this area.</p>
+    <h2 id="profile-profile"><code>/profile</code> — Profile<a class="anchor-link" href="#profile-profile">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Auth/Profile.razor</code> (448 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → ACCOUNT → Profile</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — offline banner, Personal information (Avatar, First/Last name, Email, Mobile), Change password (3 fields + rule hint), License panel with real values, Privacy (GDPR) with export/delete + email-confirm Input.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size; two-column layout holds at 1024.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Every write path is disabled: <code>AppManager</code> is unreachable and no <code>AppManager:BaseUrl</code> ships, so profile update, password change and GDPR requests are <strong>unexercised</strong> (REQ-UI-010/011/012).</li>
+    </ul>
+    <p><img alt="Profile" src="../screenshots/TechieDesk/profile.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls">Controls<a class="anchor-link" href="#controls">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Input&gt;</code></td><td>9</td><td>69, 78, 84, 92…</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>5</td><td>19, 59, 147, 182…</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>4</td><td>22, 150, 185, 196</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>4</td><td>35, 36, 176, 177</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>3</td><td>45, 107, 168</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>2</td><td>36, 177</td></tr>
+        <tr><td><code>&lt;Avatar&gt;</code></td><td>1</td><td>52</td></tr>
+        <tr><td><code>&lt;Separator&gt;</code></td><td>1</td><td>191</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AppManager.ChangePasswordAsync()</code></td><td><code>IAppManagerClient</code></td><td>356</td></tr>
+        <tr><td><code>AppManager.GetProfileAsync()</code></td><td><code>IAppManagerClient</code></td><td>282</td></tr>
+        <tr><td><code>AppManager.RequestAccountDeletionAsync()</code></td><td><code>IAppManagerClient</code></td><td>430</td></tr>
+        <tr><td><code>AppManager.RequestDataExportAsync()</code></td><td><code>IAppManagerClient</code></td><td>395</td></tr>
+        <tr><td><code>AppManager.UpdateProfileAsync()</code></td><td><code>IAppManagerClient</code></td><td>307</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Profile&gt;</code></td><td>291, 319, 401</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;Profile&gt;</code></td><td>314, 357, 396…</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;Profile&gt;</code></td><td>363, 437</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>292, 320, 373…</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>315, 359</td></tr>
+        <tr><td><code>TokenRefresher.EnsureValidTokenAsync()</code></td><td><code>ITokenRefresher</code></td><td>280, 306, 355…</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IAppManagerClient</code>, <code>ITechieDeskAuthModeProvider</code>, <code>ITechieDeskUserContext</code>, <code>SessionTokenStore</code>, <code>ITokenRefresher</code>, <code>ToastService</code>, <code>ILogger&lt;Profile&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 12 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isSavingProfile)</code> (line 20)</li>
+      <li><code>@if (!canManage)</code> (line 33)</li>
+      <li><code>@if (!string.IsNullOrWhiteSpace(profileImageUrl))</code> (line 53)</li>
+    </ul>
+    <h2 id="pricing-pricing"><code>/pricing</code> — Pricing<a class="anchor-link" href="#pricing-pricing">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Pricing.razor</code> (380 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → ACCOUNT → Pricing</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — three tier cards with prices and feature ticks, <code>Current plan</code> badge on Free, <code>Most popular</code> on Professional, currency Select (USD), promo-code Input + Apply.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, cards reflow.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Prices are TechieDesk's published list, not a live <code>GET /LicenseSvc/types</code> quote — the screen says so. Multi-currency conversion is <strong>unexercised</strong>.</li>
+    </ul>
+    <p><img alt="Pricing" src="../screenshots/TechieDesk/pricing.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-2">Controls<a class="anchor-link" href="#controls-2">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>8</td><td>39, 40, 51, 52…</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>5</td><td>40, 52, 89, 140…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>2</td><td>61, 114</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>2</td><td>66, 72</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>2</td><td>103, 125</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>1</td><td>21</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>1</td><td>122</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>1</td><td>128</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-2">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-2">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AppManager.GetLicenseTypesAsync()</code></td><td><code>IAppManagerClient</code></td><td>217</td></tr>
+        <tr><td><code>AppManager.ValidatePromoCodeAsync()</code></td><td><code>IAppManagerClient</code></td><td>331</td></tr>
+        <tr><td><code>LicenseService.EnsureFreshAsync()</code></td><td><code>ILicenseService</code></td><td>204</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Pricing&gt;</code></td><td>245, 342</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;Pricing&gt;</code></td><td>333</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;Pricing&gt;</code></td><td>239, 337</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>ILicenseService</code>, <code>ITechieDeskAuthModeProvider</code>, <code>IAppManagerClient</code>, <code>ILogger&lt;Pricing&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 6 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (!IsAppManagerConfigured)</code> (line 37)</li>
+      <li><code>@if (tier.Popular)</code> (line 63)</li>
+      <li><code>@if (IsCurrent(tier))</code> (line 69)</li>
+    </ul>
+    <h2 id="billing-billing"><code>/billing</code> — Billing<a class="anchor-link" href="#billing-billing">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Billing.razor</code> (840 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → ACCOUNT → Billing</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — License panel populated (Key/Status/Plan/Expires/Devices); Active subscription, Transactions and Invoices each render a labelled empty state that names <em>why</em> (“nothing was fetched — this instance has no licence server to ask”).</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Subscription cancel and invoice-PDF download (REQ-UI-030/031) are <strong>unexercised</strong> — no AppManager.</li>
+    </ul>
+    <p><img alt="Billing" src="../screenshots/TechieDesk/billing.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-3">Controls<a class="anchor-link" href="#controls-3">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>16</td><td>28, 31, 73, 129…</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>6</td><td>49, 57, 86, 203…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>5</td><td>95, 98, 158, 227…</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>4</td><td>34, 300, 358, 397</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>4</td><td>48, 49, 56, 57</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>4</td><td>65, 145, 189, 252</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>2</td><td>211, 274</td></tr>
+        <tr><td><code>&lt;AlertDialog&gt;</code></td><td>2</td><td>335, 370</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>1</td><td>382</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-3">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-3">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AppManager.CancelSubscriptionAsync()</code></td><td><code>IAppManagerClient</code></td><td>645</td></tr>
+        <tr><td><code>AppManager.DeactivateDeviceAsync()</code></td><td><code>IAppManagerClient</code></td><td>720</td></tr>
+        <tr><td><code>AppManager.DownloadInvoiceAsync()</code></td><td><code>IAppManagerClient</code></td><td>764</td></tr>
+        <tr><td><code>AppManager.GetInvoicesAsync()</code></td><td><code>IAppManagerClient</code></td><td>573</td></tr>
+        <tr><td><code>AppManager.GetLicensesAsync()</code></td><td><code>IAppManagerClient</code></td><td>539</td></tr>
+        <tr><td><code>AppManager.GetSubscriptionsAsync()</code></td><td><code>IAppManagerClient</code></td><td>535</td></tr>
+        <tr><td><code>AppManager.GetTransactionsAsync()</code></td><td><code>IAppManagerClient</code></td><td>565</td></tr>
+        <tr><td><code>LicenseService.EnsureFreshAsync()</code></td><td><code>ILicenseService</code></td><td>513</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Billing&gt;</code></td><td>554, 594, 618…</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;Billing&gt;</code></td><td>648, 721, 771</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;Billing&gt;</code></td><td>549, 662, 729…</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>595, 619, 675…</td></tr>
+        <tr><td><code>ToastService.Show()</code></td><td><code>ToastService</code></td><td>668</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>651, 723, 772</td></tr>
+        <tr><td><code>TokenRefresher.EnsureValidTokenAsync()</code></td><td><code>ITokenRefresher</code></td><td>532, 589, 613…</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IAppManagerClient</code>, <code>ITechieDeskAuthModeProvider</code>, <code>SessionTokenStore</code>, <code>ITokenRefresher</code>, <code>ILicenseService</code>, <code>IConfiguration</code>, <code>ToastService</code>, <code>ILogger&lt;Billing&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 18 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (CanLoad)</code> (line 29)</li>
+      <li><code>@if (isLoading)</code> (line 32)</li>
+      <li><code>@if (!CanLoad)</code> (line 46)</li>
+    </ul>
+    <h2 id="support-support"><code>/support</code> — Support<a class="anchor-link" href="#support-support">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Support.razor</code> (1312 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → ACCOUNT → Support</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — gated correctly: <code>New issue</code> is disabled, the status filter is disabled and the list shows a labelled empty state explaining that no support account exists.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> The create-issue Dialog, comment thread, attachments and change-priority (REQ-UI-032/033/047) sit behind the disabled <code>New issue</code> button and are <strong>unreachable on this install</strong>.</li>
+    </ul>
+    <p><img alt="Support" src="../screenshots/TechieDesk/support.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-4">Controls<a class="anchor-link" href="#controls-4">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>14</td><td>83, 84, 97, 98…</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>13</td><td>60, 72, 166, 195…</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>10</td><td>73, 84, 98, 112…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>8</td><td>121, 124, 184, 189…</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>4</td><td>63, 321, 430, 551</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>4</td><td>127, 243, 258, 514</td></tr>
+        <tr><td><code>&lt;Dialog&gt;</code></td><td>3</td><td>208, 334, 503</td></tr>
+        <tr><td><code>&lt;Textarea&gt;</code></td><td>3</td><td>274, 406, 528</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>2</td><td>118, 447</td></tr>
+        <tr><td><code>&lt;FileUpload&gt;</code></td><td>2</td><td>287, 412</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>1</td><td>172</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>1</td><td>230</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>1</td><td>304</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>1</td><td>306</td></tr>
+        <tr><td><code>&lt;Separator&gt;</code></td><td>1</td><td>476</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-4">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-4">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AppManager.AddIssueCommentAsync()</code></td><td><code>IAppManagerClient</code></td><td>920, 1005</td></tr>
+        <tr><td><code>AppManager.CloseIssueAsync()</code></td><td><code>IAppManagerClient</code></td><td>926</td></tr>
+        <tr><td><code>AppManager.CreateIssueAsync()</code></td><td><code>IAppManagerClient</code></td><td>823</td></tr>
+        <tr><td><code>AppManager.GetIssueAsync()</code></td><td><code>IAppManagerClient</code></td><td>868, 973</td></tr>
+        <tr><td><code>AppManager.ListIssuesAsync()</code></td><td><code>IAppManagerClient</code></td><td>732</td></tr>
+        <tr><td><code>AttachmentStore.BeginDraft()</code></td><td><code>ISupportAttachmentStore</code></td><td>773, 862, 937</td></tr>
+        <tr><td><code>AttachmentStore.DiscardDraft()</code></td><td><code>ISupportAttachmentStore</code></td><td>1189</td></tr>
+        <tr><td><code>AttachmentStore.Remove()</code></td><td><code>ISupportAttachmentStore</code></td><td>1180</td></tr>
+        <tr><td><code>AttachmentStore.SaveAsync()</code></td><td><code>ISupportAttachmentStore</code></td><td>1097, 1153</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Support&gt;</code></td><td>739, 840, 875…</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;Support&gt;</code></td><td>946</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;Support&gt;</code></td><td>977, 1038, 1214…</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>911, 1015, 1039…</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>835, 927, 931…</td></tr>
+        <tr><td><code>TokenRefresher.EnsureValidTokenAsync()</code></td><td><code>ITokenRefresher</code></td><td>731, 811, 867…</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IAppManagerClient</code>, <code>ITechieDeskAuthModeProvider</code>, <code>ITechieDeskUserContext</code>, <code>SessionTokenStore</code>, <code>ITokenRefresher</code>, <code>ISupportAttachmentStore</code>, <code>IAppVersionProvider</code>, <code>IConfiguration</code>, <code>ToastService</code>, <code>IJSRuntime</code>, <code>ILogger&lt;Support&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 19 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (CanUseSupport)</code> (line 58)</li>
+      <li><code>@if (isLoading)</code> (line 61)</li>
+      <li><code>@if (!BackendConfigured)</code> (line 81)</li>
+    </ul>
+    <h2 id="login-login"><code>/login</code> — Login<a class="anchor-link" href="#login-login">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Auth/Login.razor</code> (179 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → ACCOUNT → Sign in</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — AuthLayout (no sidebar), Email + Password Inputs, <code>Forgot password?</code>, <code>Sign in</code>, <code>Create one</code>, <code>Continue without an account</code>, and the offline banner.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, card stays centred.</li>
+      <li><strong>Known issues (2026-07-29):</strong> ✅ The sidebar <code>Sign in</code> link <strong>is</strong> actionable — driven this run with W3C pointer actions at the element centre. The older “not clickable” claim was a harness artifact (<code>element/click</code> no-ops on WebView content), not an app defect. Sign-in itself is <strong>unexercised</strong>: AppManager is unreachable and no test account may be invented (<code>_smoke-test-policy.md</code>).</li>
+      <li>⚠ <strong>Icon defect (TR-032):</strong> Icon not found: alert-circle renders as literal text on this screen.</li>
+    </ul>
+    <p><img alt="Login" src="../screenshots/TechieDesk/login.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-5">Controls<a class="anchor-link" href="#controls-5">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Input&gt;</code></td><td>2</td><td>23, 90</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>34, 35</td></tr>
+        <tr><td><code>&lt;Separator&gt;</code></td><td>2</td><td>68, 68</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>1</td><td>26</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>35</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-5">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-5">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AuthProvider.NotifySessionChanged()</code></td><td><code>TechieDeskAuthenticationStateProvider</code></td><td>140</td></tr>
+        <tr><td><code>Nav.NavigateTo()</code></td><td><code>NavigationManager</code></td><td>141</td></tr>
+        <tr><td><code>SignIn.SignInAsync()</code></td><td><code>IDesktopSignInService</code></td><td>128</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>ITechieDeskAuthModeProvider</code>, <code>IDesktopSignInService</code>, <code>TechieDeskAuthenticationStateProvider</code>, <code>NavigationManager</code></p>
+    <p><strong>Conditional render guards:</strong> 1 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (Banner is not null)</code> (line 32)</li>
+    </ul>
+    <h2 id="register-register"><code>/register</code> — Register<a class="anchor-link" href="#register-register">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Auth/Register.razor</code> (210 lines)</li>
+      <li><strong>Reached via:</strong> /login → “Create one”</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — First/Last name, Email, optional Mobile, Password + Confirm with the complexity hint, <code>Create account</code>, and the banner explaining there is no account to create.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Registration is <strong>unexercised</strong> — no licence server.</li>
+      <li>⚠ <strong>Icon defect (TR-032):</strong> Icon not found: alert-circle renders as literal text on this screen.</li>
+    </ul>
+    <p><img alt="Register" src="../screenshots/TechieDesk/register.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-6">Controls<a class="anchor-link" href="#controls-6">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>24, 25</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>1</td><td>16</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>25</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-6">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-6">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AuthProvider.NotifySessionChanged()</code></td><td><code>TechieDeskAuthenticationStateProvider</code></td><td>173</td></tr>
+        <tr><td><code>Nav.NavigateTo()</code></td><td><code>NavigationManager</code></td><td>174</td></tr>
+        <tr><td><code>SignIn.RegisterAsync()</code></td><td><code>IDesktopSignInService</code></td><td>163</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>ITechieDeskAuthModeProvider</code>, <code>IDesktopSignInService</code>, <code>TechieDeskAuthenticationStateProvider</code>, <code>NavigationManager</code></p>
+    <p><strong>Conditional render guards:</strong> 1 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (Banner is not null)</code> (line 22)</li>
+    </ul>
+    <h2 id="forgot-password-forgotpassword"><code>/forgot-password</code> — ForgotPassword<a class="anchor-link" href="#forgot-password-forgotpassword">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Auth/ForgotPassword.razor</code> (90 lines)</li>
+      <li><strong>Reached via:</strong> /login → “Forgot password?”</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — Email Input, <code>Send reset link</code>, <code>← Back to sign in</code>. Reached from <code>/login</code> → <code>Forgot password?</code>.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+    </ul>
+    <p><img alt="ForgotPassword" src="../screenshots/TechieDesk/forgot-password.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-7">Controls<a class="anchor-link" href="#controls-7">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>40, 41</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>1</td><td>9</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>1</td><td>18</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>1</td><td>26</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>1</td><td>29</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>41</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-7">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-7">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AppManager.ForgotPasswordAsync()</code></td><td><code>IAppManagerClient</code></td><td>72</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;ForgotPassword&gt;</code></td><td>75</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;ForgotPassword&gt;</code></td><td>81</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IAppManagerClient</code>, <code>ITechieDeskAuthModeProvider</code>, <code>ILogger&lt;ForgotPassword&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 3 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (emailError is not null)</code> (line 19)</li>
+      <li><code>@if (isBusy)</code> (line 27)</li>
+      <li><code>@if (submitted)</code> (line 38)</li>
+    </ul>
+    <h2 id="reset-password-resetpassword"><code>/reset-password</code> — ResetPassword<a class="anchor-link" href="#reset-password-resetpassword">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Auth/ResetPassword.razor</code> (151 lines)</li>
+      <li><strong>Reached via:</strong> emailed reset link only (token in the query string)</li>
+      <li><strong>Observed:</strong> ⚠ <strong>NOT RUNTIME-VERIFIED (2026-07-29)</strong> — the route is reachable only from an emailed reset link carrying a token, and no mail path exists on this install. Render-status remains unconfirmed.</li>
+      <li><strong>Visual (§4b):</strong> visual gate not run (2026-07-29) — screen not reached.</li>
+    </ul>
+    <h3 id="controls-8">Controls<a class="anchor-link" href="#controls-8">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>4</td><td>18, 19, 28, 29</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>2</td><td>19, 29</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>2</td><td>22, 60</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>2</td><td>37, 52</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>1</td><td>10</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>1</td><td>63</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-8">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-8">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>AppManager.ResetPasswordAsync()</code></td><td><code>IAppManagerClient</code></td><td>125</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;ResetPassword&gt;</code></td><td>142</td></tr>
+        <tr><td><code>Logger.LogInformation()</code></td><td><code>ILogger&lt;ResetPassword&gt;</code></td><td>126</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;ResetPassword&gt;</code></td><td>131</td></tr>
+        <tr><td><code>Nav.NavigateTo()</code></td><td><code>NavigationManager</code></td><td>22</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IAppManagerClient</code>, <code>ITechieDeskAuthModeProvider</code>, <code>NavigationManager</code>, <code>ILogger&lt;ResetPassword&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 5 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (succeeded)</code> (line 16)</li>
+      <li><code>@if (errorMessage is not null)</code> (line 26)</li>
+      <li><code>@if (passwordError is not null)</code> (line 38)</li>
+    </ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,889 @@
+@page "/billing"
+@using Microsoft.Extensions.Configuration
+@using TechieDesk.Services.Storage
+@using TechieDeskDb
+@inject IAppManagerClient AppManager
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject SessionTokenStore TokenStore
+@inject ITokenRefresher TokenRefresher
+@inject ILicenseService LicenseService
+@inject IInstanceModeService InstanceModeService
+@inject IConfiguration Configuration
+@inject ToastService ToastService
+@inject ILogger<Billing> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-030 / BRD-77 and REQ-UI-031 / BRD-78 — built to docs/mockups/billing.html.
+   Every figure on this page comes from AppManager, which is the system of record for billing.
+   Nothing is seeded: when no licence server is configured the tables stay empty and say WHY,
+   because an empty table with no explanation reads as "you have never been billed". *@
+
+<PageTitle>@Localizer["BillingPageTitle"]</PageTitle>
+
+<div class="td-stack">
+    <div class="flex flex-wrap items-baseline gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["BillingTitle"]</h1>
+            <TypographyMuted>@Localizer["BillingManagedByAppManager"]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button Href="/pricing" Variant="ButtonVariant.Outline" Size="ButtonSize.Small">@Localizer["ViewPlans"]</Button>
+            @if (CanLoad)
+            {
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="LoadAllAsync" Disabled="isLoading">
+                    @if (isLoading)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["BillingRefreshing"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["BillingRefresh"]</span>
+                    }
+                </Button>
+            }
+        </div>
+    </div>
+
+    @if (!CanLoad)
+    {
+        <Alert Variant="AlertVariant.Info">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+            <AlertTitle>@OfflineTitle</AlertTitle>
+            <AlertDescription>@OfflineDescription</AlertDescription>
+        </Alert>
+    }
+    else if (loadError is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["BillingLoadFailedTitle"]</AlertTitle>
+            <AlertDescription>@loadError</AlertDescription>
+        </Alert>
+    }
+
+    <div class="td-grid-2col">
+        <!-- REQ-UI-030: active subscription + cancel -->
+        <Card>
+            <CardHeader>
+                <div class="flex items-start gap-2">
+                    <div>
+                        <CardTitle>@Localizer["BillingActiveSubscription"]</CardTitle>
+                        <CardDescription>@Localizer["BillingManagedByAppManager"]</CardDescription>
+                    </div>
+                    <div class="ml-auto">
+                        <Button Href="/pricing" Variant="ButtonVariant.Link" Size="ButtonSize.Small">@Localizer["BillingViewPlansLink"]</Button>
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent Class="td-stack-tight">
+                @if (isLoading && subscription is null)
+                {
+                    <Skeleton Class="h-6 w-full rounded" />
+                    <Skeleton Class="h-10 w-full rounded" />
+                }
+                else if (subscription is null)
+                {
+                    <Empty Class="td-empty">
+                        <EmptyIcon><LucideIcon aria-hidden="true" Name="credit-card" Size="40" /></EmptyIcon>
+                        <EmptyTitle>@Localizer["BillingNoSubscriptionTitle"]</EmptyTitle>
+                        <EmptyDescription>@NoSubscriptionReason</EmptyDescription>
+                    </Empty>
+                }
+                else
+                {
+                    <div class="flex items-center gap-2">
+                        <span class="text-base font-bold">@subscription.PlanName</span>
+                        <Badge Variant="@StatusBadge(subscription.Status)">@(subscription.Status ?? "Unknown")</Badge>
+                        @if (subscription.CancelAtPeriodEnd)
+                        {
+                            <Badge Variant="BadgeVariant.Outline">@Localizer["BillingEndsAtPeriodEnd"]</Badge>
+                        }
+                    </div>
+                    <div class="td-plan-amount">
+                        @FormatMoney(subscription.Amount, subscription.CurrencyCode)
+                        <span class="td-plan-amount-suffix">@BillingCycleSuffix(subscription.BillingCycle)</span>
+                    </div>
+                    <div class="text-sm">
+                        @if (subscription.NextBillingDate is not null)
+                        {
+                            <div class="td-kv">
+                                <span class="td-kv-key">@Localizer["BillingNextBilling"]</span>
+                                <span class="td-kv-value">@FormatDate(subscription.NextBillingDate)</span>
+                            </div>
+                        }
+                        @if (subscription.CurrentPeriodEnd is not null)
+                        {
+                            <div class="td-kv">
+                                <span class="td-kv-key">@Localizer["BillingCurrentPeriodEnds"]</span>
+                                <span class="td-kv-value">@FormatDate(subscription.CurrentPeriodEnd)</span>
+                            </div>
+                        }
+                    </div>
+
+                    @if (!IsCancellable(subscription))
+                    {
+                        <TypographyMuted>@Localizer["BillingAlreadyCancelledNote"]</TypographyMuted>
+                    }
+                    else
+                    {
+                        <div class="flex flex-wrap items-center gap-2">
+                            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                    OnClick="@(() => OpenCancelDialog(false))" Disabled="isCancelling">
+                                @Localizer["BillingCancelAtPeriodEnd"]
+                            </Button>
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                    OnClick="@(() => OpenCancelDialog(true))" Disabled="isCancelling">
+                                @Localizer["BillingCancelImmediately"]
+                            </Button>
+                        </div>
+                        <TypographyMuted>@Localizer["BillingCancelKeepsAccess"]</TypographyMuted>
+                    }
+                }
+            </CardContent>
+        </Card>
+
+        <!-- REQ-UI-030: licence key, status, expiry, devices -->
+        <Card>
+            <CardHeader>
+                <CardTitle>@Localizer["BillingLicenseTitle"]</CardTitle>
+                <CardDescription>@Localizer["BillingLicenseDescription"]</CardDescription>
+            </CardHeader>
+            <CardContent Class="td-stack-tight">
+                <div class="text-sm">
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingLicenseKeyLabel"]</span>
+                        <span class="td-licence-key">@LicenseKeyDisplay</span>
+                    </div>
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingStatusLabel"]</span>
+                        <Badge Variant="@StatusBadge(LicenseStatusText)">@LicenseStatusText</Badge>
+                    </div>
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingPlanLabel"]</span>
+                        <span class="td-kv-value">@LicensePlanDisplay</span>
+                    </div>
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingExpiresLabel"]</span>
+                        <span class="td-kv-value">@LicenseExpiryDisplay</span>
+                    </div>
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingDevicesLabel"]</span>
+                        <span class="td-kv-value">@LicenseDevicesDisplay</span>
+                    </div>
+                    @* REQ-FN-044/045 (BRD-142/143) — instance mode and the AppManager seat behind
+                       it, on the licence surface that already exists rather than a new screen. *@
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingInstanceModeLabel"]</span>
+                        <span class="td-kv-value">@InstanceModeDisplay</span>
+                    </div>
+                    <div class="td-kv">
+                        <span class="td-kv-key">@Localizer["BillingTeamSeatLabel"]</span>
+                        <span class="td-kv-value">@SeatDisplay</span>
+                    </div>
+                </div>
+                @* BRD-129 is absolute: a lapsed seat costs paid team features, never access to
+                   your own documents. Stated as a muted fact, deliberately not an Alert. *@
+                @if (instanceMode is { IsSeatDegraded: true } degraded && degraded.Seat != SeatState.None)
+                {
+                    <TypographyMuted>@degraded.Describe(LocalizeLicense)</TypographyMuted>
+                }
+                @if (license is { LicenseId: > 0 } && license.MaxDevices is > 0)
+                {
+                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="OpenDeactivateDialog"
+                            Disabled="isDeactivating">
+                        @Localizer["BillingDeactivateDevice"]
+                    </Button>
+                }
+                else
+                {
+                    <TypographyMuted>@Localizer["BillingDeviceActivationsNote"]</TypographyMuted>
+                }
+            </CardContent>
+        </Card>
+    </div>
+
+    <!-- REQ-UI-031: transactions -->
+    <Card>
+        <CardHeader>
+            <CardTitle>@Localizer["BillingTransactionsTitle"]</CardTitle>
+            <CardDescription>@Localizer["BillingTransactionsDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="td-stack-tight">
+            @if (isLoading && transactions.Count == 0)
+            {
+                <Skeleton Class="h-9 w-full rounded" />
+                <Skeleton Class="h-9 w-full rounded" />
+            }
+            else if (transactions.Count == 0)
+            {
+                <Empty Class="td-empty">
+                    <EmptyIcon><LucideIcon aria-hidden="true" Name="receipt" Size="40" /></EmptyIcon>
+                    <EmptyTitle>@Localizer["BillingNoTransactionsTitle"]</EmptyTitle>
+                    <EmptyDescription>@NoPaymentDataReason</EmptyDescription>
+                </Empty>
+            }
+            else
+            {
+                <div class="relative overflow-x-auto">
+                    <DataTable TData="TransactionData" Data="@transactions" ShowToolbar="false" ShowPagination="false"
+                               InitialPageSize="@PageSize" IsLoading="isLoading">
+                        <Columns>
+                            <DataTableColumn TData="TransactionData" TValue="string"
+                                             Property="@(row => row.TransactionNumber ?? string.Empty)" Header="@Localizer["BillingColNumber"]" />
+                            <DataTableColumn TData="TransactionData" TValue="string"
+                                             Property="@(row => row.TransactionType ?? string.Empty)" Header="@Localizer["BillingColType"]" />
+                            <DataTableColumn TData="TransactionData" TValue="decimal"
+                                             Property="@(row => row.Amount)" Header="@Localizer["BillingColAmount"]">
+                                <CellTemplate Context="row">
+                                    @FormatMoney(row.Amount, row.CurrencyCode)
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="TransactionData" TValue="string"
+                                             Property="@(row => row.Status ?? string.Empty)" Header="@Localizer["BillingStatusLabel"]">
+                                <CellTemplate Context="row">
+                                    <Badge Variant="@StatusBadge(row.Status)">@(row.Status ?? "Unknown")</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="TransactionData" TValue="string"
+                                             Property="@(row => row.TransactionDate.ToString("yyyy-MM-dd"))" Header="@Localizer["BillingColDate"]" />
+                        </Columns>
+                    </DataTable>
+                </div>
+                @if (transactionPages > 1)
+                {
+                    <div class="flex items-center gap-2">
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                Disabled="@(transactionPage <= 1 || isLoading)"
+                                OnClick="@(() => ChangeTransactionPageAsync(transactionPage - 1))">@Localizer["BillingPrevious"]</Button>
+                        <TypographyMuted>@Localizer["BillingPageOf", transactionPage, transactionPages]</TypographyMuted>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                Disabled="@(transactionPage >= transactionPages || isLoading)"
+                                OnClick="@(() => ChangeTransactionPageAsync(transactionPage + 1))">@Localizer["BillingNext"]</Button>
+                    </div>
+                }
+            }
+        </CardContent>
+    </Card>
+
+    <!-- REQ-UI-031: invoices + PDF download -->
+    <Card>
+        <CardHeader>
+            <CardTitle>@Localizer["BillingInvoicesTitle"]</CardTitle>
+            <CardDescription>@Localizer["BillingInvoicesDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="td-stack-tight">
+            @if (isLoading && invoices.Count == 0)
+            {
+                <Skeleton Class="h-9 w-full rounded" />
+                <Skeleton Class="h-9 w-full rounded" />
+            }
+            else if (invoices.Count == 0)
+            {
+                <Empty Class="td-empty">
+                    <EmptyIcon><LucideIcon aria-hidden="true" Name="file-text" Size="40" /></EmptyIcon>
+                    <EmptyTitle>@Localizer["BillingNoInvoicesTitle"]</EmptyTitle>
+                    <EmptyDescription>@NoPaymentDataReason</EmptyDescription>
+                </Empty>
+            }
+            else
+            {
+                <div class="relative overflow-x-auto">
+                    <DataTable TData="InvoiceData" Data="@invoices" ShowToolbar="false" ShowPagination="false"
+                               InitialPageSize="@PageSize" IsLoading="isLoading">
+                        <Columns>
+                            <DataTableColumn TData="InvoiceData" TValue="string"
+                                             Property="@(row => row.InvoiceNumber ?? string.Empty)" Header="@Localizer["BillingColInvoice"]" />
+                            <DataTableColumn TData="InvoiceData" TValue="decimal"
+                                             Property="@(row => row.TotalAmount)" Header="@Localizer["BillingColAmount"]">
+                                <CellTemplate Context="row">
+                                    @FormatMoney(row.TotalAmount, row.CurrencyCode)
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="InvoiceData" TValue="string"
+                                             Property="@(row => row.InvoiceDate.ToString("yyyy-MM-dd"))" Header="@Localizer["BillingColDate"]" />
+                            <DataTableColumn TData="InvoiceData" TValue="string"
+                                             Property="@(row => row.Status ?? string.Empty)" Header="@Localizer["BillingStatusLabel"]">
+                                <CellTemplate Context="row">
+                                    <Badge Variant="@StatusBadge(row.Status)">@(row.Status ?? "Unknown")</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="InvoiceData" TValue="int" Property="@(row => row.InvoiceId)" Header="@Localizer["BillingColInvoiceActions"]" HeaderClass="td-th-label-hidden">
+                                <CellTemplate Context="row">
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                            Disabled="@(downloadingInvoiceId == row.InvoiceId)"
+                                            OnClick="@(() => DownloadInvoiceAsync(row))">
+                                        @if (downloadingInvoiceId == row.InvoiceId)
+                                        {
+                                            <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                                            <span>@Localizer["BillingDownloading"]</span>
+                                        }
+                                        else
+                                        {
+                                            <Button.Icon><LucideIcon aria-hidden="true" Name="download" Size="14" /></Button.Icon>
+                                            <span>@Localizer["BillingDownloadPdf"]</span>
+                                        }
+                                    </Button>
+                                </CellTemplate>
+                            </DataTableColumn>
+                        </Columns>
+                    </DataTable>
+                </div>
+                @if (invoicePages > 1)
+                {
+                    <div class="flex items-center gap-2">
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                Disabled="@(invoicePage <= 1 || isLoading)"
+                                OnClick="@(() => ChangeInvoicePageAsync(invoicePage - 1))">@Localizer["BillingPrevious"]</Button>
+                        <TypographyMuted>@Localizer["BillingPageOf", invoicePage, invoicePages]</TypographyMuted>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                Disabled="@(invoicePage >= invoicePages || isLoading)"
+                                OnClick="@(() => ChangeInvoicePageAsync(invoicePage + 1))">@Localizer["BillingNext"]</Button>
+                    </div>
+                }
+                <TypographyMuted>
+                    @Localizer["BillingInvoiceFolderNote"]
+                    <code class="text-xs">@InvoiceFolder</code>.
+                </TypographyMuted>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+<AlertDialog @bind-Open="showCancelDialog">
+    <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>@(cancelImmediately ? Localizer["BillingCancelNowTitle"].Value : Localizer["BillingCancelPeriodEndTitle"].Value)</AlertDialogTitle>
+            <AlertDialogDescription>
+                @if (cancelImmediately)
+                {
+                    <text>@Localizer["BillingCancelNowDescription"]</text>
+                }
+                else
+                {
+                    <text>@Localizer["BillingCancelPeriodEndDescription", FormatDate(subscription?.CurrentPeriodEnd ?? subscription?.NextBillingDate)]</text>
+                }
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCancelDialog = false)" Disabled="isCancelling">
+                @Localizer["BillingKeepSubscription"]
+            </Button>
+            <Button Variant="@(cancelImmediately ? ButtonVariant.Destructive : ButtonVariant.Default)"
+                    OnClick="ConfirmCancelAsync" Disabled="isCancelling">
+                @if (isCancelling)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                    <span>@Localizer["BillingCancelling"]</span>
+                }
+                else
+                {
+                    <span>@(cancelImmediately ? Localizer["BillingCancelNow"].Value : Localizer["BillingCancelAtPeriodEnd"].Value)</span>
+                }
+            </Button>
+        </AlertDialogFooter>
+    </AlertDialogContent>
+</AlertDialog>
+
+<AlertDialog @bind-Open="showDeactivateDialog">
+    <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>@Localizer["BillingDeactivateDevice"]</AlertDialogTitle>
+            <AlertDialogDescription>
+                @Localizer["BillingDeactivateDescription"]
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+        <Field IsInvalid="@(deactivateError is not null)">
+            <FieldLabel>@Localizer["BillingDeviceIdLabel"]</FieldLabel>
+            <FieldContent>
+                <Input @bind-Value="deviceIdText" Placeholder="@Localizer["BillingDeviceIdPlaceholder"]" AriaLabel="@Localizer["BillingDeviceIdLabel"]"
+                       AriaInvalid="@(deactivateError is not null)" />
+                @if (deactivateError is not null)
+                {
+                    <FieldError>@deactivateError</FieldError>
+                }
+            </FieldContent>
+        </Field>
+        <AlertDialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeactivateDialog = false)" Disabled="isDeactivating">
+                @Localizer["Cancel"]
+            </Button>
+            <Button OnClick="ConfirmDeactivateAsync" Disabled="isDeactivating">
+                @if (isDeactivating)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                    <span>@Localizer["BillingDeactivating"]</span>
+                }
+                else
+                {
+                    <span>@Localizer["BillingDeactivate"]</span>
+                }
+            </Button>
+        </AlertDialogFooter>
+    </AlertDialogContent>
+</AlertDialog>
+
+@code {
+    /// <summary>Rows fetched per page from the paginated PaymentSvc endpoints.</summary>
+    private const int PageSize = 20;
+
+    /// <summary>Folder beneath the data directory that downloaded invoice PDFs are written to.</summary>
+    private const string InvoiceFolderName = "invoices";
+
+    private LicenseStatus? licenseStatus;
+
+    // REQ-UI-055 (BRD-91): the licensing services return a resource KEY plus its arguments, never
+    // an English sentence. This is the single call that turns one into text on this surface.
+    private string LocalizeLicense(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
+    private InstanceModeStatus? instanceMode;
+    private SubscriptionData? subscription;
+    private UserLicenseData? license;
+    private List<TransactionData> transactions = new();
+    private List<InvoiceData> invoices = new();
+
+    private int transactionPage = 1;
+    private int transactionPages;
+    private int invoicePage = 1;
+    private int invoicePages;
+
+    private bool isLoading;
+    private string? loadError;
+
+    private bool showCancelDialog;
+    private bool cancelImmediately;
+    private bool isCancelling;
+
+    private bool showDeactivateDialog;
+    private string deviceIdText = string.Empty;
+    private string? deactivateError;
+    private bool isDeactivating;
+
+    private int? downloadingInvoiceId;
+
+    private bool CanLoad => AuthMode.IsAppManagerEnabled && TokenStore.HasSession;
+
+    private string OfflineTitle => AuthMode.IsAppManagerEnabled
+        ? Localizer["BillingOfflineTitleSignIn"]
+        : Localizer["BillingOfflineTitleNoServer"];
+
+    private string OfflineDescription => AuthMode.IsAppManagerEnabled
+        ? Localizer["BillingOfflineDescriptionSignIn"]
+        : Localizer["BillingOfflineDescriptionNoServer"];
+
+    private string NoSubscriptionReason => CanLoad
+        ? Localizer["BillingNoSubscriptionReported"]
+        : Localizer["BillingNothingFetchedNoServer"];
+
+    private string NoPaymentDataReason => CanLoad
+        ? Localizer["BillingNoRecordsReturned"]
+        : Localizer["BillingNothingFetchedNoServer"];
+
+    private string InvoiceFolder => Path.Combine(
+        DataDirectory.Resolve(Configuration[DataDirectory.ConfigKey]), InvoiceFolderName);
+
+    private string LicenseKeyDisplay => license?.LicenseKey is { Length: > 0 } key
+        ? key
+        : Localizer["BillingLicenseKeyNotIssued"];
+
+    private string LicenseStatusText =>
+        license?.Status
+        ?? licenseStatus?.Status
+        ?? Localizer["BillingUnknown"];
+
+    private string LicensePlanDisplay =>
+        license?.LicenseName
+        ?? licenseStatus?.LicenseName
+        ?? Localizer["BillingUnknown"];
+
+    private string LicenseExpiryDisplay
+    {
+        get
+        {
+            var expiry = license?.ExpiryDate ?? licenseStatus?.ExpiryDate;
+            if (expiry is null)
+            {
+                return Localizer["BillingExpiryNever"];
+            }
+
+            var days = license?.DaysRemaining ?? licenseStatus?.DaysRemaining;
+            return days is null
+                ? FormatDate(expiry)
+                : Localizer["BillingExpiryWithDays", FormatDate(expiry), days];
+        }
+    }
+
+    private string LicenseDevicesDisplay
+    {
+        get
+        {
+            if (license is null)
+            {
+                return Localizer["BillingDevicesThisDeviceOnly"];
+            }
+
+            return (license.ActivatedDevices, license.MaxDevices) switch
+            {
+                ({ } used, { } max) => Localizer["BillingDevicesUsedOfMax", used, max],
+                (null, { } max) => Localizer["BillingDevicesUpTo", max],
+                _ => Localizer["BillingDevicesNotTracked"]
+            };
+        }
+    }
+
+    /// <summary>
+    /// REQ-FN-044: the resolved mode, shown as a plain word. Never blank — the service floors at
+    /// Individual, so there is always something honest to render.
+    /// </summary>
+    private string InstanceModeDisplay => instanceMode?.Mode switch
+    {
+        InstanceMode.Team => Localizer["BillingInstanceModeTeam"],
+        InstanceMode.Enterprise => Localizer["BillingInstanceModeEnterprise"],
+        _ => Localizer["BillingInstanceModeIndividual"]
+    };
+
+    /// <summary>REQ-FN-045: the state of the organisation seat backing this install.</summary>
+    private string SeatDisplay => instanceMode?.Seat switch
+    {
+        SeatState.Assigned => instanceMode.IsFromCache
+            ? Localizer["BillingSeatAssignedCached"]
+            : Localizer["BillingSeatAssigned"],
+        SeatState.Unassigned => Localizer["BillingSeatUnassigned"],
+        SeatState.Expired => Localizer["BillingSeatExpired"],
+        SeatState.Revoked => Localizer["BillingSeatRevoked"],
+        SeatState.Unverified => Localizer["BillingSeatUnverified"],
+        _ => Localizer["BillingSeatNone"]
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        licenseStatus = await LicenseService.EnsureFreshAsync();
+
+        // REQ-FN-044/045: resolves from the licence status just read — no extra AppManager call
+        // and no second cache. Fails open to Individual, so it cannot break the billing page.
+        instanceMode = await InstanceModeService.EnsureFreshAsync();
+
+        if (CanLoad)
+        {
+            await LoadAllAsync();
+        }
+    }
+
+    private async Task LoadAllAsync()
+    {
+        if (!CanLoad)
+        {
+            return;
+        }
+
+        isLoading = true;
+        loadError = null;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            var token = TokenStore.AccessToken!;
+
+            var subscriptions = await AppManager.GetSubscriptionsAsync(token);
+            subscription = subscriptions.FirstOrDefault(candidate => IsCancellable(candidate))
+                ?? subscriptions.FirstOrDefault();
+
+            var licenses = await AppManager.GetLicensesAsync(token);
+            license = licenses.FirstOrDefault(candidate =>
+                    string.Equals(candidate.Status, "Active", StringComparison.OrdinalIgnoreCase))
+                ?? licenses.FirstOrDefault();
+
+            await LoadTransactionsAsync(token, transactionPage);
+            await LoadInvoicesAsync(token, invoicePage);
+        }
+        catch (AppManagerException exception)
+        {
+            Logger.LogWarning("Billing load failed ({ErrorCode})", exception.ErrorCode);
+            loadError = Localizer["BillingLoadRejected", exception.ErrorCode, exception.Message];
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Billing load failed");
+            loadError = Localizer["BillingLoadUnreachable"];
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadTransactionsAsync(string token, int page)
+    {
+        var result = await AppManager.GetTransactionsAsync(token, page, PageSize);
+        transactions = result.Items;
+        transactionPage = result.Page > 0 ? result.Page : page;
+        transactionPages = result.TotalPages;
+    }
+
+    private async Task LoadInvoicesAsync(string token, int page)
+    {
+        var result = await AppManager.GetInvoicesAsync(token, page, PageSize);
+        invoices = result.Items;
+        invoicePage = result.Page > 0 ? result.Page : page;
+        invoicePages = result.TotalPages;
+    }
+
+    private async Task ChangeTransactionPageAsync(int page)
+    {
+        if (!CanLoad || page < 1 || (transactionPages > 0 && page > transactionPages))
+        {
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await LoadTransactionsAsync(TokenStore.AccessToken!, page);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Transaction page {Page} could not be loaded", page);
+            ToastService.Error(Localizer["BillingTransactionsPageFailed"], Localizer["BillingErrorTitle"]);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ChangeInvoicePageAsync(int page)
+    {
+        if (!CanLoad || page < 1 || (invoicePages > 0 && page > invoicePages))
+        {
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await LoadInvoicesAsync(TokenStore.AccessToken!, page);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Invoice page {Page} could not be loaded", page);
+            ToastService.Error(Localizer["BillingInvoicesPageFailed"], Localizer["BillingErrorTitle"]);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCancelDialog(bool immediately)
+    {
+        cancelImmediately = immediately;
+        showCancelDialog = true;
+    }
+
+    private async Task ConfirmCancelAsync()
+    {
+        if (subscription is null || !CanLoad)
+        {
+            showCancelDialog = false;
+            return;
+        }
+
+        isCancelling = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.CancelSubscriptionAsync(
+                TokenStore.AccessToken!, subscription.SubscriptionId, cancelImmediately);
+
+            Logger.LogInformation(
+                "Subscription {SubscriptionId} cancelled (immediate: {Immediate})",
+                subscription.SubscriptionId, cancelImmediately);
+            ToastService.Success(
+                cancelImmediately
+                    ? Localizer["BillingCancelNowSuccess"].Value
+                    : Localizer["BillingCancelPeriodEndSuccess"].Value,
+                Localizer["BillingCancelledTitle"]);
+
+            showCancelDialog = false;
+            await LoadAllAsync();
+        }
+        catch (AppManagerException exception)
+        {
+            Logger.LogWarning("Subscription cancel failed ({ErrorCode})", exception.ErrorCode);
+
+            // ALREADY_CANCELLED is not a failure the user caused — the server and this screen
+            // simply disagreed, so refresh instead of showing an error the user cannot act on.
+            if (exception.Error == AppManagerError.AlreadyCancelled)
+            {
+                ToastService.Show(
+                    Localizer["BillingAlreadyCancelledBody"], Localizer["BillingAlreadyCancelledTitle"], ToastVariant.Default);
+                showCancelDialog = false;
+                await LoadAllAsync();
+            }
+            else
+            {
+                ToastService.Error(
+                    exception.Error == AppManagerError.SubscriptionNotFound
+                        ? Localizer["BillingSubscriptionNotFound"].Value
+                        : Localizer["BillingCancelFailed"].Value,
+                    Localizer["BillingErrorTitle"]);
+            }
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Subscription cancel failed");
+            ToastService.Error(Localizer["BillingServerUnreachable"], Localizer["BillingErrorTitle"]);
+        }
+        finally
+        {
+            isCancelling = false;
+        }
+    }
+
+    private void OpenDeactivateDialog()
+    {
+        deviceIdText = string.Empty;
+        deactivateError = null;
+        showDeactivateDialog = true;
+    }
+
+    private async Task ConfirmDeactivateAsync()
+    {
+        deactivateError = null;
+
+        if (!int.TryParse(deviceIdText.Trim(), out var deviceId) || deviceId <= 0)
+        {
+            deactivateError = Localizer["BillingDeviceIdRequired"];
+            return;
+        }
+
+        if (license is null || !CanLoad)
+        {
+            showDeactivateDialog = false;
+            return;
+        }
+
+        isDeactivating = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.DeactivateDeviceAsync(TokenStore.AccessToken!, license.LicenseId, deviceId);
+            Logger.LogInformation(
+                "Device {DeviceId} deactivated from license {LicenseId}", deviceId, license.LicenseId);
+            ToastService.Success(Localizer["BillingDeviceReleasedBody"], Localizer["BillingDeviceReleasedTitle"]);
+            showDeactivateDialog = false;
+            await LoadAllAsync();
+        }
+        catch (AppManagerException exception)
+        {
+            Logger.LogWarning("Device deactivation failed ({ErrorCode})", exception.ErrorCode);
+            deactivateError = exception.Error switch
+            {
+                AppManagerError.DeviceNotFound => Localizer["BillingDeactivateDeviceNotFound"],
+                AppManagerError.LicenseNotFound => Localizer["BillingDeactivateLicenseNotFound"],
+                AppManagerError.CrossAppLicense => Localizer["BillingDeactivateCrossAppLicense"],
+                _ => Localizer["BillingDeactivateFailedRetry"]
+            };
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Device deactivation failed");
+            deactivateError = Localizer["BillingDeactivateServerUnreachable"];
+        }
+        finally
+        {
+            isDeactivating = false;
+        }
+    }
+
+    /// <summary>
+    /// Fetches the PDF AppManager rendered and writes it beside the rest of TechieDesk's data.
+    /// TechieDesk never generates the document itself — AppManager owns the invoice record.
+    /// </summary>
+    private async Task DownloadInvoiceAsync(InvoiceData invoice)
+    {
+        if (!CanLoad)
+        {
+            return;
+        }
+
+        downloadingInvoiceId = invoice.InvoiceId;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            var document = await AppManager.DownloadInvoiceAsync(TokenStore.AccessToken!, invoice.InvoiceId);
+
+            var folder = InvoiceFolder;
+            Directory.CreateDirectory(folder);
+            var path = Path.Combine(folder, document.FileName);
+            await File.WriteAllBytesAsync(path, document.Content);
+
+            Logger.LogInformation("Invoice {InvoiceId} saved to {Path}", invoice.InvoiceId, path);
+            ToastService.Success(Localizer["BillingInvoiceSavedTo", path], Localizer["BillingInvoiceDownloadedTitle"]);
+            FileManagerReveal.Reveal(path);
+        }
+        catch (AppManagerException exception)
+        {
+            Logger.LogWarning("Invoice {InvoiceId} download failed ({ErrorCode})", invoice.InvoiceId, exception.ErrorCode);
+            ToastService.Error(
+                exception.Error switch
+                {
+                    AppManagerError.PdfGenerationFailed => Localizer["BillingInvoicePdfFailed"].Value,
+                    AppManagerError.InvoiceNotFound => Localizer["BillingInvoiceNotFound"].Value,
+                    _ => Localizer["BillingInvoiceDownloadFailed"].Value
+                },
+                Localizer["BillingDownloadFailedTitle"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Invoice {InvoiceId} download failed", invoice.InvoiceId);
+            ToastService.Error(Localizer["BillingInvoiceSaveFailed"], Localizer["BillingDownloadFailedTitle"]);
+        }
+        finally
+        {
+            downloadingInvoiceId = null;
+        }
+    }
+
+    private static bool IsCancellable(SubscriptionData candidate) =>
+        !candidate.CancelAtPeriodEnd
+        && !string.Equals(candidate.Status, "Cancelled", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(candidate.Status, "Canceled", StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatDate(DateTimeOffset? value) =>
+        value?.ToString("yyyy-MM-dd") ?? "—";
+
+    private string BillingCycleSuffix(string? billingCycle) => billingCycle?.ToLowerInvariant() switch
+    {
+        "monthly" => Localizer["BillingCycleMonthly"],
+        "yearly" or "annual" or "annually" => Localizer["BillingCycleYearly"],
+        "weekly" => Localizer["BillingCycleWeekly"],
+        null or "" => string.Empty,
+        _ => $"/{billingCycle.ToLowerInvariant()}"
+    };
+
+    private static string FormatMoney(decimal amount, string? currencyCode)
+    {
+        var code = string.IsNullOrWhiteSpace(currencyCode) ? "USD" : currencyCode.ToUpperInvariant();
+        var symbol = code switch
+        {
+            "USD" => "$",
+            "EUR" => "€",
+            "GBP" => "£",
+            "INR" => "₹",
+            _ => null
+        };
+
+        var magnitude = Math.Abs(amount).ToString("0.00");
+        var sign = amount < 0 ? "−" : string.Empty;
+        return symbol is null ? $"{sign}{magnitude} {code}" : $"{sign}{symbol}{magnitude}";
+    }
+
+    private static BadgeVariant StatusBadge(string? status) => status?.ToLowerInvariant() switch
+    {
+        "active" or "completed" or "paid" or "succeeded" => BadgeVariant.Default,
+        "processing" or "pending" or "due" => BadgeVariant.Secondary,
+        "failed" or "cancelled" or "canceled" or "expired" or "overdue" => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline
+    };
+}

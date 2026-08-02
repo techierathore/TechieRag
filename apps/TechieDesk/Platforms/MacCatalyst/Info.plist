@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>TechieDesk</string>
+	<key>CFBundleDisplayName</key>
+	<string>TechieDesk</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.techierathore.techiedesk</string>
+	<key>CFBundleVersion</key>
+	<string>1.0</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<!--
+	  LSMinimumSystemVersion is deliberately absent. On Mac Catalyst it carries the *macOS* version
+	  while SupportedOSPlatformVersion in the csproj carries the iOS-equivalent (15.0 -> macOS 12.0);
+	  stating both makes the SDK compare two different scales and fail. The SDK derives this.
+	-->
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>2</integer>
+	</array>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>XSAppIconAssets</key>
+	<string>Resources/AppIcon.appiconset</string>
+	<!--
+	  REQ-FN-051 (BRD-143) clause 3: a seat is one user on ONE INSTALL. This key is the Finder/Dock
+	  half — LaunchServices activates the running copy instead of starting a second one.
+
+	  It is deliberately NOT the whole guard, and must not be mistaken for it. It keys off the bundle
+	  identity, so it does nothing about launching the executable directly, about a SECOND COPY of
+	  the bundle elsewhere on disk, or about two copies pointed at one AppDb:DataDirectory — which is
+	  precisely what the acceptance clause names ("two copies racing on one data directory"). The
+	  enforcement that covers those cases is SingleInstanceGuard, which takes an exclusive lock on the
+	  data directory itself. Both ship; neither replaces the other.
+	-->
+	<key>LSMultipleInstancesProhibited</key>
+	<true/>
+	<!--
+	  REQ-NFR-008 (privacy / data locality): TechieDesk is a local-first operator console. It talks
+	  only to endpoints the operator configures (LLM/embedding providers, AppManager, a Docker
+	  daemon). No telemetry, no analytics, no background beacons.
+	-->
+	<key>NSHumanReadableCopyright</key>
+	<string>TechieDesk</string>
+	<!--
+	  REQ-UI-035 (BRD-87): mic dictation in the chat composer. macOS refuses to open the microphone
+	  at all unless the bundle declares WHY, and it refuses to hand a recording to the Speech
+	  framework unless that is declared separately. Both strings are shown verbatim in the system
+	  prompt, so they say what the audio is used for rather than restating the permission's name.
+
+	  Note what these keys do NOT do: they do not grant anything. The first dictation attempt raises
+	  an OS prompt the user must answer, and a refusal is permanent until it is changed in
+	  System Settings > Privacy & Security. The app treats a refusal as a disabled control, never as
+	  a reason to retry.
+	-->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>TechieDesk uses the microphone only while you hold the dictation button in the chat composer, to turn what you say into the message text. Nothing is recorded to disk and nothing is sent anywhere.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>TechieDesk uses macOS speech recognition to convert your dictated chat message into text. Recognition is performed by the system, not by TechieDesk.</string>
+</dict>
+</plist>

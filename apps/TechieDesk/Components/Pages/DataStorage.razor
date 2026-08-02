@@ -1,0 +1,270 @@
+@page "/settings/data"
+@using Microsoft.Extensions.Configuration
+@using TechieDesk.Services.Storage
+@using TechieDeskDb
+@inject IConfiguration Configuration
+@inject ToastService ToastService
+@inject ILogger<DataStorage> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-041 / BRD-133 — built to docs/mockups/data-storage.html. Every figure on this page is
+   measured from the live file system at render time; nothing here is seeded or illustrative. *@
+
+<PageTitle>@Localizer["StoragePageTitle"]</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["StorageHeading"]</h1>
+            <TypographyMuted>@Localizer["StorageSubtitle", HostDescription]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button Variant="ButtonVariant.Outline" OnClick="RevealDataDirectory">@RevealLabel</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="Refresh" Disabled="isMeasuring">
+                @if (isMeasuring)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                    <span>@Localizer["StorageMeasuring"]</span>
+                }
+                else
+                {
+                    <span>@Localizer["StorageRefresh"]</span>
+                }
+            </Button>
+        </div>
+    </div>
+
+    @* REQ-NFR-010: a file-system failure names itself rather than rendering an empty table that
+       reads as "TechieDesk stores nothing". *@
+    @if (measureError is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["StorageMeasureFailed"]</AlertTitle>
+            <AlertDescription>@measureError</AlertDescription>
+        </Alert>
+    }
+
+    <!-- Location -->
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["StorageBadgeLocation"]</Badge>
+                @if (snapshot is { DirectoryExists: true })
+                {
+                    <Badge Variant="BadgeVariant.Outline">@Localizer["StorageHealthy"]</Badge>
+                }
+                else
+                {
+                    <Badge Variant="BadgeVariant.Destructive">@Localizer["StorageMissing"]</Badge>
+                }
+            </div>
+            <CardTitle>@Localizer["StorageDataDirectory"]</CardTitle>
+            <CardDescription>@Localizer["StorageDataDirectoryDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-3">
+            <div class="flex items-center gap-3 overflow-x-auto rounded-md border bg-muted px-3 py-2.5">
+                <span class="whitespace-nowrap font-mono text-xs">@DataDirectoryPath</span>
+                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" Class="ml-auto whitespace-nowrap"
+                        OnClick="CopyPathAsync">@Localizer["StorageCopyPath"]</Button>
+            </div>
+            <TypographyMuted>
+                @Localizer["StorageWhereMacOs"] <code>~/Library/Application Support/TechieDesk</code>@Localizer["StorageWhereWindows"]
+                <code>%LOCALAPPDATA%\TechieDesk</code>@Localizer["StorageWhereSet"] <code>AppDb__DataDirectory</code>@Localizer["StorageWhereMove"]
+            </TypographyMuted>
+        </CardContent>
+    </Card>
+
+    <!-- Disk usage -->
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["StorageBadgeUsage"]</Badge>
+            </div>
+            <CardTitle>@Localizer["StorageDiskUsage"]</CardTitle>
+            <CardDescription>@UsageSummary</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <Progress aria-label="@Localizer["StorageVolumeUsed"]" Value="@Math.Round(snapshot?.VolumeUsedPercent ?? 0)" />
+            <div class="relative overflow-x-auto">
+                <DataTable TData="ArtefactRow" Data="@rows" ShowToolbar="false" ShowPagination="false"
+                           InitialPageSize="50" IsLoading="isMeasuring">
+                    <Columns>
+                        <DataTableColumn TData="ArtefactRow" TValue="string" Property="@(r => r.Name)" Header="@Localizer["StorageColumnArtefact"]">
+                            <CellTemplate Context="row">
+                                <div class="font-medium">@row.Name</div>
+                                <div class="text-xs text-muted-foreground">@row.Description</div>
+                            </CellTemplate>
+                        </DataTableColumn>
+                        <DataTableColumn TData="ArtefactRow" TValue="string" Property="@(r => r.RelativePath)" Header="@Localizer["StorageColumnPath"]">
+                            <CellTemplate Context="row">
+                                <code class="text-xs">@row.RelativePath</code>
+                            </CellTemplate>
+                        </DataTableColumn>
+                        <DataTableColumn TData="ArtefactRow" TValue="string" Property="@(r => r.Size)" Header="@Localizer["StorageColumnSize"]" />
+                        <DataTableColumn TData="ArtefactRow" TValue="string" Property="@(r => r.LastWritten)" Header="@Localizer["StorageColumnLastWritten"]" />
+                        <DataTableColumn TData="ArtefactRow" TValue="string" Property="@(r => r.Name)" Header="@Localizer["StorageColumnActions"]" HeaderClass="td-th-label-hidden">
+                            <CellTemplate Context="row">
+                                @* Only what exists can be revealed; an inert button on an artefact
+                                   that has never been created is worse than no button. *@
+                                @if (row.Exists)
+                                {
+                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                            OnClick="@(() => Reveal(row.FullPath))">@Localizer["StorageReveal"]</Button>
+                                }
+                            </CellTemplate>
+                        </DataTableColumn>
+                    </Columns>
+                </DataTable>
+            </div>
+            <TypographyMuted>
+                @Localizer["StorageSizesNote"]
+                &ldquo;@Localizer[DataStorageInspector.OtherArtefactNameKey]&rdquo;@Localizer["StorageSizesNoteEnd"]
+            </TypographyMuted>
+        </CardContent>
+    </Card>
+
+    <!-- Maintenance -->
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["StorageBadgeMaintenance"]</Badge>
+            </div>
+            <CardTitle>@Localizer["StorageDiagnostics"]</CardTitle>
+            <CardDescription>@Localizer["StorageDiagnosticsDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div class="flex flex-wrap gap-2">
+                <Button Variant="ButtonVariant.Outline" OnClick="RevealDataDirectory">@RevealLabel</Button>
+                <Button Variant="ButtonVariant.Outline" OnClick="RevealLogDirectory">@RevealLogsLabel</Button>
+            </div>
+            <Alert Variant="AlertVariant.Info">
+                <AlertTitle>@Localizer["StorageSurvivesTitle"]</AlertTitle>
+                <AlertDescription>@Localizer["StorageSurvivesBody"]</AlertDescription>
+            </Alert>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    private DataStorageSnapshot? snapshot;
+    private IReadOnlyList<ArtefactRow> rows = Array.Empty<ArtefactRow>();
+    private string? measureError;
+    private bool isMeasuring;
+
+    /// <summary>A measured artefact, pre-formatted for the table (REQ-UI-041).</summary>
+    private sealed record ArtefactRow(
+        string Name, string Description, string RelativePath, string Size, string LastWritten,
+        bool Exists, string FullPath);
+
+    // The data directory is resolved through DataDirectory, the single authority for it
+    // (REQ-FN-034/037) — never recomputed here from a home path or a content root.
+    private string DataDirectoryPath => DataDirectory.Resolve(Configuration[DataDirectory.ConfigKey]);
+
+    private static bool IsWindowsHost => OperatingSystem.IsWindows();
+
+    private string HostDescription => IsWindowsHost ? Localizer["StorageThisPc"].Value : Localizer["StorageThisMac"].Value;
+
+    private string RevealLabel => IsWindowsHost ? Localizer["StorageRevealWindows"].Value : Localizer["StorageRevealMac"].Value;
+
+    private string RevealLogsLabel => IsWindowsHost ? Localizer["StorageRevealLogsWindows"].Value : Localizer["StorageRevealLogsMac"].Value;
+
+    private string LogDirectoryPath => Path.Combine(DataDirectoryPath, DataDirectory.LogDirectoryName);
+
+    private string UsageSummary
+    {
+        get
+        {
+            if (snapshot is null)
+            {
+                return Localizer["StorageMeasuringDirectory"];
+            }
+
+            var present = snapshot.PresentArtefactCount;
+            var total = DataStorageInspector.FormatSize(snapshot.TotalSizeBytes);
+            var free = snapshot.VolumeTotalBytes > 0
+                ? Localizer["StorageFreeOnVolume", DataStorageInspector.FormatSize(snapshot.VolumeFreeBytes)].Value
+                : string.Empty;
+
+            return Localizer[present == 1 ? "StorageUsageSummaryOne" : "StorageUsageSummaryMany", total, present, free];
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await MeasureAsync();
+
+    private async Task Refresh() => await MeasureAsync();
+
+    // Walking the whole data directory touches thousands of files once the model is downloaded, so
+    // it runs off the UI thread — a settings page that freezes the window while it counts bytes is
+    // worse than one that says it is measuring.
+    private async Task MeasureAsync()
+    {
+        isMeasuring = true;
+        measureError = null;
+        StateHasChanged();
+
+        var directory = DataDirectoryPath;
+        try
+        {
+            var measured = await Task.Run(() => DataStorageInspector.Inspect(directory));
+            snapshot = measured;
+            rows = measured.Artefacts.Select(ToRow).ToArray();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to measure the data directory {Directory}", directory);
+            measureError = $"{directory} — {exception.Message}";
+            snapshot = null;
+            rows = Array.Empty<ArtefactRow>();
+        }
+        finally
+        {
+            isMeasuring = false;
+            StateHasChanged();
+        }
+    }
+
+    private ArtefactRow ToRow(DataStorageArtefact artefact) => new(
+        Localizer[artefact.NameKey].Value,
+        Localizer[artefact.DescriptionKey].Value,
+        artefact.RelativePath,
+        artefact.Exists ? DataStorageInspector.FormatSize(artefact.SizeBytes) : Localizer["StorageNotCreatedYet"].Value,
+        artefact.LastWrittenUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? Localizer["StorageNever"].Value,
+        artefact.Exists,
+        artefact.FullPath);
+
+    private void RevealDataDirectory() => Reveal(DataDirectoryPath);
+
+    private void RevealLogDirectory() => Reveal(LogDirectoryPath);
+
+    // The outcome is reported either way: a reveal that silently did nothing is the failure mode
+    // this REQ exists to remove.
+    private void Reveal(string path)
+    {
+        var outcome = FileManagerReveal.Reveal(path);
+        // REQ-UI-055: the outcome carries a resource key and its values, not a sentence.
+        var message = Localizer[outcome.MessageKey, outcome.Arguments].Value;
+        if (outcome.Launched)
+        {
+            ToastService.Success(message, RevealLabel);
+            return;
+        }
+
+        Logger.LogWarning("Reveal failed for {Path}: {MessageKey}", path, outcome.MessageKey);
+        ToastService.Error(message, Localizer["StorageRevealFailed"]);
+    }
+
+    private async Task CopyPathAsync()
+    {
+        try
+        {
+            await Clipboard.Default.SetTextAsync(DataDirectoryPath);
+            ToastService.Success(Localizer["StorageCopiedBody"], Localizer["StorageCopiedTitle"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Clipboard write failed");
+            ToastService.Error(Localizer["StorageClipboardUnavailable", exception.Message], Localizer["StorageNotCopied"]);
+        }
+    }
+}

@@ -93,7 +93,12 @@ public sealed class FeatureGateTests
 
         Assert.False(decision.IsEnabled);
         Assert.Equal("Enterprise", decision.RequiredLicense);
-        Assert.Equal("Upgrade required", decision.Reason);
+
+        // REQ-UI-055: FeatureSvc's own sentence is carried through VERBATIM and flagged as the
+        // server's. It is deliberately not matched against any English we know, and it is not
+        // mistaken for one of our own resource keys.
+        Assert.Equal("Upgrade required", decision.ServerReason);
+        Assert.Null(decision.ReasonKey);
     }
 
     /// <summary>Offline mode gates premium features (Free tier) and allows everything else.</summary>

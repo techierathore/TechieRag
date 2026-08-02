@@ -1,0 +1,1567 @@
+@page "/workspace/{Slug}/flows"
+@using TechieDesk.Services.Agents
+@using TechieDesk.Services.Flows
+@using TechieRag.Orchestration
+@using TrBlazeUI.Components.NumericInput
+@implements IEgressConfirmation
+@inject IWorkspaceService Workspaces
+@* REQ-UI-040 (BRD-92): the app half of the REQ-RAG-042 orchestration framework. *@
+@inject IWorkspaceFlowService Flows
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<WorkspaceFlows> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["FlowsPageTitle", workspace?.Name ?? Localizer["FlowsWorkspaceFallback"].Value]</PageTitle>
+
+@if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["FlowsWorkspaceNotAvailableTitle"]</AlertTitle>
+        <AlertDescription>@Localizer["FlowsWorkspaceNotAvailableBody"]</AlertDescription>
+    </Alert>
+}
+@* A storage outage is a different problem from a missing workspace and must say so (REQ-NFR-010). *@
+else if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["FlowsUnavailableTitle"]</AlertTitle>
+        <AlertDescription>@(Localizer["FlowsUnavailableBody", loadError])</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["FlowsLoading"]</span>
+    </div>
+}
+else if (editor is null)
+{
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@(Localizer["FlowsPageHeading", workspace.Name])</h1>
+            <TypographyMuted>@Localizer["FlowsPageSubtitle"]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="GoToAgents">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="bot" Size="16" /></Button.Icon>
+                @Localizer["FlowsOpenAgents"]
+            </Button>
+            <Button OnClick="BeginCreate">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                @Localizer["FlowsNewFlow"]
+            </Button>
+        </div>
+    </div>
+
+    <Card Class="overflow-hidden">
+        <CardHeader>
+            <CardTitle>@Localizer["FlowsListTitle"]</CardTitle>
+            <CardDescription>@Localizer["FlowsListDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent>
+            @if (items.Count == 0)
+            {
+                <div class="rounded border border-dashed p-6 text-center">
+                    <div class="font-semibold">@Localizer["FlowsEmptyTitle"]</div>
+                    <TypographyMuted Class="mt-1 block">@Localizer["FlowsEmptyBody"]</TypographyMuted>
+                </div>
+            }
+            else
+            {
+                <div class="relative overflow-x-auto">
+                    <DataTable TData="FlowListItem" Data="@items" ShowToolbar="false" ShowPagination="false"
+                               AriaLabel="@Localizer["FlowsTableAriaLabel"]">
+                        <Columns>
+                            <DataTableColumn TData="FlowListItem" TValue="string" Property="@(f => f.Record.Name)" Header="@Localizer["FlowsColumnName"]">
+                                <CellTemplate Context="row">
+                                    <div class="font-semibold">@row.Record.Name</div>
+                                    @if (!string.IsNullOrWhiteSpace(row.Record.Description))
+                                    {
+                                        <div class="text-xs text-muted-foreground">@row.Record.Description</div>
+                                    }
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="FlowListItem" TValue="string" Property="@(f => string.Empty)" Header="@Localizer["FlowsColumnShape"]">
+                                <CellTemplate Context="row">
+                                    <span class="text-sm">
+                                        @if (row.IsReadable)
+                                        {
+                                            @(Localizer["FlowsShapeSummary", row.NodeCount, row.EdgeCount])
+                                        }
+                                        else
+                                        {
+                                            @Localizer["FlowsShapeUnknown"]
+                                        }
+                                    </span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="FlowListItem" TValue="string" Property="@(f => string.Empty)" Header="@Localizer["FlowsColumnStatus"]">
+                                <CellTemplate Context="row">
+                                    @if (!row.IsReadable)
+                                    {
+                                        <Badge Variant="BadgeVariant.Destructive">@Localizer["FlowsStatusUnreadable"]</Badge>
+                                    }
+                                    else if (row.Record.IsEnabled)
+                                    {
+                                        <Badge Variant="BadgeVariant.Secondary">@Localizer["FlowsStatusEnabled"]</Badge>
+                                    }
+                                    else
+                                    {
+                                        <Badge Variant="BadgeVariant.Outline">@Localizer["FlowsStatusDisabled"]</Badge>
+                                    }
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="FlowListItem" TValue="string" Property="@(f => string.Empty)" Header="@Localizer["FlowsColumnUpdated"]">
+                                <CellTemplate Context="row">
+                                    <span class="text-sm text-muted-foreground">
+                                        @(row.Record.UpdatedAtUtc == default
+                                            ? Localizer["FlowsNever"].Value
+                                            : row.Record.UpdatedAtUtc.ToLocalTime().ToString("d MMM HH:mm"))
+                                    </span>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="FlowListItem" TValue="string" Property="@(f => string.Empty)" Header="@Localizer["FlowsColumnActions"]" HeaderClass="td-th-label-hidden">
+                                <CellTemplate Context="row">
+                                    <div class="flex items-center justify-end gap-1">
+                                        @* A row whose stored document could not be read offers no Edit
+                                           and no Run: opening an editor on a flow nobody could parse
+                                           would either invent a shape or silently discard the file. *@
+                                        @if (row.IsReadable)
+                                        {
+                                            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                    OnClick="@(() => BeginEdit(row))">@Localizer["FlowsEdit"]</Button>
+                                        }
+                                        <DropdownMenu>
+                                            @* REQ-NFR-005: the trigger renders its own button. *@
+                                            <DropdownMenuTrigger>
+                                                <span class="rounded p-1 text-muted-foreground hover:bg-muted">
+                                                    <LucideIcon aria-hidden="true" Name="ellipsis" Size="16" />
+                                                    <span class="sr-only">@(Localizer["FlowsRowActionsFor", row.Record.Name])</span>
+                                                </span>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                @if (row.IsReadable)
+                                                {
+                                                    <DropdownMenuItem OnClick="@(() => BeginRun(row))">
+                                                        <LucideIcon aria-hidden="true" Name="play" Size="14" />
+                                                        <span class="ml-2">@Localizer["FlowsRun"]</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem OnClick="@(() => ToggleEnabledAsync(row))">
+                                                        <LucideIcon aria-hidden="true" Name="power" Size="14" />
+                                                        <span class="ml-2">@Localizer[row.Record.IsEnabled ? "FlowsDisable" : "FlowsEnable"]</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                }
+                                                <DropdownMenuItem OnClick="@(() => BeginDelete(row))">
+                                                    <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                                                    <span class="ml-2">@Localizer["FlowsDelete"]</span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                </CellTemplate>
+                            </DataTableColumn>
+                        </Columns>
+                    </DataTable>
+                </div>
+
+                @* One unreadable row must not take the page down, and it must not be silently hidden
+                   either — the reason is printed so the operator knows which file to look at. *@
+                @foreach (var broken in items.Where(item => !item.IsReadable))
+                {
+                    <Alert Variant="AlertVariant.Warning" Class="mt-3">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                        <AlertDescription>
+                            @(Localizer["FlowsUnreadableNote", broken.Record.Name, broken.ReadError ?? string.Empty])
+                        </AlertDescription>
+                    </Alert>
+                }
+            }
+        </CardContent>
+    </Card>
+}
+else
+{
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["FlowsEditorHeading"]</h1>
+            <TypographyMuted>@Localizer["FlowsEditorSubtitle"]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="CancelEdit">@Localizer["FlowsBackToList"]</Button>
+            <Button OnClick="SaveAsync" Disabled="@isSaving">@Localizer["FlowsSave"]</Button>
+        </div>
+    </div>
+
+    <Card Class="mb-4">
+        <CardHeader>
+            <CardTitle>@Localizer["FlowsDetailsTitle"]</CardTitle>
+            <CardDescription>@Localizer["FlowsDetailsDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <Field>
+                <FieldLabel>@Localizer["FlowsFlowName"]</FieldLabel>
+                <FieldContent>
+                    <Input Value="@editor.Name" ValueChanged="OnFlowNameChanged" aria-label="@Localizer["FlowsFlowName"]" />
+                </FieldContent>
+            </Field>
+            <Field>
+                <FieldLabel>@Localizer["FlowsFlowDescription"]</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="editor.Description" aria-label="@Localizer["FlowsFlowDescription"]" />
+                </FieldContent>
+            </Field>
+            <div class="td-llm-pair">
+                <Field>
+                    <FieldLabel>@Localizer["FlowsStartNode"]</FieldLabel>
+                    <FieldContent>
+                        <Select TValue="string" Value="@(editor.StartNodeId ?? string.Empty)" ValueChanged="OnStartNodeChanged"
+                                DisplayTextSelector="StepTextFor">
+                            <SelectTrigger aria-label="@Localizer["FlowsStartNode"]">
+                                <SelectValue Placeholder="@Localizer["FlowsStartNodeImplicit"]" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem TValue="string" Value="@string.Empty" Text="@Localizer["FlowsStartNodeImplicit"]">@Localizer["FlowsStartNodeImplicit"]</SelectItem>
+                                @foreach (var node in editor.Nodes)
+                                {
+                                    <SelectItem TValue="string" Value="@node.Id" Text="@node.DisplayName">@node.DisplayName</SelectItem>
+                                }
+                            </SelectContent>
+                        </Select>
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>@Localizer["FlowsMaxSteps"]</FieldLabel>
+                    <FieldContent>
+                        <NumericInput TValue="int" Value="@editor.MaxSteps" ValueChanged="OnMaxStepsChanged" Min="1" Max="200" Step="1" />
+                        <FieldDescription>@Localizer["FlowsMaxStepsHint"]</FieldDescription>
+                    </FieldContent>
+                </Field>
+            </div>
+            <div class="flex items-center gap-3">
+                <Switch Checked="@editor.AllowCycles" CheckedChanged="OnAllowCyclesChanged" Id="flow-allowcycles" />
+                <div>
+                    <Label For="flow-allowcycles">@Localizer["FlowsAllowCycles"]</Label>
+                    <div class="text-xs text-muted-foreground">@Localizer["FlowsAllowCyclesHint"]</div>
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+
+    @* Live validation. FlowValidator.Validate is pure, synchronous and offline, so it is safe to run
+       on every edit; the CODE is what is translated, never the library's English message (the code is
+       the stable contract and the message is a fallback). *@
+    <Card Class="mb-4">
+        <CardHeader>
+            <CardTitle>@Localizer["FlowsValidationTitle"]</CardTitle>
+            <CardDescription>@Localizer["FlowsValidationDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent>
+            @if (validation.Count == 0)
+            {
+                <div class="flex items-center gap-2 text-sm">
+                    <LucideIcon aria-hidden="true" Name="check" Size="16" />
+                    <span>@Localizer["FlowsValidationNoIssues"]</span>
+                </div>
+            }
+            else
+            {
+                <div class="space-y-2">
+                    @foreach (var issue in validation)
+                    {
+                        <div class="flex items-start gap-2 border-b pb-2 last:border-b-0">
+                            @if (issue.Severity == FlowValidationSeverity.Error)
+                            {
+                                <Badge Variant="BadgeVariant.Destructive">@Localizer["FlowsSeverityError"]</Badge>
+                            }
+                            else
+                            {
+                                <Badge Variant="BadgeVariant.Outline">@Localizer["FlowsSeverityWarning"]</Badge>
+                            }
+                            <div class="min-w-0 flex-1">
+                                <div class="text-sm">@IssueText(issue)</div>
+                                <div class="text-xs text-muted-foreground">
+                                    @if (!string.IsNullOrWhiteSpace(issue.NodeId))
+                                    {
+                                        <span>@(Localizer["FlowsIssueAtNode", NodeLabelFor(issue.NodeId)])</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(issue.EdgeId))
+                                    {
+                                        <span>@(Localizer["FlowsIssueAtEdge", issue.EdgeId])</span>
+                                    }
+                                    <span class="ml-1">@issue.Code</span>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    @* The steps. Every editor below is built from FlowNodeCatalog.Describe(kind).Fields, so a node
+       kind added by a future library release renders here with no change to this file. *@
+    <Card Class="mb-4">
+        <CardHeader>
+            <CardTitle>@Localizer["FlowsStepsTitle"]</CardTitle>
+            <CardDescription>@Localizer["FlowsStepsDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div class="mb-3 flex flex-wrap gap-2">
+                @foreach (var kind in FlowNodeCatalog.Kinds)
+                {
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                            OnClick="@(() => AddNode(kind.Kind))">
+                        <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="14" /></Button.Icon>
+                        @KindName(kind.Kind)
+                    </Button>
+                }
+            </div>
+
+            @if (editor.Nodes.Count == 0)
+            {
+                <TypographyMuted>@Localizer["FlowsNoSteps"]</TypographyMuted>
+            }
+
+            @* A `foreach` over a snapshot rather than an indexed `for` loop: a `<` in a loop header
+               is indistinguishable from an opening tag to the localization scanner, which then reads
+               the loop header itself as untranslated English prose. *@
+            @foreach (var node in editor.Nodes.ToList())
+            {
+                var position = editor.Nodes.IndexOf(node);
+                var descriptor = FlowNodeCatalog.Describe(node.Kind);
+
+                <div class="mb-3 rounded border p-3">
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <Badge Variant="BadgeVariant.Secondary">@(Localizer["FlowsStepPosition", position + 1])</Badge>
+                        <span class="font-semibold">@node.DisplayName</span>
+                        <Badge Variant="BadgeVariant.Outline">@KindName(node.Kind)</Badge>
+                        @if (descriptor.UsesLlm)
+                        {
+                            <Badge Variant="BadgeVariant.Outline">@Localizer["FlowsUsesModel"]</Badge>
+                        }
+                        <div class="ml-auto flex items-center gap-1">
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" Disabled="@(position == 0)"
+                                    OnClick="@(() => MoveNode(position, -1))">
+                                <span class="sr-only">@Localizer["FlowsMoveUp"]</span>
+                                <LucideIcon aria-hidden="true" Name="chevron-up" Size="14" />
+                            </Button>
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" Disabled="@(position == editor.Nodes.Count - 1)"
+                                    OnClick="@(() => MoveNode(position, 1))">
+                                <span class="sr-only">@Localizer["FlowsMoveDown"]</span>
+                                <LucideIcon aria-hidden="true" Name="chevron-down" Size="14" />
+                            </Button>
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="@(() => RemoveNode(node))">
+                                <span class="sr-only">@Localizer["FlowsRemoveStep"]</span>
+                                <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                            </Button>
+                        </div>
+                    </div>
+                    <TypographyMuted Class="mb-2 block">@KindHint(node.Kind)</TypographyMuted>
+
+                    @foreach (var field in descriptor.Fields)
+                    {
+                        <Field Class="mb-2">
+                            <FieldLabel>
+                                @FieldLabelFor(node.Kind, field)@(field.IsRequired ? " *" : string.Empty)
+                            </FieldLabel>
+                            <FieldContent>
+                                @switch (field.Editor)
+                                {
+                                    case FlowFieldEditors.MultilineText:
+                                    case FlowFieldEditors.Json:
+                                        <Textarea Value="@GetText(node, field.Property)"
+                                                  ValueChanged="@((string value) => SetText(node, field.Property, value))"
+                                                  Class="min-h-[80px]"
+                                                  aria-label="@FieldLabelFor(node.Kind, field)" />
+                                        break;
+
+                                    case FlowFieldEditors.Number:
+                                        <Input Value="@GetText(node, field.Property)"
+                                               ValueChanged="@((string value) => SetText(node, field.Property, value))"
+                                               Type="InputType.Number"
+                                               aria-label="@FieldLabelFor(node.Kind, field)" />
+                                        break;
+
+                                    case FlowFieldEditors.AgentPicker:
+                                        <Select TValue="string" Value="@(node.AgentId ?? string.Empty)"
+                                                ValueChanged="@((string value) => SetText(node, field.Property, value))"
+                                                DisplayTextSelector="AgentTextFor">
+                                            <SelectTrigger aria-label="@FieldLabelFor(node.Kind, field)">
+                                                <SelectValue Placeholder="@Localizer["FlowsPickAgent"]" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                @foreach (var agent in agents)
+                                                {
+                                                    <SelectItem TValue="string" Value="@agent.Handle" Text="@("@" + agent.Handle)">@("@" + agent.Handle)</SelectItem>
+                                                }
+                                            </SelectContent>
+                                        </Select>
+                                        break;
+
+                                    case FlowFieldEditors.ToolPicker:
+                                        <Select TValue="string" Value="@(node.ToolName ?? string.Empty)"
+                                                ValueChanged="@((string value) => SetText(node, field.Property, value))">
+                                            <SelectTrigger aria-label="@FieldLabelFor(node.Kind, field)">
+                                                <SelectValue Placeholder="@Localizer["FlowsPickTool"]" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                @foreach (var tool in toolNames)
+                                                {
+                                                    <SelectItem TValue="string" Value="@tool" Text="@tool">@tool</SelectItem>
+                                                }
+                                            </SelectContent>
+                                        </Select>
+                                        break;
+
+                                    case FlowFieldEditors.NodePicker:
+                                        <Select TValue="string" Value="@(GetText(node, field.Property))"
+                                                ValueChanged="@((string value) => SetText(node, field.Property, value))"
+                                                DisplayTextSelector="StepTextFor">
+                                            <SelectTrigger aria-label="@FieldLabelFor(node.Kind, field)">
+                                                <SelectValue Placeholder="@Localizer["FlowsPickStep"]" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                @foreach (var target in editor.Nodes.Where(other => other.Id != node.Id))
+                                                {
+                                                    <SelectItem TValue="string" Value="@target.Id" Text="@target.DisplayName">@target.DisplayName</SelectItem>
+                                                }
+                                            </SelectContent>
+                                        </Select>
+                                        break;
+
+                                    case FlowFieldEditors.GuardrailPicker:
+                                        <div class="space-y-1">
+                                            @foreach (var guardrail in Flows.Guardrails)
+                                            {
+                                                <div class="flex items-start gap-2">
+                                                    <Checkbox Checked="@node.GuardrailIds.Contains(guardrail.Id)"
+                                                              CheckedChanged="@((bool value) => ToggleGuardrail(node, guardrail.Id, value))"
+                                                              Id="@($"guardrail-{node.Id}-{guardrail.Id}")" />
+                                                    <Label For="@($"guardrail-{node.Id}-{guardrail.Id}")">@GuardrailName(guardrail.Id)</Label>
+                                                </div>
+                                            }
+                                        </div>
+                                        break;
+
+                                    case FlowFieldEditors.Handoff:
+                                        <div class="space-y-2">
+                                            <Select TValue="string" Value="@(node.Handoff?.TargetNodeId ?? string.Empty)"
+                                                    ValueChanged="OnHandoffTargetChanged(node)"
+                                                    DisplayTextSelector="StepTextFor">
+                                                <SelectTrigger aria-label="@Localizer["FlowsHandoffTarget"]">
+                                                    <SelectValue Placeholder="@Localizer["FlowsPickStep"]" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    @foreach (var target in editor.Nodes.Where(other => other.Id != node.Id && other.Kind == FlowNodeKind.Agent))
+                                                    {
+                                                        <SelectItem TValue="string" Value="@target.Id" Text="@target.DisplayName">@target.DisplayName</SelectItem>
+                                                    }
+                                                </SelectContent>
+                                            </Select>
+                                            <Select TValue="string" Value="@((node.Handoff?.ContextMode ?? HandoffContextMode.LastOutputOnly).ToString())"
+                                                    ValueChanged="OnHandoffModeChanged(node)"
+                                                    DisplayTextSelector="HandoffModeTextFor">
+                                                <SelectTrigger aria-label="@Localizer["FlowsHandoffContext"]">
+                                                    <SelectValue Placeholder="@Localizer["FlowsHandoffContext"]" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    @foreach (var mode in FlowNodeCatalog.HandoffContextModes)
+                                                    {
+                                                        <SelectItem TValue="string" Value="@mode.ToString()" Text="@HandoffModeName(mode)">@HandoffModeName(mode)</SelectItem>
+                                                    }
+                                                </SelectContent>
+                                            </Select>
+                                            <Input Value="@string.Join(", ", node.Handoff?.CarryVariables ?? [])"
+                                                   ValueChanged="OnHandoffVariablesChanged(node)"
+                                                   Placeholder="@Localizer["FlowsHandoffVariablesPlaceholder"]"
+                                                   aria-label="@Localizer["FlowsHandoffVariables"]" />
+                                            <FieldDescription>@Localizer["FlowsHandoffVariablesHint"]</FieldDescription>
+                                        </div>
+                                        break;
+
+                                    default:
+                                        <Input Value="@GetText(node, field.Property)"
+                                               ValueChanged="@((string value) => SetText(node, field.Property, value))"
+                                               aria-label="@FieldLabelFor(node.Kind, field)" />
+                                        break;
+                                }
+                                <FieldDescription>@FieldHintFor(node.Kind, field)</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    }
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <Card Class="mb-4">
+        <CardHeader>
+            <CardTitle>@Localizer["FlowsLinksTitle"]</CardTitle>
+            <CardDescription>@Localizer["FlowsLinksDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="AddEdge"
+                        Disabled="@(editor.Nodes.Count < 2)">
+                    <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="14" /></Button.Icon>
+                    @Localizer["FlowsAddLink"]
+                </Button>
+                <div class="ml-auto flex items-center gap-2">
+                    <Label For="flow-sample">@Localizer["FlowsPreviewSample"]</Label>
+                    <Input Id="flow-sample" Value="@sampleValue" ValueChanged="OnSampleChanged"
+                           Class="max-w-[280px]" aria-label="@Localizer["FlowsPreviewSample"]" />
+                </div>
+            </div>
+            <TypographyMuted Class="mb-3 block">@Localizer["FlowsPreviewHint"]</TypographyMuted>
+
+            @if (editor.Edges.Count == 0)
+            {
+                <TypographyMuted>@Localizer["FlowsNoLinks"]</TypographyMuted>
+            }
+
+            @foreach (var edge in editor.Edges.ToList())
+            {
+                var current = edge;
+                <div class="mb-3 rounded border p-3">
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <Badge Variant="@(IsSampleSatisfied(current) ? BadgeVariant.Secondary : BadgeVariant.Outline)">
+                            @Localizer[IsSampleSatisfied(current) ? "FlowsPreviewTaken" : "FlowsPreviewNotTaken"]
+                        </Badge>
+                        <span class="text-xs text-muted-foreground">@current.Id</span>
+                        <div class="ml-auto">
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="@(() => RemoveEdge(current))">
+                                <span class="sr-only">@Localizer["FlowsRemoveLink"]</span>
+                                <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div class="td-llm-pair">
+                        <Field>
+                            <FieldLabel>@Localizer["FlowsLinkFrom"]</FieldLabel>
+                            <FieldContent>
+                                <Select TValue="string" Value="@current.FromNodeId" ValueChanged="OnEdgeFromChanged(current)"
+                                        DisplayTextSelector="StepTextFor">
+                                    <SelectTrigger aria-label="@Localizer["FlowsLinkFrom"]">
+                                        <SelectValue Placeholder="@Localizer["FlowsPickStep"]" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        @foreach (var node in editor.Nodes)
+                                        {
+                                            <SelectItem TValue="string" Value="@node.Id" Text="@node.DisplayName">@node.DisplayName</SelectItem>
+                                        }
+                                    </SelectContent>
+                                </Select>
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["FlowsLinkTo"]</FieldLabel>
+                            <FieldContent>
+                                <Select TValue="string" Value="@current.ToNodeId" ValueChanged="OnEdgeToChanged(current)"
+                                        DisplayTextSelector="StepTextFor">
+                                    <SelectTrigger aria-label="@Localizer["FlowsLinkTo"]">
+                                        <SelectValue Placeholder="@Localizer["FlowsPickStep"]" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        @foreach (var node in editor.Nodes)
+                                        {
+                                            <SelectItem TValue="string" Value="@node.Id" Text="@node.DisplayName">@node.DisplayName</SelectItem>
+                                        }
+                                    </SelectContent>
+                                </Select>
+                            </FieldContent>
+                        </Field>
+                    </div>
+
+                    <div class="td-llm-pair">
+                        <Field>
+                            <FieldLabel>@Localizer["FlowsLinkLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input Value="@(current.Label ?? string.Empty)" ValueChanged="OnEdgeLabelChanged(current)"
+                                       aria-label="@Localizer["FlowsLinkLabel"]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["FlowsLinkOrder"]</FieldLabel>
+                            <FieldContent>
+                                <NumericInput TValue="int" Value="@current.Order" ValueChanged="OnEdgeOrderChanged(current)" Min="0" Max="99" Step="1" />
+                                <FieldDescription>@Localizer["FlowsLinkOrderHint"]</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    </div>
+
+                    <Field>
+                        <FieldLabel>@Localizer["FlowsConditionKind"]</FieldLabel>
+                        <FieldContent>
+                            <Select TValue="string" Value="@ConditionKindValue(current)" ValueChanged="OnConditionKindChanged(current)"
+                                    DisplayTextSelector="ConditionKindTextFor">
+                                <SelectTrigger aria-label="@Localizer["FlowsConditionKind"]">
+                                    <SelectValue Placeholder="@Localizer["FlowsConditionAlways"]" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    @foreach (var kind in FlowNodeCatalog.ConditionKinds)
+                                    {
+                                        <SelectItem TValue="string" Value="@kind.ToString()" Text="@ConditionKindName(kind)">@ConditionKindName(kind)</SelectItem>
+                                    }
+                                </SelectContent>
+                            </Select>
+                        </FieldContent>
+                    </Field>
+
+                    @if (current.Condition is { } condition && condition.Kind != FlowConditionKind.Always)
+                    {
+                        <div class="td-llm-pair">
+                            <Field>
+                                <FieldLabel>@Localizer["FlowsConditionSource"]</FieldLabel>
+                                <FieldContent>
+                                    <Select TValue="string" Value="@condition.Source.ToString()" ValueChanged="OnConditionSourceChanged(condition)"
+                                        DisplayTextSelector="ConditionSourceTextFor">
+                                        <SelectTrigger aria-label="@Localizer["FlowsConditionSource"]">
+                                            <SelectValue Placeholder="@Localizer["FlowsConditionSource"]" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            @foreach (var source in FlowNodeCatalog.ConditionSources)
+                                            {
+                                                <SelectItem TValue="string" Value="@source.ToString()" Text="@ConditionSourceName(source)">@ConditionSourceName(source)</SelectItem>
+                                            }
+                                        </SelectContent>
+                                    </Select>
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>@Localizer["FlowsConditionSourceKey"]</FieldLabel>
+                                <FieldContent>
+                                    <Input Value="@(condition.SourceKey ?? string.Empty)" ValueChanged="OnConditionSourceKeyChanged(condition)"
+                                           aria-label="@Localizer["FlowsConditionSourceKey"]" />
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <Field>
+                            <FieldLabel>@Localizer["FlowsConditionOperand"]</FieldLabel>
+                            <FieldContent>
+                                <Input Value="@(condition.Operand ?? string.Empty)" ValueChanged="OnConditionOperandChanged(condition)"
+                                       aria-label="@Localizer["FlowsConditionOperand"]" />
+                            </FieldContent>
+                        </Field>
+                        <div class="flex items-center gap-3">
+                            <Switch Checked="@condition.IsCaseSensitive" CheckedChanged="OnConditionCaseChanged(condition)"
+                                    Id="@($"case-{current.Id}")" />
+                            <Label For="@($"case-{current.Id}")">@Localizer["FlowsConditionCaseSensitive"]</Label>
+                        </div>
+                    }
+                </div>
+            }
+        </CardContent>
+    </Card>
+}
+
+@* Run panel (REQ-UI-040). The trace is rendered from the run's own step reports, so it shows what
+   actually ran — including which branch was taken and which guardrail refused — rather than a
+   summary the page assembled. *@
+<Dialog @bind-Open="showRun">
+    <DialogContent Class="max-w-3xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer["FlowsRunTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["FlowsRunDescription"]</DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-3">
+            <Field>
+                <FieldLabel>@Localizer["FlowsRunInput"]</FieldLabel>
+                <FieldContent>
+                    <Textarea @bind-Value="runInput" Class="min-h-[80px]" aria-label="@Localizer["FlowsRunInput"]" />
+                </FieldContent>
+            </Field>
+
+            @if (runResult is not null)
+            {
+                <div class="flex flex-wrap items-center gap-2">
+                    <Badge Variant="@(runResult.IsSuccess ? BadgeVariant.Secondary : BadgeVariant.Destructive)">
+                        @OutcomeName(runResult.Outcome)
+                    </Badge>
+                    <span class="text-xs text-muted-foreground">@(Localizer["FlowsRunStepsExecuted", runResult.StepsExecuted])</span>
+                </div>
+
+                @if (runResult.Outcome == FlowRunOutcome.Blocked)
+                {
+                    <Alert Variant="AlertVariant.Warning">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="shield" Size="16" /></Alert.Icon>
+                        <AlertDescription>
+                            @(Localizer["FlowsRunBlockedBy", runResult.BlockedByGuardrailId ?? string.Empty, BlockedReasonText(runResult)])
+                        </AlertDescription>
+                    </Alert>
+                }
+                else if (runResult.Outcome == FlowRunOutcome.Failed)
+                {
+                    <Alert Variant="AlertVariant.Danger">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                        <AlertDescription>@(Localizer["FlowsRunFailure", runResult.FailureReason ?? string.Empty])</AlertDescription>
+                    </Alert>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(runResult.Output))
+                {
+                    <div>
+                        <div class="mb-1 text-sm font-semibold">@Localizer["FlowsRunOutput"]</div>
+                        <div class="rounded border p-2 text-sm">@runResult.Output</div>
+                    </div>
+                }
+            }
+
+            @if (runTrace is not null && runTrace.Entries.Count > 0)
+            {
+                <div>
+                    <div class="mb-1 text-sm font-semibold">@Localizer["FlowsRunTrace"]</div>
+                    <AgentTracePanel Entries="runTrace.Entries" />
+                </div>
+            }
+        </div>
+
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showRun = false)">@Localizer["FlowsRunClose"]</Button>
+            <Button OnClick="RunAsync" Disabled="@isRunning">
+                @Localizer[isRunning ? "FlowsRunning" : "FlowsRunStart"]
+            </Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["FlowsDeleteTitle"]</DialogTitle>
+            <DialogDescription>@(Localizer["FlowsDeleteBody", pendingDelete?.Record.Name ?? string.Empty])</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">@Localizer["FlowsCancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">@Localizer["FlowsDelete"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* Egress confirmation (REQ-NFR-013). A flow is a second path to the same tools, so it asks the same
+   question chat asks. Dismissing this — Escape, the close button, the backdrop — is a decline. *@
+<Dialog Open="showEgressDialog" OpenChanged="OnEgressDialogOpenChanged">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["FlowsEgressTitle"]</DialogTitle>
+            <DialogDescription>
+                @egressAgentName @Localizer["FlowsEgressWantsToUse"] <strong>@egressToolName</strong>@Localizer["FlowsEgressBody"]
+            </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-2 text-sm">
+            <TypographyMuted>@egressToolDescription</TypographyMuted>
+            <TypographyMuted>@Localizer["FlowsEgressScopeNote"]</TypographyMuted>
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => AnswerEgress(false))">@Localizer["FlowsEgressDeny"]</Button>
+            <Button OnClick="@(() => AnswerEgress(true))">@Localizer["FlowsEgressAllow"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Workspace? workspace;
+    private bool notFound;
+    private string? loadError;
+    private string? loadedSlug;
+
+    private readonly List<FlowListItem> items = new();
+    private readonly List<AgentDefinition> agents = new();
+    private readonly List<string> toolNames = new();
+
+    private FlowDefinition? editor;
+    private bool isEditorEnabled = true;
+    private IReadOnlyList<FlowValidationIssue> validation = [];
+    private string sampleValue = string.Empty;
+    private bool isSaving;
+
+    private FlowListItem? pendingDelete;
+    private bool showDeleteDialog;
+
+    private FlowDefinition? runFlow;
+    private string runInput = string.Empty;
+    private bool showRun;
+    private bool isRunning;
+    private FlowRunResult? runResult;
+    private AgentTrace? runTrace;
+
+    // ---- Egress confirmation (REQ-NFR-013) -----------------------------------------------------
+
+    private bool showEgressDialog;
+    private string egressToolName = string.Empty;
+    private string egressToolDescription = string.Empty;
+    private string egressAgentName = string.Empty;
+    private TaskCompletionSource<bool>? egressAnswer;
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug) return;
+        loadedSlug = Slug;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+        editor = null;
+        items.Clear();
+        agents.Clear();
+        toolNames.Clear();
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            await RefreshAsync();
+            agents.AddRange(await Flows.ListAgentsAsync(workspace.WorkspaceId));
+            toolNames.AddRange(await Flows.ListToolNamesAsync(workspace.WorkspaceId));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load flows for {Slug}", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (workspace is null) return;
+
+        items.Clear();
+        items.AddRange(await Flows.ListAsync(workspace.WorkspaceId));
+    }
+
+    private void GoToAgents() => Nav.NavigateTo($"/workspace/{Slug}/agents");
+
+    // ---- Editing -------------------------------------------------------------------------------
+
+    private void BeginCreate()
+    {
+        // A brand-new flow starts with one agent step and one end, because an empty canvas is a
+        // validation error the moment it is opened and reads as though the screen is broken.
+        var first = FlowNodeCatalog.CreateNode(FlowNodeKind.Agent);
+        first.Name = KindName(FlowNodeKind.Agent);
+
+        var last = FlowNodeCatalog.CreateNode(FlowNodeKind.Terminal);
+        last.Name = KindName(FlowNodeKind.Terminal);
+
+        editor = new FlowDefinition
+        {
+            Id = "flow-" + Guid.NewGuid().ToString("N")[..12],
+            Name = Localizer["FlowsUntitled"].Value,
+            StartNodeId = first.Id,
+            Nodes = [first, last],
+            Edges = [new FlowEdge { Id = "edge-" + Guid.NewGuid().ToString("N")[..12], FromNodeId = first.Id, ToNodeId = last.Id }]
+        };
+
+        isEditorEnabled = true;
+        Revalidate();
+    }
+
+    private void BeginEdit(FlowListItem item)
+    {
+        if (item.Definition is null) return;
+
+        editor = item.Definition;
+        isEditorEnabled = item.Record.IsEnabled;
+        Revalidate();
+    }
+
+    private async Task CancelEdit()
+    {
+        editor = null;
+
+        // The editor mutates the parsed definition in place, so a cancel must re-read the row rather
+        // than keep the object it was editing — otherwise "cancel" would leave the abandoned edits in
+        // the list until the next page load.
+        await RefreshAsync();
+    }
+
+    private void OnFlowNameChanged(string value)
+    {
+        if (editor is null) return;
+        editor.Name = value;
+        Revalidate();
+    }
+
+    private void OnStartNodeChanged(string value)
+    {
+        if (editor is null) return;
+        editor.StartNodeId = string.IsNullOrWhiteSpace(value) ? null : value;
+        Revalidate();
+    }
+
+    private void OnMaxStepsChanged(int value)
+    {
+        if (editor is null) return;
+        editor.MaxSteps = value;
+        Revalidate();
+    }
+
+    private void OnAllowCyclesChanged(bool value)
+    {
+        if (editor is null) return;
+        editor.AllowCycles = value;
+        Revalidate();
+    }
+
+    private void OnSampleChanged(string value)
+    {
+        sampleValue = value;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Re-runs the offline validator. It is pure, synchronous and touches no resolver and no network,
+    /// which is exactly why it can be called on every edit.
+    /// </summary>
+    private void Revalidate()
+    {
+        validation = editor is null ? [] : FlowValidator.Validate(editor).Issues;
+        StateHasChanged();
+    }
+
+    // ---- Steps ---------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Adds a step of one kind, named the way the palette names it.
+    /// </summary>
+    /// <param name="kind">The kind to add.</param>
+    /// <remarks>
+    /// <c>FlowNodeCatalog.CreateNode</c> pre-fills the name from the LIBRARY's descriptor, which is
+    /// English-only by design and does not always match this screen's word for the same thing — a
+    /// branch step arrived called "Condition" while the button that added it said "Branch", and in
+    /// Hindi it would have arrived in English. Observed on the Catalyst head, 2026-08-01.
+    /// </remarks>
+    private void AddNode(FlowNodeKind kind)
+    {
+        if (editor is null) return;
+
+        var node = FlowNodeCatalog.CreateNode(kind);
+        node.Name = KindName(kind);
+        editor.Nodes.Add(node);
+        Revalidate();
+    }
+
+    private void RemoveNode(FlowNode node)
+    {
+        if (editor is null) return;
+
+        editor.Nodes.Remove(node);
+
+        // An edge to a step that no longer exists is a dangling reference the validator would report
+        // forever; removing them with the step keeps the graph consistent by construction.
+        editor.Edges.RemoveAll(edge => edge.FromNodeId == node.Id || edge.ToNodeId == node.Id);
+        if (editor.StartNodeId == node.Id) editor.StartNodeId = editor.Nodes.FirstOrDefault()?.Id;
+
+        Revalidate();
+    }
+
+    private void MoveNode(int index, int offset)
+    {
+        if (editor is null) return;
+
+        var target = index + offset;
+        if (target < 0 || target >= editor.Nodes.Count) return;
+
+        (editor.Nodes[index], editor.Nodes[target]) = (editor.Nodes[target], editor.Nodes[index]);
+        Revalidate();
+    }
+
+    private void ToggleGuardrail(FlowNode node, string guardrailId, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!node.GuardrailIds.Contains(guardrailId)) node.GuardrailIds.Add(guardrailId);
+        }
+        else
+        {
+            node.GuardrailIds.Remove(guardrailId);
+        }
+
+        Revalidate();
+    }
+
+    /// <summary>
+    /// Reads one node property as text, for the generically rendered editor.
+    /// </summary>
+    /// <param name="node">The node being edited.</param>
+    /// <param name="property">The property named by the catalogue's field descriptor.</param>
+    /// <returns>The current value as text, or the empty string.</returns>
+    /// <remarks>
+    /// The catalogue says WHICH fields a kind has and which control to use; this maps a field name
+    /// onto the property. A new node KIND therefore needs no change here at all — only a new node
+    /// PROPERTY does, and one that is missing falls through to the empty string rather than throwing
+    /// on a screen the user is typing into.
+    /// </remarks>
+    private static string GetText(FlowNode node, string property) => property switch
+    {
+        nameof(FlowNode.Name) => node.Name,
+        nameof(FlowNode.Description) => node.Description ?? string.Empty,
+        nameof(FlowNode.AgentId) => node.AgentId ?? string.Empty,
+        nameof(FlowNode.Instruction) => node.Instruction ?? string.Empty,
+        nameof(FlowNode.ToolName) => node.ToolName ?? string.Empty,
+        nameof(FlowNode.ToolArgumentsJson) => node.ToolArgumentsJson ?? string.Empty,
+        nameof(FlowNode.OutputVariable) => node.OutputVariable ?? string.Empty,
+        nameof(FlowNode.TerminalStatus) => node.TerminalStatus ?? string.Empty,
+        nameof(FlowNode.MaxToolCalls) => node.MaxToolCalls?.ToString() ?? string.Empty,
+        _ => string.Empty
+    };
+
+    private void SetText(FlowNode node, string property, string value)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(value) ? null : value;
+
+        switch (property)
+        {
+            case nameof(FlowNode.Name): node.Name = value; break;
+            case nameof(FlowNode.Description): node.Description = trimmed; break;
+            case nameof(FlowNode.AgentId): node.AgentId = trimmed; break;
+            case nameof(FlowNode.Instruction): node.Instruction = trimmed; break;
+            case nameof(FlowNode.ToolName): node.ToolName = trimmed; break;
+            case nameof(FlowNode.ToolArgumentsJson): node.ToolArgumentsJson = trimmed; break;
+            case nameof(FlowNode.OutputVariable): node.OutputVariable = trimmed; break;
+            case nameof(FlowNode.TerminalStatus): node.TerminalStatus = trimmed; break;
+            case nameof(FlowNode.MaxToolCalls):
+                node.MaxToolCalls = int.TryParse(value, out var parsed) && parsed > 0 ? parsed : null;
+                break;
+        }
+
+        Revalidate();
+    }
+
+    private EventCallback<string> OnHandoffTargetChanged(FlowNode node) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            node.Handoff ??= new FlowHandoff { TargetNodeId = value };
+            node.Handoff.TargetNodeId = value;
+            Revalidate();
+        });
+
+    private EventCallback<string> OnHandoffModeChanged(FlowNode node) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            node.Handoff ??= new FlowHandoff { TargetNodeId = string.Empty };
+            if (Enum.TryParse<HandoffContextMode>(value, out var mode)) node.Handoff.ContextMode = mode;
+            Revalidate();
+        });
+
+    private EventCallback<string> OnHandoffVariablesChanged(FlowNode node) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            node.Handoff ??= new FlowHandoff { TargetNodeId = string.Empty };
+            node.Handoff.CarryVariables = value
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+            Revalidate();
+        });
+
+    // ---- Links ---------------------------------------------------------------------------------
+
+    private void AddEdge()
+    {
+        if (editor is null || editor.Nodes.Count < 2) return;
+
+        editor.Edges.Add(new FlowEdge
+        {
+            Id = "edge-" + Guid.NewGuid().ToString("N")[..12],
+            FromNodeId = editor.Nodes[0].Id,
+            ToNodeId = editor.Nodes[1].Id,
+            Order = editor.Edges.Count
+        });
+
+        Revalidate();
+    }
+
+    private void RemoveEdge(FlowEdge edge)
+    {
+        editor?.Edges.Remove(edge);
+        Revalidate();
+    }
+
+    private EventCallback<string> OnEdgeFromChanged(FlowEdge edge) =>
+        EventCallback.Factory.Create<string>(this, value => { edge.FromNodeId = value; Revalidate(); });
+
+    private EventCallback<string> OnEdgeToChanged(FlowEdge edge) =>
+        EventCallback.Factory.Create<string>(this, value => { edge.ToNodeId = value; Revalidate(); });
+
+    private EventCallback<string> OnEdgeLabelChanged(FlowEdge edge) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            edge.Label = string.IsNullOrWhiteSpace(value) ? null : value;
+            Revalidate();
+        });
+
+    private EventCallback<int> OnEdgeOrderChanged(FlowEdge edge) =>
+        EventCallback.Factory.Create<int>(this, value => { edge.Order = value; Revalidate(); });
+
+    private static string ConditionKindValue(FlowEdge edge) =>
+        (edge.Condition?.Kind ?? FlowConditionKind.Always).ToString();
+
+    private EventCallback<string> OnConditionKindChanged(FlowEdge edge) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            if (!Enum.TryParse<FlowConditionKind>(value, out var kind)) return;
+
+            // Always is the unconditional edge, and the library models that as a NULL condition —
+            // storing an explicit Always would round-trip a value the validator reads differently.
+            edge.Condition = kind == FlowConditionKind.Always
+                ? null
+                : edge.Condition is { } existing
+                    ? Retarget(existing, kind)
+                    : new FlowCondition { Kind = kind };
+
+            Revalidate();
+        });
+
+    private static FlowCondition Retarget(FlowCondition condition, FlowConditionKind kind)
+    {
+        condition.Kind = kind;
+        return condition;
+    }
+
+    private EventCallback<string> OnConditionSourceChanged(FlowCondition condition) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            if (Enum.TryParse<FlowConditionSource>(value, out var source)) condition.Source = source;
+            Revalidate();
+        });
+
+    private EventCallback<string> OnConditionSourceKeyChanged(FlowCondition condition) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            condition.SourceKey = string.IsNullOrWhiteSpace(value) ? null : value;
+            Revalidate();
+        });
+
+    private EventCallback<string> OnConditionOperandChanged(FlowCondition condition) =>
+        EventCallback.Factory.Create<string>(this, value =>
+        {
+            condition.Operand = string.IsNullOrWhiteSpace(value) ? null : value;
+            Revalidate();
+        });
+
+    private EventCallback<bool> OnConditionCaseChanged(FlowCondition condition) =>
+        EventCallback.Factory.Create<bool>(this, value => { condition.IsCaseSensitive = value; Revalidate(); });
+
+    /// <summary>
+    /// Shows which branch a sample value would take, without running anything.
+    /// </summary>
+    /// <param name="edge">The link being previewed.</param>
+    /// <returns>True when this link's condition is satisfied by the sample.</returns>
+    /// <remarks>
+    /// <c>FlowCondition.IsSatisfiedBy</c> is public, deterministic, side-effect free and never leaves
+    /// the process, which is what makes a live preview honest: this is the SAME evaluation the runner
+    /// performs, not a re-implementation of it that could disagree.
+    /// </remarks>
+    private bool IsSampleSatisfied(FlowEdge edge) =>
+        edge.Condition is null || edge.Condition.IsSatisfiedBy(new FlowState(sampleValue));
+
+    // ---- Saving and deleting -------------------------------------------------------------------
+
+    private async Task SaveAsync()
+    {
+        if (editor is null || workspace is null) return;
+
+        isSaving = true;
+        try
+        {
+            await Flows.SaveAsync(workspace.WorkspaceId, editor, isEditorEnabled);
+            ToastService.Success(Localizer["FlowsSavedTitle"], Localizer["FlowsSavedBody", editor.Name]);
+            editor = null;
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save flow for {Slug}", Slug);
+            ToastService.Error(Localizer["FlowsSaveFailedTitle"], Localizer["FlowsSaveFailedBody", ex.Message]);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void BeginDelete(FlowListItem item)
+    {
+        pendingDelete = item;
+        showDeleteDialog = true;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (pendingDelete is null || workspace is null) return;
+
+        try
+        {
+            await Flows.DeleteAsync(workspace.WorkspaceId, pendingDelete.Record.FlowId);
+            ToastService.Success(Localizer["FlowsDeletedTitle"], Localizer["FlowsDeletedBody", pendingDelete.Record.Name]);
+            await RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete flow for {Slug}", Slug);
+            ToastService.Error(Localizer["FlowsDeleteFailedTitle"], Localizer["FlowsDeleteFailedBody", ex.Message]);
+        }
+        finally
+        {
+            showDeleteDialog = false;
+            pendingDelete = null;
+        }
+    }
+
+    private async Task ToggleEnabledAsync(FlowListItem item)
+    {
+        if (workspace is null) return;
+
+        await Flows.SetEnabledAsync(workspace.WorkspaceId, item.Record.FlowId, !item.Record.IsEnabled);
+        await RefreshAsync();
+    }
+
+    // ---- Running -------------------------------------------------------------------------------
+
+    private void BeginRun(FlowListItem item)
+    {
+        if (item.Definition is null) return;
+
+        runFlow = item.Definition;
+        runResult = null;
+        runTrace = null;
+        runInput = string.Empty;
+        showRun = true;
+    }
+
+    private async Task RunAsync()
+    {
+        if (runFlow is null || workspace is null || isRunning) return;
+
+        // A disabled flow is not runnable, and a run that "succeeds" from a screen that shows it as
+        // disabled would make the switch a label.
+        var record = items.FirstOrDefault(item => item.Record.FlowId == runFlow.Id);
+        if (record is not null && !record.Record.IsEnabled)
+        {
+            ToastService.Error(Localizer["FlowsRunDisabledTitle"], Localizer["FlowsRunDisabledBody"]);
+            return;
+        }
+
+        isRunning = true;
+        runResult = null;
+
+        var trace = new AgentTrace();
+        runTrace = trace;
+
+        try
+        {
+            var progress = trace.AsProgress(() => InvokeAsync(StateHasChanged));
+            runResult = await Flows.RunAsync(
+                workspace.WorkspaceId, runFlow, runInput ?? string.Empty, this, progress);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Flow run failed for {Slug}", Slug);
+            ToastService.Error(Localizer["FlowsRunFailedTitle"], Localizer["FlowsRunFailedBody", ex.Message]);
+        }
+        finally
+        {
+            isRunning = false;
+        }
+    }
+
+    // ---- Egress confirmation (REQ-NFR-013) -----------------------------------------------------
+
+    /// <summary>Raises the egress prompt and does not return until the user has answered it.</summary>
+    /// <param name="request">The tool that wants to leave the machine, and the agent asking.</param>
+    /// <param name="cancellationToken">The run's cancellation token; cancellation is a decline.</param>
+    /// <returns>True when the user allows this run's outbound requests.</returns>
+    public async Task<bool> ConfirmAsync(
+        EgressConfirmationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await InvokeAsync(() =>
+        {
+            egressAnswer = answer;
+            // REQ-UI-051: a catalogue skill names a resource key; an MCP tool supplies its own
+            // server-chosen name, which is run-time data and is shown as it came.
+            egressToolName = request.DisplayNameKey is null
+                ? request.DisplayName
+                : Localizer[request.DisplayNameKey].Value;
+            egressToolDescription = request.DescriptionKey is null
+                ? request.Description
+                : Localizer[request.DescriptionKey].Value;
+            egressAgentName = request.AgentDisplayName;
+            showEgressDialog = true;
+            StateHasChanged();
+        });
+
+        using var registration = cancellationToken.Register(() => answer.TrySetResult(false));
+        var isAllowed = await answer.Task;
+
+        await InvokeAsync(() =>
+        {
+            egressAnswer = null;
+            showEgressDialog = false;
+            StateHasChanged();
+        });
+
+        return isAllowed;
+    }
+
+    private void AnswerEgress(bool isAllowed)
+    {
+        showEgressDialog = false;
+        egressAnswer?.TrySetResult(isAllowed);
+    }
+
+    /// <summary>Treats dismissing the egress prompt as a decline.</summary>
+    /// <param name="isOpen">The dialog's new open state.</param>
+    private void OnEgressDialogOpenChanged(bool isOpen)
+    {
+        showEgressDialog = isOpen;
+        if (!isOpen) egressAnswer?.TrySetResult(false);
+    }
+
+    // ---- Localization by stable code ------------------------------------------------------------
+
+    /// <summary>
+    /// Translates a validation issue by its CODE.
+    /// </summary>
+    /// <param name="issue">The issue reported by the library.</param>
+    /// <returns>The translated explanation, or the library's English message for an unknown code.</returns>
+    /// <remarks>
+    /// <c>FlowValidationIssue.Code</c> is documented as the stable contract and the English
+    /// <c>Message</c> as a fallback rather than a parsing target. Translating the message — or worse,
+    /// matching on it — would break the day the library rewords it, and would leave a Hindi screen
+    /// printing English sentences.
+    /// </remarks>
+    private string IssueText(FlowValidationIssue issue) => issue.Code switch
+    {
+        FlowValidationCodes.EmptyFlow => Localizer["FlowsIssueEmptyFlow"],
+        FlowValidationCodes.MissingIdentity => Localizer["FlowsIssueMissingIdentity"],
+        FlowValidationCodes.DuplicateNodeId => Localizer["FlowsIssueDuplicateNodeId"],
+        FlowValidationCodes.DuplicateEdgeId => Localizer["FlowsIssueDuplicateEdgeId"],
+        FlowValidationCodes.BlankNodeId => Localizer["FlowsIssueBlankNodeId"],
+        FlowValidationCodes.UnknownStartNode => Localizer["FlowsIssueUnknownStartNode"],
+        FlowValidationCodes.ImplicitStartNode => Localizer["FlowsIssueImplicitStartNode"],
+        FlowValidationCodes.DanglingEdge => Localizer["FlowsIssueDanglingEdge"],
+        FlowValidationCodes.DeadEndNode => Localizer["FlowsIssueDeadEndNode"],
+        FlowValidationCodes.UnreachableNode => Localizer["FlowsIssueUnreachableNode"],
+        FlowValidationCodes.MissingAgentId => Localizer["FlowsIssueMissingAgentId"],
+        FlowValidationCodes.MissingToolName => Localizer["FlowsIssueMissingToolName"],
+        FlowValidationCodes.MissingHandoffTarget => Localizer["FlowsIssueMissingHandoffTarget"],
+        FlowValidationCodes.UnknownHandoffTarget => Localizer["FlowsIssueUnknownHandoffTarget"],
+        FlowValidationCodes.HandoffTargetNotAgent => Localizer["FlowsIssueHandoffTargetNotAgent"],
+        FlowValidationCodes.IrrelevantProperty => Localizer["FlowsIssueIrrelevantProperty"],
+        FlowValidationCodes.CycleDetected => Localizer["FlowsIssueCycleDetected"],
+        FlowValidationCodes.InvalidStepBudget => Localizer["FlowsIssueInvalidStepBudget"],
+        FlowValidationCodes.NoDefaultBranch => Localizer["FlowsIssueNoDefaultBranch"],
+        FlowValidationCodes.UnreachableBranch => Localizer["FlowsIssueUnreachableBranch"],
+        FlowValidationCodes.InvalidPattern => Localizer["FlowsIssueInvalidPattern"],
+        FlowValidationCodes.MissingConditionSourceKey => Localizer["FlowsIssueMissingConditionSourceKey"],
+        FlowValidationCodes.UnresolvableAgent => Localizer["FlowsIssueUnresolvableAgent"],
+        FlowValidationCodes.UnresolvableGuardrail => Localizer["FlowsIssueUnresolvableGuardrail"],
+        FlowValidationCodes.UnresolvableTool => Localizer["FlowsIssueUnresolvableTool"],
+        FlowValidationCodes.NoToolHandler => Localizer["FlowsIssueNoToolHandler"],
+        _ => issue.Message
+    };
+
+    private string NodeLabelFor(string? nodeId) =>
+        editor?.FindNode(nodeId)?.DisplayName ?? nodeId ?? string.Empty;
+
+    /// <summary>
+    /// Renders a step-picker's bound value as the step's NAME.
+    /// </summary>
+    /// <param name="nodeId">The node id the picker is bound to.</param>
+    /// <returns>The step's display name, or the empty-selection label.</returns>
+    /// <remarks>
+    /// TR-024: a Select's trigger paints its raw bound VALUE on first paint. The bound value here is
+    /// a node id — it has to be, because it is what goes into the stored document — so without this
+    /// the picker read "agent-e5e018887f5f4f63b2" until the user opened it. Observed on the live
+    /// Catalyst head, 2026-08-01.
+    /// </remarks>
+    private string StepTextFor(string nodeId) => string.IsNullOrWhiteSpace(nodeId)
+        ? Localizer["FlowsStartNodeImplicit"].Value
+        : editor?.FindNode(nodeId)?.DisplayName ?? nodeId;
+
+    /// <summary>Renders an agent picker's bound handle as the mention the user knows it by.</summary>
+    /// <param name="handle">The agent handle the picker is bound to.</param>
+    /// <returns>The handle with its leading '@', or the empty-selection label.</returns>
+    private string AgentTextFor(string handle) => string.IsNullOrWhiteSpace(handle)
+        ? Localizer["FlowsPickAgent"].Value
+        : "@" + handle;
+
+    /// <summary>Renders a handoff mode's bound enum NAME as its translated label.</summary>
+    /// <param name="value">The enum name the picker is bound to.</param>
+    /// <returns>The translated label.</returns>
+    private string HandoffModeTextFor(string value) =>
+        Enum.TryParse<HandoffContextMode>(value, out var mode) ? HandoffModeName(mode) : value;
+
+    /// <summary>Renders a condition operator's bound enum NAME as its translated label.</summary>
+    /// <param name="value">The enum name the picker is bound to.</param>
+    /// <returns>The translated label.</returns>
+    private string ConditionKindTextFor(string value) =>
+        Enum.TryParse<FlowConditionKind>(value, out var kind) ? ConditionKindName(kind) : value;
+
+    /// <summary>Renders a condition source's bound enum NAME as its translated label.</summary>
+    /// <param name="value">The enum name the picker is bound to.</param>
+    /// <returns>The translated label.</returns>
+    private string ConditionSourceTextFor(string value) =>
+        Enum.TryParse<FlowConditionSource>(value, out var source) ? ConditionSourceName(source) : value;
+
+    private string KindName(FlowNodeKind kind) => kind switch
+    {
+        FlowNodeKind.Agent => Localizer["FlowsKindAgent"],
+        FlowNodeKind.Tool => Localizer["FlowsKindTool"],
+        FlowNodeKind.Condition => Localizer["FlowsKindCondition"],
+        FlowNodeKind.Handoff => Localizer["FlowsKindHandoff"],
+        FlowNodeKind.Terminal => Localizer["FlowsKindTerminal"],
+        _ => FlowNodeCatalog.Describe(kind).DisplayName
+    };
+
+    private string KindHint(FlowNodeKind kind) => kind switch
+    {
+        FlowNodeKind.Agent => Localizer["FlowsKindAgentHint"],
+        FlowNodeKind.Tool => Localizer["FlowsKindToolHint"],
+        FlowNodeKind.Condition => Localizer["FlowsKindConditionHint"],
+        FlowNodeKind.Handoff => Localizer["FlowsKindHandoffHint"],
+        FlowNodeKind.Terminal => Localizer["FlowsKindTerminalHint"],
+        _ => FlowNodeCatalog.Describe(kind).Description
+    };
+
+    /// <summary>
+    /// Translates a catalogue field's label.
+    /// </summary>
+    /// <param name="kind">The node kind the field belongs to.</param>
+    /// <param name="field">The field descriptor published by the catalogue.</param>
+    /// <returns>The translated label, or the library's English one for a field this build has not translated.</returns>
+    /// <remarks>
+    /// The one field whose meaning depends on its kind is <c>Instruction</c>: on an agent step it is
+    /// the task, on an end step it is an output override. Translating it by property name alone would
+    /// print the wrong label on one of the two.
+    /// </remarks>
+    private string FieldLabelFor(FlowNodeKind kind, FlowFieldDescriptor field) =>
+        kind == FlowNodeKind.Terminal && field.Property == nameof(FlowNode.Instruction)
+            ? Localizer["FlowsFieldTerminalInstruction"]
+            : field.Property switch
+            {
+                nameof(FlowNode.Name) => Localizer["FlowsFieldName"],
+                nameof(FlowNode.Description) => Localizer["FlowsFieldDescription"],
+                nameof(FlowNode.AgentId) => Localizer["FlowsFieldAgentId"],
+                nameof(FlowNode.Instruction) => Localizer["FlowsFieldInstruction"],
+                nameof(FlowNode.ToolName) => Localizer["FlowsFieldToolName"],
+                nameof(FlowNode.ToolArgumentsJson) => Localizer["FlowsFieldToolArgumentsJson"],
+                nameof(FlowNode.GuardrailIds) => Localizer["FlowsFieldGuardrailIds"],
+                nameof(FlowNode.OutputVariable) => Localizer["FlowsFieldOutputVariable"],
+                nameof(FlowNode.MaxToolCalls) => Localizer["FlowsFieldMaxToolCalls"],
+                nameof(FlowNode.TerminalStatus) => Localizer["FlowsFieldTerminalStatus"],
+                nameof(FlowNode.Handoff) => Localizer["FlowsFieldHandoff"],
+                _ => field.DisplayName
+            };
+
+    private string FieldHintFor(FlowNodeKind kind, FlowFieldDescriptor field) =>
+        kind == FlowNodeKind.Terminal && field.Property == nameof(FlowNode.Instruction)
+            ? Localizer["FlowsFieldTerminalInstructionHint"]
+            : field.Property switch
+            {
+                nameof(FlowNode.Name) => Localizer["FlowsFieldNameHint"],
+                nameof(FlowNode.Description) => Localizer["FlowsFieldDescriptionHint"],
+                nameof(FlowNode.AgentId) => Localizer["FlowsFieldAgentIdHint"],
+                nameof(FlowNode.Instruction) => Localizer["FlowsFieldInstructionHint"],
+                nameof(FlowNode.ToolName) => Localizer["FlowsFieldToolNameHint"],
+                nameof(FlowNode.ToolArgumentsJson) => Localizer["FlowsFieldToolArgumentsJsonHint"],
+                nameof(FlowNode.GuardrailIds) => Localizer["FlowsFieldGuardrailIdsHint"],
+                nameof(FlowNode.OutputVariable) => Localizer["FlowsFieldOutputVariableHint"],
+                nameof(FlowNode.MaxToolCalls) => Localizer["FlowsFieldMaxToolCallsHint"],
+                nameof(FlowNode.TerminalStatus) => Localizer["FlowsFieldTerminalStatusHint"],
+                nameof(FlowNode.Handoff) => Localizer["FlowsFieldHandoffHint"],
+                _ => field.Description
+            };
+
+    private string GuardrailName(string guardrailId) => guardrailId switch
+    {
+        FlowGuardrailCatalog.LocalToolsOnlyId => Localizer["FlowsGuardrailLocalToolsOnly"],
+        FlowGuardrailCatalog.NonEmptyOutputId => Localizer["FlowsGuardrailNonEmptyOutput"],
+        FlowGuardrailCatalog.NoCredentialsInOutputId => Localizer["FlowsGuardrailNoCredentials"],
+        _ => guardrailId
+    };
+
+    /// <summary>
+    /// Renders why a guardrail stopped the run, in the reader's language when this build knows the
+    /// guardrail (REQ-UI-055 / BRD-91).
+    /// </summary>
+    /// <param name="result">The blocked run.</param>
+    /// <returns>The translated reason, or the library's own English reason for an unknown id.</returns>
+    /// <remarks>
+    /// The reason on <c>FlowRunResult</c> is deliberately English: the same string is handed to the
+    /// MODEL when a flow is invoked as a tool by an agent, and to the library's trace and logs. So
+    /// the catalogue publishes a resource key per guardrail ID — the wire value, which is the same in
+    /// every culture — and this is where it becomes a sentence. The fallback matters: an MCP-era
+    /// build or a host guardrail can refuse under an id this catalogue does not own, and an English
+    /// explanation is far better than a blank alert.
+    /// </remarks>
+    private string BlockedReasonText(FlowRunResult result) =>
+        FlowGuardrailCatalog.BlockReasonKey(result.BlockedByGuardrailId) is { } key
+            ? Localizer[key].Value
+            : result.BlockReason ?? string.Empty;
+
+    private string ConditionKindName(FlowConditionKind kind) => kind switch
+    {
+        FlowConditionKind.Always => Localizer["FlowsConditionAlways"],
+        FlowConditionKind.Contains => Localizer["FlowsConditionContains"],
+        FlowConditionKind.NotContains => Localizer["FlowsConditionNotContains"],
+        FlowConditionKind.EqualsText => Localizer["FlowsConditionEquals"],
+        FlowConditionKind.NotEqualsText => Localizer["FlowsConditionNotEquals"],
+        FlowConditionKind.StartsWith => Localizer["FlowsConditionStartsWith"],
+        FlowConditionKind.IsEmpty => Localizer["FlowsConditionIsEmpty"],
+        FlowConditionKind.IsNotEmpty => Localizer["FlowsConditionIsNotEmpty"],
+        FlowConditionKind.LastStepSucceeded => Localizer["FlowsConditionLastSucceeded"],
+        FlowConditionKind.LastStepFailed => Localizer["FlowsConditionLastFailed"],
+        FlowConditionKind.Matches => Localizer["FlowsConditionMatches"],
+        _ => kind.ToString()
+    };
+
+    private string ConditionSourceName(FlowConditionSource source) => source switch
+    {
+        FlowConditionSource.LastOutput => Localizer["FlowsSourceLastOutput"],
+        FlowConditionSource.Variable => Localizer["FlowsSourceVariable"],
+        FlowConditionSource.NodeOutput => Localizer["FlowsSourceNodeOutput"],
+        FlowConditionSource.OriginalInput => Localizer["FlowsSourceOriginalInput"],
+        _ => source.ToString()
+    };
+
+    private string HandoffModeName(HandoffContextMode mode) => mode switch
+    {
+        HandoffContextMode.LastOutputOnly => Localizer["FlowsHandoffLastOutputOnly"],
+        HandoffContextMode.OriginalInputAndLastOutput => Localizer["FlowsHandoffInputAndOutput"],
+        HandoffContextMode.FullTranscript => Localizer["FlowsHandoffFullTranscript"],
+        _ => mode.ToString()
+    };
+
+    private string OutcomeName(FlowRunOutcome outcome) => outcome switch
+    {
+        FlowRunOutcome.Completed => Localizer["FlowsOutcomeCompleted"],
+        FlowRunOutcome.Blocked => Localizer["FlowsOutcomeBlocked"],
+        FlowRunOutcome.StepBudgetExhausted => Localizer["FlowsOutcomeBudget"],
+        FlowRunOutcome.Failed => Localizer["FlowsOutcomeFailed"],
+        FlowRunOutcome.Cancelled => Localizer["FlowsOutcomeCancelled"],
+        _ => outcome.ToString()
+    };
+}

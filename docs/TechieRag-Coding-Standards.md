@@ -99,6 +99,43 @@ public class DatabaseService
 ### Security
 - Never hardcode credentials or API keys. Parameterized queries. Validate inputs. Log security events.
 
+### UI strings — localized when written (REQ-UI-050 / BRD-91, owner decision 2026-07-31)
+TechieDesk ships **English (`en`) and Hindi (`hi`)**. New UI is localized **as it is written**; it is
+never added in English for a later translation pass to pick up. Four clusters ship UI concurrently, so
+anything left to "catch up later" grows the untranslated surface faster than a translation tranche can
+shrink it.
+
+Writing a user-visible string in a `.razor` file:
+1. `@inject IStringLocalizer<AppStrings> Localizer` (the type and the `AppStrings` alias are already in
+   `Components/_Imports.razor`).
+2. `@Localizer["YourKey"]` in markup, `Tooltip="@Localizer["YourKey"]"` in a text-bearing attribute,
+   `ToastService.Success(Localizer["TitleKey"], Localizer["BodyKey"])` in toasts.
+3. Add the key to **both** `apps/TechieDesk.Core/Resources/AppStrings.resx` **and**
+   `AppStrings.hi.resx`. A key present in only the neutral file does **not** fail on its own — it
+   renders English inside a Hindi screen with `ResourceNotFound` false.
+4. Composite text uses indexed placeholders (`Localizer["Key", count]` against `Deleted {0} items.`),
+   never string interpolation — an interpolated string cannot be translated.
+
+**Never localize**: CSS classes, `Class`/`Style`/`Href`/`Name`/`Variant`, log and exception messages,
+enum names, API and JSON field names, route templates, or product/protocol nouns (`Qdrant`, `LLM`,
+`RAG`, `HTTP`, connector brand names) — those stay in Latin script inside the Hindi text too.
+
+**Accessible names on TrBlazeUI components**: write the raw HTML attribute `aria-label="…"`, never a
+`AriaLabel="…"` *parameter* — no TrBlazeUI component declares one, so Blazor splats it verbatim as the
+meaningless `arialabel="…"` and the name is silently never emitted (TR-008, amended). Most components
+(`SelectTrigger`, `FieldLabel`, `Progress`, `Input`) splat `aria-label` correctly; `Slider` and
+`FileUpload` have no splat at all and stay genuinely unnameable — see `docs/TechieRag-TrBlazeUI-Feedback.md`.
+
+Enforced by `tests/TechieDesk.Tests/Localization/`:
+| Test | Fails when |
+|---|---|
+| `LocalizedFilesNeverRegainAHardcodedString` | an English literal is added to an already-localized file |
+| `EveryCleanFileIsOnTheLocalizedFileRegistry` | a file is deleted from that registry to dodge the above |
+| `LocalizedSiteCountNeverFalls` | localization is removed (ratchet on the **absolute** site count) |
+| `ResolvesEveryKeyTheRazorComponentsAskFor` | a key a screen names is missing from `en` or `hi` |
+| `EveryPlaceholderSurvivesTranslation` | a `{0}` is dropped in translation |
+| `EveryHindiStringIsWrittenInDevanagari` | a Hindi value was never actually translated |
+
 ## Enforcement
 
 ### .editorconfig (machine-checkable)

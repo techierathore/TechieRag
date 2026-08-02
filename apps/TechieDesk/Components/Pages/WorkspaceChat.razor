@@ -1,20 +1,35 @@
 @page "/workspace/{Slug}"
+@using TechieDesk.Services.Agents
+@using TechieDesk.Services.Agents.Mcp
 @using TechieDesk.Services.Threads
+@using TechieDesk.Services.Web
+@using TrBlazeUI.Components.FileUpload
+@implements IAsyncDisposable
+@* REQ-NFR-013: this page is the UI half of the egress gate — the agent's ConfirmEgress switch is
+   answered by the dialog below, and the outbound call does not happen until it is. *@
+@implements IEgressConfirmation
 @inject TechieRagManager Rag
+@inject TechieRagConfigService RagConfig
+@inject IAgentRegistry AgentRegistry
+@* REQ-RAG-023: the workspace's registered MCP servers, whose tools join the agent's own skills. *@
+@inject IWorkspaceMcpService WorkspaceMcp
 @inject IWorkspaceService Workspaces
 @inject ToastService ToastService
+@inject ThreadExportService ExportService
+@inject IWebContentFetcherFactory WebFetchers
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject ILogger<WorkspaceChat> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>@(workspace?.Name ?? "Workspace") — Chat</PageTitle>
+<PageTitle>@Localizer["ChatPageTitle", workspace?.Name ?? Localizer["ChatWorkspaceFallback"].Value]</PageTitle>
 
 @if (notFound)
 {
     <Alert Variant="AlertVariant.Danger">
         <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-        <AlertTitle>Workspace not available</AlertTitle>
-        <AlertDescription>This workspace does not exist or you are not assigned to it.</AlertDescription>
+        <AlertTitle>@Localizer["ChatWorkspaceNotAvailable"]</AlertTitle>
+        <AlertDescription>@Localizer["ChatWorkspaceNotAvailableBody"]</AlertDescription>
     </Alert>
 }
 @* REQ-NFR-010/BRD-101: a persistence/vector-store outage is a different problem from a missing
@@ -23,34 +38,45 @@ else if (loadError is not null)
 {
     <Alert Variant="AlertVariant.Danger">
         <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-        <AlertTitle>Workspace data is unavailable</AlertTitle>
+        <AlertTitle>@Localizer["ChatWorkspaceDataUnavailable"]</AlertTitle>
         <AlertDescription>
-            The conversation store could not be reached, so this workspace cannot be opened right
-            now. Check the vector store and persistence configuration, then reload.
-            Details: @loadError
+            @Localizer["ChatWorkspaceDataUnavailableBody"]
+            @Localizer["ChatLoadErrorDetails", loadError]
         </AlertDescription>
     </Alert>
 }
 else if (workspace is null)
 {
     <div class="flex items-center gap-2 text-muted-foreground">
-        <Spinner Size="SpinnerSize.Small" /> <span>Loading workspace…</span>
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["ChatLoadingWorkspace"]</span>
     </div>
 }
 else
 {
+    @* REQ-UI-048: no visible page title here. The mockup goes breadcrumb -> content directly, and
+       the shell's topbar already renders "Workspace: {name} / Chat" — so a 3xl heading repeating the
+       workspace name was both a duplicate and the reason the three-column layout started a full
+       heading-plus-subtitle down the window, which is what made the screen read as misaligned
+       against the design.
+
+       The heading is kept as screen-reader-only rather than deleted: a document with no h1 fails
+       WCAG 2.4.6, and a breadcrumb is navigation, not a heading. Visually it matches the mockup;
+       structurally it is still a properly titled page. *@
+    <h1 class="sr-only">@Localizer["ChatPageTitle", workspace.Name]</h1>
     <div class="mb-4 flex items-center gap-3">
-        <div>
-            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@workspace.Name</h1>
-            <TypographyMuted>Chat — retrieval scoped to this workspace's documents.</TypographyMuted>
-        </div>
         <div class="ml-auto flex items-center gap-2">
-            <Badge Variant="BadgeVariant.Secondary">@(workspace.ChatMode == WorkspaceChatMode.Query ? "Query mode" : "Chat mode")</Badge>
+            <Badge Variant="BadgeVariant.Secondary">@Localizer["ChatWorkspaceDefaultLabel"] @(workspace.ChatMode == WorkspaceChatMode.Query ? "Query" : "Chat")</Badge>
+            @* REQ-RAG-021: agents are invoked from here, so the place they are defined has to be
+               reachable from here. *@
+            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="GoToAgents">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="bot" Size="16" /></Button.Icon>
+                @Localizer["ChatAgents"]
+            </Button>
             @if (Workspaces.CanManageWorkspaces)
             {
                 <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="GoToSettings">
                     <Button.Icon><LucideIcon aria-hidden="true" Name="settings-2" Size="16" /></Button.Icon>
-                    Settings
+                    @Localizer["ChatSettings"]
                 </Button>
             }
         </div>
@@ -61,24 +87,24 @@ else
         <Card>
             <CardContent Class="p-3">
                 <div class="mb-2 flex items-center justify-between px-1">
-                    <span class="text-sm font-semibold">Threads</span>
+                    <span class="text-sm font-semibold">@Localizer["ChatThreads"]</span>
                     @if (threads.Count > 0)
                     {
                         <button type="button" class="rounded p-1 text-xs text-muted-foreground hover:bg-muted hover:text-destructive"
-                                aria-label="Delete all my history" title="Delete all my history" @onclick="BeginDeleteAll">
+                                aria-label="@Localizer["ChatDeleteAllHistory"]" title="@Localizer["ChatDeleteAllHistory"]" @onclick="BeginDeleteAll">
                             <LucideIcon aria-hidden="true" Name="trash" Size="14" />
                         </button>
                     }
                 </div>
                 <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="mb-2 w-full" OnClick="NewThreadAsync">
                     <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="14" /></Button.Icon>
-                    New thread
+                    @Localizer["ChatNewThread"]
                 </Button>
 
                 @if (threads.Count == 0)
                 {
                     <div class="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground">
-                        No threads yet
+                        @Localizer["ChatNoThreadsYet"]
                     </div>
                 }
                 else
@@ -89,7 +115,7 @@ else
                             var isActive = activeThread?.ThreadId == thread.ThreadId;
                             <div class="@($"flex items-center gap-1 rounded-md px-2 py-1.5 {(isActive ? "bg-accent" : "hover:bg-muted")}")">
                                 <button type="button" class="min-w-0 flex-1 text-left" @onclick="@(() => SelectThreadAsync(thread))">
-                                    <div class="truncate text-sm @(isActive ? "font-semibold" : "")">@thread.Title</div>
+                                    <div class="truncate text-sm @(isActive ? "font-semibold" : "")">@ThreadTitle(thread)</div>
                                     <div class="text-xs text-muted-foreground">@thread.UpdatedAt.ToLocalTime().ToString("MMM d")</div>
                                 </button>
                                 <DropdownMenu>
@@ -100,25 +126,25 @@ else
                                     <DropdownMenuTrigger>
                                         <span class="rounded p-1 text-muted-foreground hover:bg-muted">
                                             <LucideIcon aria-hidden="true" Name="ellipsis" Size="16" />
-                                            <span class="sr-only">Actions for thread @thread.Title</span>
+                                            <span class="sr-only">@Localizer["ChatThreadActions", ThreadTitle(thread)]</span>
                                         </span>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent>
                                         <DropdownMenuItem OnClick="@(() => BeginRename(thread))">
                                             <LucideIcon aria-hidden="true" Name="pencil" Size="14" />
-                                            <span class="ml-2">Rename</span>
+                                            <span class="ml-2">@Localizer["ChatRename"]</span>
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem OnClick="@(() => ExportThreadAsync(thread, ExportFormat.Markdown))">
+                                        <DropdownMenuItem OnClick="@(() => ExportThreadAsync(thread, ThreadExportFormat.Markdown))">
                                             <LucideIcon aria-hidden="true" Name="file-down" Size="14" />
-                                            <span class="ml-2">Export as Markdown</span>
+                                            <span class="ml-2">@Localizer["ChatExportAsMarkdown"]</span>
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem OnClick="@(() => ExportThreadAsync(thread, ExportFormat.Json))">
+                                        <DropdownMenuItem OnClick="@(() => ExportThreadAsync(thread, ThreadExportFormat.Json))">
                                             <LucideIcon aria-hidden="true" Name="braces" Size="14" />
-                                            <span class="ml-2">Export as JSON</span>
+                                            <span class="ml-2">@Localizer["ChatExportAsJson"]</span>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem OnClick="@(() => BeginDelete(thread))">
                                             <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
-                                            <span class="ml-2">Delete</span>
+                                            <span class="ml-2">@Localizer["ChatDelete"]</span>
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -132,20 +158,29 @@ else
         <!-- Chat column (REQ-UI-018 / REQ-RAG-007/008/009/010) -->
         <Card Class="flex flex-col">
             <CardContent Class="flex flex-1 flex-col gap-3 p-4">
-                <div class="flex-1 space-y-4 overflow-y-auto" style="min-height:50vh;max-height:56vh">
+                @* REQ-UI-044: the transcript is the only part of this column that may shrink, so its
+                   height is the viewport minus the chrome that has to stay on screen with it — see
+                   `.td-chat-transcript` in base.css for the measured budget. It replaces a
+                   `min-height:24vh; max-height:56vh` inline box that fitted a 1240px-tall window and
+                   pushed the composer's Attach/Prompts row, keyboard hint and mode hint clean off
+                   the bottom of a 720px one (the REQ-UI-041 floor).
+
+                   The id is the scroll target: the transcript is parked at the NEWEST message, not
+                   the oldest. *@
+                <div id="@TranscriptElementId" class="td-chat-transcript flex-1 space-y-4 overflow-y-auto">
                     @if (activeThread is null)
                     {
                         <div class="flex h-full items-center justify-center">
                             <div class="space-y-2 text-center">
                                 <LucideIcon aria-hidden="true" Name="message-square" Size="40" Class="mx-auto text-muted-foreground" />
-                                <TypographyMuted>Start a new thread to chat with @workspace.Name.</TypographyMuted>
+                                <TypographyMuted>@Localizer["ChatStartNewThreadWith", workspace.Name]</TypographyMuted>
                             </div>
                         </div>
                     }
                     else if (messages.Count == 0 && !isProcessing)
                     {
                         <div class="flex h-full items-center justify-center">
-                            <TypographyMuted>Ask a question to get started.</TypographyMuted>
+                            <TypographyMuted>@Localizer["ChatAskToGetStarted"]</TypographyMuted>
                         </div>
                     }
 
@@ -153,7 +188,44 @@ else
                     {
                         <div class="@(msg.Role == "user" ? "flex justify-end" : "flex justify-start")">
                             <div class="@(msg.Role == "user" ? "bg-primary text-primary-foreground" : "bg-muted") max-w-[85%] rounded-lg px-4 py-2">
+                                @if (msg.Role == "assistant" && msg.AgentHandle is not null)
+                                {
+                                    <div class="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                                        <LucideIcon aria-hidden="true" Name="bot" Size="12" />
+                                        <span>@("@" + msg.AgentHandle)</span>
+                                    </div>
+                                }
                                 <div class="whitespace-pre-wrap text-sm">@msg.Content</div>
+                                @if (msg.Role == "assistant")
+                                {
+                                    @* REQ-UI-036 / BRD-88: read the answer aloud.
+
+                                       Aligned to the START of the bubble, with the trace and
+                                       sources triggers below it, rather than to the bubble's right
+                                       edge. An assistant bubble is sized by its own text, so a
+                                       right-aligned action row sits in a column that MOVES with the
+                                       message: at 1024x720 the read-aloud control landed in the
+                                       composer's Send/Dictate band and the 2026-07-31 sweep
+                                       measured the two intersecting by 980 px; at 1600x1240 the
+                                       same control sat 380 px clear of it. Pinning the row to the
+                                       bubble's left edge takes the message's own length out of the
+                                       control's position. *@
+                                    <div class="mt-1 flex"><ReadAloudButton Text="@msg.Content" /></div>
+                                }
+                                @* REQ-UI-034 / BRD-85: the execution trace for this answer. Collapsed once
+                                   the run is done — the answer is the point, the trace is the audit. *@
+                                @if (msg.Trace.Count > 0)
+                                {
+                                    <Collapsible Class="mt-2">
+                                        <CollapsibleTrigger Class="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <LucideIcon aria-hidden="true" Name="chevron-down" Size="12" />
+                                            <span>@Localizer["ChatExecutionTrace"] (@msg.Trace.Count @(msg.Trace.Count == 1 ? Localizer["ChatStepSingular"].Value : Localizer["ChatStepPlural"].Value))</span>
+                                        </CollapsibleTrigger>
+                                        <CollapsibleContent>
+                                            <AgentTracePanel Entries="msg.Trace" />
+                                        </CollapsibleContent>
+                                    </Collapsible>
+                                }
                                 @if (msg.Role == "assistant" && msg.Citations.Count > 0)
                                 {
                                     <div class="mt-2 flex flex-wrap gap-2">
@@ -168,7 +240,7 @@ else
                                     <Collapsible Class="mt-2">
                                         <CollapsibleTrigger Class="flex items-center gap-1 text-xs text-muted-foreground">
                                             <LucideIcon aria-hidden="true" Name="chevron-down" Size="12" />
-                                            <span>Show sources (@msg.Citations.Count)</span>
+                                            <span>@Localizer["ChatShowSources", msg.Citations.Count]</span>
                                         </CollapsibleTrigger>
                                         <CollapsibleContent>
                                             <div class="mt-2 space-y-2">
@@ -177,7 +249,7 @@ else
                                                     <div class="rounded-md border border-primary/30 bg-accent/40 p-2 text-xs">
                                                         <div class="font-semibold">@cite.DocumentName</div>
                                                         <div class="italic text-muted-foreground">@cite.Snippet</div>
-                                                        <div class="mt-1 text-right text-muted-foreground">relevance @cite.Score.ToString("0.00")</div>
+                                                        <div class="mt-1 text-right text-muted-foreground">@Localizer["ChatRelevance"] @cite.Score.ToString("0.00")</div>
                                                     </div>
                                                 }
                                             </div>
@@ -192,6 +264,19 @@ else
                     {
                         <div class="flex justify-start">
                             <div class="max-w-[85%] rounded-lg bg-muted px-4 py-2">
+                                @if (activeAgent is not null)
+                                {
+                                    <div class="mb-1 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                                        <LucideIcon aria-hidden="true" Name="bot" Size="12" />
+                                        <span>@("@" + activeAgent.Handle)</span>
+                                    </div>
+                                }
+                                @* REQ-UI-034: the trace streams open while the agent is still working, so a
+                                   long run shows what it is doing rather than an unexplained spinner. *@
+                                @if (activeTrace is not null && !activeTrace.IsEmpty)
+                                {
+                                    <AgentTracePanel Entries="activeTrace.Entries" />
+                                }
                                 @if (streamingSources.Count > 0)
                                 {
                                     <div class="mb-2 flex flex-wrap gap-2">
@@ -207,13 +292,13 @@ else
                                 @if (!string.IsNullOrEmpty(streamingContent))
                                 {
                                     <div class="whitespace-pre-wrap text-sm">@streamingContent<span class="animate-pulse">▍</span></div>
-                                    <div class="mt-1 text-xs text-muted-foreground">Streaming…</div>
+                                    <div class="mt-1 text-xs text-muted-foreground">@Localizer["ChatStreaming"]</div>
                                 }
                                 else
                                 {
                                     <div class="flex items-center gap-2">
                                         <Spinner Size="SpinnerSize.Small" />
-                                        <span class="text-sm text-muted-foreground">Retrieving &amp; thinking…</span>
+                                        <span class="text-sm text-muted-foreground">@Localizer["ChatRetrievingThinking"]</span>
                                     </div>
                                 }
                             </div>
@@ -221,18 +306,157 @@ else
                     }
                 </div>
 
-                <!-- Composer -->
-                <div class="flex items-end gap-2 border-t pt-3" @onkeydown="HandleKeyDown">
-                    <Textarea @bind-Value="userInput" Placeholder="@($"Message {workspace.Name}…")" Class="min-h-[44px] max-h-[120px] flex-1"
-                              Disabled="@(activeThread is null || isProcessing)" />
+                @* Composer (REQ-UI-044 / BRD-137): a multi-line input under a control bar carrying
+                   the per-turn answering mode, model override and retrieval scope, plus attach and
+                   saved prompts. Matches docs/mockups/workspace-chat.html. *@
+                <div class="td-composer border-t pt-3">
+                    <div class="td-composer-bar mb-2 flex flex-wrap items-center gap-2">
+                        @* DisplayTextSelector is required: SelectValue otherwise renders the raw
+                           bound value ("AutoRag") rather than the option's Text (TR-024). *@
+                        <Select TValue="string" Value="@composerModeValue" ValueChanged="OnModeChangedAsync"
+                                DisplayTextSelector="ModeTextFor" Class="td-composer-mode">
+                            <SelectTrigger aria-label="@Localizer["ChatAnsweringModeAria"]">
+                                <SelectValue Placeholder="@Localizer["ChatAnsweringModePlaceholder"]" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                @foreach (var mode in ComposerModes)
+                                {
+                                    <SelectItem TValue="string" Value="@mode.ToString()" Text="@ModeOptionText(mode)">@ModeOptionText(mode)</SelectItem>
+                                }
+                            </SelectContent>
+                        </Select>
+
+                        @* Per-turn model override — deliberately "this turn only": it is cleared
+                           once the turn is dispatched so it can never leak into the next one. *@
+                        <DropdownMenu>
+                            <DropdownMenuTrigger>
+                                <span class="td-composer-chip">
+                                    <LucideIcon aria-hidden="true" Name="cpu" Size="14" />
+                                    <span>@ModelChipLabel()</span>
+                                    <LucideIcon aria-hidden="true" Name="chevron-down" Size="12" />
+                                    <span class="sr-only">@Localizer["ChatChooseModelForTurn"]</span>
+                                </span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuLabel>@Localizer["ChatThisTurnOnly"]</DropdownMenuLabel>
+                                <DropdownMenuItem OnClick="@(() => SetTurnModel(null))">
+                                    <span>@WorkspaceModelLabel()</span>
+                                </DropdownMenuItem>
+                                @foreach (var model in availableModels)
+                                {
+                                    <DropdownMenuItem OnClick="@(() => SetTurnModel(model))">
+                                        <span>@model</span>
+                                    </DropdownMenuItem>
+                                }
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem OnClick="GoToLlmSettings">
+                                    <span>@Localizer["ChatProviderSettings"]</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        @* Retrieval scope — narrows retrieval within this workspace only. *@
+                        <DropdownMenu>
+                            <DropdownMenuTrigger>
+                                <span class="td-composer-chip">
+                                    <LucideIcon aria-hidden="true" Name="filter" Size="14" />
+                                    <span>@ScopeChipLabel()</span>
+                                    <LucideIcon aria-hidden="true" Name="chevron-down" Size="12" />
+                                    <span class="sr-only">@Localizer["ChatChooseScopeForTurn"]</span>
+                                </span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuLabel>@Localizer["ChatRetrievalScope"]</DropdownMenuLabel>
+                                <DropdownMenuItem OnClick="@(() => SetScope(WorkspaceRetrievalScope.WholeWorkspace))">
+                                    <span>@Localizer["ChatScopeWholeWorkspace", workspaceDocuments.Count]</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem OnClick="@(() => SetScope(WorkspaceRetrievalScope.PinnedOnly))">
+                                    <span>@Localizer["ChatScopePinnedOnly", PinnedCount()]</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem OnClick="OpenScopePicker">
+                                    <span>@Localizer["ChatScopeChooseDocuments"]</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        @* REQ-RAG-021: the mention is the invocation, so the picker only inserts the
+                           handle into the composer — it never sends a turn behind the user's back. *@
+                        <DropdownMenu>
+                            <DropdownMenuTrigger>
+                                <span class="td-composer-chip">
+                                    <LucideIcon aria-hidden="true" Name="bot" Size="14" />
+                                    <span>@Localizer["ChatAgents"]</span>
+                                    <LucideIcon aria-hidden="true" Name="chevron-down" Size="12" />
+                                    <span class="sr-only">@Localizer["ChatInsertAgentHandle"]</span>
+                                </span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuLabel>@Localizer["ChatCallAnAgent"]</DropdownMenuLabel>
+                                @foreach (var agent in workspaceAgents)
+                                {
+                                    <DropdownMenuItem OnClick="@(() => InsertAgentMentionAsync(agent))">
+                                        <span>@("@" + agent.Handle)</span>
+                                    </DropdownMenuItem>
+                                }
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem OnClick="GoToAgents">
+                                    <span>@Localizer["ChatManageAgents"]</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <span class="td-composer-meta text-xs text-muted-foreground">
+                            @Localizer["ChatTopK"] @(workspace.TopK ?? 5) · @Localizer["ChatThreshold"] @(workspace.SimilarityThreshold?.ToString("0.00") ?? Localizer["ChatThresholdOff"].Value)
+                        </span>
+                    </div>
+
+                    <div class="flex items-end gap-2">
+                        <Textarea Id="@ComposerElementId" @bind-Value="userInput" rows="4"
+                                  Placeholder="@ComposerPlaceholder()" Class="td-composer-input flex-1"
+                                  AriaLabel="@Localizer["ChatComposerAria", workspace.Name]"
+                                  Disabled="@(activeThread is null || isProcessing)" />
+                    @* REQ-UI-035 / BRD-87: mic dictation. Self-contained — it owns permission,
+                       capture and teardown, and talks to the composer through Text/TextChanged. *@
+                        <DictationButton Text="@userInput" TextChanged="OnDictatedAsync"
+                                         Disabled="@(activeThread is null || isProcessing)" />
                     @* REQ-NFR-005: icon-only control — see Chat.razor composer (axe button-name). *@
-                    <Button OnClick="SendAsync" Disabled="@(activeThread is null || isProcessing || string.IsNullOrWhiteSpace(userInput))">
-                        <LucideIcon aria-hidden="true" Name="send" Size="16" />
-                        <span class="sr-only">Send message</span>
-                    </Button>
+                        <Button OnClick="SendFromButtonAsync" Disabled="@(activeThread is null || isProcessing)">
+                            <LucideIcon aria-hidden="true" Name="send" Size="16" />
+                            <span class="sr-only">@Localizer["ChatSendMessage"]</span>
+                        </Button>
+                    </div>
+
+                    <div class="td-composer-foot mt-2 flex flex-wrap items-center gap-2">
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="OpenAttachDialog"
+                                Disabled="@(activeThread is null || isProcessing)">
+                            <Button.Icon><LucideIcon aria-hidden="true" Name="paperclip" Size="14" /></Button.Icon>
+                            @Localizer["ChatAttach"]
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger>
+                                <span class="td-composer-chip">
+                                    <LucideIcon aria-hidden="true" Name="book-open" Size="14" />
+                                    <span>@Localizer["ChatPrompts"]</span>
+                                    <span class="sr-only">@Localizer["ChatInsertSavedPrompt"]</span>
+                                </span>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuLabel>@Localizer["ChatSavedPrompts"]</DropdownMenuLabel>
+                                @foreach (var saved in LocalizedSavedPrompts())
+                                {
+                                    <DropdownMenuItem OnClick="@(() => InsertSavedPromptAsync(saved))">
+                                        <span>@saved.Title</span>
+                                    </DropdownMenuItem>
+                                }
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <span class="td-composer-meta text-xs text-muted-foreground">
+                            <b>@Localizer["ChatKeyReturn"]</b> @Localizer["ChatToSend"] · <b>@Localizer["ChatKeyShiftReturn"]</b> @Localizer["ChatForNewLine"] · @Localizer["ChatBoxGrowsToLines", ChatComposerState.MaxComposerRows]
+                        </span>
+                    </div>
                 </div>
                 <div class="text-xs text-muted-foreground">
-                    Retrieval scoped to this workspace · @(workspace.ChatMode == WorkspaceChatMode.Query ? "Query mode answers only from documents" : "Chat mode") · Shift+Enter for newline
+                    @Localizer["ChatModeLabel"] @ModeLabelText(composer.Mode) — @ModeDescriptionText(composer.Mode) · @ScopeHint()
                 </div>
             </CardContent>
         </Card>
@@ -243,14 +467,14 @@ else
 <Dialog @bind-Open="showRenameDialog">
     <DialogContent>
         <DialogHeader>
-            <DialogTitle>Rename thread</DialogTitle>
+            <DialogTitle>@Localizer["ChatRenameThread"]</DialogTitle>
         </DialogHeader>
         <div class="py-2">
-            <Input @bind-Value="renameTitle" Placeholder="Thread title" />
+            <Input @bind-Value="renameTitle" Placeholder="@Localizer["ChatThreadTitlePlaceholder"]" />
         </div>
         <DialogFooter>
-            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showRenameDialog = false)">Cancel</Button>
-            <Button OnClick="ConfirmRenameAsync" Disabled="@string.IsNullOrWhiteSpace(renameTitle)">Save</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showRenameDialog = false)">@Localizer["Cancel"]</Button>
+            <Button OnClick="ConfirmRenameAsync" Disabled="@string.IsNullOrWhiteSpace(renameTitle)">@Localizer["ChatSave"]</Button>
         </DialogFooter>
     </DialogContent>
 </Dialog>
@@ -259,12 +483,70 @@ else
 <Dialog @bind-Open="showDeleteDialog">
     <DialogContent>
         <DialogHeader>
-            <DialogTitle>Delete thread?</DialogTitle>
-            <DialogDescription>This permanently removes the thread and all of its messages. This cannot be undone.</DialogDescription>
+            <DialogTitle>@Localizer["ChatDeleteThreadTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["ChatDeleteThreadBody"]</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">Cancel</Button>
-            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">Delete</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">@Localizer["ChatDelete"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- Choose-documents retrieval scope (REQ-UI-044) -->
+<Dialog @bind-Open="showScopeDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["ChatChooseDocumentsTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["ChatChooseDocumentsBody"]</DialogDescription>
+        </DialogHeader>
+        <div class="max-h-64 space-y-2 overflow-y-auto py-2">
+            @if (workspaceDocuments.Count == 0)
+            {
+                <TypographyMuted>@Localizer["ChatNoDocumentsYet"]</TypographyMuted>
+            }
+            @foreach (var doc in workspaceDocuments)
+            {
+                <div class="flex items-center gap-2">
+                    <Checkbox Checked="@scopeSelection.Contains(doc.DocumentId)"
+                              CheckedChanged="@((bool value) => ToggleScopeDocument(doc.DocumentId, value))"
+                              Id="@($"scope-{doc.DocumentId}")" />
+                    <Label For="@($"scope-{doc.DocumentId}")">
+                        @doc.Name
+                        @if (doc.IsPinned)
+                        {
+                            <span class="ml-1 text-xs text-muted-foreground">@Localizer["ChatPinnedSuffix"]</span>
+                        }
+                    </Label>
+                </div>
+            }
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showScopeDialog = false)">@Localizer["Cancel"]</Button>
+            <Button OnClick="ApplyScopeSelection">@Localizer["ChatUseTheseDocuments"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- Attach a file to this workspace and scope the turn to it (REQ-UI-044) -->
+<Dialog @bind-Open="showAttachDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["ChatAttachDocumentTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["ChatAttachDocumentBody"]</DialogDescription>
+        </DialogHeader>
+        <div class="py-2">
+            <FileUpload Accept="@AttachAcceptTypes" Multiple="false" Files="attachFiles" FilesChanged="OnAttachFilesChangedAsync" Disabled="isAttaching" />
+            @if (isAttaching)
+            {
+                <div class="mt-2 flex items-center gap-2">
+                    <Spinner Size="SpinnerSize.Small" />
+                    <span class="text-sm text-muted-foreground">@Localizer["ChatEmbeddingAttachment"]</span>
+                </div>
+            }
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showAttachDialog = false)" Disabled="isAttaching">@Localizer["ChatClose"]</Button>
         </DialogFooter>
     </DialogContent>
 </Dialog>
@@ -273,12 +555,36 @@ else
 <Dialog @bind-Open="showDeleteAllDialog">
     <DialogContent>
         <DialogHeader>
-            <DialogTitle>Delete all my history?</DialogTitle>
-            <DialogDescription>This permanently removes every conversation thread and message you own across all workspaces. This cannot be undone.</DialogDescription>
+            <DialogTitle>@Localizer["ChatDeleteAllHistoryTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["ChatDeleteAllHistoryBody"]</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteAllDialog = false)">Cancel</Button>
-            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAllAsync">Delete everything</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteAllDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAllAsync">@Localizer["ChatDeleteEverything"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* Egress confirmation (REQ-NFR-013 / REQ-NFR-008). The agent's "Ask before any skill that leaves
+   this machine" switch is answered here. Dismissing this dialog — Escape, the close button, the
+   backdrop — is a decline, so the safe answer is the one you get by doing nothing deliberate. *@
+<Dialog Open="showEgressDialog" OpenChanged="OnEgressDialogOpenChanged">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["ChatEgressTitle"]</DialogTitle>
+            <DialogDescription>
+                @egressAgentName @Localizer["ChatEgressWantsToUse"] <strong>@egressSkillName</strong>@Localizer["ChatEgressBody"]
+            </DialogDescription>
+        </DialogHeader>
+        <div class="space-y-2 text-sm">
+            <TypographyMuted>@egressSkillDescription</TypographyMuted>
+            <TypographyMuted>
+                @Localizer["ChatEgressScopeNote"]
+            </TypographyMuted>
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => AnswerEgress(false))">@Localizer["ChatEgressDeny"]</Button>
+            <Button OnClick="@(() => AnswerEgress(true))">@Localizer["ChatEgressAllow"]</Button>
         </DialogFooter>
     </DialogContent>
 </Dialog>
@@ -312,17 +618,90 @@ else
     private string renameTitle = string.Empty;
     private ConversationThread? pendingThread;
 
-    private readonly ThreadExporter exporter = new();
 
-    /// <summary>Supported thread export serialization formats (REQ-FN-010).</summary>
-    private enum ExportFormat
-    {
-        /// <summary>Human-readable Markdown transcript.</summary>
-        Markdown,
+    // ---- Composer state (REQ-UI-044 / BRD-137) -------------------------------------------------
 
-        /// <summary>Machine-readable JSON export.</summary>
-        Json
-    }
+    /// <summary>The DOM id of the composer textarea, used by the composer JS module.</summary>
+    private const string ComposerElementId = "workspace-composer";
+
+    /// <summary>The DOM id of the transcript scroll container, parked at the newest message.</summary>
+    private const string TranscriptElementId = "workspace-transcript";
+
+    /// <summary>
+    /// The message count the transcript was last scrolled to the bottom for; -1 until the first
+    /// scroll. Comparing counts rather than raising a flag at every call site means a message that
+    /// arrives by any route — thread switch, sent turn, completed stream — still lands in view.
+    /// </summary>
+    private int scrolledMessageCount = -1;
+
+    /// <summary>Upload filter for the composer's attach affordance — the same matrix as the library.</summary>
+    private const string AttachAcceptTypes = TechieDesk.Services.Data.UploadTypePolicy.AcceptTypes;
+
+    /// <summary>The five answering modes the composer offers, in mockup order.</summary>
+    private static readonly ChatAnswerMode[] ComposerModes =
+    [
+        ChatAnswerMode.AutoRag,
+        ChatAnswerMode.Query,
+        ChatAnswerMode.Chat,
+        ChatAnswerMode.DirectLlm,
+        ChatAnswerMode.Agent
+    ];
+
+    private readonly ChatComposerState composer = new();
+    private string composerModeValue = ChatAnswerMode.AutoRag.ToString();
+
+    private readonly List<ScopeDocument> workspaceDocuments = new();
+    private readonly HashSet<string> scopeSelection = new(StringComparer.Ordinal);
+    private readonly List<string> availableModels = new();
+
+    // ---- Agents (REQ-RAG-021 / REQ-UI-034) -----------------------------------------------------
+
+    /// <summary>The agents callable from this workspace's chat, for the composer's handle picker.</summary>
+    private readonly List<AgentDefinition> workspaceAgents = new();
+
+    /// <summary>The agent answering the in-flight turn, so the pending bubble can name it.</summary>
+    private AgentDefinition? activeAgent;
+
+    /// <summary>The trace being filled by the in-flight agent run; null when no agent is running.</summary>
+    private AgentTrace? activeTrace;
+
+    // ---- Egress confirmation (REQ-NFR-013) -----------------------------------------------------
+
+    /// <summary>Whether the "send a request off this machine?" prompt is up.</summary>
+    private bool showEgressDialog;
+
+    /// <summary>The catalogue label of the skill waiting for approval.</summary>
+    private string egressSkillName = string.Empty;
+
+    /// <summary>The catalogue one-liner for the skill waiting for approval.</summary>
+    private string egressSkillDescription = string.Empty;
+
+    /// <summary>The agent that wants to go out, so the prompt can name it.</summary>
+    private string egressAgentName = string.Empty;
+
+    /// <summary>
+    /// The in-flight prompt's answer. Non-null exactly while a confirmation is pending, which is
+    /// what makes the tool call wait rather than race the dialog.
+    /// </summary>
+    private TaskCompletionSource<bool>? egressAnswer;
+
+    private bool showScopeDialog;
+    private bool showAttachDialog;
+    private bool isAttaching;
+    private IReadOnlyList<FileUploadItem> attachFiles = Array.Empty<FileUploadItem>();
+
+    private IJSObjectReference? composerModule;
+    private DotNetObjectReference<WorkspaceChat>? composerRef;
+
+    /// <summary>A workspace document offered by the retrieval-scope picker.</summary>
+    /// <param name="DocumentId">The document identifier used to scope retrieval.</param>
+    /// <param name="Name">The display name shown in the picker.</param>
+    /// <param name="IsPinned">Whether the document is pinned in this workspace.</param>
+    private sealed record ScopeDocument(string DocumentId, string Name, bool IsPinned);
+
+    // REQ-FN-010: the export formats now come from TechieDesk.Services.Threads.ThreadExportFormat,
+    // which the export SERVICE takes — the private duplicate that used to live here could not be
+    // referenced from a test project, and the export path is exactly what needed covering.
 
     protected override async Task OnParametersSetAsync()
     {
@@ -343,6 +722,11 @@ else
         threads.Clear();
         activeThread = null;
         messages.Clear();
+        workspaceDocuments.Clear();
+        scopeSelection.Clear();
+        composer.SelectedDocumentIds.Clear();
+        composer.Scope = WorkspaceRetrievalScope.WholeWorkspace;
+        composer.TurnModel = null;
 
         try
         {
@@ -352,6 +736,11 @@ else
                 notFound = true;
                 return;
             }
+
+            await LoadScopeDocumentsAsync();
+            await LoadAvailableModelsAsync();
+            await LoadAgentsAsync();
+            PrefillMentionFromQuery();
 
             var store = await Rag.GetConversationStoreAsync();
             if (store is not null)
@@ -376,6 +765,10 @@ else
         activeThread = thread;
         messages.Clear();
 
+        // Two threads can hold the same number of messages, so a count comparison alone would skip
+        // the scroll on a switch between them (REQ-UI-044).
+        scrolledMessageCount = -1;
+
         var store = await Rag.GetConversationStoreAsync();
         if (store is null) return;
 
@@ -392,7 +785,7 @@ else
         var store = await Rag.GetConversationStoreAsync();
         if (store is null) return;
 
-        var thread = await store.CreateThreadAsync(Workspaces.CurrentUserId, workspace.WorkspaceId, "New conversation");
+        var thread = await store.CreateThreadAsync(Workspaces.CurrentUserId, workspace.WorkspaceId, UntitledThreadSentinel);
         threads.Insert(0, thread);
         activeThread = thread;
         messages.Clear();
@@ -401,7 +794,7 @@ else
     private void BeginRename(ConversationThread thread)
     {
         pendingThread = thread;
-        renameTitle = thread.Title;
+        renameTitle = ThreadTitle(thread);
         showRenameDialog = true;
     }
 
@@ -451,44 +844,53 @@ else
 
     /// <summary>
     /// REQ-FN-010: serializes a thread's full message history (role, content, cited sources,
-    /// timestamps) to Markdown or JSON and streams it to the browser as a file download.
+    /// timestamps) to Markdown or JSON and writes it to a location the user picks in the OS save
+    /// panel, then reports the outcome.
     /// </summary>
-    private async Task ExportThreadAsync(ConversationThread thread, ExportFormat format)
+    /// <remarks>
+    /// The success toast is raised ONLY when <see cref="ThreadExportOutcome.IsSuccess"/> is true,
+    /// which <c>ThreadExportService</c> sets only after confirming a non-empty file exists at the
+    /// chosen path. This is the whole point of the rewrite: the previous implementation pushed a
+    /// Blob URL through a WebView anchor — which MAUI's BlazorWebView has no download delegate for,
+    /// so nothing was ever written — and then toasted "Exported" unconditionally. A cancelled save
+    /// panel now says nothing at all, and a failed write says it failed.
+    /// </remarks>
+    private async Task ExportThreadAsync(ConversationThread thread, ThreadExportFormat format)
     {
         try
         {
             var store = await Rag.GetConversationStoreAsync();
             if (store is null)
             {
-                ToastService.Error("Conversation storage is not configured.", "Export failed");
+                ToastService.Error(Localizer["ChatNoConversationStore"].Value, Localizer["ChatExportFailedTitle"].Value);
                 return;
             }
 
             var stored = await store.GetMessagesAsync(thread.ThreadId);
-            string content;
-            string fileName;
-            string mimeType;
-            if (format == ExportFormat.Markdown)
+            var outcome = await ExportService.ExportAsync(thread, stored, format);
+
+            if (outcome.IsSuccess)
             {
-                content = exporter.ToMarkdown(thread, stored);
-                fileName = exporter.BuildFileName(thread, "md");
-                mimeType = "text/markdown";
-            }
-            else
-            {
-                content = exporter.ToJson(thread, stored);
-                fileName = exporter.BuildFileName(thread, "json");
-                mimeType = "application/json";
+                Logger.LogInformation(
+                    "Exported thread {ThreadId} to {FilePath} ({Bytes} bytes)",
+                    thread.ThreadId, outcome.FilePath, outcome.BytesWritten);
+                ToastService.Success(outcome.Message, Localizer["ChatExportedTitle"].Value);
+                return;
             }
 
-            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/download.js");
-            await module.InvokeVoidAsync("saveText", fileName, mimeType, content);
-            ToastService.Success($"Exported \"{thread.Title}\" as {(format == ExportFormat.Markdown ? "Markdown" : "JSON")}.", "Exported");
+            if (outcome.IsError)
+            {
+                Logger.LogWarning("Export of thread {ThreadId} failed: {Reason}", thread.ThreadId, outcome.Message);
+                ToastService.Error(outcome.Message, Localizer["ChatExportFailedTitle"].Value);
+            }
+
+            // Cancelled: the user closed the save panel. No toast — nothing happened, and nothing
+            // went wrong.
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to export thread {ThreadId}", thread.ThreadId);
-            ToastService.Error("Export failed. Please try again.", "Export failed");
+            ToastService.Error(Localizer["ChatExportFailedBody"].Value, Localizer["ChatExportFailedTitle"].Value);
         }
     }
 
@@ -511,12 +913,12 @@ else
             threads.Clear();
             activeThread = null;
             messages.Clear();
-            ToastService.Success("All conversation history deleted.", "History cleared");
+            ToastService.Success(Localizer["ChatHistoryDeletedBody"].Value, Localizer["ChatHistoryClearedTitle"].Value);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Failed to delete all history for user");
-            ToastService.Error("Could not delete history. Please try again.", "Delete failed");
+            ToastService.Error(Localizer["ChatDeleteHistoryFailedBody"].Value, Localizer["ChatDeleteFailedTitle"].Value);
         }
         finally
         {
@@ -524,12 +926,485 @@ else
         }
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
+    /// <summary>
+    /// REQ-UI-044: loads the workspace's documents (with their display names and pin state) so the
+    /// retrieval-scope picker can offer real choices rather than a decorative list.
+    /// </summary>
+    private async Task LoadScopeDocumentsAsync()
     {
-        if (e.Key == "Enter" && !e.ShiftKey)
+        workspaceDocuments.Clear();
+        if (workspace is null) return;
+
+        var manager = await Rag.GetWorkspaceManagerAsync();
+        if (manager is null) return;
+
+        var members = await manager.GetStore().ListDocumentsAsync(workspace.WorkspaceId);
+        if (members.Count == 0) return;
+
+        var library = await Rag.ListDocumentsAsync();
+        var names = library.ToDictionary(d => d.Id, d => d.Name, StringComparer.Ordinal);
+
+        foreach (var member in members)
         {
-            await SendAsync();
+            var name = names.TryGetValue(member.DocumentId, out var found) ? found : member.DocumentId;
+            workspaceDocuments.Add(new ScopeDocument(member.DocumentId, name, member.IsPinned));
         }
+    }
+
+    /// <summary>
+    /// REQ-UI-044: offers the models the app is actually configured with — the primary provider's
+    /// model and the fallback provider's model — for the per-turn override.
+    /// </summary>
+    private async Task LoadAvailableModelsAsync()
+    {
+        availableModels.Clear();
+        try
+        {
+            var config = await RagConfig.LoadConfigAsync();
+            AddModel(config.Llm.Source, config.Llm.Model);
+            if (config.LlmFallback is not null)
+            {
+                AddModel(config.LlmFallback.Source, config.LlmFallback.Model);
+            }
+        }
+        catch (Exception ex)
+        {
+            // A missing or unreadable provider config must not stop the composer rendering.
+            Logger.LogWarning(ex, "Could not read the LLM configuration for the per-turn model list");
+        }
+    }
+
+    /// <summary>
+    /// REQ-RAG-021: loads the handles this workspace's chat can call, so the composer's picker
+    /// offers real agents and an unrecognised mention can name the ones that do exist.
+    /// </summary>
+    private async Task LoadAgentsAsync()
+    {
+        workspaceAgents.Clear();
+        if (workspace is null) return;
+
+        try
+        {
+            workspaceAgents.AddRange(await AgentRegistry.ListAsync(workspace.WorkspaceId));
+        }
+        catch (Exception ex)
+        {
+            // The chat itself still works without the agent registry; only @mentions are lost.
+            Logger.LogWarning(ex, "Could not load the agents for workspace {Slug}", Slug);
+        }
+    }
+
+    /// <summary>
+    /// "Run in chat" on the Agents screen arrives here as <c>?agent=handle</c>. It PREFILLS the
+    /// composer and stops there: the mention is the invocation, so sending it has to stay the
+    /// user's own act rather than something a menu item did on their behalf (REQ-RAG-021).
+    /// </summary>
+    private void PrefillMentionFromQuery()
+    {
+        var query = Nav.ToAbsoluteUri(Nav.Uri).Query;
+        if (string.IsNullOrEmpty(query)) return;
+
+        foreach (var pair in query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length != 2 || !string.Equals(parts[0], "agent", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var handle = AgentMentionParser.Normalize(Uri.UnescapeDataString(parts[1]));
+            if (handle.Length > 0)
+            {
+                userInput = $"@{handle} ";
+            }
+            return;
+        }
+    }
+
+    private void AddModel(LlmSource source, string? model)
+    {
+        if (source == LlmSource.None || string.IsNullOrWhiteSpace(model)) return;
+
+        var label = $"{source} · {model.Trim()}";
+        if (!availableModels.Contains(label, StringComparer.Ordinal))
+        {
+            availableModels.Add(label);
+        }
+    }
+
+    /// <summary>
+    /// Strips the "Provider · " prefix the model menu shows, leaving the bare model id the LLM
+    /// providers expect in <see cref="LlmCompletionOptions.Model"/>.
+    /// </summary>
+    /// <param name="label">A model menu label, or null.</param>
+    /// <returns>The bare model identifier, or null.</returns>
+    private static string? ModelIdFromLabel(string? label)
+    {
+        if (string.IsNullOrWhiteSpace(label)) return null;
+        var separator = label.IndexOf('·');
+        return separator < 0 ? label.Trim() : label[(separator + 1)..].Trim();
+    }
+
+    private async Task OnModeChangedAsync(string? value)
+    {
+        composerModeValue = value ?? ChatAnswerMode.AutoRag.ToString();
+        composer.Mode = Enum.TryParse<ChatAnswerMode>(composerModeValue, out var parsed) ? parsed : ChatAnswerMode.AutoRag;
+        await Task.CompletedTask;
+    }
+
+    private void SetTurnModel(string? label) => composer.TurnModel = ModelIdFromLabel(label);
+
+    private void SetScope(WorkspaceRetrievalScope scope)
+    {
+        composer.Scope = scope;
+        if (scope != WorkspaceRetrievalScope.SelectedDocuments)
+        {
+            composer.SelectedDocumentIds.Clear();
+        }
+    }
+
+    private void OpenScopePicker()
+    {
+        scopeSelection.Clear();
+        foreach (var id in composer.SelectedDocumentIds)
+        {
+            scopeSelection.Add(id);
+        }
+        showScopeDialog = true;
+    }
+
+    private void ToggleScopeDocument(string documentId, bool selected)
+    {
+        if (selected)
+        {
+            scopeSelection.Add(documentId);
+        }
+        else
+        {
+            scopeSelection.Remove(documentId);
+        }
+    }
+
+    private void ApplyScopeSelection()
+    {
+        composer.SelectedDocumentIds.Clear();
+        composer.SelectedDocumentIds.AddRange(scopeSelection);
+        composer.Scope = composer.SelectedDocumentIds.Count == 0
+            ? WorkspaceRetrievalScope.WholeWorkspace
+            : WorkspaceRetrievalScope.SelectedDocuments;
+        showScopeDialog = false;
+    }
+
+    private void OpenAttachDialog()
+    {
+        attachFiles = Array.Empty<FileUploadItem>();
+        showAttachDialog = true;
+    }
+
+    /// <summary>
+    /// REQ-UI-044 attach affordance: embeds the picked file into this workspace through the same
+    /// library ingestion path the document library uses, then scopes retrieval to it.
+    /// </summary>
+    /// <param name="files">The files the user picked.</param>
+    private async Task OnAttachFilesChangedAsync(IReadOnlyList<FileUploadItem> files)
+    {
+        attachFiles = files;
+        if (workspace is null || files.Count == 0 || isAttaching) return;
+
+        var picked = files[0];
+        var rejection = TechieDesk.Services.Data.UploadTypePolicy.GetRejection(picked.Name);
+        if (rejection is not null)
+        {
+            // REQ-UI-055: the policy returns a KEY; this page owns the language.
+            ToastService.Error(
+                Localizer[rejection.MessageKey, rejection.Arguments].Value,
+                Localizer["ChatCannotAttachTitle"].Value);
+            return;
+        }
+
+        isAttaching = true;
+        string? tempDir = null;
+        try
+        {
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (manager is null)
+            {
+                ToastService.Error(Localizer["ChatNoWorkspacePersistence"].Value, Localizer["ChatCannotAttachTitle"].Value);
+                return;
+            }
+
+            byte[] bytes;
+            await using (var readStream = picked.File.OpenReadStream(67108864))
+            await using (var buffer = new MemoryStream())
+            {
+                await readStream.CopyToAsync(buffer);
+                bytes = buffer.ToArray();
+            }
+
+            tempDir = Path.Combine(Path.GetTempPath(), "techiedesk-attachments", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDir);
+            var tempPath = Path.Combine(tempDir, Path.GetFileName(picked.Name));
+            await File.WriteAllBytesAsync(tempPath, bytes);
+
+            var documentId = await manager.IngestFileAsync(workspace.WorkspaceId, tempPath);
+
+            await LoadScopeDocumentsAsync();
+            composer.SelectedDocumentIds.Clear();
+            composer.SelectedDocumentIds.Add(documentId);
+            composer.Scope = WorkspaceRetrievalScope.SelectedDocuments;
+
+            showAttachDialog = false;
+            ToastService.Success(Localizer["ChatAttachedBody", picked.Name].Value, Localizer["ChatAttachedTitle"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to attach {File}", picked.Name);
+            ToastService.Error(ex.Message, Localizer["ChatAttachFailedTitle"].Value);
+        }
+        finally
+        {
+            if (tempDir is not null && Directory.Exists(tempDir))
+            {
+                try { Directory.Delete(tempDir, recursive: true); } catch { /* best-effort temp cleanup */ }
+            }
+            isAttaching = false;
+            attachFiles = Array.Empty<FileUploadItem>();
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// REQ-UI-044: inserts a saved prompt at the caret and keeps the bound field in step with the
+    /// DOM value the JS module returns.
+    /// </summary>
+    /// <param name="saved">The saved prompt to insert.</param>
+    private async Task InsertSavedPromptAsync(PromptOption saved)
+    {
+        var module = await GetComposerModuleAsync();
+        if (module is null)
+        {
+            userInput = (userInput ?? string.Empty) + saved.Text;
+            return;
+        }
+
+        userInput = await module.InvokeAsync<string>(
+            "insertAtCaret", ComposerElementId, saved.Text, ChatComposerState.MaxComposerRows);
+    }
+
+    /// <summary>
+    /// REQ-UI-035: takes a dictation revision into the composer.
+    /// </summary>
+    /// <param name="text">The composer text after the latest transcript revision.</param>
+    /// <remarks>
+    /// <b>replaceValue, not insertAtCaret.</b> A dictation transcript is REVISED as speech
+    /// continues, so a write can be SHORTER than what the textarea already holds — which
+    /// <c>insertAtCaret</c>'s stale-echo guard is designed to swallow. Without the explicit replace
+    /// the DOM textarea keeps its own value and dictated words never appear on screen, even though
+    /// the bound field is correct.
+    /// </remarks>
+    private async Task OnDictatedAsync(string text)
+    {
+        userInput = text;
+
+        var module = await GetComposerModuleAsync();
+        if (module is null)
+        {
+            // No JS module: the two-way binding still carries the text to the textarea.
+            return;
+        }
+
+        try
+        {
+            await module.InvokeVoidAsync(
+                "replaceValue", ComposerElementId, text, ChatComposerState.MaxComposerRows);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit went away mid-dictation; there is nothing left to write to.
+        }
+    }
+
+    private string ModelChipLabel() =>
+        string.IsNullOrEmpty(composer.TurnModel) ? WorkspaceModelLabel() : composer.TurnModel!;
+
+    private string WorkspaceModelLabel() =>
+        string.IsNullOrEmpty(workspace?.LlmModel)
+            ? Localizer["ChatWorkspaceDefaultModel"]
+            : Localizer["ChatWorkspaceDefaultModelNamed", workspace!.LlmModel];
+
+    private string ScopeChipLabel() =>
+        ScopeLabelText(composer.Scope, composer.SelectedDocumentIds.Count);
+
+    private int PinnedCount() => workspaceDocuments.Count(d => d.IsPinned);
+
+    /// <summary>
+    /// REQ-UI-051: the localized label for a retrieval scope.
+    /// </summary>
+    /// <param name="scope">The scope to name.</param>
+    /// <param name="chosenCount">How many documents are chosen, used by the selected-documents label.</param>
+    /// <returns>The label shown on the scope chip and in the composer hint.</returns>
+    /// <remarks>
+    /// REQ-UI-051: <see cref="ChatComposerState"/> now names the resource key for each enum value,
+    /// so this is a lookup rather than a second copy of the mapping. The COUNT is applied here
+    /// rather than in the service: pluralising means spelling "document"/"documents", which is
+    /// English, so the singular and plural live in two resource keys instead. The extra argument is
+    /// harmless for the keys that carry no placeholder.
+    /// </remarks>
+    private string ScopeLabelText(WorkspaceRetrievalScope scope, int chosenCount) =>
+        Localizer[ChatComposerState.ScopeLabelKey(scope), chosenCount].Value;
+
+    /// <summary>REQ-UI-051: the localized short name of an answering mode.</summary>
+    /// <param name="mode">The mode to name.</param>
+    /// <returns>The mode's label.</returns>
+    private string ModeLabelText(ChatAnswerMode mode) =>
+        Localizer[ChatComposerState.ModeLabelKey(mode)].Value;
+
+    /// <summary>REQ-UI-051: the localized one-line explanation of an answering mode.</summary>
+    /// <param name="mode">The mode to describe.</param>
+    /// <returns>The mode's explanation.</returns>
+    private string ModeDescriptionText(ChatAnswerMode mode) =>
+        Localizer[ChatComposerState.ModeDescriptionKey(mode)].Value;
+
+    private string ScopeHint() => composer.Mode == ChatAnswerMode.DirectLlm
+        ? Localizer["ChatScopeHintNoRetrieval"]
+        : Localizer["ChatScopeHintRetrieval", ScopeLabelText(composer.Scope, composer.SelectedDocumentIds.Count)];
+
+    // The em dash is punctuation, not prose: joining in code keeps the two halves as separate
+    // resource strings rather than inventing a "{0} — {1}" key with no translatable words in it.
+    private string ModeOptionText(ChatAnswerMode mode) =>
+        $"{ModeLabelText(mode)} — {ModeDescriptionText(mode)}";
+
+    /// <summary>Renders the selected mode's friendly label on the Select trigger.</summary>
+    /// <param name="value">The bound enum name.</param>
+    /// <returns>The option text for that mode.</returns>
+    private string ModeTextFor(string value) =>
+        ModeOptionText(Enum.TryParse<ChatAnswerMode>(value, out var parsed) ? parsed : ChatAnswerMode.AutoRag);
+
+    private string ComposerPlaceholder() =>
+        Localizer["ChatComposerPlaceholder", workspace?.Name ?? string.Empty];
+
+    /// <summary>
+    /// The title a thread is created with, kept culture-invariant because it is PERSISTED.
+    /// </summary>
+    /// <remarks>
+    /// REQ-UI-051. Translating the stored value would write Hindi into the conversation store and
+    /// break <see cref="BumpThreadTitleAsync"/>'s "is this still untitled?" test the moment the user
+    /// switched language. The sentinel stays English on disk; <see cref="ThreadTitle"/> is what the
+    /// user actually reads.
+    /// </remarks>
+    private const string UntitledThreadSentinel = "New conversation";
+
+    /// <summary>REQ-UI-051: the title to DISPLAY for a thread.</summary>
+    /// <param name="thread">The thread whose title is being shown.</param>
+    /// <returns>The user's own title, or the localized name for a still-untitled thread.</returns>
+    private string ThreadTitle(ConversationThread thread) =>
+        string.Equals(thread?.Title, UntitledThreadSentinel, StringComparison.Ordinal)
+            ? Localizer["ChatNewConversation"]
+            : thread?.Title ?? string.Empty;
+
+    /// <summary>
+    /// REQ-UI-051: the saved-prompt menu, in the user's language.
+    /// </summary>
+    /// <returns>The saved prompts, title and body both localized.</returns>
+    /// <remarks>
+    /// REQ-UI-051: <see cref="ChatComposerState.SavedPrompts"/> now carries resource KEYS, so this
+    /// resolves that list instead of restating it — a fifth saved prompt appears here the moment it
+    /// is added to the service. The BODY is localized as well as the title: the text is inserted
+    /// into the composer as the user's own question, and an English question is what the model then
+    /// answers.
+    /// </remarks>
+    private IReadOnlyList<PromptOption> LocalizedSavedPrompts() =>
+        ChatComposerState.SavedPrompts
+            .Select(prompt => new PromptOption(
+                Localizer[prompt.TitleKey].Value,
+                Localizer[prompt.TextKey].Value))
+            .ToArray();
+
+    /// <summary>A saved prompt with its words already resolved (REQ-UI-051).</summary>
+    /// <param name="Title">The label shown in the saved-prompts menu.</param>
+    /// <param name="Text">The prompt text inserted into the composer.</param>
+    private sealed record PromptOption(string Title, string Text);
+
+    private void GoToLlmSettings() => Nav.NavigateTo("/llm-settings");
+
+    /// <summary>
+    /// Wires the composer's send/newline keyboard contract and auto-grow after the first render
+    /// that actually produced the textarea (REQ-UI-044).
+    /// </summary>
+    /// <param name="firstRender">Whether this is the component's first render.</param>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _ = firstRender;
+        if (workspace is null) return;
+
+        var module = await GetComposerModuleAsync();
+        if (module is null) return;
+
+        composerRef ??= DotNetObjectReference.Create(this);
+        await module.InvokeAsync<bool>(
+            "attach", ComposerElementId, composerRef, ChatComposerState.MaxComposerRows);
+
+        // REQ-UI-044: park the transcript on the newest message whenever the message list has
+        // changed. Runs after render, so the new message is already laid out and measurable.
+        if (scrolledMessageCount != messages.Count)
+        {
+            scrolledMessageCount = messages.Count;
+            try
+            {
+                await module.InvokeVoidAsync("scrollToEnd", TranscriptElementId);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit went away before the scroll could be applied; nothing to scroll.
+            }
+        }
+    }
+
+    private async Task<IJSObjectReference?> GetComposerModuleAsync()
+    {
+        try
+        {
+            composerModule ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/composer.js");
+            return composerModule;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Composer JS module unavailable");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Invoked from the composer JS module when Return is pressed without Shift. The text is
+    /// passed in from the live DOM value so a send can never race the two-way binding.
+    /// </summary>
+    /// <param name="text">The composer's current text.</param>
+    /// <returns>A task that completes once the turn has been dispatched.</returns>
+    [JSInvokable]
+    public async Task SubmitFromComposer(string text)
+    {
+        userInput = text;
+        await SendAsync();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Sends from the Send button, reading the live DOM value first so a click that steals focus
+    /// before the binding fires still sends what the user typed.
+    /// </summary>
+    private async Task SendFromButtonAsync()
+    {
+        var module = await GetComposerModuleAsync();
+        if (module is not null)
+        {
+            var live = await module.InvokeAsync<string>("readValue", ComposerElementId);
+            if (!string.IsNullOrWhiteSpace(live))
+            {
+                userInput = live;
+            }
+        }
+
+        await SendAsync();
     }
 
     private async Task SendAsync()
@@ -539,11 +1414,47 @@ else
             return;
         }
 
-        var question = userInput!.Trim();
+        var typed = userInput!.Trim();
+
+        // REQ-RAG-021: a leading @handle routes this turn through that named agent. Resolved BEFORE
+        // anything is persisted, so an unrecognised handle costs nothing and the user keeps what
+        // they typed. Silently falling through to the normal chat path would be worse than saying
+        // no: the person would never learn their agent was not called.
+        var mention = AgentMentionParser.Parse(typed);
+        AgentDefinition? invoked = null;
+        var prompt = typed;
+
+        if (mention is not null)
+        {
+            invoked = await ResolveMentionedAgentAsync(mention.Handle);
+            if (invoked is null)
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(mention.Message))
+            {
+                ToastService.Error(
+                    Localizer["ChatMentionNeedsQuestion", mention.Handle].Value,
+                    Localizer["ChatNothingToAskTitle"].Value);
+                return;
+            }
+
+            prompt = mention.Message;
+        }
+
+        // REQ-UI-044: snapshot the composer's mode/model/scope for THIS turn. TakeTurn also clears
+        // the "this turn only" model, so it cannot silently govern the next question.
+        var plan = composer.TakeTurn(workspace);
+
+        var question = typed;
         userInput = string.Empty;
+        await ResetComposerAsync();
         isProcessing = true;
         streamingContent = string.Empty;
         streamingSources.Clear();
+        activeAgent = invoked;
+        activeTrace = null;
         messages.Add(new ChatDisplayMessage("user", question, new List<Citation>()));
         StateHasChanged();
 
@@ -555,7 +1466,8 @@ else
             var manager = await Rag.GetWorkspaceManagerAsync();
             if (store is null || manager is null)
             {
-                messages.Add(new ChatDisplayMessage("assistant", "Workspace persistence is not configured.", new List<Citation>()));
+                messages.Add(new ChatDisplayMessage(
+                    "assistant", Localizer["ChatWorkspacePersistenceMissing"], new List<Citation>()));
                 return;
             }
 
@@ -565,7 +1477,7 @@ else
             var provider = await Rag.GetLlmProviderAsync();
             if (provider is null)
             {
-                const string noProvider = "No LLM provider is configured. Configure one in LLM Settings to chat.";
+                string noProvider = Localizer["ChatNoProviderConfiguredMessage"];
                 messages.Add(new ChatDisplayMessage("assistant", noProvider, new List<Citation>()));
                 await store.AddMessageAsync(activeThread.ThreadId, ChatMessage.Assistant(noProvider));
                 return;
@@ -576,61 +1488,513 @@ else
             var history = await store.GetTrimmedHistoryAsync(activeThread.ThreadId, HistoryTokenBudget, provider.EstimateTokenCount);
             var priorTurns = ChatHistoryTrimmer.PriorTurns(history);
 
-            var options = string.IsNullOrEmpty(workspace.LlmModel) ? null : new LlmCompletionOptions { Model = workspace.LlmModel };
-
             var tracker = await Rag.GetTokenTrackerAsync();
             var before = tracker.GetSessionUsage();
 
-            // REQ-RAG-013 / TR-RAG-003: the library owns workspace-scoped streaming now, so pinned
-            // documents are merged into the context while streaming — the previous app-side
-            // composition of SearchAsync + provider.ChatStreamAsync silently dropped them.
-            // REQ-RAG-007/014: scoping, top-K and threshold come from the workspace settings.
-            // REQ-RAG-010: the native Sources event arrives before the first token, so the citation
-            // chips render from real SearchResults rather than a post-hoc keyword match.
-            // REQ-RAG-015: query mode emits the honest "not covered" answer without calling the LLM.
-            await foreach (var evt in manager.AskStreamWithSourcesAsync(workspace.WorkspaceId, question, priorTurns, options))
+            if (invoked is not null)
             {
-                if (evt.Type == RagStreamEventType.Sources)
+                // REQ-RAG-021: an @handle turn always runs the agent loop, whatever the composer's
+                // mode selector says — the user named an agent, so the agent answers.
+                sources = await RunAgentTurnAsync(manager, provider, plan, prompt, priorTurns, invoked);
+            }
+            else if (!plan.RetrievalEnabled)
+            {
+                // REQ-UI-044 Direct-LLM: no retrieval at all, so there are no sources and no
+                // workspace context — the model answers from the conversation alone.
+                await StreamDirectAsync(provider, plan, question, priorTurns);
+            }
+            else if (plan.ToolsEnabled)
+            {
+                // REQ-UI-044 Agent: the model decides whether to retrieve, via a workspace-scoped
+                // search tool honoring the same per-turn retrieval scope.
+                sources = await RunAgentTurnAsync(manager, provider, plan, question, priorTurns, agent: null);
+            }
+            else
+            {
+                // REQ-RAG-013 / TR-RAG-003: the library owns workspace-scoped streaming now, so pinned
+                // documents are merged into the context while streaming — the previous app-side
+                // composition of SearchAsync + provider.ChatStreamAsync silently dropped them.
+                // REQ-RAG-007/014: scoping, top-K and threshold come from the workspace settings.
+                // REQ-RAG-010: the native Sources event arrives before the first token, so the citation
+                // chips render from real SearchResults rather than a post-hoc keyword match.
+                // REQ-RAG-015: query mode emits the honest "not covered" answer without calling the LLM.
+                // REQ-UI-044: the per-turn mode/model/scope ride along as WorkspaceTurnOverrides.
+                await foreach (var evt in manager.AskTurnStreamAsync(
+                    workspace.WorkspaceId, question, plan.Overrides, priorTurns))
                 {
-                    sources = evt.Sources ?? Array.Empty<SearchResult>();
-                    streamingSources.Clear();
-                    streamingSources.AddRange(ToCitations(sources));
-                    StateHasChanged();
+                    if (evt.Type == RagStreamEventType.Sources)
+                    {
+                        sources = evt.Sources ?? Array.Empty<SearchResult>();
+                        streamingSources.Clear();
+                        streamingSources.AddRange(ToCitations(sources));
+                        StateHasChanged();
 
-                    // REQ-RAG-010: yield to the renderer so the citation chips are painted while
-                    // the LLM is still being contacted. Without this the chips can be starved
-                    // until the first token — or never shown at all if the provider fails fast.
-                    await Task.Yield();
-                    continue;
-                }
+                        // REQ-RAG-010: yield to the renderer so the citation chips are painted while
+                        // the LLM is still being contacted. Without this the chips can be starved
+                        // until the first token — or never shown at all if the provider fails fast.
+                        await Task.Yield();
+                        continue;
+                    }
 
-                if (evt.Type == RagStreamEventType.Token)
-                {
-                    streamingContent += evt.Token;
-                    StateHasChanged();
+                    if (evt.Type == RagStreamEventType.Token)
+                    {
+                        streamingContent += evt.Token;
+                        StateHasChanged();
+                    }
                 }
             }
 
             AccountStreamedUsage(provider, question, streamingContent, tracker, before);
 
             var citations = ToCitations(sources);
-            messages.Add(new ChatDisplayMessage("assistant", streamingContent, citations));
+            messages.Add(new ChatDisplayMessage(
+                "assistant", streamingContent, citations, TraceForTurn(invoked), invoked?.Handle));
             await store.AddMessageAsync(activeThread.ThreadId, ChatMessage.Assistant(streamingContent), sources);
             await BumpThreadTitleAsync(store, question);
+
+            if (invoked is not null)
+            {
+                await AgentRegistry.MarkUsedAsync(invoked);
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Workspace chat send failed");
 
-            // Keep the retrieved citations on the failed turn: retrieval succeeded, generation did not.
-            messages.Add(new ChatDisplayMessage("assistant", $"Error: {ex.Message}", ToCitations(sources)));
+            // Keep the retrieved citations AND the trace on the failed turn: whatever the agent did
+            // before it failed is exactly what a reader needs to see to understand the failure.
+            messages.Add(new ChatDisplayMessage(
+                "assistant", Localizer["ChatTurnFailedMessage", ex.Message], ToCitations(sources),
+                TraceForTurn(invoked), invoked?.Handle));
         }
         finally
         {
             isProcessing = false;
             streamingContent = string.Empty;
             streamingSources.Clear();
+            activeAgent = null;
+            activeTrace = null;
             StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// REQ-UI-034: hands the finished trace to the message about to be rendered, honoring the
+    /// agent's own "show the execution trace in chat" guardrail. An agent configured to keep quiet
+    /// produces no panel rather than one that is merely collapsed.
+    /// </summary>
+    /// <param name="agent">The agent that answered, or null for a non-agent turn.</param>
+    /// <returns>The trace entries to attach to the message.</returns>
+    private IReadOnlyList<AgentTraceEntry> TraceForTurn(AgentDefinition? agent)
+    {
+        if (activeTrace is null || activeTrace.IsEmpty)
+        {
+            return [];
+        }
+
+        return agent is not null && !agent.ShowTrace ? [] : activeTrace.Entries;
+    }
+
+    /// <summary>
+    /// REQ-RAG-021: resolves a typed handle, and says plainly when it names nothing — listing the
+    /// handles that do exist, because "no such agent" without them is a dead end.
+    /// </summary>
+    /// <param name="handle">The normalized handle taken off the message.</param>
+    /// <returns>The agent, or null when the workspace has none by that handle.</returns>
+    private async Task<AgentDefinition?> ResolveMentionedAgentAsync(string handle)
+    {
+        AgentDefinition? agent = null;
+        try
+        {
+            agent = await AgentRegistry.ResolveAsync(workspace!.WorkspaceId, handle);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not resolve agent handle {Handle}", handle);
+            ToastService.Error(ex.Message, Localizer["ChatAgentRegistryUnavailable"].Value);
+            return null;
+        }
+
+        if (agent is not null)
+        {
+            return agent;
+        }
+
+        var known = workspaceAgents.Count == 0
+            ? $"@{AgentDefinition.BuiltInHandle}"
+            : string.Join(", ", workspaceAgents.Select(a => "@" + a.Handle));
+        ToastService.Error(
+            Localizer["ChatNoSuchAgentBody", handle, known].Value, Localizer["ChatNoSuchAgentTitle"].Value);
+        return null;
+    }
+
+    /// <summary>
+    /// REQ-UI-044 Direct-LLM mode: streams straight from the provider with no retrieval, so the
+    /// turn is demonstrably different from Auto-RAG — no Sources event, no citations.
+    /// </summary>
+    /// <param name="provider">The configured LLM provider.</param>
+    /// <param name="plan">The turn plan supplying the per-turn model.</param>
+    /// <param name="question">The user's question.</param>
+    /// <param name="priorTurns">The trimmed conversation history.</param>
+    private async Task StreamDirectAsync(
+        ILlmProvider provider,
+        ChatTurnPlan plan,
+        string question,
+        IReadOnlyList<ChatMessage> priorTurns)
+    {
+        var conversation = new List<ChatMessage>();
+        if (!string.IsNullOrWhiteSpace(workspace?.SystemPrompt))
+        {
+            conversation.Add(ChatMessage.System(workspace!.SystemPrompt!));
+        }
+        conversation.AddRange(priorTurns);
+        conversation.Add(ChatMessage.User(question));
+
+        await foreach (var token in provider.ChatStreamAsync(conversation, plan.CompletionOptions))
+        {
+            streamingContent += token;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Runs the library agent loop for this turn (REQ-UI-044 Agent mode and REQ-RAG-021 @@handle
+    /// invocation are the same path), building the tool set from the workspace skill catalogue
+    /// intersected with the agent's own selection (REQ-RAG-022) and filling an execution trace as
+    /// it goes (REQ-UI-034).
+    /// </summary>
+    /// <param name="manager">The library workspace manager providing scoped retrieval.</param>
+    /// <param name="provider">The configured LLM provider.</param>
+    /// <param name="plan">The turn plan supplying the per-turn model and retrieval scope.</param>
+    /// <param name="question">The question to answer, with any @@handle already removed.</param>
+    /// <param name="priorTurns">The trimmed conversation history.</param>
+    /// <param name="agent">
+    /// The agent named by an @@handle, or null for composer Agent mode — in which case the built-in
+    /// agent governs, so the same catalogue and guardrails apply either way.
+    /// </param>
+    /// <returns>Whatever the agent retrieved, so the citation chips still reflect real sources.</returns>
+    private async Task<IReadOnlyList<SearchResult>> RunAgentTurnAsync(
+        WorkspaceManager manager,
+        ILlmProvider provider,
+        ChatTurnPlan plan,
+        string question,
+        IReadOnlyList<ChatMessage> priorTurns,
+        AgentDefinition? agent)
+    {
+        var retrieved = new List<SearchResult>();
+        var workspaceId = workspace!.WorkspaceId;
+
+        // Composer Agent mode is the built-in agent by another name. Resolving it here means the
+        // workspace catalogue and the built-in guardrails govern BOTH entry points, instead of the
+        // composer path quietly having a different, wider tool set.
+        agent ??= await AgentRegistry.ResolveAsync(workspaceId, AgentDefinition.BuiltInHandle)
+            ?? AgentDefinition.BuiltIn(workspaceId, DateTime.UtcNow);
+
+        // REQ-UI-045: an agent that restricts itself to pinned documents narrows the turn's scope.
+        // It can only ever narrow — a per-turn "chosen documents" selection the user made stays.
+        var overrides = plan.Overrides;
+        if (agent.RestrictToPinned && overrides.Scope == WorkspaceRetrievalScope.WholeWorkspace)
+        {
+            overrides = new WorkspaceTurnOverrides
+            {
+                ChatMode = overrides.ChatMode,
+                LlmModel = overrides.LlmModel,
+                Scope = WorkspaceRetrievalScope.PinnedOnly,
+                DocumentIds = overrides.DocumentIds
+            };
+        }
+
+        // REQ-RAG-022: the intersection is computed HERE, on this turn, against the catalogue as it
+        // is right now. A skill the catalogue forbids is never registered, so it is never offered to
+        // the model and cannot be called by accident.
+        var permitted = await AgentRegistry.PermittedSkillsAsync(agent);
+
+        // REQ-NFR-013: ConfirmEgress is enforced HERE, wrapping the implementations rather than
+        // filtering the registry. A skill that leaves the machine stays registered and stays visible
+        // to the model; it is the outbound call that stops until the user has answered, and a
+        // declined call is reported as unavailable so the rest of the turn still completes.
+        var egress = new EgressGate(agent, this);
+        var tools = AgentToolPlanner.BuildRegistry(permitted, egress.Guard(
+        [
+            WorkspaceSkillTools.RagSearch(async (query, cancellationToken) =>
+            {
+                var hits = await manager.SearchScopedAsync(
+                    workspaceId, query, overrides, cancellationToken: cancellationToken);
+                if (hits.Count == 0)
+                {
+                    return Localizer["ChatNoMatchingPassages"];
+                }
+
+                retrieved.AddRange(hits);
+                streamingSources.Clear();
+                streamingSources.AddRange(ToCitations(retrieved));
+                await InvokeAsync(StateHasChanged);
+
+                return string.Join("\n\n", hits.Select(h => h.Chunk.Text));
+            }),
+
+            // The other five catalogue skills need nothing from this page, so they come from one
+            // factory rather than being spelled out here — a page assembling them by hand is how a
+            // build ends up offering four of five. They are still filtered by `permitted` above, so
+            // a skill the workspace catalogue forbids is never registered and never reaches the model.
+            .. WorkspaceSkillTools.Standard(AgentSkillOptions())
+        ]));
+
+        var conversation = new List<ChatMessage>();
+        var systemPrompt = AgentSystemPrompt(agent);
+        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        {
+            conversation.Add(ChatMessage.System(systemPrompt));
+        }
+        conversation.AddRange(priorTurns);
+        conversation.Add(ChatMessage.User(question));
+
+        // REQ-UI-034: the trace is filled from the loop's own progress reports, so it records what
+        // actually ran rather than what the page assumed would run.
+        var trace = new AgentTrace();
+        activeTrace = trace;
+        var progress = trace.AsProgress(() => InvokeAsync(StateHasChanged));
+
+        // REQ-UI-045 guardrail: the per-run time limit is a real cancellation, not a label.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(agent.TimeLimitSeconds));
+
+        var options = AgentCompletionOptions(agent, plan);
+
+        // REQ-RAG-023: the workspace's registered MCP servers are started HERE, for this turn, and
+        // shut down with it — a stdio server is a child process and must not outlive the answer it
+        // was started for. Local skills are passed in so they win a name clash: a registered server
+        // cannot shadow rag-search. With no server registered nothing is started and nothing is
+        // contacted, which is what keeps REQ-NFR-008's zero-egress default true.
+        await using var mcpTools = await WorkspaceMcp.BuildTurnToolsAsync(
+            workspaceId, tools, egress, timeout.Token);
+
+        foreach (var failure in mcpTools.Failures)
+        {
+            // Partial failure is normal — one unreachable endpoint must not cost the user every
+            // other tool they have. It is logged rather than swallowed; the Agents screen's Test
+            // connection is where an administrator diagnoses it.
+            Logger.LogWarning(
+                "MCP server {ServerName} is registered for this workspace but could not be used: {Reason}",
+                failure.ServerName, failure.Reason);
+        }
+
+        var runner = new AgentLoopRunner(provider, mcpTools.ToolHandler, maxIterations: agent.MaxToolCalls);
+        var response = await runner.RunAsync(conversation, options, progress, timeout.Token);
+        streamingContent = response.Content ?? string.Empty;
+        StateHasChanged();
+
+        return retrieved;
+    }
+
+    /// <summary>
+    /// REQ-NFR-013: raises the egress prompt and does not return until the user has answered it.
+    /// </summary>
+    /// <param name="request">The skill that wants to leave the machine, and the agent asking.</param>
+    /// <param name="cancellationToken">The turn's time-limit token; expiry is a decline.</param>
+    /// <returns>True when the user allows this turn's outbound requests.</returns>
+    /// <remarks>
+    /// <para>The awaited <see cref="TaskCompletionSource{TResult}"/> is the whole mechanism: the
+    /// gated tool call is suspended inside its own invoker, so no request is composed — let alone
+    /// issued — while this dialog is open. Returning early with an optimistic <c>true</c> would
+    /// reintroduce the exact defect.</para>
+    /// <para>Every path that ends the prompt resolves it: the two buttons, dismissal, and the
+    /// turn's cancellation. A prompt that could be closed without an answer would hang the turn
+    /// until the time limit, which reads as a freeze.</para>
+    /// </remarks>
+    public async Task<bool> ConfirmAsync(
+        EgressConfirmationRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var answer = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await InvokeAsync(() =>
+        {
+            egressAnswer = answer;
+            // REQ-UI-051: a catalogue skill names a resource key; an MCP tool supplies its own
+            // server-chosen name, which is run-time data and is shown as it came.
+            egressSkillName = request.DisplayNameKey is null
+                ? request.DisplayName
+                : Localizer[request.DisplayNameKey].Value;
+            egressSkillDescription = request.DescriptionKey is null
+                ? request.Description
+                : Localizer[request.DescriptionKey].Value;
+            egressAgentName = request.AgentDisplayName;
+            showEgressDialog = true;
+            StateHasChanged();
+        });
+
+        using var registration = cancellationToken.Register(() => answer.TrySetResult(false));
+        var isAllowed = await answer.Task;
+
+        await InvokeAsync(() =>
+        {
+            egressAnswer = null;
+            showEgressDialog = false;
+            StateHasChanged();
+        });
+
+        return isAllowed;
+    }
+
+    /// <summary>Records the user's answer to the egress prompt (REQ-NFR-013).</summary>
+    /// <param name="isAllowed">True when the user allowed the request.</param>
+    private void AnswerEgress(bool isAllowed)
+    {
+        showEgressDialog = false;
+        egressAnswer?.TrySetResult(isAllowed);
+    }
+
+    /// <summary>
+    /// Treats dismissing the egress prompt as a decline (REQ-NFR-013).
+    /// </summary>
+    /// <param name="isOpen">The dialog's new open state.</param>
+    /// <remarks>
+    /// Escape, the close button and the backdrop all land here. Deny-by-default is the only safe
+    /// reading of "the user closed the box without answering".
+    /// </remarks>
+    private void OnEgressDialogOpenChanged(bool isOpen)
+    {
+        showEgressDialog = isOpen;
+        if (!isOpen)
+        {
+            egressAnswer?.TrySetResult(false);
+        }
+    }
+
+    /// <summary>
+    /// Resolves what the five self-contained skills have to work with on THIS install (REQ-RAG-022).
+    /// </summary>
+    /// <returns>The dependencies available now; null for anything nothing nominates.</returns>
+    /// <remarks>
+    /// <para><b>Null is a real answer here, not a gap being papered over.</b> Implemented and
+    /// configured are different questions: every catalogue skill has a tool behind it, but a tool
+    /// with no dependency reports <c>unavailable: …</c> with the reason when it is called. Inventing
+    /// a file area or a database target so the wiring "looked complete" would hand an agent a
+    /// filesystem or a connection nobody chose, which is exactly the boundary REQ-RAG-022 exists to
+    /// draw.</para>
+    /// <para><b>The fetcher blocks private targets, unlike web ingestion.</b> There the operator
+    /// typed the URL and the intranet opt-in is theirs to make. Here the URL is composed by a model
+    /// from text a document could have influenced, so loopback, RFC 1918 and link-local — that last
+    /// one being where cloud instance-metadata lives — stay refused with no way to ask otherwise.</para>
+    /// </remarks>
+    private WorkspaceSkillOptions AgentSkillOptions() => new()
+    {
+        WebFetcher = WebFetchers.Create(blockPrivateNetworkTargets: true),
+
+        // No web search provider ships: choosing a search host is an outbound egress decision the
+        // operator has to make, and REQ-NFR-008's egress guard requires it be reviewed first.
+        WebSearch = null,
+
+        // Nothing in the product nominates a reporting database yet, and the app's own database is
+        // permanently off limits to agents.
+        SqlTarget = null,
+
+        // There is no per-workspace file area in the product yet, so there is no directory an agent
+        // could be confined to. The skill says so rather than defaulting to somewhere plausible.
+        Files = null
+    };
+
+    /// <summary>
+    /// Builds the system prompt for an agent turn: the agent's own instructions when it has them,
+    /// otherwise the workspace prompt, plus the honesty clause when the agent may not fall back on
+    /// general knowledge.
+    /// </summary>
+    /// <param name="agent">The agent answering the turn.</param>
+    /// <returns>The system prompt, or an empty string when there is nothing to say.</returns>
+    private string AgentSystemPrompt(AgentDefinition agent)
+    {
+        var instructions = string.IsNullOrWhiteSpace(agent.Instructions)
+            ? workspace?.SystemPrompt ?? string.Empty
+            : agent.Instructions!;
+
+        if (agent.AllowGeneralKnowledge)
+        {
+            return instructions.Trim();
+        }
+
+        // REQ-UI-045: with general knowledge off, an unanswerable question must get "the documents
+        // do not cover this" rather than a plausible guess.
+        const string honesty =
+            "Answer only from the passages returned by your tools. If they do not answer the "
+            + "question, say plainly that the documents do not cover it rather than reasoning from "
+            + "general knowledge.";
+        return string.IsNullOrWhiteSpace(instructions) ? honesty : instructions.Trim() + "\n\n" + honesty;
+    }
+
+    /// <summary>
+    /// Resolves the completion options for an agent turn. The agent's own model wins over the
+    /// workspace default; a per-turn model override the user picked wins over both, because it is
+    /// the most recent explicit instruction.
+    /// </summary>
+    /// <param name="agent">The agent answering the turn.</param>
+    /// <param name="plan">The turn plan carrying any per-turn model override.</param>
+    /// <returns>The completion options, or null to use the provider's configured model.</returns>
+    private static LlmCompletionOptions? AgentCompletionOptions(AgentDefinition agent, ChatTurnPlan plan)
+    {
+        if (plan.CompletionOptions is not null && !string.IsNullOrWhiteSpace(plan.Model))
+        {
+            return plan.CompletionOptions;
+        }
+
+        return string.IsNullOrWhiteSpace(agent.Model)
+            ? plan.CompletionOptions
+            : new LlmCompletionOptions { Model = agent.Model };
+    }
+
+    /// <summary>
+    /// REQ-RAG-021: inserts a handle at the caret so the mention is composed, reviewed and sent by
+    /// the user — picking an agent never dispatches a turn on its own.
+    /// </summary>
+    /// <param name="agent">The agent whose handle to insert.</param>
+    private async Task InsertAgentMentionAsync(AgentDefinition agent)
+    {
+        var mention = $"@{agent.Handle} ";
+        var module = await GetComposerModuleAsync();
+        if (module is null)
+        {
+            userInput = mention + (userInput ?? string.Empty);
+            return;
+        }
+
+        userInput = await module.InvokeAsync<string>(
+            "insertAtCaret", ComposerElementId, mention, ChatComposerState.MaxComposerRows);
+    }
+
+    /// <summary>Clears the composer's DOM value and collapses it back to its resting height.</summary>
+    private async Task ResetComposerAsync()
+    {
+        var module = await GetComposerModuleAsync();
+        if (module is null) return;
+
+        try
+        {
+            await module.InvokeVoidAsync("reset", ComposerElementId, ChatComposerState.MaxComposerRows);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit went away mid-turn; nothing to reset.
+        }
+    }
+
+    /// <summary>Releases the composer JS module and its .NET reference.</summary>
+    /// <returns>A task that completes once interop resources are released.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        composerRef?.Dispose();
+        composerRef = null;
+
+        if (composerModule is not null)
+        {
+            try
+            {
+                await composerModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is already gone; the module went with it.
+            }
+            composerModule = null;
         }
     }
 
@@ -642,7 +2006,7 @@ else
     {
         if (activeThread is null) return;
         activeThread.UpdatedAt = DateTime.UtcNow;
-        if (activeThread.Title == "New conversation")
+        if (activeThread.Title == UntitledThreadSentinel)
         {
             var title = question.Length > 48 ? question[..48] + "…" : question;
             await store.RenameThreadAsync(activeThread.ThreadId, title);
@@ -709,6 +2073,8 @@ else
 
     private void GoToSettings() => Nav.NavigateTo($"/workspace/{Slug}/settings");
 
+    private void GoToAgents() => Nav.NavigateTo($"/workspace/{Slug}/agents");
+
     private sealed record Citation(string DocumentName, string Snippet, float Score);
 
     private sealed class ChatDisplayMessage
@@ -717,11 +2083,24 @@ else
         public string Content { get; }
         public List<Citation> Citations { get; }
 
-        public ChatDisplayMessage(string role, string content, List<Citation> citations)
+        /// <summary>The execution trace for this answer; empty for a non-agent turn (REQ-UI-034).</summary>
+        public IReadOnlyList<AgentTraceEntry> Trace { get; }
+
+        /// <summary>The handle of the agent that answered, or null (REQ-RAG-021).</summary>
+        public string? AgentHandle { get; }
+
+        public ChatDisplayMessage(
+            string role,
+            string content,
+            List<Citation> citations,
+            IReadOnlyList<AgentTraceEntry>? trace = null,
+            string? agentHandle = null)
         {
             Role = role;
             Content = content;
             Citations = citations;
+            Trace = trace ?? [];
+            AgentHandle = agentHandle;
         }
     }
 }

@@ -6,8 +6,17 @@
     --card-foreground: oklch(0.1450 0 0);
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.1450 0 0);
-    --primary: oklch(0.3700 0.0900 250);
-    --primary-foreground: oklch(0.9850 0 0);
+    /* REQ-UI-048 / UIDesign "Theme": indigo #4F46E5. The previous oklch(0.37 0.09 250) was the
+       sample application's slate blue — wrong hue and under half the chroma, which is why the live
+       app never looked like the approved mockups even where the markup matched.
+
+       REQ-UI-038 wraps it in a var() so the operator's accent choice can override it, WITHOUT the
+       accent code having to know which palette is in force: wwwroot/js/theme.js writes both the
+       light and dark variants as --td-accent-* on <html>, and each palette block below picks its
+       own. The literal stays as the var() fallback, so the approved indigo is still what an
+       unconfigured install renders and is still declared in exactly one place. */
+    --primary: var(--td-accent-light, oklch(0.5106 0.2301 276.97));
+    --primary-foreground: var(--td-accent-light-fg, oklch(0.9850 0 0));
     --secondary: oklch(0.9700 0 0);
     --secondary-foreground: oklch(0.2050 0 0);
     --muted: oklch(0.9700 0 0);
@@ -30,8 +39,8 @@
     /* Sidebar-specific */
     --sidebar: oklch(0.9850 0 0);
     --sidebar-foreground: oklch(0.1450 0 0);
-    --sidebar-primary: oklch(0.3700 0.0900 250);
-    --sidebar-primary-foreground: oklch(0.9850 0 0);
+    --sidebar-primary: var(--td-accent-light, oklch(0.5106 0.2301 276.97));
+    --sidebar-primary-foreground: var(--td-accent-light-fg, oklch(0.9850 0 0));
     --sidebar-accent: oklch(0.9700 0 0);
     --sidebar-accent-foreground: oklch(0.2050 0 0);
     --sidebar-border: oklch(0.9220 0 0);
@@ -49,4 +58,103 @@
     --chart-4: oklch(0.828 0.189 84.429);
     --chart-5: oklch(0.769 0.188 70.08);
   }
+
+  /*
+    REQ-UI-038 (BRD-90) — the dark palette.
+
+    TWO SELECTORS, DELIBERATELY. The frozen visual contract (docs/mockups/workspace-chat.html and
+    every other mockup) switches on `html[data-theme="dark"]`. TrBlazeUI's PREBUILT Tailwind bundle
+    compiles its `dark:` variants to `:is(.dark *)` — verified by reading
+    _content/TrBlazeUI.Components/trblazeui.css, which contains `.dark\:bg-input\/30:is(.dark *)` and
+    nothing else `.dark`-shaped. So the two conventions are not interchangeable and neither one alone
+    is sufficient: with only `data-theme`, every component's own dark-mode rule stays inert; with
+    only `.dark`, any CSS ported from a mockup stops matching. Rather than pick one and quietly break
+    the other half, the head sets BOTH attributes on <html> (see wwwroot/js/theme.js) and this block
+    answers to either. Note that TrBlazeUI ships NO `.dark { … }` token block of its own — the
+    library defines the `dark:` utilities but leaves the values to the app — which is why the whole
+    dark palette has to be written out here rather than inherited.
+
+    The colours are the mockup's, converted from sRGB hex to OKLCH: canvas #0D1017, card #151A26,
+    text #E2E5EE, sidebar #10131F, accent #818CF8.
+  */
+  .dark,
+  html[data-theme="dark"] {
+    --background: oklch(0.1733 0.0154 266.68);       /* #0D1017 */
+    --foreground: oklch(0.9222 0.0126 271.28);       /* #E2E5EE — 15.1:1 on the canvas */
+    --card: oklch(0.2186 0.0249 266.86);             /* #151A26 */
+    --card-foreground: oklch(0.9222 0.0126 271.28);
+    --popover: oklch(0.2186 0.0249 266.86);
+    --popover-foreground: oklch(0.9222 0.0126 271.28);
+
+    /*
+      #818CF8, the approved dark accent. Its FOREGROUND is not the mockup's `#fff`: white on
+      #818CF8 measures 2.98:1, which fails WCAG 2.1 AA 1.4.3 (REQ-NFR-005) for the label of every
+      primary button in the app. The near-black below — the same #10131F as the dark sidebar, so it
+      stays inside the approved palette — measures 6.20:1. This is the same class of correction the
+      --muted-foreground note above records, and it changes ink colour only; the accent itself is
+      exactly the approved value.
+    */
+    --primary: var(--td-accent-dark, oklch(0.6801 0.1583 276.93));          /* #818CF8 */
+    --primary-foreground: var(--td-accent-dark-fg, oklch(0.1899 0.0249 273.04)); /* #10131F */
+
+    --secondary: oklch(0.2533 0.0299 267.43);        /* #1C2231 */
+    --secondary-foreground: oklch(0.9222 0.0126 271.28);
+    --muted: oklch(0.2533 0.0299 267.43);            /* #1C2231 */
+    --muted-foreground: oklch(0.6638 0.0325 268.95); /* #8B93A8 — 6.2:1 on canvas, 5.7:1 on card */
+    --accent: oklch(0.2874 0.0364 268.50);           /* #232A3D — hover surface, not the brand hue */
+    --accent-foreground: oklch(0.9222 0.0126 271.28);
+
+    /*
+      Held at the light value rather than lightened to the mockup's #F87171. #F87171 is what dark
+      mode uses for destructive TEXT; --destructive here is a button BACKGROUND carrying
+      --destructive-foreground white, and lightening it would drop that pair to about 2.4:1. White on
+      #DC2626 measures 4.83:1 and reads correctly against the dark canvas.
+    */
+    --destructive: oklch(0.5771 0.2152 27.33);       /* #DC2626 */
+    --destructive-foreground: oklch(1 0 0);
+
+    --border: oklch(0.2908 0.0345 267.83);           /* #242B3D */
+    --input: oklch(0.3157 0.0373 269.32);            /* #2A3145 — the mockup's dark field border */
+    --ring: var(--td-accent-dark, oklch(0.6801 0.1583 276.93));
+
+    /* Sidebar-specific — the mockup's #10131F rail. */
+    --sidebar: oklch(0.1899 0.0249 273.04);          /* #10131F */
+    --sidebar-foreground: oklch(0.9349 0.0152 273.84); /* #E6E9F4 — 15.3:1 on the rail */
+    --sidebar-primary: var(--td-accent-dark, oklch(0.6801 0.1583 276.93));
+    --sidebar-primary-foreground: var(--td-accent-dark-fg, oklch(0.1899 0.0249 273.04));
+    --sidebar-accent: oklch(0.2974 0.0641 273.36);   /* #232A4D — the active-item tint */
+    --sidebar-accent-foreground: oklch(0.9349 0.0152 273.84);
+    --sidebar-border: oklch(0.2871 0.0449 272.58);   /* #232941 */
+
+    /*
+      Alert variants are TEXT and icon colours on tinted panels, so unlike --destructive they must be
+      lightened — the light-mode values are 2-3:1 against #0D1017. These are the mockup's dark alert
+      inks: #4ADE80, #93B4FD, #FBBF24, #F87171.
+    */
+    --alert-success: oklch(0.8003 0.1821 151.71);
+    --alert-info: oklch(0.7738 0.1112 265.25);
+    --alert-warning: oklch(0.8369 0.1644 84.43);
+    --alert-danger: oklch(0.7106 0.1661 22.22);
+
+    /* Chart colors, lifted for a dark canvas. */
+    --chart-1: oklch(0.7220 0.1920 41.12);
+    --chart-2: oklch(0.7000 0.1180 184.71);
+    --chart-3: oklch(0.6200 0.0900 227.39);
+    --chart-4: oklch(0.8280 0.1890 84.43);
+    --chart-5: oklch(0.8100 0.1700 70.08);
+  }
+}
+
+/*
+  REQ-UI-038: the shell paints edge to edge, so the WebView's own canvas — the area behind the
+  document while the app is still booting, and the overscroll gutter — has to follow the theme too,
+  or a dark-mode window flashes white at those edges. Outside @layer base so it is not competing with
+  the token declarations above.
+*/
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
 }

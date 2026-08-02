@@ -1,0 +1,113 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    REQ-FN-035: TechieDesk's application services, extracted out of the head so they target plain
+    net10.0. The MAUI Blazor Hybrid head targets net10.0-maccatalyst / net10.0-windows, and a
+    net10.0 test project cannot reference a platform-targeted project — extracting the services is
+    what keeps tests/TechieDesk.Tests compiling and running under a plain `dotnet test`.
+
+    RootNamespace is deliberately `TechieDesk`, matching the head, so every moved file keeps its
+    existing `namespace TechieDesk.Services.*` declaration and every consumer keeps its existing
+    `using`. The move is physical only — no source churn, no namespace rewrite.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TechieDesk</RootNamespace>
+    <AssemblyName>TechieDesk.Core</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    REQ-FN-041 (2026-07-26): SessionContext.cs, SessionEndpoints.cs and TechieDeskAuthExtensions.cs
+    were DELETED here, together with the <Compile Remove> lines that had excluded them since
+    REQ-FN-035. They were bound to ASP.NET Core request-pipeline types — HttpContext, the cookie
+    authentication scheme, antiforgery and WebApplication — none of which exist in a desktop host.
+    Their replacements are DesktopSessionContext and DesktopAuthExtensions in Services/Auth/.
+  -->
+
+  <!--
+    REQ-FN-035: the files moved here were written under Microsoft.NET.Sdk.Web, which contributes
+    these namespaces as implicit global usings. Microsoft.NET.Sdk does not. Re-declaring exactly
+    that set keeps the move source-identical — the alternative was adding `using` lines to 99 files
+    for no behavioural gain. ASP.NET-only namespaces from the Web SDK's list (Builder, Hosting,
+    Http, Routing) are deliberately NOT re-declared: nothing portable should depend on them.
+  -->
+  <ItemGroup>
+    <Using Include="Microsoft.Extensions.Configuration" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Hosting" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="System.Net.Http.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TechieRag\TechieRag.csproj" />
+    <ProjectReference Include="..\..\src\TechieRag.Embedded\TechieRag.Embedded.csproj" />
+    <ProjectReference Include="..\TechieDeskDb\TechieDeskDb.csproj" />
+  </ItemGroup>
+
+  <!--
+    App data access (REQ-FN-029/BRD-102): Dapper + the SQLite ADO.NET driver. EF Core is banned.
+    Npgsql was removed on 2026-07-28: BRD-102 was amended on 2026-07-26 to Dapper-over-SQLite only,
+    dropping the PostgreSQL alternative. (The pgvector/Npgsql support in src/TechieRag is a
+    LIBRARY vector-store concern and is unaffected — this is the app's relational path only.)
+  -->
+  <ItemGroup>
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+  </ItemGroup>
+
+  <!-- Qdrant administration (F-QADMIN, retained by the desktop pivot — REQ-FN-040). -->
+  <ItemGroup>
+    <PackageReference Include="Docker.DotNet" Version="3.125.15" />
+    <PackageReference Include="Qdrant.Client" Version="1.18.1" />
+  </ItemGroup>
+
+  <!--
+    These two ship as standalone NuGet packages and do NOT require an ASP.NET Core host:
+    DataProtection backs the REQ-NFR-004b encryption-at-rest of provider API keys, and
+    Components.Authorization supplies the AuthenticationStateProvider the Razor components consume.
+  -->
+  <!--
+    REQ-NFR-004 (2026-07-28): DataProtection 10.0.0 carried NU1904 CRITICAL GHSA-9mv3-2cwr-p262
+    (CVE-2026-40372, ASP.NET Core elevation of privilege, patched in 10.0.7) and dragged in
+    System.Security.Cryptography.Xml 10.0.0, which carried SEVEN NU1903 highs — GHSA-37gx-xxp4-5rgx
+    and GHSA-w3x6-4m5h-cxqf (patched 10.0.6) plus GHSA-23rf-6693-g89p, GHSA-8q5v-6pqq-x66h,
+    GHSA-cvvh-rhrc-wg4q, GHSA-g8r8-53c2-pm3f and GHSA-mmjf-rqrv-855v (patched 10.0.10).
+    10.0.10 is therefore the LOWEST stable version of Cryptography.Xml that clears all seven, and
+    DataProtection 10.0.10 is the lowest DataProtection release whose dependency graph pins it —
+    10.0.7 would have cleared its own advisory while still resolving Cryptography.Xml 10.0.7.
+    Bumping the direct reference fixes it at the right level, so no transitive pin is needed and
+    no NU1903/NU1904 warning is suppressed.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="10.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Authorization" Version="10.0.0" />
+  </ItemGroup>
+
+  <!--
+    REQ-UI-039 (BRD-91): .resx localization. Microsoft.Extensions.Localization is the standalone
+    package, not an ASP.NET Core-only one, so it works in a plain net10.0 library and the net10.0
+    test project can assert the Hindi lookups directly.
+
+    SatelliteResourceLanguages is deliberately NOT set. Restricting it is the usual way to slim an
+    output, and it would delete exactly the hi/ satellite assembly this requirement is.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <!-- 10.0.10 tracks the patched DataProtection 10.0.10 above; 10.0.0 here was an NU1605 downgrade. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
+    <!-- Supplies PhysicalFileProvider for DesktopHostEnvironment.ContentRootFileProvider. -->
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Physical" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <!-- 10.0.3 matches what TechieRag already resolves; anything lower is a package downgrade. -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.3" />
+  </ItemGroup>
+
+</Project>

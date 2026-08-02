@@ -26,7 +26,29 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\apps\TechieDesk\TechieDesk.csproj" />
+    <!--
+      REQ-FN-041 (2026-07-26): Auth/LoginEndpointTests.cs was DELETED together with its subject,
+      SessionEndpoints — the POST /auth/login and /auth/logout HTTP endpoints, antiforgery validation
+      and cookie writing. Sign-in is now the in-process DesktopSignInService (REQ-FN-039), covered by
+      SecretStoreSessionTests.
+    -->
+
+    <!--
+      REQ-FN-035: points at TechieDesk.Core, not the head. The head is now MAUI
+      (net10.0-maccatalyst / net10.0-windows) and a net10.0 test project cannot reference a
+      platform-targeted project. The application services under test all live in Core, so these
+      tests are unchanged by the host swap.
+    -->
+    <ProjectReference Include="..\..\apps\TechieDesk.Core\TechieDesk.Core.csproj" />
+
+    <!--
+      REQ-FN-048: the migration console is referenced so WorkingDirectoryArtefactTests can drive its
+      REAL logging call site from a sandbox working directory. REQ-FN-034 claimed no path resolves
+      against the working directory while this console still passed Serilog the bare relative
+      "logs/techiedeskdb-.log"; the only guard that could have caught that is one which runs the
+      production code and then looks at what appeared on disk.
+    -->
+    <ProjectReference Include="..\..\apps\TechieDeskDb.Cli\TechieDeskDb.Cli.csproj" />
   </ItemGroup>
 
 </Project>

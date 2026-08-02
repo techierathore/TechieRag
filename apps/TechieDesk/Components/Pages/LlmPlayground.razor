@@ -4,68 +4,69 @@
 @using TechieRag.Models
 @inject TechieDesk.Services.TechieRagManager TechieRag
 @inject ToastService ToastService
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>LLM Playground</PageTitle>
+<PageTitle>@Localizer["PlaygroundPageTitle"]</PageTitle>
 
 <div class="space-y-6">
     <div>
-        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">LLM Playground</h1>
-        <TypographyMuted>Test LLM completions, structured output, and streaming directly.</TypographyMuted>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["PlaygroundHeading"]</h1>
+        <TypographyMuted>@Localizer["PlaygroundSubtitle"]</TypographyMuted>
     </div>
 
     <Tabs DefaultValue="completion">
         <TabsList Class="grid w-full grid-cols-3">
-            <TabsTrigger Value="completion">Completion</TabsTrigger>
-            <TabsTrigger Value="structured">Structured Output</TabsTrigger>
-            <TabsTrigger Value="chat">Chat</TabsTrigger>
+            <TabsTrigger Value="completion">@Localizer["PlaygroundTabCompletion"]</TabsTrigger>
+            <TabsTrigger Value="structured">@Localizer["PlaygroundTabStructured"]</TabsTrigger>
+            <TabsTrigger Value="chat">@Localizer["PlaygroundTabChat"]</TabsTrigger>
         </TabsList>
 
         <!-- Completion Tab -->
-        <TabsContent Value="completion">
+        <TabsContent Value="completion" ForceMount="true">
             <div class="space-y-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Prompt</CardTitle>
+                        <CardTitle>@Localizer["PlaygroundPromptTitle"]</CardTitle>
                     </CardHeader>
                     <CardContent Class="space-y-4">
                         <Field>
-                            <FieldLabel>System Prompt</FieldLabel>
+                            <FieldLabel>@Localizer["PlaygroundSystemPrompt"]</FieldLabel>
                             <FieldContent>
-                                <Textarea @bind-Value="systemPrompt" Placeholder="You are a helpful assistant" Class="min-h-[60px]" />
+                                <Textarea @bind-Value="systemPrompt" Placeholder="@Localizer["PlaygroundSystemPromptPlaceholder"]" Class="min-h-[60px]" />
                             </FieldContent>
                         </Field>
                         <Field>
-                            <FieldLabel>User Prompt</FieldLabel>
+                            <FieldLabel>@Localizer["PlaygroundUserPrompt"]</FieldLabel>
                             <FieldContent>
-                                <Textarea @bind-Value="userPrompt" Placeholder="Write a haiku about coding" Class="min-h-[80px]" />
+                                <Textarea @bind-Value="userPrompt" Placeholder="@Localizer["PlaygroundUserPromptPlaceholder"]" Class="min-h-[80px]" />
                             </FieldContent>
                         </Field>
                         <div class="grid grid-cols-3 gap-4">
                             <Field>
-                                <FieldLabel>Temperature</FieldLabel>
+                                <FieldLabel>@Localizer["PlaygroundTemperature"]</FieldLabel>
                                 <FieldContent>
                                     <Input Type="InputType.Number" @bind-Value="temperatureString" Placeholder="0.7" />
                                 </FieldContent>
                             </Field>
                             <Field>
-                                <FieldLabel>Max Tokens</FieldLabel>
+                                <FieldLabel>@Localizer["PlaygroundMaxTokens"]</FieldLabel>
                                 <FieldContent>
                                     <Input Type="InputType.Number" @bind-Value="maxTokensString" Placeholder="2048" />
                                 </FieldContent>
                             </Field>
                             <Field>
-                                <FieldLabel>Streaming</FieldLabel>
+                                <FieldLabel>@Localizer["PlaygroundStreaming"]</FieldLabel>
                                 <FieldContent>
                                     <div class="flex items-center space-x-2 pt-2">
                                         <Switch @bind-Checked="useStreaming" Id="pg-streaming" />
-                                        <Label For="pg-streaming">@(useStreaming ? "On" : "Off")</Label>
+                                        <Label For="pg-streaming">@(useStreaming ? Localizer["PlaygroundOn"] : Localizer["PlaygroundOff"])</Label>
                                     </div>
                                 </FieldContent>
                             </Field>
                         </div>
                         <Button OnClick="GenerateCompletion" Disabled="isGenerating">
-                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Generating...</span> }
-                            else { <span>Generate</span> }
+                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["PlaygroundGenerating"]</span> }
+                            else { <span>@Localizer["PlaygroundGenerate"]</span> }
                         </Button>
                     </CardContent>
                 </Card>
@@ -74,7 +75,7 @@
                 {
                     <Card>
                         <CardHeader>
-                            <CardTitle>Response</CardTitle>
+                            <CardTitle>@Localizer["PlaygroundResponse"]</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4">@completionResponse</div>
@@ -89,36 +90,36 @@
         </TabsContent>
 
         <!-- Structured Output Tab -->
-        <TabsContent Value="structured">
+        <TabsContent Value="structured" ForceMount="true">
             <div class="space-y-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Typed Response Test</CardTitle>
+                        <CardTitle>@Localizer["PlaygroundTypedTitle"]</CardTitle>
                     </CardHeader>
                     <CardContent Class="space-y-4">
                         <Field>
-                            <FieldLabel>Prompt</FieldLabel>
+                            <FieldLabel>@Localizer["PlaygroundPromptTitle"]</FieldLabel>
                             <FieldContent>
-                                <Textarea @bind-Value="structuredPrompt" Placeholder="Analyze the sentiment of: I love this product!" Class="min-h-[80px]" />
+                                <Textarea @bind-Value="structuredPrompt" Placeholder="@Localizer["PlaygroundStructuredPlaceholder"]" Class="min-h-[80px]" />
                             </FieldContent>
                         </Field>
                         <Field>
-                            <FieldLabel>Response Type</FieldLabel>
+                            <FieldLabel>@Localizer["PlaygroundResponseType"]</FieldLabel>
                             <FieldContent>
-                                <Select @bind-Value="structuredType" TValue="string">
-                                    <SelectTrigger>
-                                        <SelectValue Placeholder="Select type" /></SelectTrigger>
+                                <Select @bind-Value="structuredType" TValue="string" DisplayTextSelector="StructuredTypeTextFor">
+                                    <SelectTrigger aria-label="@Localizer["PlaygroundResponseType"]">
+                                        <SelectValue Placeholder="@Localizer["PlaygroundSelectType"]" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem Value="@("sentiment")" Text="SentimentAnalysis" TValue="string">Sentiment Analysis</SelectItem>
-                                        <SelectItem Value="@("weather")" Text="WeatherForecast" TValue="string">Weather Forecast</SelectItem>
-                                        <SelectItem Value="@("book")" Text="BookSummary" TValue="string">Book Summary</SelectItem>
+                                        <SelectItem Value="@("sentiment")" Text="@Localizer["PlaygroundTypeSentiment"]" TValue="string">@Localizer["PlaygroundTypeSentiment"]</SelectItem>
+                                        <SelectItem Value="@("weather")" Text="@Localizer["PlaygroundTypeWeather"]" TValue="string">@Localizer["PlaygroundTypeWeather"]</SelectItem>
+                                        <SelectItem Value="@("book")" Text="@Localizer["PlaygroundTypeBook"]" TValue="string">@Localizer["PlaygroundTypeBook"]</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FieldContent>
                         </Field>
                         <Button OnClick="GenerateStructured" Disabled="isGenerating">
-                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>Generating...</span> }
-                            else { <span>Generate Typed Response</span> }
+                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["PlaygroundGenerating"]</span> }
+                            else { <span>@Localizer["PlaygroundGenerateTyped"]</span> }
                         </Button>
                     </CardContent>
                 </Card>
@@ -127,7 +128,7 @@
                 {
                     <Card>
                         <CardHeader>
-                            <CardTitle>Parsed Result</CardTitle>
+                            <CardTitle>@Localizer["PlaygroundParsedResult"]</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4 font-mono">@structuredResponse</div>
@@ -138,12 +139,12 @@
         </TabsContent>
 
         <!-- Chat Tab -->
-        <TabsContent Value="chat">
+        <TabsContent Value="chat" ForceMount="true">
             <Card Class="h-[500px] flex flex-col">
                 <CardHeader>
                     <div class="flex items-center justify-between">
-                        <CardTitle>Direct LLM Chat</CardTitle>
-                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearDirectChat">Clear</Button>
+                        <CardTitle>@Localizer["PlaygroundDirectChat"]</CardTitle>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearDirectChat">@Localizer["PlaygroundClear"]</Button>
                     </div>
                 </CardHeader>
                 <CardContent Class="flex-1 overflow-y-auto space-y-3">
@@ -165,10 +166,10 @@
                     }
                 </CardContent>
                 <CardFooter Class="gap-2">
-                    <Textarea @bind-Value="directChatInput" Placeholder="Type a message..." Class="flex-1 min-h-[44px]" />
+                    <Textarea @bind-Value="directChatInput" Placeholder="@Localizer["PlaygroundTypeMessage"]" Class="flex-1 min-h-[44px]" />
                     <Button OnClick="SendDirectChat" Disabled="@(isGenerating || string.IsNullOrWhiteSpace(directChatInput))">
                         <LucideIcon aria-hidden="true" Name="send" Size="16" />
-                        <span class="sr-only">Send prompt</span>
+                        <span class="sr-only">@Localizer["PlaygroundSendPrompt"]</span>
                     </Button>
                 </CardFooter>
             </Card>
@@ -193,11 +194,23 @@
     private string? temperatureString = "0.7";
     private string? maxTokensString = "2048";
 
+    /// <summary>
+    /// Paints the response type's TRANSLATED label on the closed Select trigger (TR-024).
+    /// </summary>
+    /// <param name="value">The bound, culture-invariant type key.</param>
+    /// <returns>The label to draw.</returns>
+    private string StructuredTypeTextFor(string? value) => value switch
+    {
+        "weather" => Localizer["PlaygroundTypeWeather"].Value,
+        "book" => Localizer["PlaygroundTypeBook"].Value,
+        _ => Localizer["PlaygroundTypeSentiment"].Value
+    };
+
     private async Task<ILlmProvider?> GetProviderAsync()
     {
         var provider = await TechieRag.GetLlmProviderAsync();
         if (provider is null)
-            ToastService.Error("No LLM provider configured. Go to LLM Settings.", "Error");
+            ToastService.Error(Localizer["PlaygroundNoProvider"], Localizer["PlaygroundErrorToast"]);
         return provider;
     }
 
@@ -233,12 +246,12 @@
                 var response = await provider.CompleteAsync(prompt, options);
                 sw.Stop();
                 completionResponse = response.Content ?? "";
-                completionStats = $"{sw.ElapsedMilliseconds}ms | Input: {response.Usage.InputTokens} | Output: {response.Usage.OutputTokens}";
+                completionStats = Localizer["PlaygroundStats", sw.ElapsedMilliseconds, response.Usage.InputTokens, response.Usage.OutputTokens];
             }
         }
         catch (Exception ex)
         {
-            completionResponse = $"Error: {ex.Message}";
+            completionResponse = Localizer["PlaygroundError", ex.Message];
         }
         finally
         {
@@ -265,35 +278,35 @@
                     {
                         var prompt = $"Analyze the sentiment and respond with JSON: {{\"sentiment\": \"positive|negative|neutral\", \"confidence\": 0.0-1.0, \"explanation\": \"...\"}}\n\n{structuredPrompt}";
                         var result = await provider.CompleteAsync<SentimentAnalysis>(prompt, options);
-                        structuredResponse =
-                            $"SentimentAnalysis (typed)\n"
-                            + $"Sentiment:   {result.Sentiment}\n"
-                            + $"Confidence:  {result.Confidence.ToString("0.00", CultureInfo.InvariantCulture)}\n"
-                            + $"Explanation: {result.Explanation}";
+                        structuredResponse = Localizer[
+                            "PlaygroundTypedSentiment",
+                            result.Sentiment,
+                            result.Confidence.ToString("0.00", CultureInfo.InvariantCulture),
+                            result.Explanation];
                         break;
                     }
                 case "weather":
                     {
                         var prompt = $"Create a weather forecast and respond with JSON: {{\"city\": \"...\", \"temperature\": 0, \"condition\": \"...\", \"humidity\": 0}}\n\n{structuredPrompt}";
                         var result = await provider.CompleteAsync<WeatherForecast>(prompt, options);
-                        structuredResponse =
-                            $"WeatherForecast (typed)\n"
-                            + $"City:        {result.City}\n"
-                            + $"Temperature: {result.Temperature}\n"
-                            + $"Condition:   {result.Condition}\n"
-                            + $"Humidity:    {result.Humidity}";
+                        structuredResponse = Localizer[
+                            "PlaygroundTypedWeather",
+                            result.City,
+                            result.Temperature,
+                            result.Condition,
+                            result.Humidity];
                         break;
                     }
                 case "book":
                     {
                         var prompt = $"Summarize the book and respond with JSON: {{\"title\": \"...\", \"author\": \"...\", \"summary\": \"...\", \"rating\": 0.0-5.0}}\n\n{structuredPrompt}";
                         var result = await provider.CompleteAsync<BookSummary>(prompt, options);
-                        structuredResponse =
-                            $"BookSummary (typed)\n"
-                            + $"Title:   {result.Title}\n"
-                            + $"Author:  {result.Author}\n"
-                            + $"Rating:  {result.Rating.ToString("0.0", CultureInfo.InvariantCulture)}\n"
-                            + $"Summary: {result.Summary}";
+                        structuredResponse = Localizer[
+                            "PlaygroundTypedBook",
+                            result.Title,
+                            result.Author,
+                            result.Rating.ToString("0.0", CultureInfo.InvariantCulture),
+                            result.Summary];
                         break;
                     }
                 default:
@@ -306,7 +319,7 @@
         }
         catch (Exception ex)
         {
-            structuredResponse = $"Parse error: {ex.Message}";
+            structuredResponse = Localizer["PlaygroundParseError", ex.Message];
         }
         finally
         {
@@ -350,7 +363,7 @@
         }
         catch (Exception ex)
         {
-            directChatMessages.Add(new ChatMsg("assistant", $"Error: {ex.Message}"));
+            directChatMessages.Add(new ChatMsg("assistant", Localizer["PlaygroundError", ex.Message]));
         }
         finally
         {

@@ -8,6 +8,9 @@
 
   <Folder Name="/src/">
     <Project Path="src/TechieRag.Embedded/TechieRag.Embedded.csproj" />
+    <!-- REQ-RAG-036 / BRD-117: the opt-in OpenTelemetry exporters, kept out of the core package so
+         the core still links no exporter (REQ-NFR-008). -->
+    <Project Path="src/TechieRag.Telemetry/TechieRag.Telemetry.csproj" />
     <Project Path="src/TechieRag/TechieRag.csproj" />
   </Folder>
   <Folder Name="/docs/">
@@ -28,7 +31,11 @@
 
   <Folder Name="/apps/">
     <Project Path="apps/TechieDesk/TechieDesk.csproj" />
+    <Project Path="apps/TechieDesk.Core/TechieDesk.Core.csproj" />
     <Project Path="apps/TechieDeskDb/TechieDeskDb.csproj" />
+    <Project Path="apps/TechieDeskDb.Cli/TechieDeskDb.Cli.csproj" />
+    <!-- REQ-FN-042 / BRD-139: the background scheduler helper (ADR-009). -->
+    <Project Path="apps/TechieDeskScheduler/TechieDeskScheduler.csproj" />
   </Folder>
 
   <Folder Name="/tests/">

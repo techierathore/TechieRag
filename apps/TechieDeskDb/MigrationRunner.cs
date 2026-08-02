@@ -7,44 +7,61 @@ using Serilog;
 namespace TechieDeskDb;
 
 /// <summary>
-/// Builds and executes the DbUp upgrade engine for the selected provider
-/// (BRD-103/BRD-104). Scripts are embedded per provider under
-/// <c>Scripts/Sqlite</c> and <c>Scripts/Postgres</c>, applied in name order,
+/// Builds and executes the DbUp upgrade engine against the app database (BRD-103).
+/// Scripts are embedded under <c>Scripts/Sqlite</c>, applied in name order,
 /// journaled, and therefore idempotent on re-run.
 /// </summary>
+/// <remarks>
+/// SQLite is the only provider. BRD-102 was amended on 2026-07-26 to Dapper-over-SQLite
+/// only (REQ-FN-029) and BRD-104/REQ-FN-031 ("per-provider migration scripts") is
+/// <c>N/A (removed)</c>, so the PostgreSQL branch and the <c>dbup-postgresql</c>
+/// dependency were removed on 2026-07-28. No <c>Scripts/Postgres</c> directory had
+/// ever existed, which means that branch would have silently applied ZERO scripts and
+/// then reported success — a stale <c>Postgres</c> configuration now fails loudly instead.
+/// </remarks>
 public static class MigrationRunner
 {
+    /// <summary>The only provider name accepted by <see cref="Run"/>.</summary>
+    private const string SupportedProvider = "Sqlite";
+
     /// <summary>Default SQLite database file used when no connection string is supplied.</summary>
-    public const string DefaultSqliteConnectionString = "Data Source=data/techiedesk.db";
+    /// <remarks>
+    /// Resolved through <see cref="DataDirectory"/>, which since REQ-FN-037 means the per-user OS data
+    /// directory and NOT the current working directory, the content root, or
+    /// <see cref="AppContext.BaseDirectory"/> (REQ-FN-034). The previous CWD-relative default meant a
+    /// standalone <c>dotnet run</c> migrated a different file from the one the app opened, while both
+    /// reported success. The desktop head pins an explicit connection string derived from the same
+    /// resolver, and <c>DataDirectory.Resolve</c> now takes no root argument, so the console migrator
+    /// and the running app cannot address different files.
+    /// </remarks>
+    public static string DefaultSqliteConnectionString =>
+        DataDirectory.AppDbConnectionString(DataDirectory.Resolve(configuredDirectory: null));
 
     /// <summary>
-    /// Applies all pending migrations for the given provider.
+    /// Applies all pending migrations to the SQLite app database.
     /// </summary>
-    /// <param name="providerName">Either <c>Sqlite</c> or <c>Postgres</c> (case-insensitive).</param>
-    /// <param name="connectionString">Provider connection string; optional for SQLite (defaults to <see cref="DefaultSqliteConnectionString"/>).</param>
+    /// <param name="providerName">Must be <c>Sqlite</c> (case-insensitive); any other value is rejected.</param>
+    /// <param name="connectionString">SQLite connection string; optional (defaults to <see cref="DefaultSqliteConnectionString"/>).</param>
     /// <returns>0 on success, 1 on migration failure, 2 on invalid configuration.</returns>
     public static int Run(string providerName, string? connectionString)
     {
-        var isSqlite = providerName.Equals("Sqlite", StringComparison.OrdinalIgnoreCase);
-        var isPostgres = providerName.Equals("Postgres", StringComparison.OrdinalIgnoreCase);
-        if (!isSqlite && !isPostgres)
+        if (!providerName.Equals(SupportedProvider, StringComparison.OrdinalIgnoreCase))
         {
-            Log.Error("Unknown provider {Provider}; expected Sqlite or Postgres", providerName);
+            var removed = providerName.Contains("Postgres", StringComparison.OrdinalIgnoreCase)
+                || providerName.Contains("Npgsql", StringComparison.OrdinalIgnoreCase);
+            Log.Error(
+                removed
+                    ? "AppDb provider {Provider} was removed by the 2026-07-26 BRD-102 amendment (REQ-FN-029); "
+                        + "TechieDesk is SQLite-only. Set AppDb:Provider to '{Supported}' (or remove it) and point "
+                        + "AppDb:ConnectionString at a SQLite file."
+                    : "Unsupported AppDb provider {Provider}; the only supported value is '{Supported}'.",
+                providerName, SupportedProvider);
             return 2;
         }
 
-        if (isPostgres && string.IsNullOrWhiteSpace(connectionString))
-        {
-            Log.Error("A connection string is required for the Postgres provider");
-            return 2;
-        }
+        connectionString = PrepareSqlite(connectionString);
 
-        if (isSqlite)
-        {
-            connectionString = PrepareSqlite(connectionString);
-        }
-
-        var engine = BuildEngine(isSqlite, connectionString!);
+        var engine = BuildEngine(connectionString);
         var result = engine.PerformUpgrade();
         if (!result.Successful)
         {
@@ -75,14 +92,11 @@ public static class MigrationRunner
         return effective;
     }
 
-    private static UpgradeEngine BuildEngine(bool isSqlite, string connectionString)
+    private static UpgradeEngine BuildEngine(string connectionString)
     {
-        var scriptPrefix = isSqlite ? "TechieDeskDb.Scripts.Sqlite." : "TechieDeskDb.Scripts.Postgres.";
-        var builder = isSqlite
-            ? DeployChanges.To.SqliteDatabase(connectionString)
-            : DeployChanges.To.PostgresqlDatabase(connectionString);
+        const string scriptPrefix = "TechieDeskDb.Scripts.Sqlite.";
 
-        return builder
+        return DeployChanges.To.SqliteDatabase(connectionString)
             .WithScriptsEmbeddedInAssembly(
                 Assembly.GetExecutingAssembly(),
                 name => name.StartsWith(scriptPrefix, StringComparison.Ordinal))

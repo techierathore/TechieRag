@@ -1,0 +1,1364 @@
+@page "/support"
+@using System.Runtime.InteropServices
+@using Microsoft.Extensions.Configuration
+@using TechieDesk.Services.Support
+@using TechieDesk.Services.Updates
+@using TechieDeskDb
+@using TrBlazeUI.Components.FileUpload
+@implements IAsyncDisposable
+@inject IAppManagerClient AppManager
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject ITechieDeskUserContext UserContext
+@inject SessionTokenStore TokenStore
+@inject ITokenRefresher TokenRefresher
+@inject ISupportAttachmentStore AttachmentStore
+@inject IAppVersionProvider AppVersion
+@inject IConfiguration Configuration
+@inject ToastService ToastService
+@inject IJSRuntime JS
+@inject ILogger<Support> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-032 / REQ-UI-033 / REQ-UI-047 / REQ-FN-027 — built to docs/mockups/support.html.
+
+   Nothing on this page is seeded. Support issues live in AppManager, and this install may have no
+   AppManager configured at all (BRD-129, offline single-user). When that is the case the page says
+   so in as many words instead of rendering an empty table, which would read as "you have raised no
+   issues" — a different and untrue statement. *@
+
+<PageTitle>@Localizer["SupportPageTitle"]</PageTitle>
+
+@* One definition of the removable attachment chip row, used by the new-issue form and by the
+   comment composer. A templated delegate rather than a hand-written RenderTreeBuilder: the markup
+   is the thing being reviewed, and it should read as markup. *@
+@{
+    RenderFragment<AttachmentChipRow> attachmentChips = row =>
+    @<div class="flex flex-wrap gap-2 pt-2">
+        @foreach (var attachment in row.Staged)
+        {
+            var captured = attachment;
+            <span class="inline-flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+                <span class="rounded bg-muted px-1.5 py-0.5 text-[10px] font-bold">@captured.TypeLabel</span>
+                <span>@captured.FileName</span>
+                <span class="text-muted-foreground">@captured.FormattedSize</span>
+                <button type="button" class="text-muted-foreground hover:text-foreground"
+                        aria-label="@Localizer["SupportRemoveAttachment", captured.FileName]" disabled="@row.Disabled"
+                        @onclick="@(() => row.OnRemove(captured))">&times;</button>
+            </span>
+        }
+    </div>;
+}
+
+<div class="space-y-6">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["SupportTitle"]</h1>
+            <TypographyMuted>@Localizer["SupportIntro"]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            @if (CanUseSupport)
+            {
+                <Button Variant="ButtonVariant.Outline" OnClick="LoadIssuesAsync" Disabled="isLoading">
+                    @if (isLoading)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["SupportLoading"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["SupportRefresh"]</span>
+                    }
+                </Button>
+            }
+            <Button OnClick="OpenNewIssueDialog" Disabled="!CanUseSupport">
+                <LucideIcon aria-hidden="true" Name="plus" Size="16" Class="mr-2" />
+                <span>@Localizer["SupportNewIssue"]</span>
+            </Button>
+        </div>
+    </div>
+
+    @* BRD-129. The honest state, and the common one on this build: there is no support service to
+       talk to. Said plainly, with the reason and the fix, rather than implied by an empty list. *@
+    @if (!BackendConfigured)
+    {
+        <Alert Variant="AlertVariant.Info" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["SupportNoBackendTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["SupportNoBackendBodyStart"] <code>AppManager:BaseUrl</code>
+                @Localizer["SupportNoBackendBodyEnd"]
+            </AlertDescription>
+        </Alert>
+    }
+    else if (!SignedIn)
+    {
+        <Alert Variant="AlertVariant.Warning" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="log-in" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["SupportSignInTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["SupportSignInBodyStart"] <a class="underline" href="/login">@Localizer["SupportSignInLink"]</a>
+                @Localizer["SupportSignInBodyEnd"]
+            </AlertDescription>
+        </Alert>
+    }
+
+    @* REQ-NFR-010: a failed call names the real failure. An unreachable service must never be
+       rendered as "no issues". *@
+    @if (loadError is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["SupportLoadFailedTitle"]</AlertTitle>
+            <AlertDescription>@loadError</AlertDescription>
+        </Alert>
+    }
+
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex flex-wrap items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["SupportMyIssues"]</Badge>
+                @if (CanUseSupport && loadError is null && !isLoading)
+                {
+                    <Badge Variant="BadgeVariant.Outline">@Localizer["SupportShownCount", rows.Count]</Badge>
+                }
+                <div class="ml-auto w-[220px]">
+                    @* TR-024: the bound value is the AppManager wire code, so without
+                       DisplayTextSelector the trigger paints "InProgress" (REQ-UI-051). *@
+                    <Select TValue="string" Value="@statusFilter" ValueChanged="OnStatusFilterChanged"
+                            Disabled="!CanUseSupport" DisplayTextSelector="StatusFilterText">
+                        <SelectTrigger aria-label="@Localizer["SupportFilterByStatus"]">
+                            <SelectValue Placeholder="@Localizer["SupportAllStatuses"]" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem TValue="string" Value="@AllStatuses" Text="@Localizer["SupportAllStatuses"]">@Localizer["SupportAllStatuses"]</SelectItem>
+                            @foreach (var status in SupportIssueCatalog.Statuses)
+                            {
+                                <SelectItem TValue="string" Value="@status.Code" Text="@StatusLabelText(status.Code)">@StatusLabelText(status.Code)</SelectItem>
+                            }
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <CardTitle>@Localizer["SupportListTitle"]</CardTitle>
+            <CardDescription>@Localizer["SupportListDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent>
+            @if (!CanUseSupport)
+            {
+                @* Hand-rolled rather than TrBlazeUI's <Empty>: in 1.0.7 that component rendered
+                   its Icon and silently dropped the Title and Description strings, which is exactly
+                   the blank-control failure this screen must not have. *@
+                <div class="flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-9 text-center">
+                    <LucideIcon aria-hidden="true" Name="life-buoy" Size="36" Class="text-muted-foreground" />
+                    <div class="font-medium">@Localizer["SupportNothingToShowTitle"]</div>
+                    <TypographyMuted>
+                        @Localizer["SupportNothingToShowBody"]
+                    </TypographyMuted>
+                </div>
+            }
+            else if (!isLoading && loadError is null && rows.Count == 0)
+            {
+                <div class="flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-9 text-center">
+                    <LucideIcon aria-hidden="true" Name="inbox" Size="36" Class="text-muted-foreground" />
+                    <div class="font-medium">@Localizer["SupportNoIssuesTitle"]</div>
+                    <TypographyMuted>@NoIssuesDescription</TypographyMuted>
+                    <Button Class="mt-2" OnClick="OpenNewIssueDialog">@Localizer["SupportNewIssue"]</Button>
+                </div>
+            }
+            else
+            {
+                <div class="relative overflow-x-auto">
+                    <DataTable TData="IssueRow" Data="@rows" ShowToolbar="false" ShowPagination="false"
+                               InitialPageSize="100" IsLoading="isLoading">
+                        <Columns>
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Number)" Header="@Localizer["SupportLabelNumber"]">
+                                <CellTemplate Context="row"><code class="text-xs">@row.Number</code></CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Title)" Header="@Localizer["SupportLabelTitle"]">
+                                <CellTemplate Context="row"><div class="font-medium">@row.Title</div></CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Type)" Header="@Localizer["SupportLabelType"]" />
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Priority)" Header="@Localizer["SupportLabelPriority"]">
+                                <CellTemplate Context="row">
+                                    <Badge Variant="@PriorityVariant(row.PriorityCode)">@row.Priority</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Status)" Header="@Localizer["SupportLabelStatus"]">
+                                <CellTemplate Context="row">
+                                    <Badge Variant="@StatusVariant(row.StatusCode)">@row.Status</Badge>
+                                </CellTemplate>
+                            </DataTableColumn>
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Updated)" Header="@Localizer["SupportLabelUpdated"]" />
+                            <DataTableColumn TData="IssueRow" TValue="string" Property="@(r => r.Number)" Header="@Localizer["SupportColumnActions"]" HeaderClass="td-th-label-hidden">
+                                <CellTemplate Context="row">
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                            OnClick="@(() => OpenIssueAsync(row.IssueId))">@Localizer["SupportView"]</Button>
+                                </CellTemplate>
+                            </DataTableColumn>
+                        </Columns>
+                    </DataTable>
+                </div>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@* ---------------------------------------------------------------- New issue (REQ-UI-032) *@
+<Dialog @bind-Open="showNewIssueDialog">
+    <DialogContent Class="max-w-3xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer["SupportNewIssue"]</DialogTitle>
+            <DialogDescription>
+                @Localizer["SupportNewIssueDescription"]
+            </DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4 py-2" id="@NewIssuePasteTargetId">
+            @if (newIssueError is not null)
+            {
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertDescription>@newIssueError</AlertDescription>
+                </Alert>
+            }
+
+            <Field IsInvalid="@(titleError is not null)">
+                <FieldLabel>@Localizer["SupportLabelTitle"]</FieldLabel>
+                <FieldContent>
+                    <Input @bind-Value="newTitle" Placeholder="@Localizer["SupportTitlePlaceholder"]"
+                           AriaInvalid="@(titleError is not null)" Disabled="isSubmitting" />
+                    @if (titleError is not null)
+                    {
+                        <FieldError>@titleError</FieldError>
+                    }
+                </FieldContent>
+            </Field>
+
+            <div class="grid gap-4 md:grid-cols-2">
+                <Field>
+                    <FieldLabel>@Localizer["SupportLabelType"]</FieldLabel>
+                    <FieldContent>
+                        <Select TValue="string" @bind-Value="newType" Disabled="isSubmitting"
+                                DisplayTextSelector="TypeLabelText">
+                            <SelectTrigger aria-label="@Localizer["SupportIssueTypeAria"]"><SelectValue Placeholder="@Localizer["SupportChooseType"]" /></SelectTrigger>
+                            <SelectContent>
+                                @foreach (var option in SupportIssueCatalog.Types)
+                                {
+                                    <SelectItem TValue="string" Value="@option.Code" Text="@TypeLabelText(option.Code)">@TypeLabelText(option.Code)</SelectItem>
+                                }
+                            </SelectContent>
+                        </Select>
+                        <FieldDescription>@TypeQualifier(newType)</FieldDescription>
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>@Localizer["SupportLabelPriority"]</FieldLabel>
+                    <FieldContent>
+                        <Select TValue="string" @bind-Value="newPriority" Disabled="isSubmitting"
+                                DisplayTextSelector="PriorityLabelWithQualifier">
+                            <SelectTrigger aria-label="@Localizer["SupportIssuePriorityAria"]"><SelectValue Placeholder="@Localizer["SupportChoosePriority"]" /></SelectTrigger>
+                            <SelectContent>
+                                @foreach (var option in SupportIssueCatalog.Priorities)
+                                {
+                                    <SelectItem TValue="string" Value="@option.Code" Text="@PriorityLabelWithQualifier(option.Code)">@PriorityLabelWithQualifier(option.Code)</SelectItem>
+                                }
+                            </SelectContent>
+                        </Select>
+                    </FieldContent>
+                </Field>
+            </div>
+
+            <Field IsInvalid="@(descriptionError is not null)">
+                <FieldLabel>@Localizer["SupportLabelDescription"]</FieldLabel>
+                <FieldContent>
+                    <Textarea @bind-Value="newDescription" Disabled="isSubmitting"
+                              Placeholder="@Localizer["SupportDescriptionPlaceholder"]" />
+                    @if (descriptionError is not null)
+                    {
+                        <FieldError>@descriptionError</FieldError>
+                    }
+                </FieldContent>
+            </Field>
+
+            @* REQ-UI-047: drag, paste, or choose from disk — all three on the new-issue form. *@
+            <Field>
+                <FieldLabel>@Localizer["SupportLabelAttachments"]</FieldLabel>
+                <FieldContent>
+                    <FileUpload Accept="@SupportAttachmentPolicy.AcceptTypes" Multiple="true"
+                                MaxFileSize="SupportAttachmentPolicy.MaxFileSizeBytes"
+                                MaxFileCount="SupportAttachmentPolicy.MaxAttachmentCount"
+                                Files="newIssueUploads" FilesChanged="OnNewIssueFilesChangedAsync"
+                                Disabled="isSubmitting" />
+                    <FieldDescription>
+                        @Localizer["SupportAttachHintNew", PasteShortcut, HostDescription, SupportAttachmentPolicy.LimitsSummary]
+                    </FieldDescription>
+                    @if (newAttachments.Count > 0)
+                    {
+                        @attachmentChips(new AttachmentChipRow(newAttachments, RemoveNewIssueAttachment, isSubmitting))
+                    }
+                </FieldContent>
+            </Field>
+
+            <div class="flex items-start gap-3 rounded-md border p-3">
+                <Switch @bind-Checked="attachDiagnostics" Id="support-diagnostics" Disabled="isSubmitting" />
+                <div>
+                    <Label For="support-diagnostics">@Localizer["SupportAttachDiagnostics"]</Label>
+                    <TypographyMuted>
+                        @Localizer["SupportDiagnosticsHelp", SupportDiagnostics.MaxLogLines]
+                    </TypographyMuted>
+                </div>
+            </div>
+        </div>
+
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="CancelNewIssueAsync" Disabled="isSubmitting">@Localizer["Cancel"]</Button>
+            <Button OnClick="SubmitIssueAsync" Disabled="isSubmitting">
+                @if (isSubmitting)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                    <span>@Localizer["SupportSubmitting"]</span>
+                }
+                else
+                {
+                    <span>@Localizer["SupportSubmitIssue"]</span>
+                }
+            </Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* ------------------------------------------------- Issue detail + thread (REQ-UI-033) *@
+<Dialog @bind-Open="showDetailDialog">
+    <DialogContent Class="max-w-5xl">
+        <DialogHeader>
+            <DialogTitle>@DetailHeading</DialogTitle>
+            <DialogDescription>@DetailSubheading</DialogDescription>
+        </DialogHeader>
+
+        @if (detailError is not null)
+        {
+            <Alert Variant="AlertVariant.Danger">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                <AlertDescription>@detailError</AlertDescription>
+            </Alert>
+        }
+
+        @if (isLoadingDetail)
+        {
+            <div class="space-y-2 py-4">
+                <Skeleton Class="h-4 w-2/3" />
+                <Skeleton Class="h-4 w-full" />
+                <Skeleton Class="h-4 w-1/2" />
+            </div>
+        }
+        else if (detail is not null)
+        {
+            <div class="mb-3 flex flex-wrap items-center gap-2">
+                <Badge Variant="@StatusVariant(detail.Status)">@StatusLabelText(detail.Status)</Badge>
+                <Badge Variant="BadgeVariant.Outline">@TypeLabelText(detail.IssueType)</Badge>
+                <Badge Variant="@PriorityVariant(detail.Priority)">@PriorityLabelText(detail.Priority)</Badge>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-[1fr_280px]">
+                <div id="@CommentPasteTargetId">
+                    <div class="max-h-[320px] space-y-2 overflow-y-auto pr-1">
+                        @* The opening description is the first thing on the thread — leaving it out
+                           makes every reply answer a question the reader cannot see. *@
+                        @if (!string.IsNullOrWhiteSpace(detail.Description))
+                        {
+                            <div class="rounded-md border p-3">
+                                <div class="mb-1 text-xs text-muted-foreground">
+                                    <span class="font-semibold text-foreground">@Localizer["SupportYou"]</span>
+                                    · @FormatMoment(detail.CreatedDate)
+                                </div>
+                                <div class="whitespace-pre-wrap text-sm">@detail.Description</div>
+                            </div>
+                        }
+                        @foreach (var comment in detail.Comments)
+                        {
+                            <div class="rounded-md border p-3 @(IsMine(comment) ? string.Empty : "bg-muted")">
+                                <div class="mb-1 text-xs text-muted-foreground">
+                                    <span class="font-semibold text-foreground">@AuthorOf(comment)</span>
+                                    · @FormatMoment(comment.CreatedDate)
+                                </div>
+                                <div class="whitespace-pre-wrap text-sm">@comment.Comment</div>
+                            </div>
+                        }
+                        @if (detail.Comments.Count == 0 && string.IsNullOrWhiteSpace(detail.Description))
+                        {
+                            <TypographyMuted>@Localizer["SupportNoComments"]</TypographyMuted>
+                        }
+                    </div>
+
+                    @if (IssueIsClosed)
+                    {
+                        <Alert Variant="AlertVariant.Info" Class="mt-3">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="check-circle" Size="16" /></Alert.Icon>
+                            <AlertDescription>@Localizer["SupportIssueClosedNotice"]</AlertDescription>
+                        </Alert>
+                    }
+                    else
+                    {
+                        <div class="mt-3 space-y-2">
+                            <Textarea @bind-Value="commentText" Disabled="isCommenting"
+                                      Placeholder="@Localizer["SupportCommentPlaceholder"]" />
+
+                            @* REQ-UI-047: the same three affordances on EVERY comment, not only on
+                               the new-issue form. A bug report without a screenshot is materially
+                               harder to act on, and the reply is where the screenshot usually is. *@
+                            <FileUpload Accept="@SupportAttachmentPolicy.AcceptTypes" Multiple="true"
+                                        MaxFileSize="SupportAttachmentPolicy.MaxFileSizeBytes"
+                                        MaxFileCount="SupportAttachmentPolicy.MaxAttachmentCount"
+                                        Files="commentUploads" FilesChanged="OnCommentFilesChangedAsync"
+                                        Disabled="isCommenting" />
+                            <TypographyMuted>
+                                @Localizer["SupportAttachHintComment", PasteShortcut, HostDescription, SupportAttachmentPolicy.LimitsSummary]
+                            </TypographyMuted>
+                            @if (commentAttachments.Count > 0)
+                            {
+                                @attachmentChips(new AttachmentChipRow(commentAttachments, RemoveCommentAttachment, isCommenting))
+                            }
+
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                <Button Size="ButtonSize.Small" OnClick="@(() => SubmitCommentAsync(false))" Disabled="isCommenting">
+                                    @if (isCommenting)
+                                    {
+                                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                                    }
+                                    <span>@Localizer["SupportComment"]</span>
+                                </Button>
+                                @* REQ-FN-027: closing one's own issue, with the comment that
+                                   explains why, in a single action. *@
+                                <Button Size="ButtonSize.Small" Variant="ButtonVariant.Outline"
+                                        OnClick="@(() => SubmitCommentAsync(true))" Disabled="isCommenting">
+                                    @Localizer["SupportCommentAndClose"]
+                                </Button>
+                                <TypographyMuted Class="ml-auto">@Localizer["SupportOnlyResolvedClose"]</TypographyMuted>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>@Localizer["SupportDetails"]</CardTitle>
+                        </CardHeader>
+                        <CardContent Class="space-y-3 text-sm">
+                            <div>
+                                <div class="text-xs text-muted-foreground">@Localizer["SupportLabelStatus"]</div>
+                                <Badge Variant="@StatusVariant(detail.Status)">@StatusLabelText(detail.Status)</Badge>
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted-foreground">@Localizer["SupportLabelType"]</div>
+                                @TypeLabelText(detail.IssueType)
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted-foreground">@Localizer["SupportLabelPriority"]</div>
+                                @PriorityLabelText(detail.Priority)
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted-foreground">@Localizer["SupportLabelRaisedBy"]</div>
+                                @RaisedBy
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted-foreground">@Localizer["SupportLabelAppVersion"]</div>
+                                @AppVersionLabel
+                            </div>
+                            <div>
+                                <div class="text-xs text-muted-foreground">@Localizer["SupportLabelOpened"]</div>
+                                @FormatMoment(detail.CreatedDate)
+                            </div>
+                            <Separator />
+                            <div class="flex flex-col gap-2">
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                        OnClick="OpenPriorityDialog" Disabled="IssueIsClosed || isCommenting">
+                                    @Localizer["SupportChangePriorityAction"]
+                                </Button>
+                                @* The mockup's "Copy issue link" is deliberately "Copy issue
+                                   number" here: AppManager publishes no per-issue web URL through
+                                   its API, and a link that guesses one would be a link that
+                                   404s. The number is what support asks for anyway. *@
+                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="CopyIssueNumberAsync">
+                                    @Localizer["SupportCopyIssueNumber"]
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        }
+
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="CloseDetailDialogAsync">@Localizer["SupportClose"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* ------------------------------------------------- Change priority (REQ-UI-047) *@
+<Dialog @bind-Open="showPriorityDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["SupportChangePriorityTitle"]</DialogTitle>
+            <DialogDescription>@DetailHeading</DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4 py-2">
+            <Field>
+                <FieldLabel>@Localizer["SupportLabelPriority"]</FieldLabel>
+                <FieldContent>
+                    <Select TValue="string" @bind-Value="priorityChoice" Disabled="isChangingPriority"
+                            DisplayTextSelector="PriorityLabelWithQualifier">
+                        <SelectTrigger aria-label="@Localizer["SupportIssuePriorityAria"]"><SelectValue Placeholder="@Localizer["SupportChoosePriority"]" /></SelectTrigger>
+                        <SelectContent>
+                            @foreach (var option in SupportIssueCatalog.Priorities)
+                            {
+                                <SelectItem TValue="string" Value="@option.Code" Text="@PriorityLabelWithQualifier(option.Code)">@PriorityLabelWithQualifier(option.Code)</SelectItem>
+                            }
+                        </SelectContent>
+                    </Select>
+                </FieldContent>
+            </Field>
+            <Field>
+                <FieldLabel>@Localizer["SupportLabelReason"]</FieldLabel>
+                <FieldContent>
+                    <Textarea @bind-Value="priorityReason" Disabled="isChangingPriority"
+                              Placeholder="@Localizer["SupportReasonPlaceholder"]" />
+                    <FieldDescription>@Localizer["SupportReasonHelp"]</FieldDescription>
+                </FieldContent>
+            </Field>
+
+            @* Honest about the mechanism. AppManager's wire contract v1.4 exposes no priority
+               mutation, so the change is recorded on the thread rather than silently pretending a
+               field moved server-side. *@
+            <Alert Variant="AlertVariant.Info">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+                <AlertDescription>
+                    @Localizer["SupportPriorityNoticeBody"]
+                </AlertDescription>
+            </Alert>
+        </div>
+
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showPriorityDialog = false)" Disabled="isChangingPriority">@Localizer["Cancel"]</Button>
+            <Button OnClick="ChangePriorityAsync" Disabled="isChangingPriority">
+                @if (isChangingPriority)
+                {
+                    <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                }
+                <span>@Localizer["SupportUpdatePriority"]</span>
+            </Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>Sentinel the status <c>Select</c> uses for "no filter".</summary>
+    private const string AllStatuses = "";
+
+    /// <summary>Element the new-issue dialog listens for pasted screenshots on.</summary>
+    private const string NewIssuePasteTargetId = "support-new-issue-paste";
+
+    /// <summary>Element the comment composer listens for pasted screenshots on.</summary>
+    private const string CommentPasteTargetId = "support-comment-paste";
+
+    /// <summary>Paste-target key identifying the new-issue draft on the JS boundary.</summary>
+    private const string NewIssueTargetKey = "new-issue";
+
+    /// <summary>Paste-target key identifying the comment draft on the JS boundary.</summary>
+    private const string CommentTargetKey = "comment";
+
+    private IReadOnlyList<IssueRow> rows = Array.Empty<IssueRow>();
+    private bool isLoading;
+    private string? loadError;
+    private string statusFilter = AllStatuses;
+
+    private bool showNewIssueDialog;
+    private string newTitle = string.Empty;
+    private string newType = SupportIssueCatalog.DefaultType;
+    private string newPriority = SupportIssueCatalog.DefaultPriority;
+    private string newDescription = string.Empty;
+    private bool attachDiagnostics = true;
+    private bool isSubmitting;
+    private string? newIssueError;
+    private string? titleError;
+    private string? descriptionError;
+    private string newIssueDraftKey = string.Empty;
+    private readonly List<SupportAttachment> newAttachments = new();
+    private IReadOnlyList<FileUploadItem> newIssueUploads = Array.Empty<FileUploadItem>();
+
+    private bool showDetailDialog;
+    private SupportIssueData? detail;
+    private bool isLoadingDetail;
+    private string? detailError;
+    private string commentText = string.Empty;
+    private bool isCommenting;
+    private string commentDraftKey = string.Empty;
+    private readonly List<SupportAttachment> commentAttachments = new();
+    private IReadOnlyList<FileUploadItem> commentUploads = Array.Empty<FileUploadItem>();
+
+    private bool showPriorityDialog;
+    private string priorityChoice = SupportIssueCatalog.DefaultPriority;
+    private string priorityReason = string.Empty;
+    private bool isChangingPriority;
+
+    private IJSObjectReference? pasteModule;
+    private DotNetObjectReference<Support>? selfReference;
+    private bool newIssuePasteBound;
+    private bool commentPasteBound;
+
+    /// <summary>The inputs one attachment-chip row needs (REQ-UI-047).</summary>
+    /// <param name="Staged">The attachments currently staged for that composer.</param>
+    /// <param name="OnRemove">Removes one of them.</param>
+    /// <param name="Disabled">True while that composer's submission is in flight.</param>
+    private sealed record AttachmentChipRow(
+        IReadOnlyList<SupportAttachment> Staged, Action<SupportAttachment> OnRemove, bool Disabled);
+
+    /// <summary>One issue as the table renders it (REQ-UI-033).</summary>
+    private sealed record IssueRow(
+        int IssueId, string Number, string Title, string Type,
+        string Priority, string? PriorityCode, string Status, string? StatusCode, string Updated);
+
+    private bool BackendConfigured => AuthMode.IsAppManagerEnabled;
+
+    private bool SignedIn => TokenStore.HasSession;
+
+    private bool CanUseSupport => BackendConfigured && SignedIn;
+
+    private bool IssueIsClosed => SupportIssueCatalog.IsClosed(detail?.Status);
+
+    private static bool IsWindowsHost => OperatingSystem.IsWindows();
+
+    private string HostDescription => IsWindowsHost ? Localizer["SupportHostThisPc"] : Localizer["SupportHostThisMac"];
+
+    private static string PasteShortcut => IsWindowsHost ? "Ctrl+V" : "⌘V";
+
+    private string AppVersionLabel => $"TechieDesk {AppVersion.RawVersion} ({RuntimeInformation.OSDescription})";
+
+    private string RaisedBy
+    {
+        get
+        {
+            var email = TokenStore.User?.Email ?? UserContext.CurrentUser.Email;
+            return string.IsNullOrWhiteSpace(email) ? Localizer["SupportRaisedByThisInstall"].Value : email;
+        }
+    }
+
+    private string NoIssuesDescription => statusFilter == AllStatuses
+        ? Localizer["SupportNoIssuesAll"].Value
+        : Localizer["SupportNoIssuesFiltered",
+            StatusLabelText(statusFilter).ToLowerInvariant()].Value;
+
+    private string DetailHeading => detail is null
+        ? Localizer["SupportDetailFallbackHeading"].Value
+        : $"{detail.IssueNumber} — {detail.Title}";
+
+    private string DetailSubheading => detail is null
+        ? Localizer["SupportDetailLoading"].Value
+        : Localizer["SupportDetailSubheading",
+            FormatMoment(detail.CreatedDate),
+            TypeLabelText(detail.IssueType),
+            FormatMoment(detail.UpdatedDate)].Value;
+
+    private string LogDirectoryPath => Path.Combine(
+        DataDirectory.Resolve(Configuration[DataDirectory.ConfigKey]), DataDirectory.LogDirectoryName);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CanUseSupport)
+        {
+            await LoadIssuesAsync();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // The paste targets live inside dialogs, so they do not exist on the first render and have
+        // to be bound once the dialog has actually rendered. The flags stop this costing a JS
+        // round-trip on every keystroke: a render while a dialog is open is the common case.
+        if (showNewIssueDialog && !newIssuePasteBound)
+        {
+            newIssuePasteBound = await BindPasteTargetAsync(NewIssuePasteTargetId, NewIssueTargetKey);
+        }
+
+        if (showDetailDialog && detail is not null && !IssueIsClosed && !commentPasteBound)
+        {
+            commentPasteBound = await BindPasteTargetAsync(CommentPasteTargetId, CommentTargetKey);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        // Abandoned drafts must not leave staged files behind on disk.
+        DiscardDraft(newIssueDraftKey, newAttachments);
+        DiscardDraft(commentDraftKey, commentAttachments);
+
+        selfReference?.Dispose();
+        if (pasteModule is not null)
+        {
+            try
+            {
+                await pasteModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The web view is already gone; there is nothing left to release.
+            }
+        }
+    }
+
+    private async Task OnStatusFilterChanged(string? value)
+    {
+        statusFilter = value ?? AllStatuses;
+        await LoadIssuesAsync();
+    }
+
+    private async Task LoadIssuesAsync()
+    {
+        if (!CanUseSupport)
+        {
+            rows = Array.Empty<IssueRow>();
+            return;
+        }
+
+        isLoading = true;
+        loadError = null;
+        StateHasChanged();
+
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            var issues = await AppManager.ListIssuesAsync(
+                TokenStore.AccessToken!, statusFilter == AllStatuses ? null : statusFilter);
+
+            rows = issues.Select(ToRow).ToArray();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to load support issues");
+            // The table is emptied AND the reason is named. Leaving stale rows behind would be
+            // worse: they would read as current.
+            rows = Array.Empty<IssueRow>();
+            loadError = Describe(exception);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private IssueRow ToRow(SupportIssueData issue) => new(
+        issue.IssueId,
+        issue.IssueNumber,
+        issue.Title,
+        TypeLabelText(issue.IssueType),
+        PriorityLabelText(issue.Priority),
+        issue.Priority,
+        StatusLabelText(issue.Status),
+        issue.Status,
+        FormatMoment(issue.UpdatedDate ?? issue.CreatedDate));
+
+    // ---------------------------------------------------------------- new issue
+
+    private void OpenNewIssueDialog()
+    {
+        if (!CanUseSupport)
+        {
+            return;
+        }
+
+        DiscardDraft(newIssueDraftKey, newAttachments);
+        newIssueDraftKey = AttachmentStore.BeginDraft();
+        newTitle = string.Empty;
+        newDescription = string.Empty;
+        newType = SupportIssueCatalog.DefaultType;
+        newPriority = SupportIssueCatalog.DefaultPriority;
+        attachDiagnostics = true;
+        newIssueError = null;
+        titleError = null;
+        descriptionError = null;
+        newIssueUploads = Array.Empty<FileUploadItem>();
+        newIssuePasteBound = false;
+        showNewIssueDialog = true;
+    }
+
+    private Task CancelNewIssueAsync()
+    {
+        DiscardDraft(newIssueDraftKey, newAttachments);
+        newIssueDraftKey = string.Empty;
+        showNewIssueDialog = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task SubmitIssueAsync()
+    {
+        titleError = string.IsNullOrWhiteSpace(newTitle) ? Localizer["SupportTitleRequired"].Value : null;
+        descriptionError = string.IsNullOrWhiteSpace(newDescription)
+            ? Localizer["SupportDescriptionRequired"].Value
+            : null;
+
+        if (titleError is not null || descriptionError is not null)
+        {
+            return;
+        }
+
+        isSubmitting = true;
+        newIssueError = null;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+
+            var description = SupportThreadNote.Compose(newDescription, newAttachments);
+            if (attachDiagnostics)
+            {
+                var diagnostics = SupportDiagnostics.Build(
+                    AppVersion.RawVersion,
+                    $"{RuntimeInformation.OSDescription} ({RuntimeInformation.OSArchitecture})",
+                    SupportDiagnostics.ReadRecentLogLines(LogDirectoryPath));
+                description = description + Environment.NewLine + Environment.NewLine + diagnostics;
+            }
+
+            var created = await AppManager.CreateIssueAsync(TokenStore.AccessToken!, new CreateIssueRequest
+            {
+                ApplicationId = ApplicationId(),
+                Title = newTitle.Trim(),
+                Description = description,
+                Type = newType,
+                Priority = newPriority
+            });
+
+            showNewIssueDialog = false;
+            newIssueDraftKey = string.Empty;
+            newAttachments.Clear();
+            ToastService.Success(
+                Localizer["SupportRaisedAs", created.IssueNumber], Localizer["SupportIssueSubmitted"]);
+            await LoadIssuesAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to create a support issue");
+            newIssueError = Describe(exception);
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    // ---------------------------------------------------------------- detail + thread
+
+    private async Task OpenIssueAsync(int issueId)
+    {
+        showDetailDialog = true;
+        commentPasteBound = false;
+        isLoadingDetail = true;
+        detailError = null;
+        detail = null;
+        commentText = string.Empty;
+        commentUploads = Array.Empty<FileUploadItem>();
+        DiscardDraft(commentDraftKey, commentAttachments);
+        commentDraftKey = AttachmentStore.BeginDraft();
+        StateHasChanged();
+
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            detail = await AppManager.GetIssueAsync(TokenStore.AccessToken!, issueId);
+            priorityChoice = string.IsNullOrWhiteSpace(detail.Priority)
+                ? SupportIssueCatalog.DefaultPriority
+                : detail.Priority!;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to open support issue {IssueId}", issueId);
+            detailError = Describe(exception);
+        }
+        finally
+        {
+            isLoadingDetail = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task CloseDetailDialogAsync()
+    {
+        DiscardDraft(commentDraftKey, commentAttachments);
+        commentDraftKey = string.Empty;
+        showDetailDialog = false;
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Posts a comment and, when asked, closes the issue in the same action (REQ-UI-033,
+    /// REQ-FN-027).
+    /// </summary>
+    /// <param name="alsoClose">True for "Comment &amp; close".</param>
+    private async Task SubmitCommentAsync(bool alsoClose)
+    {
+        // Captured once: the field is refreshed mid-method, and the catch clauses must report the
+        // issue the user actually acted on.
+        var issue = detail;
+        if (issue is null)
+        {
+            return;
+        }
+
+        var body = SupportThreadNote.Compose(commentText, commentAttachments);
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            ToastService.Error(
+                Localizer["SupportNothingToSendBody"], Localizer["SupportNothingToSendTitle"]);
+            return;
+        }
+
+        isCommenting = true;
+        detailError = null;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            await AppManager.AddIssueCommentAsync(TokenStore.AccessToken!, issue.IssueId, body);
+
+            if (alsoClose)
+            {
+                // The comment is already on the thread, so a failure to close leaves the user's
+                // words safely recorded rather than losing them with the action.
+                await AppManager.CloseIssueAsync(TokenStore.AccessToken!, issue.IssueId);
+                ToastService.Success(
+                    Localizer["SupportIssueClosedBody", issue.IssueNumber], Localizer["SupportClosedTitle"]);
+            }
+            else
+            {
+                ToastService.Success(
+                    Localizer["SupportCommentAddedBody"], Localizer["SupportCommentAddedTitle"]);
+            }
+
+            commentText = string.Empty;
+            commentAttachments.Clear();
+            commentUploads = Array.Empty<FileUploadItem>();
+            commentDraftKey = AttachmentStore.BeginDraft();
+
+            await ReloadDetailAsync();
+            await LoadIssuesAsync();
+        }
+        catch (AppManagerException exception) when (exception.Error == AppManagerError.AlreadyClosed)
+        {
+            // Documented and expected: someone (or another window) closed it first. Say exactly
+            // that, and resynchronise, rather than reporting a generic failure.
+            Logger.LogInformation(exception, "Issue {IssueId} was already closed", issue.IssueId);
+            detailError = Localizer["SupportAlreadyClosedNotice"];
+            await ReloadDetailAsync();
+            await LoadIssuesAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to comment on issue {IssueId}", issue.IssueId);
+            detailError = Describe(exception);
+        }
+        finally
+        {
+            isCommenting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ReloadDetailAsync()
+    {
+        var issueId = detail?.IssueId;
+        if (issueId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            detail = await AppManager.GetIssueAsync(TokenStore.AccessToken!, issueId.Value);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Could not refresh issue {IssueId} after writing to it", issueId.Value);
+        }
+    }
+
+    // ---------------------------------------------------------------- change priority
+
+    private void OpenPriorityDialog()
+    {
+        priorityChoice = string.IsNullOrWhiteSpace(detail?.Priority)
+            ? SupportIssueCatalog.DefaultPriority
+            : detail!.Priority!;
+        priorityReason = string.Empty;
+        showPriorityDialog = true;
+    }
+
+    private async Task ChangePriorityAsync()
+    {
+        var issue = detail;
+        if (issue is null)
+        {
+            return;
+        }
+
+        isChangingPriority = true;
+        try
+        {
+            await TokenRefresher.EnsureValidTokenAsync();
+            var note = SupportThreadNote.FormatPriorityChange(issue.Priority, priorityChoice, priorityReason);
+            await AppManager.AddIssueCommentAsync(TokenStore.AccessToken!, issue.IssueId, note);
+
+            showPriorityDialog = false;
+            ToastService.Success(
+                Localizer["SupportPriorityRecordedBody", issue.IssueNumber],
+                Localizer["SupportPriorityChangeSentTitle"]);
+            await ReloadDetailAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to record a priority change on issue {IssueId}", issue.IssueId);
+            ToastService.Error(Describe(exception), Localizer["SupportPriorityNotChangedTitle"]);
+        }
+        finally
+        {
+            isChangingPriority = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyIssueNumberAsync()
+    {
+        if (detail is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Clipboard.Default.SetTextAsync(detail.IssueNumber);
+            ToastService.Success(
+                Localizer["SupportCopiedBody", detail.IssueNumber], Localizer["SupportCopiedTitle"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogWarning(exception, "Clipboard write failed");
+            ToastService.Error(
+                Localizer["SupportClipboardUnavailable", exception.Message], Localizer["SupportNotCopiedTitle"]);
+        }
+    }
+
+    // ---------------------------------------------------------------- attachments (REQ-UI-047)
+
+    private Task OnNewIssueFilesChangedAsync(IReadOnlyList<FileUploadItem> files)
+    {
+        newIssueUploads = files;
+        return StageUploadsAsync(files, newIssueDraftKey, newAttachments, () => newIssueUploads = Array.Empty<FileUploadItem>());
+    }
+
+    private Task OnCommentFilesChangedAsync(IReadOnlyList<FileUploadItem> files)
+    {
+        commentUploads = files;
+        return StageUploadsAsync(files, commentDraftKey, commentAttachments, () => commentUploads = Array.Empty<FileUploadItem>());
+    }
+
+    /// <summary>
+    /// Stages files picked or dropped onto a composer, one rejection message per rejected file.
+    /// </summary>
+    /// <param name="files">The files the control handed over.</param>
+    /// <param name="draftKey">The draft they belong to.</param>
+    /// <param name="staged">The list to add the accepted attachments to.</param>
+    /// <param name="clearControl">Resets the upload control once the files have been consumed.</param>
+    private async Task StageUploadsAsync(
+        IReadOnlyList<FileUploadItem> files,
+        string draftKey,
+        List<SupportAttachment> staged,
+        Action clearControl)
+    {
+        if (files.Count == 0 || string.IsNullOrEmpty(draftKey))
+        {
+            return;
+        }
+
+        foreach (var item in files)
+        {
+            if (staged.Count >= SupportAttachmentPolicy.MaxAttachmentCount)
+            {
+                ToastService.Error(
+                    Localizer["SupportTooManyAttachmentsBody", SupportAttachmentPolicy.MaxAttachmentCount],
+                    Localizer["SupportTooManyAttachmentsTitle"]);
+                break;
+            }
+
+            // Checked before a byte is read so an oversize file is refused by name rather than by
+            // an OpenReadStream exception the user cannot interpret.
+            var rejection = SupportAttachmentPolicy.GetRejectionReason(item.Name, item.Size);
+            if (rejection is not null)
+            {
+                ToastService.Error(rejection, Localizer["SupportCannotAttachTitle"]);
+                continue;
+            }
+
+            try
+            {
+                await using var stream = item.File.OpenReadStream(SupportAttachmentPolicy.MaxFileSizeBytes);
+                staged.Add(await AttachmentStore.SaveAsync(draftKey, item.Name, item.ContentType, stream));
+            }
+            catch (SupportAttachmentRejectedException exception)
+            {
+                ToastService.Error(exception.Message, Localizer["SupportCannotAttachTitle"]);
+            }
+            catch (Exception exception)
+            {
+                Logger.LogError(exception, "Failed to stage support attachment {FileName}", item.Name);
+                ToastService.Error(exception.Message, Localizer["SupportCannotAttachTitle"]);
+            }
+        }
+
+        clearControl();
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Receives a screenshot pasted into a composer (REQ-UI-047). Called from
+    /// <c>wwwroot/js/support-attachments.js</c>.
+    /// </summary>
+    /// <param name="targetKey">Which composer the paste landed in.</param>
+    /// <param name="fileName">The name the module generated for the clipboard image.</param>
+    /// <param name="contentType">The clipboard image's MIME type.</param>
+    /// <param name="base64">The image bytes, base64-encoded.</param>
+    [JSInvokable]
+    public async Task OnPastedAttachment(string targetKey, string fileName, string contentType, string base64)
+    {
+        var isComment = targetKey == CommentTargetKey;
+        var staged = isComment ? commentAttachments : newAttachments;
+        var draftKey = isComment ? commentDraftKey : newIssueDraftKey;
+
+        if (string.IsNullOrEmpty(draftKey))
+        {
+            return;
+        }
+
+        if (staged.Count >= SupportAttachmentPolicy.MaxAttachmentCount)
+        {
+            ToastService.Error(
+                Localizer["SupportTooManyAttachmentsBody", SupportAttachmentPolicy.MaxAttachmentCount],
+                Localizer["SupportTooManyAttachmentsTitle"]);
+            return;
+        }
+
+        try
+        {
+            var bytes = Convert.FromBase64String(base64);
+            var rejection = SupportAttachmentPolicy.GetRejectionReason(fileName, bytes.LongLength);
+            if (rejection is not null)
+            {
+                ToastService.Error(rejection, Localizer["SupportCannotAttachTitle"]);
+                return;
+            }
+
+            using var stream = new MemoryStream(bytes);
+            staged.Add(await AttachmentStore.SaveAsync(draftKey, fileName, contentType, stream));
+            ToastService.Success(
+                Localizer["SupportScreenshotAttachedBody", fileName], Localizer["SupportScreenshotPastedTitle"]);
+        }
+        catch (SupportAttachmentRejectedException exception)
+        {
+            ToastService.Error(exception.Message, Localizer["SupportCannotAttachTitle"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Failed to stage a pasted screenshot");
+            ToastService.Error(exception.Message, Localizer["SupportCannotAttachTitle"]);
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveNewIssueAttachment(SupportAttachment attachment) =>
+        RemoveAttachment(newAttachments, attachment);
+
+    private void RemoveCommentAttachment(SupportAttachment attachment) =>
+        RemoveAttachment(commentAttachments, attachment);
+
+    private void RemoveAttachment(List<SupportAttachment> staged, SupportAttachment attachment)
+    {
+        staged.Remove(attachment);
+        AttachmentStore.Remove(attachment);
+        StateHasChanged();
+    }
+
+    private void DiscardDraft(string draftKey, List<SupportAttachment> staged)
+    {
+        staged.Clear();
+        if (!string.IsNullOrEmpty(draftKey))
+        {
+            AttachmentStore.DiscardDraft(draftKey);
+        }
+    }
+
+    // ---------------------------------------------------------------- plumbing
+
+    /// <summary>Wires the paste handler to a composer once its element exists.</summary>
+    /// <param name="elementId">The container element listening for the paste.</param>
+    /// <param name="targetKey">Which composer the paste belongs to.</param>
+    /// <returns>True once the element was found and bound.</returns>
+    private async Task<bool> BindPasteTargetAsync(string elementId, string targetKey)
+    {
+        var module = await GetPasteModuleAsync();
+        if (module is null)
+        {
+            return false;
+        }
+
+        selfReference ??= DotNetObjectReference.Create(this);
+        try
+        {
+            return await module.InvokeAsync<bool>("attachPasteTarget", elementId, selfReference, targetKey);
+        }
+        catch (JSException exception)
+        {
+            Logger.LogWarning(exception, "Could not bind the paste target {ElementId}", elementId);
+            return false;
+        }
+    }
+
+    private async Task<IJSObjectReference?> GetPasteModuleAsync()
+    {
+        try
+        {
+            pasteModule ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/support-attachments.js");
+            return pasteModule;
+        }
+        catch (Exception exception)
+        {
+            // Paste is the one affordance that needs JS; drag and choose-from-disk still work, so a
+            // missing module degrades the screen rather than breaking it.
+            Logger.LogWarning(exception, "Support paste module unavailable");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the ApplicationId <c>POST /IssueSvc</c> requires, preferring the configured value
+    /// and falling back to the one the licence carries.
+    /// </summary>
+    /// <returns>The application identifier, or zero when none is known.</returns>
+    private int ApplicationId()
+    {
+        var configured = Configuration.GetValue<int?>($"{AppManagerOptions.SectionName}:ApplicationId");
+        return configured ?? TokenStore.ActiveLicense?.ApplicationId ?? 0;
+    }
+
+    private bool IsMine(SupportIssueCommentData comment)
+    {
+        var author = comment.CreatedByName;
+        if (string.IsNullOrWhiteSpace(author))
+        {
+            return false;
+        }
+
+        var me = TokenStore.User?.DisplayName ?? UserContext.CurrentUser.DisplayName;
+        return string.Equals(author, me, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string AuthorOf(SupportIssueCommentData comment) =>
+        IsMine(comment) ? Localizer["SupportYou"].Value : (comment.CreatedByName ?? Localizer["SupportTitle"].Value);
+
+    private static string FormatMoment(DateTimeOffset? moment) =>
+        moment?.ToLocalTime().ToString("d MMM yyyy, HH:mm") ?? "—";
+
+    /// <summary>
+    /// REQ-UI-051: resolves a resource key for the catalogue.
+    /// </summary>
+    /// <param name="key">A key present in <c>AppStrings.resx</c>.</param>
+    /// <param name="arguments">Format arguments, when the key carries placeholders.</param>
+    /// <returns>The translated text.</returns>
+    /// <remarks>
+    /// <see cref="SupportIssueCatalog"/> is static and is shared with non-UI callers, so it takes
+    /// its localizer as an argument rather than holding one. This is the page's one adapter onto
+    /// the injected <c>IStringLocalizer</c>.
+    /// </remarks>
+    private string Localize(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
+
+    /// <summary>REQ-UI-051: the localized plain-language note under the issue-type picker.</summary>
+    /// <param name="code">The invariant issue-type code.</param>
+    /// <returns>The qualifier, or an empty string for an unrecognised code.</returns>
+    private string TypeQualifier(string? code) =>
+        SupportIssueCatalog.Find(SupportIssueCatalog.Types, code) is { } option
+            ? Localize(option.QualifierKey)
+            : string.Empty;
+
+    /// <summary>
+    /// REQ-UI-051: the localized label for an issue-type code.
+    /// </summary>
+    /// <param name="code">The invariant wire code, or null.</param>
+    /// <returns>The label the user reads.</returns>
+    /// <remarks>
+    /// <see cref="SupportIssueCatalog"/> holds the WIRE vocabulary \u2014 the codes AppManager receives,
+    /// which must never be translated \u2014 beside the resource KEY naming each label. These helpers
+    /// resolve the key half only. The switch they replaced restated the six codes a third time (the
+    /// catalogue, the wire, and here) and matched on lower-cased literals, so a code the catalogue
+    /// gained but the switch did not would have rendered English.
+    /// </remarks>
+    private string TypeLabelText(string? code) => SupportIssueCatalog.TypeLabel(code, Localize);
+
+    /// <summary>REQ-UI-051: the localized label for a priority code.</summary>
+    /// <param name="code">The invariant wire code, or null.</param>
+    /// <returns>The label the user reads.</returns>
+    private string PriorityLabelText(string? code) => SupportIssueCatalog.PriorityLabel(code, Localize);
+
+    /// <summary>REQ-UI-051: the localized label and qualifier for a priority code.</summary>
+    /// <param name="code">The invariant wire code, or null.</param>
+    /// <returns>The text the priority pickers show.</returns>
+    private string PriorityLabelWithQualifier(string? code) =>
+        SupportIssueCatalog.PriorityLabelWithQualifier(code, Localize);
+
+    /// <summary>REQ-UI-051 / TR-024: the status filter's trigger text, "All statuses" included.</summary>
+    /// <param name="code">The invariant wire code, or the empty all-statuses sentinel.</param>
+    /// <returns>The text painted on the filter's trigger.</returns>
+    private string StatusFilterText(string? code) =>
+        string.IsNullOrEmpty(code) ? Localizer["SupportAllStatuses"] : StatusLabelText(code);
+
+    /// <summary>REQ-UI-051: the localized label for a status code.</summary>
+    /// <param name="code">The invariant wire code, or null.</param>
+    /// <returns>The label the user reads.</returns>
+    private string StatusLabelText(string? code) => SupportIssueCatalog.StatusLabel(code, Localize);
+
+    private static BadgeVariant PriorityVariant(string? priority) => priority?.ToLowerInvariant() switch
+    {
+        "critical" or "high" => BadgeVariant.Destructive,
+        "medium" => BadgeVariant.Default,
+        _ => BadgeVariant.Secondary
+    };
+
+    private static BadgeVariant StatusVariant(string? status) => status?.ToLowerInvariant() switch
+    {
+        "open" => BadgeVariant.Default,
+        "inprogress" => BadgeVariant.Outline,
+        _ => BadgeVariant.Secondary
+    };
+
+    /// <summary>
+    /// Turns a failure into a sentence naming what actually went wrong.
+    /// </summary>
+    /// <param name="exception">The failure.</param>
+    /// <returns>The message to show.</returns>
+    /// <remarks>
+    /// AppManager's own message is preferred over anything invented here — "Issue is already
+    /// closed" tells the user what to do next, and "Support is unavailable" does not.
+    /// </remarks>
+    private string Describe(Exception exception) => exception switch
+    {
+        AppManagerException { Error: AppManagerError.NotConfigured } =>
+            Localizer["SupportErrorNotConfigured"],
+        AppManagerException { Error: AppManagerError.Unauthorized or AppManagerError.InvalidToken } =>
+            Localizer["SupportErrorSessionExpired"],
+        // Server text plus its code: no English of ours, so nothing to translate.
+        AppManagerException appManager => $"{appManager.Message} ({appManager.ErrorCode})",
+        HttpRequestException http => Localizer["SupportErrorUnreachable", http.Message],
+        _ => exception.Message
+    };
+}

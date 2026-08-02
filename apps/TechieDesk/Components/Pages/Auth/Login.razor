@@ -1,72 +1,82 @@
 @page "/login"
 @layout AuthLayout
-@inject IAppManagerClient AppManager
-@inject TechieDeskAuthenticationStateProvider AuthProvider
 @inject ITechieDeskAuthModeProvider AuthMode
+@inject IDesktopSignInService SignIn
+@inject TechieDeskAuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
-@inject ILogger<Login> Logger
+@inject IStringLocalizer<AppStrings> Localizer
 
-<PageTitle>TechieDesk — Sign in</PageTitle>
+<PageTitle>@Localizer["LoginPageTitle"]</PageTitle>
+
+@* REQ-FN-039 / REQ-UI-007: an IN-PROCESS sign-in, not an HTML form post.
+
+   Until now this posted to /auth/login — an ASP.NET Core endpoint that died with the web host in
+   REQ-FN-035, so the screen rendered and submitting it did precisely nothing. A MAUI Blazor Hybrid
+   head has no HTTP boundary and no cookie to write, which were the only two reasons the form post
+   existed: the component calls IDesktopSignInService on the same thread, that service establishes
+   the session, and the tokens go to the OS credential store (REQ-FN-039).
+
+   Consequently gone: the <AntiforgeryToken /> (a desktop app has no cross-site request to forge),
+   the ?error= redirect round-trip (the outcome is returned, not redirected back), and
+   NavigateTo(forceLoad: true) (there is no server to reload from — a full reload would restart the
+   whole WebView).
+
+   The fields stay plain <input> elements carrying the classes TrBlazeUI's <Input> emits, so the
+   screen is byte-for-byte what the mockup shows; they are now bound instead of named. *@
 
 <Card Class="rounded-2xl p-2 shadow-lg">
     <CardHeader>
-        <h1 class="text-2xl font-semibold leading-none tracking-tight">Welcome back</h1>
-        <CardDescription>Sign in to your TechieDesk instance</CardDescription>
+        <h1 class="text-2xl font-semibold leading-none tracking-tight">@Localizer["LoginHeading"]</h1>
+        <CardDescription>@Localizer["LoginSubheading"]</CardDescription>
     </CardHeader>
     <CardContent Class="space-y-4">
-        @if (errorMessage is not null)
+        @if (Banner is not null)
         {
-            <Alert Variant="@errorVariant" AccentBorder="true">
+            <Alert Variant="@Banner.Value.Variant" AccentBorder="true">
                 <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-                <AlertDescription>@errorMessage</AlertDescription>
+                <AlertDescription>@Banner.Value.Message</AlertDescription>
             </Alert>
         }
 
-        <Field IsInvalid="@(emailError is not null)">
-            <FieldLabel>Email</FieldLabel>
-            <FieldContent>
-                <Input AriaLabel="Email" Id="login-email" Type="InputType.Email" @bind-Value="email"
-                       Placeholder="you@company.com" AriaInvalid="@(emailError is not null)" />
-                @if (emailError is not null)
-                {
-                    <FieldError>@emailError</FieldError>
-                }
-            </FieldContent>
-        </Field>
+        <form class="space-y-4" @onsubmit="SubmitAsync" @onsubmit:preventDefault="true">
+            <Field>
+                <FieldLabel>@Localizer["AuthEmailLabel"]</FieldLabel>
+                <FieldContent>
+                    <input id="login-email" name="email" type="email" required autocomplete="username"
+                           placeholder="@Localizer["AuthEmailPlaceholder"]" aria-label="@Localizer["AuthEmailLabel"]" class="@InputClass"
+                           disabled="@Busy" value="@Email"
+                           @oninput="@(args => Email = args.Value?.ToString() ?? string.Empty)" />
+                </FieldContent>
+            </Field>
 
-        <Field IsInvalid="@(passwordError is not null)">
-            <div class="flex items-center justify-between">
-                <FieldLabel>Password</FieldLabel>
-                <a href="/forgot-password" class="text-xs font-semibold text-primary hover:underline">Forgot password?</a>
-            </div>
-            <FieldContent>
-                <Input AriaLabel="Password" Id="login-password" Type="InputType.Password" @bind-Value="password"
-                       Placeholder="••••••••" AriaInvalid="@(passwordError is not null)" />
-                @if (passwordError is not null)
-                {
-                    <FieldError>@passwordError</FieldError>
-                }
-            </FieldContent>
-        </Field>
+            <Field>
+                <div class="flex items-center justify-between">
+                    <FieldLabel>@Localizer["AuthPasswordLabel"]</FieldLabel>
+                    <a href="/forgot-password" class="text-xs font-semibold text-primary hover:underline">@Localizer["LoginForgotPassword"]</a>
+                </div>
+                <FieldContent>
+                    <input id="login-password" name="password" type="password" required autocomplete="current-password"
+                           placeholder="••••••••" aria-label="@Localizer["AuthPasswordLabel"]" class="@InputClass"
+                           disabled="@Busy" value="@Password"
+                           @oninput="@(args => Password = args.Value?.ToString() ?? string.Empty)" />
+                </FieldContent>
+            </Field>
 
-        <Button Class="w-full" OnClick="SignInAsync" Disabled="isBusy" Type="ButtonType.Submit">
-            @if (isBusy)
-            {
-                <Spinner Size="SpinnerSize.Small" Class="mr-2" />
-                <span>Signing in…</span>
-            }
-            else
-            {
-                <span>Sign in</span>
-            }
-        </Button>
+            <button type="submit" class="@SubmitClass" disabled="@Busy">@SubmitLabel</button>
+        </form>
 
         <div class="flex items-center gap-2.5 text-xs text-muted-foreground">
-            <Separator Class="flex-1" /> or <Separator Class="flex-1" />
+            <Separator Class="flex-1" /> @Localizer["AuthOr"] <Separator Class="flex-1" />
         </div>
 
         <div class="text-center text-sm text-muted-foreground">
-            No account? <a href="/register" class="font-semibold text-primary hover:underline">Create one</a>
+            @Localizer["LoginNoAccount"] <a href="/register" class="font-semibold text-primary hover:underline">@Localizer["LoginCreateOne"]</a>
+        </div>
+
+        @* REQ-FN-036 / BRD-129: nothing in the app sends anyone here, so the way back must always
+           be on the screen. Signing in activates a licence; the workspace is already usable. *@
+        <div class="text-center text-sm">
+            <a href="/" class="font-semibold text-primary hover:underline">@Localizer["AuthContinueWithoutAccount"]</a>
         </div>
     </CardContent>
 </Card>
@@ -75,83 +85,94 @@
     [SupplyParameterFromQuery(Name = "returnUrl")]
     private string? ReturnUrl { get; set; }
 
-    private string email = string.Empty;
-    private string password = string.Empty;
-    private string? emailError;
-    private string? passwordError;
-    private string? errorMessage;
-    private AlertVariant errorVariant = AlertVariant.Danger;
-    private bool isBusy;
+    [SupplyParameterFromQuery(Name = "error")]
+    private string? ErrorCode { get; set; }
 
-    private async Task SignInAsync()
+    // The exact classes TrBlazeUI's <Input> emits, so a plain input looks identical to the
+    // component used on every other screen.
+    private const string InputClass =
+        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background " +
+        "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground " +
+        "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
+        "focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 " +
+        "aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive transition-colors md:text-sm";
+
+    private const string SubmitClass =
+        "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors " +
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 " +
+        "disabled:opacity-50 disabled:pointer-events-none bg-primary text-primary-foreground hover:bg-primary/90 " +
+        "h-10 px-4 py-2 w-full";
+
+    private string Email { get; set; } = string.Empty;
+
+    private string Password { get; set; } = string.Empty;
+
+    private bool Busy { get; set; }
+
+    // REQ-UI-052: the coverage counter cannot see a C# literal that reaches the screen through a
+    // single markup position, so these were invisible to it — and just as English on a Hindi screen.
+    private string SubmitLabel => Busy ? Localizer["LoginSubmitBusy"] : Localizer["LoginSubmit"];
+
+    private string SafeReturnUrl => AuthScreenCodes.SafeReturnUrl(ReturnUrl);
+
+    private (AlertVariant Variant, string Message)? Banner => BuildBanner();
+
+    // Signs in through the in-process service, then hands the app back its authenticated identity.
+    private async Task SubmitAsync()
     {
-        emailError = passwordError = errorMessage = null;
-
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            emailError = "Email is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(password))
-        {
-            passwordError = "Password is required.";
-        }
-
-        if (emailError is not null || passwordError is not null)
+        if (Busy)
         {
             return;
         }
 
-        if (!AuthMode.IsAppManagerEnabled)
-        {
-            errorVariant = AlertVariant.Info;
-            errorMessage = "This instance runs in offline single-user mode — no login is required.";
-            return;
-        }
-
-        isBusy = true;
+        Busy = true;
         try
         {
-            var auth = await AppManager.LoginAsync(email.Trim(), password);
-            AuthProvider.SignIn(auth);
-            Logger.LogInformation("Login succeeded for {Email}", email.Trim());
-            Nav.NavigateTo(SafeReturnUrl(), forceLoad: true);
-        }
-        catch (AppManagerException ex)
-        {
-            Logger.LogWarning("Login failed for {Email} ({ErrorCode})", email.Trim(), ex.ErrorCode);
-            (errorVariant, errorMessage) = MapError(ex);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Unexpected error during login for {Email}", email.Trim());
-            errorVariant = AlertVariant.Danger;
-            errorMessage = "Something went wrong while signing in. Please try again.";
+            var outcome = await SignIn.SignInAsync(Email, Password);
+            ErrorCode = outcome.ErrorCode;
+            if (!outcome.Succeeded)
+            {
+                return;
+            }
+
+            // The password never outlives the call that needed it.
+            Password = string.Empty;
+
+            // The session was established on the app-wide session context, so every consumer already
+            // sees it; this is what tells Blazor's authorization plumbing to re-read it.
+            AuthProvider.NotifySessionChanged();
+            Nav.NavigateTo(SafeReturnUrl);
         }
         finally
         {
-            isBusy = false;
+            Busy = false;
         }
     }
 
-    // REQ-UI-013: distinct friendly banners for the key account-state errors.
-    private static (AlertVariant, string) MapError(AppManagerException ex) => ex.Error switch
+    // REQ-UI-007 / REQ-UI-013: distinct friendly banners for the key account-state errors, keyed
+    // off the code the sign-in service reports.
+    private (AlertVariant, string)? BuildBanner()
     {
-        AppManagerError.InvalidCredentials => (AlertVariant.Danger, "Invalid email or password."),
-        AppManagerError.AccountLocked => (AlertVariant.Warning, "Account locked — too many failed attempts. Try again in 15 minutes."),
-        AppManagerError.AccountDisabled => (AlertVariant.Danger, "Account disabled — contact your administrator."),
-        AppManagerError.NoAppAccess => (AlertVariant.Danger, "Your account doesn't have access to this application. Contact your administrator."),
-        _ => (AlertVariant.Danger, "Unable to sign in right now. Please try again later.")
-    };
-
-    private string SafeReturnUrl()
-    {
-        var target = ReturnUrl;
-        if (string.IsNullOrWhiteSpace(target) || !target.StartsWith('/') || target.StartsWith("//"))
+        // REQ-FN-036 / BRD-129: signing in activates a licence — it is never required to use the
+        // app on your own data. With no AppManager configured there is nothing to sign in to, so
+        // say so plainly instead of implying the user is missing out on access.
+        if (!AuthMode.IsAppManagerEnabled)
         {
-            return "/";
+            return (AlertVariant.Info, Localizer["LoginBannerNoLicenceServer"]);
         }
 
-        return target;
+        return ErrorCode switch
+        {
+            null or "" => null,
+            "INVALID_CREDENTIALS" => (AlertVariant.Danger, Localizer["LoginErrorInvalidCredentials"]),
+            "ACCOUNT_LOCKED" => (AlertVariant.Warning, Localizer["LoginErrorAccountLocked"]),
+            "ACCOUNT_DISABLED" => (AlertVariant.Danger, Localizer["LoginErrorAccountDisabled"]),
+            "NO_APP_ACCESS" => (AlertVariant.Danger, Localizer["LoginErrorNoAppAccess"]),
+            AuthScreenCodes.MissingFields => (AlertVariant.Danger, Localizer["LoginErrorMissingFields"]),
+            AuthScreenCodes.NoLicenceServer => (AlertVariant.Info, Localizer["LoginErrorNoLicenceServer"]),
+            @* REQ-FN-035: the ANTIFORGERY_FAILED banner is gone with the HTML form post it
+               protected. A desktop app has no cross-site request to forge. *@
+            _ => (AlertVariant.Danger, Localizer["LoginErrorGeneric"])
+        };
     }
 }

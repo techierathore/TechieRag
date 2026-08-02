@@ -10,8 +10,8 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
 a{color:inherit;text-decoration:none}
-.shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
-.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto}
+.shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 62px)}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:calc(100vh - 62px);overflow-y:auto}
 .logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;padding:6px 8px 14px;letter-spacing:-.01em}
 .logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:var(--shadow)}
 .ws-switch{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:9px;background:var(--card);padding:8px 10px;margin:2px 0 10px;font-weight:600;font-size:13px;cursor:pointer;box-shadow:var(--shadow-sm)}
@@ -79,7 +79,7 @@ table.t tr:hover td{background:#fafbff}
 .switch.off:after{right:auto;left:2px}
 .progress{height:8px;border-radius:999px;background:var(--muted);overflow:hidden}
 .progress i{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#4f46e5);border-radius:999px}
-.auth{min-height:100vh;background:linear-gradient(160deg,#eef2ff 0%,#f6f7f9 45%,#f6f7f9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth{min-height:calc(100vh - 62px);background:linear-gradient(160deg,#eef2ff 0%,#f6f7f9 45%,#f6f7f9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
 .auth .box{width:410px;display:flex;flex-direction:column;gap:16px}
 .auth .card{box-shadow:var(--shadow-lg);border-radius:14px;padding:26px}
 .empty{text-align:center;color:var(--muted-fg);padding:36px;border:1.5px dashed var(--border);border-radius:12px;font-size:13px;background:#fafbfc}
@@ -103,20 +103,20 @@ table.t tr:hover td{background:#fafbff}
 .wizard-foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px}
 
 /* ===== v3 overrides — dark sidebar + dark mode ===== */
-.sidebar{background:linear-gradient(180deg,#161b2e,#10131f);border-right:1px solid #232941}
-.sidebar .logo{color:#fff}
-.navgroup{color:#5d6480}
-.navitem{color:#a6adc5}
-.navitem svg{stroke:#6f7691}
-.navitem:hover{background:rgba(255,255,255,.06);color:#e6e9f4}
-.navitem:hover svg{stroke:#c3c9dd}
-.navitem.active{background:rgba(99,102,241,.22);color:#c7d2fe}
-.navitem.active svg{stroke:#a5b4fc}
-.ws-switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#e6e9f4;box-shadow:none}
-.ws-switch:hover{border-color:#6366f1}
-.ws-switch .chev{color:#8b92ad}
-.sidebar .foot{border-top-color:rgba(255,255,255,.1);color:#e6e9f4}
-.sidebar .foot .hint{color:#8b92ad}
+html[data-theme="dark"] .sidebar{background:linear-gradient(180deg,#161b2e,#10131f);border-right:1px solid #232941}
+html[data-theme="dark"] .sidebar .logo{color:#fff}
+html[data-theme="dark"] .navgroup{color:#5d6480}
+html[data-theme="dark"] .navitem{color:#a6adc5}
+html[data-theme="dark"] .navitem svg{stroke:#6f7691}
+html[data-theme="dark"] .navitem:hover{background:rgba(255,255,255,.06);color:#e6e9f4}
+html[data-theme="dark"] .navitem:hover svg{stroke:#c3c9dd}
+html[data-theme="dark"] .navitem.active{background:rgba(99,102,241,.22);color:#c7d2fe}
+html[data-theme="dark"] .navitem.active svg{stroke:#a5b4fc}
+html[data-theme="dark"] .ws-switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#e6e9f4;box-shadow:none}
+html[data-theme="dark"] .ws-switch:hover{border-color:#6366f1}
+html[data-theme="dark"] .ws-switch .chev{color:#8b92ad}
+html[data-theme="dark"] .sidebar .foot{border-top-color:rgba(255,255,255,.1);color:#e6e9f4}
+html[data-theme="dark"] .sidebar .foot .hint{color:#8b92ad}
 .theme-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted-fg);cursor:pointer;padding:0}
 .theme-btn:hover{color:var(--accent);border-color:var(--accent-border)}
 .theme-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -152,23 +152,86 @@ html[data-theme="dark"] [style*="#fafbff"]{background:#161c2a!important}
 /* dark-mode screen fixes */
 html[data-theme="dark"] .radio-row .dot{border-color:#4a5266}
 html[data-theme="dark"] .step.done .lbl{color:#4ade80}
+/* --- desktop window chrome (2026-07-26: MAUI Blazor Hybrid window, not a browser tab) --- */
+.winbar{display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;background:linear-gradient(#f2f3f6,#e9ebef);border-bottom:1px solid var(--border);user-select:none;flex:0 0 auto}
+.traffic{display:flex;gap:7px}
+.traffic i{width:11px;height:11px;border-radius:50%;display:block}
+.traffic .r{background:#ff5f57}.traffic .y{background:#febc2e}.traffic .g{background:#28c840}
+.wintitle{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted-fg);margin-right:46px}
+.menubar{display:flex;align-items:center;gap:17px;height:28px;padding:0 14px;background:var(--card);border-bottom:1px solid var(--border);font-size:12.5px;color:#4b5563;user-select:none;flex:0 0 auto}
+.menubar b{font-weight:700;color:var(--fg)}
+html[data-theme="dark"] .winbar{background:linear-gradient(#20242e,#1a1e27);border-color:#2a3145}
+html[data-theme="dark"] .menubar{background:#151a26;border-color:#2a3145;color:#98a1b3}
+
+/* ===== prototype kit (owner review 2026-07-26) — menus, tabs, dialogs, popovers ===== */
+.menubar{position:relative;z-index:120}
+.mb{position:relative}
+.mb>button{background:none;border:0;font:inherit;color:inherit;cursor:pointer;padding:3px 9px;border-radius:6px;line-height:1.6}
+.mb>button:hover{background:var(--muted)}
+.mb.open>button{background:var(--accent);color:#fff}
+.menu{position:absolute;top:calc(100% + 3px);left:0;min-width:236px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;font-size:13px;color:var(--fg)}
+.mb.open>.menu{display:block}
+.menu a,.menu .mi{display:flex;align-items:center;gap:10px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.menu a:hover,.menu .mi:not(.disabled):hover{background:var(--muted)}
+.menu .mi.disabled{color:var(--muted-fg);cursor:default}
+.menu .sep{height:1px;background:var(--border);margin:4px 2px}
+.menu .k{margin-left:auto;color:var(--muted-fg);font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.menu .grouplbl{padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)}
+
+/* popovers — row overflow menus, workspace switcher, anything anchored */
+.popwrap{position:relative;display:inline-block}
+.pop{position:absolute;top:calc(100% + 5px);right:0;min-width:210px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;z-index:180;font-size:13px;text-align:left;font-weight:400}
+.pop.open{display:block}
+.pop.left{right:auto;left:0}
+.pop a,.pop .mi{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.pop a:hover,.pop .mi:not(.disabled):hover{background:var(--muted)}
+.pop .mi.danger{color:var(--destructive)}
+.pop .mi.disabled{color:var(--muted-fg);cursor:default}
+.pop .sep{height:1px;background:var(--border);margin:4px 2px}
+.dots{border:0;background:none;color:var(--muted-fg);cursor:pointer;font-size:16px;line-height:1;padding:3px 7px;border-radius:6px}
+.dots:hover{background:var(--muted);color:var(--fg)}
+
+/* modal dialogs */
+.modal{position:fixed;inset:0;background:rgba(12,15,23,.5);display:none;align-items:center;justify-content:center;z-index:400;padding:28px}
+.modal.open{display:flex}
+.modal .sheet{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);width:min(700px,100%);max-height:84vh;overflow:auto;padding:22px}
+.modal .sheet.wide{width:min(960px,100%)}
+.modal .mhead{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.modal .mhead h3{font-size:16px;font-weight:680}
+.modal .mhead .sub{color:var(--muted-fg);font-size:12.5px;margin-top:2px}
+.modal .x{margin-left:auto;border:0;background:none;font-size:20px;line-height:1;color:var(--muted-fg);cursor:pointer;padding:0 4px}
+.modal .x:hover{color:var(--fg)}
+.modal .mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+
+/* tab panels — the tab strips were decorative; now they switch */
+.tab{user-select:none}
+.tabpanel{display:none}
+.tabpanel.active{display:block}
+
+/* 3 — fill the window instead of stranding half of it */
+.content{max-width:none !important}
+.content>*{max-width:1560px}
 </style>
 <script>(function(){try{if(localStorage.getItem('td-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}})();function tdTheme(){var r=document.documentElement,d=r.getAttribute('data-theme')==='dark';if(d)r.removeAttribute('data-theme');else r.setAttribute('data-theme','dark');try{localStorage.setItem('td-theme',d?'light':'dark')}catch(e){}}</script>
 </head>
 <body>
+<div class="winbar">
+  <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+  <div class="wintitle">TechieDesk</div>
+</div>
+<div class="menubar"><div class="mb"><button><b>TechieDesk</b></button><div class="menu"><div class="mi">About TechieDesk</div><div class="mi">Check for Updates&hellip;</div><div class="sep"></div><a href="admin-settings.html">Settings<span class="k">&#8984;,</span></a><a href="data-storage.html">Data &amp; Storage</a><a href="billing.html">Licence &amp; Account</a><div class="sep"></div><div class="mi">Quit TechieDesk<span class="k">&#8984;Q</span></div></div></div><div class="mb"><button>File</button><div class="menu"><div class="mi">New Workspace&hellip;<span class="k">&#8984;N</span></div><div class="mi">New Thread<span class="k">&#8984;T</span></div><div class="sep"></div><a href="document-library.html">Import Documents&hellip;<span class="k">&#8984;O</span></a><a href="connectors.html">Add a Connector&hellip;</a><div class="sep"></div><div class="mi">Export Thread as Markdown&hellip;</div><div class="mi">Reveal Data Folder in Finder</div></div></div><div class="mb"><button>Edit</button><div class="menu"><div class="mi disabled">Undo<span class="k">&#8984;Z</span></div><div class="mi disabled">Redo<span class="k">&#8679;&#8984;Z</span></div><div class="sep"></div><div class="mi">Cut<span class="k">&#8984;X</span></div><div class="mi">Copy<span class="k">&#8984;C</span></div><div class="mi">Paste<span class="k">&#8984;V</span></div><div class="sep"></div><div class="mi">Find in Thread&hellip;<span class="k">&#8984;F</span></div></div></div><div class="mb"><button>View</button><div class="menu"><div class="mi">Toggle Sidebar<span class="k">&#8984;\</span></div><div class="sep"></div><div class="grouplbl">Appearance</div><div class="mi" onclick="tdSetTheme('light')">Light</div><div class="mi" onclick="tdSetTheme('dark')">Dark</div><div class="mi" onclick="tdSetTheme('system')">Match System</div><div class="sep"></div><div class="mi">Zoom In<span class="k">&#8984;+</span></div><div class="mi">Zoom Out<span class="k">&#8984;&minus;</span></div><div class="mi">Actual Size<span class="k">&#8984;0</span></div><div class="mi">Enter Full Screen<span class="k">&#8963;&#8984;F</span></div></div></div><div class="mb"><button>Workspace</button><div class="menu"><a href="workspace-chat.html">Chat</a><a href="document-library.html">Documents</a><a href="connectors.html">Connectors</a><a href="agents.html">Agents</a><a href="automations.html">Automations</a><div class="sep"></div><a href="workspace-settings.html">Workspace Settings&hellip;</a><div class="sep"></div><div class="grouplbl">Switch to</div><a href="workspace-chat.html">Contracts</a><a href="workspace-chat.html">HR Docs</a><a href="workspace-chat.html">Legal Archive</a></div></div><div class="mb"><button>Window</button><div class="menu"><div class="mi">Minimise<span class="k">&#8984;M</span></div><div class="mi">Zoom</div><div class="sep"></div><div class="mi">Bring All to Front</div></div></div><div class="mb"><button>Help</button><div class="menu"><div class="mi">TechieDesk Help<span class="k">&#8984;?</span></div><div class="mi">Keyboard Shortcuts</div><div class="sep"></div><a href="support.html">Support&hellip;</a><a href="admin-events.html">Event Log</a><div class="mi">Reveal Logs in Finder</div></div></div></div>
 <button class="theme-btn" onclick="tdTheme()" title="Toggle dark mode"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></button>
 <div class="auth">
   <div class="box wide">
     <a class="logo" href="login.html" style="justify-content:center"><span class="mark">TD</span> TechieDesk</a>
     <div style="text-align:center;color:var(--muted-fg);font-size:13px;margin-top:-10px">First-run setup</div>
     <div class="card">
-      <div class="progress"><i style="width:40%"></i></div>
+      <div class="progress"><i style="width:50%"></i></div>
       <div class="steps">
         <div class="step done"><span class="node">✓</span><span class="lbl">Defaults</span></div>
         <div class="step current"><span class="node">2</span><span class="lbl">AI Provider</span></div>
-        <div class="step"><span class="node">3</span><span class="lbl">AppManager</span></div>
-        <div class="step"><span class="node">4</span><span class="lbl">Admin account</span></div>
-        <div class="step"><span class="node">5</span><span class="lbl">Workspace</span></div>
+        <div class="step"><span class="node">3</span><span class="lbl">Licence <span class="hint">(optional)</span></span></div>
+        <div class="step"><span class="node">4</span><span class="lbl">Workspace</span></div>
       </div>
       <div class="alert green" style="margin-bottom:10px">Zero-config defaults applied — offline embeddings (BGE-M3) + SqliteVec vector store. No external services needed.</div>
       <div class="alert green" style="margin-bottom:14px">Ollama detected at localhost:11434 (3 models).</div>
@@ -185,12 +248,49 @@ html[data-theme="dark"] .step.done .lbl{color:#4ade80}
       <div class="radio-row"><span class="dot"></span> OpenAI-compatible endpoint…</div>
       <div class="radio-row"><span class="dot"></span> Skip — chat later, embedded-only for now</div>
       <div class="wizard-foot">
-        <a class="btn outline" href="login.html">Back</a>
+        <a class="btn outline" href="#">Back</a>
         <a class="btn" href="workspace-chat.html">Continue</a>
       </div>
     </div>
-    <div class="hint" style="text-align:center">Step 3 connects AppManager (licensing &amp; accounts) — or choose offline single-user mode.</div>
+    <div class="hint" style="text-align:center">Step 3 is optional — it activates a licence through AppManager. Skipping it leaves the app fully usable on your own documents.</div>
   </div>
 </div>
+<script>
+/* prototype kit — menus, popovers, tabs, dialogs (owner review 2026-07-26) */
+(function(){
+  function closeAll(except){
+    document.querySelectorAll('.mb.open').forEach(function(m){ if(m!==except) m.classList.remove('open'); });
+    document.querySelectorAll('.pop.open').forEach(function(p){ if(p!==except) p.classList.remove('open'); });
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var trigger = t.closest('.mb>button');
+    if(trigger){ var mb = trigger.parentElement; var was = mb.classList.contains('open'); closeAll(); if(!was) mb.classList.add('open'); e.preventDefault(); return; }
+    var popBtn = t.closest('[data-pop]');
+    if(popBtn){ var p = document.getElementById(popBtn.getAttribute('data-pop')); var open = p && p.classList.contains('open'); closeAll(); if(p && !open) p.classList.add('open'); e.preventDefault(); return; }
+    if(t.closest('.menu') || t.closest('.pop')){ if(!t.closest('a')) { closeAll(); } return; }
+    closeAll();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeAll(); document.querySelectorAll('.modal.open').forEach(function(m){ m.classList.remove('open'); }); }
+  });
+  /* tabs: .tab[data-tab] switches the sibling [data-panel] of the same name */
+  document.addEventListener('click', function(e){
+    var tab = e.target.closest('.tab[data-tab]');
+    if(!tab) return;
+    var strip = tab.closest('.tabs');
+    var scope = strip.closest('.content') || document;
+    strip.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+    tab.classList.add('active');
+    var want = tab.getAttribute('data-tab');
+    scope.querySelectorAll('[data-panel]').forEach(function(p){
+      p.classList.toggle('active', p.getAttribute('data-panel') === want);
+    });
+  });
+})();
+function tdOpen(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
+function tdClose(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+function tdSetTheme(m){var r=document.documentElement;if(m==='system'){try{localStorage.removeItem('td-theme')}catch(e){}r.removeAttribute('data-theme');if(window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)r.setAttribute('data-theme','dark');return}if(m==='dark')r.setAttribute('data-theme','dark');else r.removeAttribute('data-theme');try{localStorage.setItem('td-theme',m)}catch(e){}}
+</script>
 </body>
 </html>
