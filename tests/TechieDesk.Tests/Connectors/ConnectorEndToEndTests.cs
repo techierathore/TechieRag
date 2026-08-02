@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
@@ -237,11 +239,83 @@ public sealed class ConnectorEndToEndTests : IAsyncDisposable
         await using var harness = await Harness.CreateAsync(directory);
 
         var connectorId = await harness.SaveConnectorAsync(Token, projectPath: "techie/not-here");
-        var failure = await harness.Registry.TestAsync(connectorId);
+        // REQ-UI-056: TestAsync now returns codes; ToInvariantString is the English rendering, which
+        // is what a credential-leak assertion has to look at.
+        var failure = (await harness.Registry.TestAsync(connectorId))?.ToInvariantString();
 
         Assert.NotNull(failure);
         Assert.Contains("techie/not-here", failure, StringComparison.Ordinal);
         Assert.DoesNotContain(Token, failure, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// REQ-UI-057: loopback hosts built at the same moment each take a port of their own, serve on
+    /// it, and hand it straight back when disposed.
+    /// </summary>
+    /// <remarks>
+    /// <para>The flake this replaces was a fixture that bound a port some other socket had claimed
+    /// while it was not looking — <c>HttpListenerException: Address already in use</c> — landing on a
+    /// different test each time and passing on re-run. That is the failure mode that teaches a team
+    /// to re-run instead of read, so the fixture is now asserted directly rather than trusted.</para>
+    /// <para>Re-binding every port AFTER disposal is the half that cannot be argued about: a leaked
+    /// listener holds its port permanently, so a leak reddens this and a rival test merely
+    /// momentarily borrowing a freed port does not.</para>
+    /// </remarks>
+    [Fact]
+    public async Task ConcurrentLoopbackHostsTakeDistinctPortsAndReleaseThemOnDisposal()
+    {
+        const int HostCount = 24;
+
+        var hosts = await Task.WhenAll(Enumerable.Range(0, HostCount)
+            .Select(_ => Task.Run(() => new FakeGitHubHost())));
+        var ports = hosts.Select(host => new Uri(host.ApiBaseUrl).Port).ToList();
+
+        try
+        {
+            Assert.Equal(HostCount, ports.Distinct().Count());
+
+            // Bound is not the same as serving; every one of them answers.
+            using var client = new HttpClient();
+            foreach (var host in hosts)
+            {
+                using var response = await client.GetAsync($"{host.ApiBaseUrl}/repos/{host.ProjectPath}");
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            }
+        }
+        finally
+        {
+            Array.ForEach(hosts, host => host.Dispose());
+        }
+
+        Assert.All(ports, port => Assert.True(
+            IsFreeAgain(port), $"port {port} was still held after the host that owned it was disposed"));
+    }
+
+    /// <summary>Reports whether a loopback port can be bound again.</summary>
+    /// <param name="port">The port a disposed host used to own.</param>
+    /// <returns>True once the port binds.</returns>
+    /// <remarks>
+    /// A leaked listener holds its port for the life of the process, so retrying separates a real
+    /// leak from another test in this assembly having been handed the freed port for a moment.
+    /// </remarks>
+    private static bool IsFreeAgain(int port)
+    {
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            try
+            {
+                var reclaimed = new TcpListener(IPAddress.Loopback, port);
+                reclaimed.Start();
+                reclaimed.Stop();
+                return true;
+            }
+            catch (SocketException)
+            {
+                Thread.Sleep(20 * attempt);
+            }
+        }
+
+        return false;
     }
 
     /// <summary>The production service graph, over one database file and one loopback host.</summary>

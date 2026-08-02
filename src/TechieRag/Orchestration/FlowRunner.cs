@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
@@ -101,9 +102,14 @@ public sealed class FlowRunner
 
         if (!validation.IsValid)
         {
+            // The argument is the joined ENGLISH issue text, but a consumer never has to use it:
+            // every error is also on FlowRunResult.ValidationIssues with its own stable
+            // FlowValidationCodes value, which is the better thing to translate and join (REQ-RAG-050).
             return run.Fail(
-                "The flow did not validate, so nothing was run: "
-                + string.Join("; ", validation.Errors.Select(issue => issue.Message)),
+                FlowMessage.Create(
+                    FlowMessageCodes.FlowNotValidated,
+                    "The flow did not validate, so nothing was run: {0}",
+                    string.Join("; ", validation.Errors.Select(issue => issue.Message))),
                 new FlowState(input),
                 validation.Errors);
         }
@@ -120,6 +126,17 @@ public sealed class FlowRunner
 
                 if (run.StepsExecuted >= flow.MaxSteps)
                 {
+                    var budgetContent = FlowMessage.Create(
+                        FlowMessageCodes.StepBudgetExhausted,
+                        "The flow reached its budget of {0} steps and stopped before running '{1}'.",
+                        flow.MaxSteps.ToString(CultureInfo.InvariantCulture),
+                        current.DisplayName);
+
+                    var budgetFailure = FlowMessage.Create(
+                        FlowMessageCodes.StepBudgetReached,
+                        "Step budget of {0} exhausted.",
+                        flow.MaxSteps.ToString(CultureInfo.InvariantCulture));
+
                     run.Report(new FlowStep
                     {
                         RunId = run.RunId,
@@ -130,8 +147,10 @@ public sealed class FlowRunner
                         NodeKind = current.Kind,
                         Depth = depth,
                         IsSuccess = false,
-                        Content = $"The flow reached its budget of {flow.MaxSteps} steps and stopped before running '{current.DisplayName}'.",
-                        ErrorMessage = $"Step budget of {flow.MaxSteps} exhausted."
+                        Content = budgetContent.Text,
+                        ContentMessage = budgetContent,
+                        ErrorMessage = budgetFailure.Text,
+                        FailureMessage = budgetFailure
                     });
 
                     return run.Finish(FlowRunOutcome.StepBudgetExhausted, state, current.Id, null);
@@ -164,8 +183,10 @@ public sealed class FlowRunner
                     NodeKind = current.Kind,
                     Depth = depth,
                     Content = step.Output,
+                    ContentMessage = step.OutputMessage,
                     IsSuccess = step.IsSuccess,
-                    ErrorMessage = step.FailureReason
+                    ErrorMessage = step.FailureReason,
+                    FailureMessage = step.FailureMessage
                 });
 
                 if (current.Kind == FlowNodeKind.Terminal)
@@ -284,9 +305,18 @@ public sealed class FlowRunner
         var agent = await runtime.Agents.ResolveAgentAsync(node.AgentId!, cancellationToken).ConfigureAwait(false);
         if (agent is null)
         {
+            var unavailable = FlowMessage.Create(
+                FlowMessageCodes.AgentUnavailable,
+                "Agent '{0}' is not available on this host.",
+                node.AgentId ?? string.Empty);
+
+            var unresolvable = FlowMessage.Create(
+                FlowMessageCodes.AgentUnresolvable,
+                "Agent '{0}' could not be resolved.",
+                node.AgentId ?? string.Empty);
+
             return new NodeOutcome(
-                $"Agent '{node.AgentId}' is not available on this host.", false,
-                $"Agent '{node.AgentId}' could not be resolved.", null);
+                unavailable.Text, false, unresolvable.Text, null, unavailable, unresolvable);
         }
 
         var messages = BuildConversation(node, agent, state, pending);
@@ -324,7 +354,13 @@ public sealed class FlowRunner
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Agent node {NodeId} failed", node.Id);
-            return new NodeOutcome($"The agent step failed: {ex.Message}", false, ex.Message, null);
+
+            // The failure reason stays the raw exception text — a runtime detail no resource file
+            // can hold — but the sentence AROUND it is the library's, so it carries a code.
+            var failed = FlowMessage.Create(
+                FlowMessageCodes.AgentStepFailed, "The agent step failed: {0}", ex.Message);
+
+            return new NodeOutcome(failed.Text, false, ex.Message, null, failed, null);
         }
     }
 
@@ -340,9 +376,16 @@ public sealed class FlowRunner
     {
         if (runtime.Tools is null)
         {
+            var unavailable = FlowMessage.Create(
+                FlowMessageCodes.ToolHandlerMissing,
+                "Tool '{0}' is not available: this runtime has no tool handler.",
+                node.ToolName ?? string.Empty);
+
+            var noHandler = FlowMessage.Create(
+                FlowMessageCodes.NoToolHandlerConfigured, "No tool handler is configured.");
+
             return new NodeOutcome(
-                $"Tool '{node.ToolName}' is not available: this runtime has no tool handler.", false,
-                "No tool handler is configured.", null);
+                unavailable.Text, false, noHandler.Text, null, unavailable, noHandler);
         }
 
         var arguments = state.Expand(node.ToolArgumentsJson)
@@ -355,11 +398,22 @@ public sealed class FlowRunner
             ArgumentsJson = arguments
         };
 
+        // The refusal is captured here rather than read back off the handler because the tool result
+        // itself has nowhere to carry a code: ToolResult.ErrorMessage is a string, and it is the
+        // very text a host paints under "Blocked by …" (REQ-RAG-050). One call, one callback, so the
+        // capture is sequential and cannot race.
+        GuardrailVerdict? refusal = null;
+
         var guarded = new GuardedToolHandler(
             runtime.Tools, chain, node, state.Variables,
-            (verdict, toolCall) => ReportToolBlock(node, verdict, toolCall, run));
+            (verdict, toolCall) =>
+            {
+                refusal = verdict;
+                ReportToolBlock(node, verdict, toolCall, run);
+            });
 
         var result = await guarded.ExecuteToolAsync(call, cancellationToken).ConfigureAwait(false);
+        var failure = refusal is null ? null : GuardedToolHandler.RefusalMessage(refusal);
 
         run.Report(new FlowStep
         {
@@ -374,10 +428,11 @@ public sealed class FlowRunner
             ToolArgumentsJson = arguments,
             Content = result.Content,
             IsSuccess = result.IsSuccess,
-            ErrorMessage = result.ErrorMessage
+            ErrorMessage = result.ErrorMessage,
+            FailureMessage = failure
         });
 
-        return new NodeOutcome(result.Content, result.IsSuccess, result.ErrorMessage, null);
+        return new NodeOutcome(result.Content, result.IsSuccess, result.ErrorMessage, null, null, failure);
     }
 
     /// <summary>
@@ -459,6 +514,19 @@ public sealed class FlowRunner
             ? run.TranscriptBefore(node.Id, flow)
             : Array.Empty<ChatMessage>();
 
+        var summary = carried.Count == 0
+            ? FlowMessage.Create(
+                FlowMessageCodes.HandoffNoVariables,
+                "{0}: {1} characters, no variables carried",
+                handoff.ContextMode.ToString(),
+                input.Length.ToString(CultureInfo.InvariantCulture))
+            : FlowMessage.Create(
+                FlowMessageCodes.HandoffCarryingVariables,
+                "{0}: {1} characters, carrying {2}",
+                handoff.ContextMode.ToString(),
+                input.Length.ToString(CultureInfo.InvariantCulture),
+                string.Join(", ", carried.Keys));
+
         run.Report(new FlowStep
         {
             RunId = run.RunId,
@@ -470,8 +538,8 @@ public sealed class FlowRunner
             FromNodeId = node.Id,
             ToNodeId = handoff.TargetNodeId,
             Depth = depth,
-            Content = $"{handoff.ContextMode}: {input.Length} characters"
-                + (carried.Count == 0 ? ", no variables carried" : $", carrying {string.Join(", ", carried.Keys)}")
+            Content = summary.Text,
+            ContentMessage = summary
         });
 
         return new PendingHandoff(handoff, input, note, transcript);
@@ -514,6 +582,9 @@ public sealed class FlowRunner
             var next = flow.FindNode(edge.ToNodeId);
             if (next is null) continue;
 
+            var routeLabel = FlowMessage.Create(
+                FlowMessageCodes.RouteToNode, "{0} to {1}", node.DisplayName, next.DisplayName);
+
             run.Report(new FlowStep
             {
                 RunId = run.RunId,
@@ -526,7 +597,11 @@ public sealed class FlowRunner
                 ToNodeId = next.Id,
                 EdgeId = edge.Id,
                 Depth = depth,
-                Content = edge.Label ?? $"{node.DisplayName} to {next.DisplayName}"
+                Content = edge.Label ?? routeLabel.Text,
+
+                // Only the generated label carries a code. An author's own edge label is their text
+                // in their language and must not be treated as a string this library owns.
+                ContentMessage = edge.Label is null ? routeLabel : null
             });
 
             return next;
@@ -539,7 +614,14 @@ public sealed class FlowRunner
     /// <param name="node">The node that was refused.</param>
     /// <param name="verdict">The refusal.</param>
     /// <param name="run">The accumulator collecting the trace.</param>
-    private void ReportBlock(FlowNode node, GuardrailVerdict verdict, RunAccumulator run) =>
+    private void ReportBlock(FlowNode node, GuardrailVerdict verdict, RunAccumulator run)
+    {
+        var framing = FlowMessage.Create(
+            FlowMessageCodes.NodeBlockedByGuardrail,
+            "Blocked by guardrail '{0}' at {1}.",
+            verdict.GuardrailId ?? string.Empty,
+            verdict.Stage.ToString());
+
         run.Report(new FlowStep
         {
             RunId = run.RunId,
@@ -553,15 +635,27 @@ public sealed class FlowRunner
             Depth = depth,
             IsSuccess = false,
             Content = verdict.Reason,
-            ErrorMessage = $"Blocked by guardrail '{verdict.GuardrailId}' at {verdict.Stage}."
+            ContentMessage = verdict.Message,
+            ErrorMessage = framing.Text,
+            FailureMessage = framing
         });
+    }
 
     /// <summary>Records a guardrail refusal of one tool call, which does not stop the run.</summary>
     /// <param name="node">The node whose agent asked for the tool.</param>
     /// <param name="verdict">The refusal.</param>
     /// <param name="toolCall">The call that was refused.</param>
     /// <param name="run">The accumulator collecting the trace.</param>
-    private void ReportToolBlock(FlowNode node, GuardrailVerdict verdict, ToolCall toolCall, RunAccumulator run) =>
+    private void ReportToolBlock(FlowNode node, GuardrailVerdict verdict, ToolCall toolCall, RunAccumulator run)
+    {
+        // The row a user actually reads when a flow's guardrail refuses a tool call: the title comes
+        // from the guardrail id, and THIS is the detail under it (REQ-RAG-050 / BRD-91).
+        var framing = FlowMessage.Create(
+            FlowMessageCodes.ToolCallBlockedByGuardrail,
+            "Blocked by guardrail '{0}' before '{1}' ran.",
+            verdict.GuardrailId ?? string.Empty,
+            toolCall.Name);
+
         run.Report(new FlowStep
         {
             RunId = run.RunId,
@@ -577,21 +671,41 @@ public sealed class FlowRunner
             Depth = depth,
             IsSuccess = false,
             Content = verdict.Reason,
-            ErrorMessage = $"Blocked by guardrail '{verdict.GuardrailId}' before '{toolCall.Name}' ran."
+            ContentMessage = verdict.Message,
+            ErrorMessage = framing.Text,
+            FailureMessage = framing
         });
+    }
 
     /// <summary>What one node produced, or the guardrail that refused it.</summary>
     /// <param name="Output">The node's output text.</param>
     /// <param name="IsSuccess">Whether the node did what it was asked.</param>
     /// <param name="FailureReason">Why it did not, when it did not.</param>
     /// <param name="Blocked">The refusal, when a guardrail stopped it.</param>
-    private sealed record NodeOutcome(string Output, bool IsSuccess, string? FailureReason, GuardrailVerdict? Blocked)
+    /// <param name="OutputMessage">The localizable form of <paramref name="Output"/>, when the runner wrote it (REQ-RAG-050).</param>
+    /// <param name="FailureMessage">The localizable form of <paramref name="FailureReason"/> (REQ-RAG-050).</param>
+    private sealed record NodeOutcome(
+        string Output,
+        bool IsSuccess,
+        string? FailureReason,
+        GuardrailVerdict? Blocked,
+        FlowMessage? OutputMessage = null,
+        FlowMessage? FailureMessage = null)
     {
+        /// <summary>The stand-in output for a refusal that named no reason.</summary>
+        private static readonly FlowMessage NoReasonGiven = FlowMessage.Create(
+            FlowMessageCodes.BlockedByGuardrail, "Blocked by a guardrail.");
+
         /// <summary>Builds an outcome representing a guardrail refusal.</summary>
         /// <param name="verdict">The refusal.</param>
         /// <returns>The blocked outcome.</returns>
         public static NodeOutcome Block(GuardrailVerdict verdict) =>
-            new(verdict.Reason ?? "Blocked by a guardrail.", false, verdict.Reason, verdict);
+            new(verdict.Reason ?? NoReasonGiven.Text,
+                false,
+                verdict.Reason,
+                verdict,
+                verdict.Message ?? (verdict.Reason is null ? NoReasonGiven : null),
+                verdict.Message);
     }
 
     /// <summary>The context a handoff hands to the receiving agent node.</summary>
@@ -729,15 +843,16 @@ public sealed class FlowRunner
             StepsExecuted = StepsExecuted,
             BlockedByGuardrailId = verdict.GuardrailId,
             BlockReason = verdict.Reason,
+            BlockMessage = verdict.Message,
             Usage = usage
         };
 
         /// <summary>Builds the result for a flow that never started.</summary>
-        /// <param name="reason">Why it could not run.</param>
+        /// <param name="reason">Why it could not run, as a code plus its arguments.</param>
         /// <param name="state">The state it would have started from.</param>
         /// <param name="issues">The validation errors.</param>
         /// <returns>The run result.</returns>
-        public FlowRunResult Fail(string reason, FlowState state, IReadOnlyList<FlowValidationIssue> issues) => new()
+        public FlowRunResult Fail(FlowMessage reason, FlowState state, IReadOnlyList<FlowValidationIssue> issues) => new()
         {
             RunId = RunId,
             FlowId = flowId,
@@ -747,7 +862,8 @@ public sealed class FlowRunner
             VisitedNodeIds = visited,
             Variables = new Dictionary<string, string>(state.Variables, StringComparer.Ordinal),
             StepsExecuted = StepsExecuted,
-            FailureReason = reason,
+            FailureReason = reason.Text,
+            FailureMessage = reason,
             ValidationIssues = issues,
             Usage = usage
         };

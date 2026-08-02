@@ -50,20 +50,19 @@ public sealed class DatabaseMaintenanceJobHandler : IScheduledJobHandler
     public string JobKind => Kind;
 
     /// <inheritdoc />
-    public string DisplayName => "Local database maintenance";
+    public string DisplayNameKey => "JobKindMaintenanceName";
 
     /// <inheritdoc />
-    public string Description =>
-        "Compacts TechieDesk's local databases so deleted documents and chunks give their disk space back.";
+    public string DescriptionKey => "JobKindMaintenanceDescription";
 
     /// <inheritdoc />
-    public string DescribeAction(string? payload) => "Compact the local databases";
+    public JobMessage DescribeAction(string? payload) => JobMessage.Of("JobKindMaintenanceAction");
 
     /// <inheritdoc />
-    public string? ValidatePayload(string? payload) =>
+    public JobMessage? ValidatePayload(string? payload) =>
         Directory.Exists(dataDirectory)
             ? null
-            : $"The data directory {dataDirectory} does not exist, so there is nothing to compact.";
+            : JobMessage.Of("MaintenanceDataDirectoryMissingForSave", dataDirectory);
 
     /// <inheritdoc />
     public async Task<JobRunResult> RunAsync(JobRunContext context, CancellationToken cancellationToken)
@@ -72,11 +71,16 @@ public sealed class DatabaseMaintenanceJobHandler : IScheduledJobHandler
 
         if (!Directory.Exists(dataDirectory))
         {
-            return JobRunResult.Failed($"The data directory {dataDirectory} does not exist.");
+            return JobRunResult.FailedWith("MaintenanceDataDirectoryMissing", dataDirectory);
         }
 
         var databases = Directory.GetFiles(dataDirectory, "*.db");
-        context.Progress.Report(0, databases.Length, $"Compacting {databases.Length} database(s)");
+        context.Progress.Report(
+            0,
+            databases.Length,
+            JobMessage.Of(
+                databases.Length == 1 ? "MaintenanceCompactingOne" : "MaintenanceCompactingMany",
+                databases.Length));
 
         var reclaimed = 0L;
         foreach (var path in databases)
@@ -92,17 +96,27 @@ public sealed class DatabaseMaintenanceJobHandler : IScheduledJobHandler
                 reclaimed += Math.Max(0, before - after);
 
                 context.Progress.RecordItem(
-                    RunItemStatus.Processed, name, name, $"{FormatBytes(before)} → {FormatBytes(after)}");
+                    RunItemStatus.Processed,
+                    name,
+                    name,
+                    JobMessage.Of("MaintenanceItemCompacted", FormatBytes(before), FormatBytes(after)));
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
                 // Named, kept, and not fatal to the run — the whole point of BRD-65's per-item shape.
                 logger.LogWarning(exception, "Could not compact {Database}", name);
-                context.Progress.RecordItem(RunItemStatus.Failed, name, name, exception.Message);
+                // Verbatim: the words are SQLite's, not ours, so there is no code to name them by.
+                context.Progress.RecordItem(
+                    RunItemStatus.Failed, name, name, JobMessage.Text(exception.Message));
             }
         }
 
-        return new JobRunResult($"{databases.Length} database(s) · {FormatBytes(reclaimed)} reclaimed");
+        return new JobRunResult(
+            JobMessage
+                .Of(
+                    databases.Length == 1 ? "MaintenanceDetailOneDatabase" : "MaintenanceDetailDatabases",
+                    databases.Length)
+                .Then("MaintenanceDetailReclaimed", FormatBytes(reclaimed)));
     }
 
     private static async Task CompactAsync(string path, CancellationToken cancellationToken)

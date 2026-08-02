@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using TechieDesk.Services.Files;
+using TechieDesk.Services.Localization;
 using TechieDesk.Services.Threads;
+using TechieDesk.Tests.Support;
 using Xunit;
 
 namespace TechieDesk.Tests.Files;
@@ -18,9 +20,16 @@ public sealed class FileSaveRegistrationTests
     [Fact]
     public void ExportServiceResolvesFromTheHeadRegistrations()
     {
+        using var resources = new ResourceHarness("en");
         var services = new ServiceCollection();
         services.AddTechieDeskFileSave();
         services.AddSingleton<ThreadExporter>();
+
+        // REQ-UI-055: the export outcome is toasted, so the service resolves a LocalizeText. The
+        // head registers it (AddTechieDeskScheduling / AddTechieDeskWebIngestion both TryAdd it);
+        // registering it here keeps this test a statement about ORDERING rather than about which
+        // extension method happened to run first.
+        services.AddSingleton(resources.Localize);
         services.AddSingleton<ThreadExportService>();
 
         using var provider = services.BuildServiceProvider();

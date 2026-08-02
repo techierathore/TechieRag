@@ -42,7 +42,8 @@ public sealed class JobRunnerTests
         harness.Handler.Behaviour = (context, _) =>
         {
             context.Progress.RecordItem(RunItemStatus.Processed, "1", "one");
-            context.Progress.RecordItem(RunItemStatus.Failed, "2", "two", "the source returned 403");
+            context.Progress.RecordItem(
+                RunItemStatus.Failed, "2", "two", JobMessage.Text("the source returned 403"));
             return Task.FromResult(JobRunResult.Completed);
         };
 
@@ -59,7 +60,11 @@ public sealed class JobRunnerTests
         var harness = new Harness();
         harness.Handler.Behaviour = (context, _) =>
         {
-            context.Progress.RecordItem(RunItemStatus.Failed, "msg-9", "Renewal notice", "attachment too large");
+            context.Progress.RecordItem(
+                RunItemStatus.Failed,
+                "msg-9",
+                "Renewal notice",
+                JobMessage.Text("attachment too large"));
             return Task.FromResult(JobRunResult.Completed);
         };
 
@@ -94,7 +99,7 @@ public sealed class JobRunnerTests
     {
         var harness = new Harness();
         harness.Handler.Behaviour = (_, _) =>
-            Task.FromResult(JobRunResult.Failed("the connector is not configured"));
+            Task.FromResult(JobRunResult.Failed(JobMessage.Text("the connector is not configured")));
 
         var run = await harness.RunAsync();
 
@@ -140,7 +145,7 @@ public sealed class JobRunnerTests
         var snapshots = new List<JobProgressSnapshot>();
         harness.Handler.Behaviour = (context, _) =>
         {
-            context.Progress.Report(0, 3, "starting");
+            context.Progress.Report(0, 3, JobMessage.Text("starting"));
             context.Progress.RecordItem(RunItemStatus.Processed, "1", "one");
             context.Progress.RecordItem(RunItemStatus.Processed, "2", "two");
             return Task.FromResult(JobRunResult.Completed);
@@ -149,7 +154,7 @@ public sealed class JobRunnerTests
         await harness.Runner.RunOnceAsync("Job", "Test", null, snapshots.Add, CancellationToken.None);
 
         Assert.Equal(3, snapshots.Count);
-        Assert.Equal("starting", snapshots[0].Message);
+        Assert.Equal("starting", snapshots[0].Message?.ToInvariantString());
         Assert.Equal(3, snapshots[^1].Total);
         Assert.Equal(2, snapshots[^1].Processed);
     }
@@ -182,7 +187,8 @@ public sealed class JobRunnerTests
 
             for (var index = 0; index < 10; index++)
             {
-                context.Progress.RecordItem(RunItemStatus.Failed, $"f{index}", $"failure {index}", "broken");
+                context.Progress.RecordItem(
+                    RunItemStatus.Failed, $"f{index}", $"failure {index}", JobMessage.Text("broken"));
             }
 
             return Task.FromResult(JobRunResult.Completed);

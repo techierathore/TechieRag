@@ -101,7 +101,7 @@ public sealed class ObservedConnector : IDataConnector
     public async Task<ConnectorPage> ListAsync(
         ConnectorListRequest request, CancellationToken cancellationToken = default)
     {
-        Report($"Listing items in {SourceName}…");
+        Report(JobMessage.Of("ConnectorProgressListing", SourceName));
 
         var page = await inner.ListAsync(request, cancellationToken).ConfigureAwait(false);
 
@@ -115,10 +115,15 @@ public sealed class ObservedConnector : IDataConnector
         // here puts them on screen at the moment they happen.
         foreach (var failure in page.Failures ?? [])
         {
-            Record(RunItemStatus.Failed, failure.ItemId, failure.ItemName, failure.Reason);
+            // The library's words, carried through verbatim — see ConnectorSetupException.ReasonFor.
+            Record(
+                RunItemStatus.Failed,
+                failure.ItemId,
+                failure.ItemName,
+                JobMessage.Text(failure.Reason));
         }
 
-        Report($"Listed {ListedCount} item(s) in {SourceName}");
+        Report(JobMessage.Of("ConnectorProgressListed", ListedCount, SourceName));
         return page;
     }
 
@@ -127,7 +132,7 @@ public sealed class ObservedConnector : IDataConnector
         ConnectorItem item, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
-        Report($"Reading {item.Name}");
+        Report(JobMessage.Of("ConnectorProgressReading", item.Name));
 
         var document = await FetchInnerAsync(item, cancellationToken).ConfigureAwait(false);
         await IngestAsync(item, document, cancellationToken).ConfigureAwait(false);
@@ -159,7 +164,7 @@ public sealed class ObservedConnector : IDataConnector
         }
         catch (Exception exception)
         {
-            Record(RunItemStatus.Failed, item.Id, item.Name, exception.Message);
+            Record(RunItemStatus.Failed, item.Id, item.Name, ConnectorSetupException.ReasonFor(exception));
             throw;
         }
     }
@@ -187,7 +192,7 @@ public sealed class ObservedConnector : IDataConnector
         {
             // A sink that cannot take this one document costs this one document. Rethrowing keeps the
             // runner's own failure list and circuit breaker in step with what the screen was told.
-            Record(RunItemStatus.Failed, item.Id, item.Name, exception.Message);
+            Record(RunItemStatus.Failed, item.Id, item.Name, ConnectorSetupException.ReasonFor(exception));
             throw;
         }
 
@@ -207,7 +212,7 @@ public sealed class ObservedConnector : IDataConnector
         }
 
         Record(RunItemStatus.Processed, item.Id, item.Name, outcome.Reason);
-        Report($"Ingested {item.Name} ({IngestedCount} of {ListedCount} listed)");
+        Report(JobMessage.Of("ConnectorProgressIngested", item.Name, IngestedCount, ListedCount));
     }
 
     /// <summary>Records one item's result, once.</summary>
@@ -215,7 +220,7 @@ public sealed class ObservedConnector : IDataConnector
     /// <param name="itemId">The source's identifier for the item.</param>
     /// <param name="itemName">The human-facing name.</param>
     /// <param name="reason">Why, in operator terms.</param>
-    private void Record(RunItemStatus status, string itemId, string itemName, string? reason)
+    private void Record(RunItemStatus status, string itemId, string itemName, JobMessage? reason)
     {
         lock (gate)
         {
@@ -230,7 +235,7 @@ public sealed class ObservedConnector : IDataConnector
 
     /// <summary>Pushes the current counts and a status line to whoever is watching.</summary>
     /// <param name="message">What is happening right now, in plain language.</param>
-    private void Report(string message)
+    private void Report(JobMessage message)
     {
         int done;
         int total;

@@ -1,4 +1,5 @@
 using TechieDesk.Services.Files;
+using TechieDesk.Services.Localization;
 using TechieRag.Models;
 
 namespace TechieDesk.Services.Threads;
@@ -23,20 +24,31 @@ public sealed class ThreadExportService
 {
     private readonly ThreadExporter exporter;
     private readonly IFileSaveService fileSaveService;
+    private readonly LocalizeText localize;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ThreadExportService"/> class.
     /// </summary>
     /// <param name="exporter">The serializer that renders a thread to Markdown or JSON.</param>
     /// <param name="fileSaveService">The platform save panel that writes the file.</param>
+    /// <param name="localize">Resolves the outcome sentence the chat screen toasts (REQ-UI-055).</param>
     /// <exception cref="ArgumentNullException">Thrown when any dependency is null.</exception>
-    public ThreadExportService(ThreadExporter exporter, IFileSaveService fileSaveService)
+    /// <remarks>
+    /// REQ-UI-055 / BRD-91: <see cref="ThreadExportOutcome.Message"/> goes straight into a toast
+    /// body, so the five sentences below used to be the only English on an otherwise Hindi chat
+    /// screen. The FORMAT names ("Markdown", "JSON") and the file path stay verbatim inside the
+    /// translated sentence — they name a serialization and a real location on disk.
+    /// </remarks>
+    public ThreadExportService(
+        ThreadExporter exporter, IFileSaveService fileSaveService, LocalizeText localize)
     {
         ArgumentNullException.ThrowIfNull(exporter);
         ArgumentNullException.ThrowIfNull(fileSaveService);
+        ArgumentNullException.ThrowIfNull(localize);
 
         this.exporter = exporter;
         this.fileSaveService = fileSaveService;
+        this.localize = localize;
     }
 
     /// <summary>
@@ -77,7 +89,7 @@ public sealed class ThreadExportService
         }
         catch (Exception ex)
         {
-            return Failure($"Export failed: {ex.Message}");
+            return Failure(localize("ChatExportFailedDetail", ex.Message));
         }
 
         if (result.Status == FileSaveStatus.Cancelled)
@@ -87,7 +99,7 @@ public sealed class ThreadExportService
 
         if (result.Status == FileSaveStatus.Failed)
         {
-            return Failure(result.ErrorMessage ?? "The export could not be saved.");
+            return Failure(result.ErrorMessage ?? localize("ChatExportNotSaved"));
         }
 
         return Confirm(thread, result, isMarkdown);
@@ -96,17 +108,17 @@ public sealed class ThreadExportService
     /// <summary>
     /// Downgrades a claimed save to a failure unless a non-empty file really exists at the path.
     /// </summary>
-    private static ThreadExportOutcome Confirm(ConversationThread thread, FileSaveResult result, bool isMarkdown)
+    private ThreadExportOutcome Confirm(ConversationThread thread, FileSaveResult result, bool isMarkdown)
     {
         if (string.IsNullOrWhiteSpace(result.FilePath) || !File.Exists(result.FilePath))
         {
-            return Failure("The export reported success but no file was written.");
+            return Failure(localize("ChatExportNoFileWritten"));
         }
 
         var length = new FileInfo(result.FilePath).Length;
         if (length == 0)
         {
-            return Failure("The export produced an empty file.");
+            return Failure(localize("ChatExportEmptyFile"));
         }
 
         var label = isMarkdown ? "Markdown" : "JSON";
@@ -115,7 +127,7 @@ public sealed class ThreadExportService
             Status = FileSaveStatus.Saved,
             FilePath = result.FilePath,
             BytesWritten = length,
-            Message = $"Exported \"{thread.Title}\" as {label} to {result.FilePath}."
+            Message = localize("ChatExportSaved", thread.Title, label, result.FilePath)
         };
     }
 

@@ -85,7 +85,9 @@ public sealed class DatabaseMaintenanceJobTests : IDisposable
         var handler = new DatabaseMaintenanceJobHandler(
             directory, NullLogger<DatabaseMaintenanceJobHandler>.Instance);
 
-        Assert.Equal("Compact the local databases", handler.DescribeAction("""{"anything":true}"""));
+        Assert.Equal(
+            "Compact the local databases",
+            handler.DescribeAction("""{"anything":true}""").ToInvariantString());
         Assert.Null(handler.ValidatePayload(null));
     }
 

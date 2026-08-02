@@ -228,12 +228,11 @@ public sealed class SchedulerCatchUpTests
                 Runs,
                 jobs,
                 new RunConditionEvaluator(
-                    probe ?? new FakeRunEnvironmentProbe(PowerState.Mains, "Home"), SchedulingText.Localize),
+                    probe ?? new FakeRunEnvironmentProbe(PowerState.Mains, "Home")),
                 Preferences,
                 Clock,
                 Options.Create(new SchedulerOptions()),
-                NullLogger<SchedulerService>.Instance,
-                SchedulingText.Localize);
+                NullLogger<SchedulerService>.Instance);
         }
 
         public TestClock Clock { get; }

@@ -25,7 +25,7 @@ public sealed class RunConditionTests
         var verdict = Evaluate(new RunConditions(RequireMainsPower: true), PowerState.Battery, null);
 
         Assert.False(verdict.IsAllowed);
-        Assert.Contains("battery", verdict.Reason);
+        Assert.Contains("battery", verdict.Reason!.ToInvariantString(), StringComparison.Ordinal);
     }
 
     /// <summary>Mains-power-only allows a run on mains.</summary>
@@ -60,7 +60,7 @@ public sealed class RunConditionTests
         var verdict = Evaluate(conditions, PowerState.Mains, "Airport WiFi");
 
         Assert.False(verdict.IsAllowed);
-        Assert.Contains("Airport WiFi", verdict.Reason);
+        Assert.Contains("Airport WiFi", verdict.Reason!.ToInvariantString(), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -102,6 +102,5 @@ public sealed class RunConditionTests
     }
 
     private static RunConditionVerdict Evaluate(RunConditions conditions, PowerState power, string? network) =>
-        new RunConditionEvaluator(new FakeRunEnvironmentProbe(power, network), SchedulingText.Localize)
-            .Evaluate(conditions);
+        new RunConditionEvaluator(new FakeRunEnvironmentProbe(power, network)).Evaluate(conditions);
 }

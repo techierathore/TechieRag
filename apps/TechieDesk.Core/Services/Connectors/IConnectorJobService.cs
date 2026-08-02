@@ -39,12 +39,12 @@ public interface IConnectorJobService
     /// <summary>Checks a run request before it is started or saved to a schedule.</summary>
     /// <param name="payload">What the run would do.</param>
     /// <returns><see langword="null"/> when the request is usable, otherwise the reason it is not.</returns>
-    string? Validate(ConnectorJobPayload payload);
+    JobMessage? Validate(ConnectorJobPayload payload);
 
     /// <summary>Starts a connector run in the background and returns as soon as it has a run row.</summary>
     /// <param name="payload">What to read.</param>
     /// <returns>The run key, for <see cref="Cancel"/> and <see cref="GetReportAsync"/>.</returns>
-    /// <exception cref="ConnectorException">The request is not usable; the message says why.</exception>
+    /// <exception cref="ConnectorSetupException">The request is not usable; <c>Reason</c> says why.</exception>
     /// <remarks>
     /// Returns while the run is still going. The caller watches <see cref="ActiveRuns"/> for the run
     /// with this key and reads <see cref="GetReportAsync"/> once it disappears from that list.

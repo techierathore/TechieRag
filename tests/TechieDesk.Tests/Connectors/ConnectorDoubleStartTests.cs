@@ -300,5 +300,5 @@ public sealed class CountingRunRepository : IScheduleRunRepository
     }
 
     /// <inheritdoc />
-    public Task<int> CloseAbandonedRunsAsync(string reason, DateTime asOfUtc) => Task.FromResult(0);
+    public Task<int> CloseAbandonedRunsAsync(JobMessage reason, DateTime asOfUtc) => Task.FromResult(0);
 }

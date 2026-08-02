@@ -531,7 +531,7 @@ else
                                     <span>@Localizer["HubRunCounts", run.Processed, run.Failed, run.Skipped]</span>
                                 </div>
                             }
-                            <TypographyMuted Class="block text-xs">@(run.Message ?? Localizer["HubStarting"].Value)</TypographyMuted>
+                            <TypographyMuted Class="block text-xs">@(run.Message?.Resolve(Localize) ?? Localizer["HubStarting"].Value)</TypographyMuted>
                         </div>
                     }
                 }
@@ -1110,7 +1110,7 @@ else
         }
 
         var payload = BuildPayload();
-        startError = jobs.Validate(payload);
+        startError = jobs.Validate(payload)?.Resolve(Localize);
         if (startError is not null)
         {
             return;
@@ -1124,6 +1124,14 @@ else
             await jobs.StartAsync(payload);
             ToastService.Success(Localizer["HubSyncStartedBody"], Localizer["HubSyncStartedTitle"]);
             await LoadHistoryAsync();
+        }
+        catch (ConnectorSetupException ex)
+        {
+            // REQ-UI-056: an app-authored refusal carries codes, so it is resolved rather than
+            // printed. The library's own ConnectorException, below, has only English words.
+            var reason = ex.Reason.Resolve(Localize);
+            startError = reason;
+            ToastService.Error(reason, Localizer["HubSyncFailedTitle"]);
         }
         catch (ConnectorException ex)
         {
@@ -1180,7 +1188,7 @@ else
 
         try
         {
-            var failure = await registry.TestAsync(connectorId);
+            var failure = (await registry.TestAsync(connectorId))?.Resolve(Localize);
             testResults[connectorId] = failure;
             if (failure is null)
             {
@@ -1231,7 +1239,7 @@ else
                 return;
             }
 
-            var invalid = jobs.Validate(payload);
+            var invalid = jobs.Validate(payload)?.Resolve(Localize);
             if (invalid is not null)
             {
                 ToastService.Error(invalid, Localizer["HubSyncFailedTitle"]);
@@ -1241,6 +1249,10 @@ else
             await jobs.StartAsync(payload);
             ToastService.Success(Localizer["HubSyncStartedBody"], Localizer["HubSyncStartedTitle"]);
             await LoadHistoryAsync();
+        }
+        catch (ConnectorSetupException ex)
+        {
+            ToastService.Error(ex.Reason.Resolve(Localize), Localizer["HubSyncFailedTitle"]);
         }
         catch (ConnectorException ex)
         {
@@ -1388,14 +1400,17 @@ else
     private IReadOnlyList<ItemRow> ItemRows(ConnectorRunReport report)
     {
         var rows = new List<ItemRow>(report.Ingested.Count + report.NotIngested.Count);
+        // REQ-UI-056: DescribeReason renders the stored codes in the reader's language, or prints the
+        // stored text verbatim when the row has none — a run recorded before this release, or a reason
+        // that came from the library rather than from us.
         rows.AddRange(report.Ingested.Select(item => new ItemRow(
             Localizer["HubReportIngested"], true, item.ItemName,
-            item.Reason ?? Localizer["HubItemAddedToLibrary"].Value)));
+            item.DescribeReason(Localize) ?? Localizer["HubItemAddedToLibrary"].Value)));
         rows.AddRange(report.NotIngested.Select(item => new ItemRow(
             item.Status == RunItemStatus.Failed ? Localizer["HubOutcomeFailed"] : Localizer["HubItemSkipped"],
             false,
             item.ItemName,
-            item.Reason ?? Localizer["HubItemNoReasonRecorded"].Value)));
+            item.DescribeReason(Localize) ?? Localizer["HubItemNoReasonRecorded"].Value)));
         return rows;
     }
 

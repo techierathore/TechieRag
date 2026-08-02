@@ -40,8 +40,19 @@ public sealed class ScheduleRunItem
     /// <summary>Gets or sets what happened to the item.</summary>
     public RunItemStatus Status { get; set; }
 
-    /// <summary>Gets or sets why, in operator terms. Never contains a credential.</summary>
+    /// <summary>Gets or sets why, in operator terms, in English. Never contains a credential.</summary>
+    /// <remarks>
+    /// Read only through <see cref="JobMessage.Render"/>, paired with <see cref="ReasonJson"/>
+    /// (REQ-UI-056). The 17 rows an installed build had already written carry text and no codes, and
+    /// they must keep rendering exactly the words they were written with.
+    /// </remarks>
     public string? Reason { get; set; }
+
+    /// <summary>
+    /// Gets or sets <see cref="Reason"/> as resource codes and their arguments, or
+    /// <see langword="null"/> when the reason came from outside this app, and for a legacy row.
+    /// </summary>
+    public string? ReasonJson { get; set; }
 
     /// <summary>Gets or sets when the item was recorded, in UTC.</summary>
     public DateTime RecordedUtc { get; set; }

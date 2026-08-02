@@ -9,6 +9,17 @@ namespace TechieRag.Orchestration;
 /// <param name="Reason">Why it refused; null when allowed.</param>
 public sealed record GuardrailVerdict(bool IsAllowed, GuardrailStage Stage, string? GuardrailId, string? Reason)
 {
+    /// <summary>
+    /// Gets the localizable form of <see cref="Reason"/> — a stable code plus its arguments — or
+    /// null when the refusing guardrail supplied only English (REQ-RAG-050).
+    /// </summary>
+    /// <remarks>
+    /// Added as an init-only property rather than a fifth positional parameter so the record's
+    /// constructor and <c>Deconstruct</c> arity are unchanged: an existing NuGet consumer that
+    /// constructs or deconstructs a verdict keeps compiling and keeps binding.
+    /// </remarks>
+    public FlowMessage? Message { get; init; }
+
     /// <summary>Gets the verdict used when nothing objected.</summary>
     /// <param name="stage">The stage that was evaluated.</param>
     /// <returns>An allowing verdict.</returns>
@@ -99,7 +110,9 @@ public sealed class FlowGuardrailChain
             try
             {
                 decision = await guardrail.InspectAsync(context, cancellationToken).ConfigureAwait(false)
-                    ?? GuardrailDecision.Block("The guardrail returned no decision.");
+                    ?? GuardrailDecision.Block(FlowMessage.Create(
+                        FlowMessageCodes.GuardrailReturnedNoDecision,
+                        "The guardrail returned no decision."));
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -109,13 +122,19 @@ public sealed class FlowGuardrailChain
             {
                 // Deny by default. A check that cannot run is not a check that passed, and a broken
                 // guardrail must never be the cheapest way past it.
-                decision = GuardrailDecision.Block(
-                    $"The guardrail could not complete ({ex.GetType().Name}: {ex.Message}), so the step was refused.");
+                decision = GuardrailDecision.Block(FlowMessage.Create(
+                    FlowMessageCodes.GuardrailFaulted,
+                    "The guardrail could not complete ({0}: {1}), so the step was refused.",
+                    ex.GetType().Name,
+                    ex.Message));
             }
 
             if (!decision.IsAllowed)
             {
-                return new GuardrailVerdict(false, context.Stage, guardrail.Id, decision.Reason);
+                return new GuardrailVerdict(false, context.Stage, guardrail.Id, decision.Reason)
+                {
+                    Message = decision.Message
+                };
             }
         }
 
@@ -131,8 +150,13 @@ public sealed class FlowGuardrailChain
             id,
             "Unresolvable guardrail — denies by default.",
             null,
-            (_, _) => Task.FromResult(GuardrailDecision.Block(
-                isResolverMissing
-                    ? $"The flow requires guardrail '{id}' but this host configured no guardrail resolver, so the step was refused."
-                    : $"The flow requires guardrail '{id}' but it could not be loaded, so the step was refused.")));
+            (_, _) => Task.FromResult(GuardrailDecision.Block(isResolverMissing
+                ? FlowMessage.Create(
+                    FlowMessageCodes.GuardrailResolverMissing,
+                    "The flow requires guardrail '{0}' but this host configured no guardrail resolver, so the step was refused.",
+                    id)
+                : FlowMessage.Create(
+                    FlowMessageCodes.GuardrailUnresolvable,
+                    "The flow requires guardrail '{0}' but it could not be loaded, so the step was refused.",
+                    id))));
 }

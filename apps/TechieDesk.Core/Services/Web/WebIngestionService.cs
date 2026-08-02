@@ -1,3 +1,4 @@
+using TechieDesk.Services.Localization;
 using TechieRag;
 using TechieRag.Web;
 
@@ -35,6 +36,7 @@ public sealed class WebIngestionService : IWebIngestionService
     private readonly IWebContentFetcherFactory fetcherFactory;
     private readonly IWorkspaceDocumentLinker linker;
     private readonly YouTubeTranscriptReader transcriptReader;
+    private readonly LocalizeText localize;
     private readonly ILogger<WebIngestionService> logger;
 
     /// <summary>Initializes a new instance of the <see cref="WebIngestionService"/> class.</summary>
@@ -42,18 +44,21 @@ public sealed class WebIngestionService : IWebIngestionService
     /// <param name="fetcherFactory">Creates a fetcher carrying this run's private-network policy.</param>
     /// <param name="linker">Adds the ingested documents to the workspace.</param>
     /// <param name="transcriptReader">Reads YouTube caption tracks (REQ-RAG-018).</param>
+    /// <param name="localize">Resolves the progress lines and skip reasons this service composes (REQ-UI-055).</param>
     /// <param name="logger">Diagnostics.</param>
     public WebIngestionService(
         ITechieRag rag,
         IWebContentFetcherFactory fetcherFactory,
         IWorkspaceDocumentLinker linker,
         YouTubeTranscriptReader transcriptReader,
+        LocalizeText localize,
         ILogger<WebIngestionService> logger)
     {
         this.rag = rag ?? throw new ArgumentNullException(nameof(rag));
         this.fetcherFactory = fetcherFactory ?? throw new ArgumentNullException(nameof(fetcherFactory));
         this.linker = linker ?? throw new ArgumentNullException(nameof(linker));
         this.transcriptReader = transcriptReader ?? throw new ArgumentNullException(nameof(transcriptReader));
+        this.localize = localize ?? throw new ArgumentNullException(nameof(localize));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -67,7 +72,7 @@ public sealed class WebIngestionService : IWebIngestionService
 
         // The same check the form ran. Re-running it here is not belt-and-braces: the service is the
         // only thing standing between a programmatic caller and an unbounded crawl.
-        var invalid = request.Validate();
+        var invalid = request.Validate(localize);
         if (invalid is not null)
         {
             throw new WebFetchException(request.TrimmedUrl, invalid);
@@ -75,7 +80,7 @@ public sealed class WebIngestionService : IWebIngestionService
 
         var total = request.ExpectedFetchCount();
         progress?.Report(new WebIngestionProgress(
-            WebIngestionStage.Starting, request.TrimmedUrl, 0, total, "Starting…"));
+            WebIngestionStage.Starting, request.TrimmedUrl, 0, total, localize("WebProgressStarting")));
 
         var outcome = request.Source switch
         {
@@ -85,11 +90,12 @@ public sealed class WebIngestionService : IWebIngestionService
                 .ConfigureAwait(false),
             WebIngestionSource.Video => await IngestVideoAsync(request, progress, cancellationToken)
                 .ConfigureAwait(false),
-            _ => throw new WebFetchException(request.TrimmedUrl, $"'{request.Source}' is not a web source."),
+            _ => throw new WebFetchException(
+                request.TrimmedUrl, localize("WebValidationNotAWebSource", request.Source)),
         };
 
         progress?.Report(new WebIngestionProgress(
-            WebIngestionStage.Done, request.TrimmedUrl, total, total, outcome.Summary));
+            WebIngestionStage.Done, request.TrimmedUrl, total, total, outcome.SummaryText(localize)));
 
         logger.LogInformation(
             "Web ingestion of {Url} ({Source}) into {WorkspaceId}: {Ingested} ingested, {Skipped} skipped",
@@ -167,7 +173,7 @@ public sealed class WebIngestionService : IWebIngestionService
         CancellationToken cancellationToken)
     {
         progress?.Report(new WebIngestionProgress(
-            WebIngestionStage.Fetching, request.TrimmedUrl, 0, 1, "Reading the caption track…"));
+            WebIngestionStage.Fetching, request.TrimmedUrl, 0, 1, localize("WebProgressReadingCaptions")));
 
         string documentId;
         try
@@ -190,7 +196,7 @@ public sealed class WebIngestionService : IWebIngestionService
     private IWebContentFetcher CreateFetcher(
         WebIngestionRequest request, IProgress<WebIngestionProgress>? progress, int total) =>
         new ProgressReportingWebContentFetcher(
-            fetcherFactory.Create(!request.AllowPrivateNetworkTargets), progress, total);
+            fetcherFactory.Create(!request.AllowPrivateNetworkTargets), progress, total, localize);
 
     /// <summary>
     /// Adds every ingested document to the workspace and resolves its display name.
@@ -213,7 +219,7 @@ public sealed class WebIngestionService : IWebIngestionService
             request.TrimmedUrl,
             total,
             total,
-            $"Adding {documentIds.Count} document(s) to the workspace…"));
+            localize("WebProgressAddingDocuments", documentIds.Count)));
 
         var catalogue = await ReadCatalogueAsync(cancellationToken).ConfigureAwait(false);
         var ingested = new List<WebIngestedDocument>(documentIds.Count);
@@ -239,14 +245,12 @@ public sealed class WebIngestionService : IWebIngestionService
 
                 // Embedded but not reachable from the workspace. Counting it as ingested would put a
                 // number on screen that the Documents table then contradicts.
-                failures.Add(new CrawlFailure(
-                    sourceUrl,
-                    "Embedded, but workspace persistence is not configured, so it was not added to this workspace."));
+                failures.Add(new CrawlFailure(sourceUrl, localize("WebSkipNoWorkspacePersistence")));
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogError(ex, "Failed to add {DocumentId} to workspace {WorkspaceId}", documentId, request.WorkspaceId);
-                failures.Add(new CrawlFailure(sourceUrl, $"Embedded, but adding it to the workspace failed: {ex.Message}"));
+                failures.Add(new CrawlFailure(sourceUrl, localize("WebSkipLinkFailed", ex.Message)));
             }
         }
 
@@ -308,22 +312,52 @@ public sealed record WebIngestionOutcome(
     public bool IsPartial => Ingested.Count > 0 && Skipped.Count > 0;
 
     /// <summary>
-    /// Gets a one-line summary that never overstates what happened.
+    /// Builds a one-line summary, in the reader's language, that never overstates what happened.
     /// </summary>
+    /// <param name="localize">Resolves the resource keys the summary is assembled from.</param>
+    /// <returns>The line the "Add from web" card and its toast show against the run.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="localize"/> is <see langword="null"/>.</exception>
     /// <remarks>
-    /// A run with skips is never described as a success. "Ingested 20 pages" when 5 were dropped is
-    /// technically true and practically a lie, because the operator's next act is to go looking for
-    /// content that was never added.
+    /// <para>A run with skips is never described as a success. "Ingested 20 pages" when 5 were
+    /// dropped is technically true and practically a lie, because the operator's next act is to go
+    /// looking for content that was never added.</para>
+    /// <para><b>REQ-UI-055 / BRD-91.</b> This was a property returning four English literals, read
+    /// straight into an alert and three toasts. It is a method taking a
+    /// <see cref="LocalizeText"/> for the reason <c>ConnectorRunReport.SummaryText</c> already
+    /// records: the sentence is genuinely COMPOSED here from a head and one or two pluralized
+    /// counts, and moving that composition into the page would put the honesty rule where the next
+    /// screen can get it wrong.</para>
+    /// <para>Pluralization goes through separate keys rather than an <c>s</c> appended in code.
+    /// Hindi does not form a plural that way, and "4 दस्तावेज़s" is the tell-tale of a counter that
+    /// was never really translated.</para>
     /// </remarks>
-    public string Summary => (Ingested.Count, Skipped.Count) switch
+    public string SummaryText(LocalizeText localize)
     {
-        (0, 0) => "Nothing was ingested.",
-        (0, var skipped) => $"Nothing was ingested — {Plural(skipped, "item")} could not be read.",
-        (var ingested, 0) => $"Ingested {Plural(ingested, "document")}.",
-        var (ingested, skipped) =>
-            $"Ingested {Plural(ingested, "document")}; {Plural(skipped, "item")} skipped.",
-    };
+        ArgumentNullException.ThrowIfNull(localize);
 
-    private static string Plural(int count, string noun) =>
-        count == 1 ? $"1 {noun}" : $"{count} {noun}s";
+        return (Ingested.Count, Skipped.Count) switch
+        {
+            (0, 0) => localize("WebSummaryNothing"),
+            (0, var skipped) => localize("WebSummaryNothingSkipped", Items(localize, skipped)),
+            (var ingested, 0) => localize("WebSummaryIngested", Documents(localize, ingested)),
+            var (ingested, skipped) => localize(
+                "WebSummaryIngestedWithSkips",
+                Documents(localize, ingested),
+                Items(localize, skipped)),
+        };
+    }
+
+    /// <summary>Renders a count of ingested documents in the reader's language.</summary>
+    /// <param name="localize">Resolves the singular or plural key.</param>
+    /// <param name="count">How many.</param>
+    /// <returns>"1 document" or "4 documents", translated.</returns>
+    private static string Documents(LocalizeText localize, int count) =>
+        localize(count == 1 ? "WebCountDocument" : "WebCountDocuments", count);
+
+    /// <summary>Renders a count of source items in the reader's language.</summary>
+    /// <param name="localize">Resolves the singular or plural key.</param>
+    /// <param name="count">How many.</param>
+    /// <returns>"1 item" or "4 items", translated.</returns>
+    private static string Items(LocalizeText localize, int count) =>
+        localize(count == 1 ? "WebCountItem" : "WebCountItems", count);
 }

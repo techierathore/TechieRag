@@ -1,3 +1,5 @@
+using TechieDesk.Services.Localization;
+
 namespace TechieDesk.Services.Support;
 
 /// <summary>
@@ -36,8 +38,15 @@ public static class SupportAttachmentPolicy
     /// <summary>The file-picker accept filter matching <see cref="AllowedExtensions"/>.</summary>
     public const string AcceptTypes = ".png,.jpg,.jpeg,.pdf,.log";
 
-    /// <summary>Human-readable summary of the limits, shown beside the drop zone.</summary>
-    public const string LimitsSummary = "PNG, JPG, PDF, LOG · 10 MB each";
+    /// <summary>Resource key for the human-readable summary of the limits, shown beside the drop zone.</summary>
+    /// <remarks>
+    /// REQ-UI-055 / BRD-91. This was the literal <c>"PNG, JPG, PDF, LOG · 10 MB each"</c>, and it was
+    /// passed as an ARGUMENT into two already-localized sentences on the Support screen — so a Hindi
+    /// install rendered a Devanagari hint with an English tail glued onto it, which is worse than an
+    /// English hint because it reads as a rendering fault. The extension tokens inside the value stay
+    /// in Latin script in every language: they are file-type names, not words.
+    /// </remarks>
+    public const string LimitsSummaryKey = "SupportAttachmentLimitsSummary";
 
     /// <summary>The extensions an attachment may carry.</summary>
     public static IReadOnlySet<string> AllowedExtensions { get; } =
@@ -51,31 +60,38 @@ public static class SupportAttachmentPolicy
     /// </summary>
     /// <param name="fileName">The file name as offered by the picker, drop or paste.</param>
     /// <param name="sizeBytes">The file size in bytes.</param>
+    /// <param name="localize">Resolves the resource key of whichever rule the file breaks.</param>
     /// <returns>The rejection reason, or null when the file may be attached.</returns>
-    public static string? GetRejectionReason(string? fileName, long sizeBytes)
+    /// <exception cref="ArgumentNullException"><paramref name="localize"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// REQ-UI-055 / BRD-91. Three of the four refusals NAME the file and one of them names two
+    /// sizes, so this takes a <see cref="LocalizeText"/> rather than returning a bare key: a key on
+    /// its own cannot carry an argument, and the screen that toasts this message has no way to know
+    /// which arguments a given refusal wanted. There is deliberately no parameterless overload.
+    /// </remarks>
+    public static string? GetRejectionReason(string? fileName, long sizeBytes, LocalizeText localize)
     {
+        ArgumentNullException.ThrowIfNull(localize);
+
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            return "That file can't be attached — it has no file name.";
+            return localize("SupportAttachmentRejectedNoName");
         }
 
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrEmpty(extension) || !AllowedExtensions.Contains(extension))
         {
-            return $"\"{fileName}\" can't be attached — support accepts {LimitsSummary}.";
+            return localize("SupportAttachmentRejectedType", fileName, localize(LimitsSummaryKey));
         }
 
         if (sizeBytes <= 0)
         {
-            return $"\"{fileName}\" can't be attached — the file is empty.";
+            return localize("SupportAttachmentRejectedEmpty", fileName);
         }
 
-        if (sizeBytes > MaxFileSizeBytes)
-        {
-            return $"\"{fileName}\" is {FormatSize(sizeBytes)} — the limit is {FormatSize(MaxFileSizeBytes)}.";
-        }
-
-        return null;
+        return sizeBytes > MaxFileSizeBytes
+            ? localize("SupportAttachmentRejectedTooLarge", fileName, FormatSize(sizeBytes), FormatSize(MaxFileSizeBytes))
+            : null;
     }
 
     /// <summary>

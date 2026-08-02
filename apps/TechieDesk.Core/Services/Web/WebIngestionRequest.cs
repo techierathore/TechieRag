@@ -1,3 +1,4 @@
+using TechieDesk.Services.Localization;
 using TechieRag.Web;
 
 namespace TechieDesk.Services.Web;
@@ -81,18 +82,32 @@ public sealed class WebIngestionRequest
     /// <summary>
     /// Checks the request against everything that can be known without touching the network.
     /// </summary>
+    /// <param name="localize">Resolves the resource key of whichever rule the request breaks.</param>
     /// <returns>An operator-facing reason the request cannot run, or null when it can.</returns>
-    public string? Validate()
+    /// <exception cref="ArgumentNullException"><paramref name="localize"/> is <see langword="null"/>.</exception>
+    /// <remarks>
+    /// <para><b>REQ-UI-055 / BRD-91.</b> Every arm below used to be an English literal built in this
+    /// service and rendered raw by the "Add from web" card's validation alert, which neither razor
+    /// counter can see. It takes a <see cref="LocalizeText"/> rather than returning a bare key
+    /// because four of the six sentences NAME something — the URL, the host, a bound — and a bare
+    /// key cannot carry an argument.</para>
+    /// <para>There is deliberately no parameterless overload. An English default would put the
+    /// sentences back and the caller that forgot to pass a localizer would render them on a Hindi
+    /// install with every test still green.</para>
+    /// </remarks>
+    public string? Validate(LocalizeText localize)
     {
+        ArgumentNullException.ThrowIfNull(localize);
+
         var url = TrimmedUrl;
         if (string.IsNullOrEmpty(url))
         {
-            return "Enter a URL first.";
+            return localize("WebValidationEnterUrl");
         }
 
         if (string.IsNullOrWhiteSpace(WorkspaceId))
         {
-            return "No workspace is selected, so there is nowhere to put the result.";
+            return localize("WebValidationNoWorkspace");
         }
 
         if (Source == WebIngestionSource.Video)
@@ -101,21 +116,20 @@ public sealed class WebIngestionRequest
             // legitimate things to paste, and YouTubeUrl is the one place that knows the shapes.
             return YouTubeUrl.IsYouTube(url)
                 ? null
-                : $"'{url}' is not a YouTube video URL. Paste a watch, youtu.be, shorts or embed link.";
+                : localize("WebValidationNotYouTube", url);
         }
 
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            return $"'{url}' is not an absolute http or https URL. Include the scheme, e.g. https://example.com.";
+            return localize("WebValidationNotAbsoluteUrl", url);
         }
 
         // The library refuses a private seed too, but it does so after the request is already in
         // flight and with no idea that a toggle exists. Saying it here names the toggle.
         if (!AllowPrivateNetworkTargets && WebCrawlOptions.IsPrivateNetworkHost(uri.Host))
         {
-            return $"'{uri.Host}' is a private-network address. Turn on 'Allow intranet and private addresses' "
-                   + "if you really mean to read from your own network.";
+            return localize("WebValidationPrivateHost", uri.Host);
         }
 
         if (Source != WebIngestionSource.Site)
@@ -125,11 +139,11 @@ public sealed class WebIngestionRequest
 
         if (MaxDepth < 0 || MaxDepth > MaxAllowedDepth)
         {
-            return $"Crawl depth must be between 0 and {MaxAllowedDepth}.";
+            return localize("WebValidationDepthRange", MaxAllowedDepth);
         }
 
         return MaxPages is < 1 or > MaxAllowedPages
-            ? $"The page limit must be between 1 and {MaxAllowedPages}."
+            ? localize("WebValidationPageRange", MaxAllowedPages)
             : null;
     }
 

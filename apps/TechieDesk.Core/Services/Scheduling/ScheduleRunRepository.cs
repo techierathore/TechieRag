@@ -25,10 +25,12 @@ public sealed class ScheduleRunRepository : IScheduleRunRepository
         const string sql = """
             INSERT INTO "ScheduleRun" (
                 "ScheduleId", "JobName", "JobKind", "TriggerKind", "StartedUtc", "CompletedUtc",
-                "Outcome", "ItemsProcessed", "ItemsFailed", "ItemsSkipped", "Detail", "FailureReason")
+                "Outcome", "ItemsProcessed", "ItemsFailed", "ItemsSkipped", "Detail", "DetailJson",
+                "FailureReason", "FailureReasonJson")
             VALUES (
                 @ScheduleId, @JobName, @JobKind, @TriggerKind, @StartedUtc, @CompletedUtc,
-                @Outcome, @ItemsProcessed, @ItemsFailed, @ItemsSkipped, @Detail, @FailureReason)
+                @Outcome, @ItemsProcessed, @ItemsFailed, @ItemsSkipped, @Detail, @DetailJson,
+                @FailureReason, @FailureReasonJson)
             RETURNING "ScheduleRunId";
             """;
         using var connection = connectionFactory.CreateConnection();
@@ -50,7 +52,9 @@ public sealed class ScheduleRunRepository : IScheduleRunRepository
                 "ItemsFailed" = @ItemsFailed,
                 "ItemsSkipped" = @ItemsSkipped,
                 "Detail" = @Detail,
-                "FailureReason" = @FailureReason
+                "DetailJson" = @DetailJson,
+                "FailureReason" = @FailureReason,
+                "FailureReasonJson" = @FailureReasonJson
             WHERE "ScheduleRunId" = @ScheduleRunId;
             """;
         using var connection = connectionFactory.CreateConnection();
@@ -68,8 +72,10 @@ public sealed class ScheduleRunRepository : IScheduleRunRepository
 
         const string sql = """
             INSERT INTO "ScheduleRunItem" (
-                "ScheduleRunId", "ItemId", "ItemName", "Status", "Reason", "RecordedUtc")
-            VALUES (@scheduleRunId, @itemId, @itemName, @status, @reason, @recordedUtc);
+                "ScheduleRunId", "ItemId", "ItemName", "Status", "Reason", "ReasonJson",
+                "RecordedUtc")
+            VALUES (
+                @scheduleRunId, @itemId, @itemName, @status, @reason, @reasonJson, @recordedUtc);
             """;
 
         var rows = items.Select(item => new
@@ -79,6 +85,7 @@ public sealed class ScheduleRunRepository : IScheduleRunRepository
             itemName = item.ItemName,
             status = item.Status.ToString(),
             reason = item.Reason,
+            reasonJson = item.ReasonJson,
             recordedUtc = item.RecordedUtc == default ? DateTime.UtcNow : item.RecordedUtc
         }).ToList();
 
@@ -130,17 +137,27 @@ public sealed class ScheduleRunRepository : IScheduleRunRepository
     }
 
     /// <inheritdoc />
-    public async Task<int> CloseAbandonedRunsAsync(string reason, DateTime asOfUtc)
+    public async Task<int> CloseAbandonedRunsAsync(JobMessage reason, DateTime asOfUtc)
     {
+        ArgumentNullException.ThrowIfNull(reason);
+
         const string sql = """
             UPDATE "ScheduleRun" SET
                 "Outcome" = 'Failed',
                 "CompletedUtc" = @asOfUtc,
-                "FailureReason" = @reason
+                "FailureReason" = @reason,
+                "FailureReasonJson" = @reasonJson
             WHERE "Outcome" = 'Running';
             """;
         using var connection = connectionFactory.CreateConnection();
-        return await connection.ExecuteAsync(sql, new { reason, asOfUtc }).ConfigureAwait(false);
+        return await connection.ExecuteAsync(
+            sql,
+            new
+            {
+                reason = reason.ToInvariantString(),
+                reasonJson = reason.ToStorage(),
+                asOfUtc
+            }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -168,6 +185,8 @@ public sealed class ScheduleRunRepository : IScheduleRunRepository
         run.ItemsFailed,
         run.ItemsSkipped,
         run.Detail,
-        run.FailureReason
+        run.DetailJson,
+        run.FailureReason,
+        run.FailureReasonJson
     };
 }

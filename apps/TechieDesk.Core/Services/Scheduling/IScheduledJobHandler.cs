@@ -17,6 +17,12 @@ namespace TechieDesk.Services.Scheduling;
 /// <para><b>Cancellation is cooperative and must be honoured.</b> A desktop user closing the window
 /// mid-crawl expects the crawl to stop, and a handler that ignores the token turns a quit into a
 /// hang.</para>
+/// <para><b>Nothing here returns English (REQ-UI-056 / BRD-91).</b> A handler names a resource KEY or
+/// returns a <see cref="JobMessage"/>; whoever renders resolves it. Before this, a handler's
+/// <c>DisplayName</c> was an English literal, and <c>ScheduleInterpreter</c> interpolated it into a
+/// refusal that was otherwise fully translated — so a Hindi install told the user, in Hindi, that it
+/// only knew how to do "Local database maintenance". The seam is the right place to fix that because
+/// every handler crosses it, including the connector one.</para>
 /// </remarks>
 public interface IScheduledJobHandler
 {
@@ -26,19 +32,31 @@ public interface IScheduledJobHandler
     /// <remarks>Compared case-insensitively. Changing it orphans existing schedules, so treat it as persisted data.</remarks>
     string JobKind { get; }
 
-    /// <summary>Gets the human-facing name of this kind of job, for the authoring dialog's action list.</summary>
-    string DisplayName { get; }
+    /// <summary>
+    /// Gets the resource key naming this kind of job, for the authoring dialog's action list.
+    /// </summary>
+    /// <remarks>A key present in <c>AppStrings.resx</c>, never a name. See the type remarks.</remarks>
+    string DisplayNameKey { get; }
 
-    /// <summary>Gets a one-line description of what this handler does, shown when choosing an action.</summary>
-    string Description { get; }
+    /// <summary>
+    /// Gets the resource key for the one line describing what this handler does, shown when choosing
+    /// an action.
+    /// </summary>
+    string DescriptionKey { get; }
 
     /// <summary>
     /// Renders a payload as the one-line action summary shown in the schedules grid
     /// ("Email connector → Contracts").
     /// </summary>
     /// <param name="payload">The handler-specific payload, or <see langword="null"/>.</param>
-    /// <returns>A plain-language summary. Never cron, never JSON.</returns>
-    string DescribeAction(string? payload);
+    /// <returns>A plain-language summary as codes and arguments. Never cron, never JSON.</returns>
+    /// <remarks>
+    /// The summary is also stored on <see cref="Schedule.ActionSummary"/> as the record of what the
+    /// user confirmed (BRD-140), which is why the grid re-describes from
+    /// <see cref="Schedule.JobPayload"/> rather than painting the stored copy — the same treatment
+    /// <see cref="Schedule.ScheduleText"/> gets.
+    /// </remarks>
+    JobMessage DescribeAction(string? payload);
 
     /// <summary>
     /// Validates a payload before a schedule is saved.
@@ -50,7 +68,7 @@ public interface IScheduledJobHandler
     /// from BRD-136. A natural-language draft that named a workspace which does not exist must be
     /// rejected in the confirm dialog, not at 07:00 three days later.
     /// </remarks>
-    string? ValidatePayload(string? payload);
+    JobMessage? ValidatePayload(string? payload);
 
     /// <summary>Runs the job.</summary>
     /// <param name="context">What to run, and where to report progress.</param>

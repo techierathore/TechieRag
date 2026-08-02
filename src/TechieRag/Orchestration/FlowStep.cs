@@ -53,6 +53,33 @@ public class FlowStep : AgentStep
     public int Depth { get; init; }
 
     /// <summary>
+    /// Gets the localizable form of <see cref="AgentStep.Content"/> — a stable code plus its
+    /// arguments — for the steps whose content this library WROTE (REQ-RAG-050).
+    /// </summary>
+    /// <remarks>
+    /// Null whenever <see cref="AgentStep.Content"/> is the run's own data: a model's answer, a
+    /// tool's output, a node's text. There is nothing to translate there, and pretending otherwise
+    /// would put a code on content no resource file could ever carry. It is populated only for the
+    /// sentences the runner composed itself — a route with no label, a handoff summary, a step
+    /// budget running out — which are the ones that read as English chrome inside a Hindi trace.
+    /// </remarks>
+    public FlowMessage? ContentMessage { get; init; }
+
+    /// <summary>
+    /// Gets the localizable form of <see cref="AgentStep.ErrorMessage"/> — a stable code plus its
+    /// arguments (REQ-RAG-050).
+    /// </summary>
+    /// <remarks>
+    /// This is the property that fixes the reported defect. A host's trace renderer paints
+    /// <see cref="AgentStep.ErrorMessage"/> as the detail line under "Blocked by …", so for a
+    /// guardrail refusal it is the whole of what a user is told about why their tool call did not
+    /// run. Rendering this code instead makes that line translatable; falling back to
+    /// <see cref="AgentStep.ErrorMessage"/> when the code is unknown keeps every existing renderer
+    /// working unchanged.
+    /// </remarks>
+    public FlowMessage? FailureMessage { get; init; }
+
+    /// <summary>
     /// Re-emits a step reported by the single-agent loop, attributed to the node it ran in.
     /// </summary>
     /// <param name="step">The step reported by <c>AgentLoopRunner</c>.</param>

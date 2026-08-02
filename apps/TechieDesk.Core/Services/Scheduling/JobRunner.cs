@@ -99,7 +99,7 @@ public sealed class JobRunner : IJobRunner
                 run,
                 RunOutcome.Failed,
                 null,
-                $"No installed component handles jobs of kind '{jobKind}'.",
+                JobMessage.Of("JobRunNoHandler", jobKind),
                 []).ConfigureAwait(false);
         }
 
@@ -110,7 +110,7 @@ public sealed class JobRunner : IJobRunner
 
         JobRunResult result;
         RunOutcome outcome;
-        string? failureReason = null;
+        JobMessage? failureReason = null;
 
         try
         {
@@ -124,14 +124,18 @@ public sealed class JobRunner : IJobRunner
         {
             result = JobRunResult.Completed;
             outcome = RunOutcome.Cancelled;
-            failureReason = "The run was cancelled.";
+            failureReason = JobMessage.Of("JobRunCancelled");
             logger.LogInformation("Job {JobName} ({JobKind}) was cancelled", jobName, jobKind);
         }
         catch (Exception exception)
         {
             result = JobRunResult.Completed;
             outcome = RunOutcome.Failed;
-            failureReason = exception.Message;
+            // Verbatim, not coded: these words belong to whatever threw — a library, a driver, the OS
+            // — and pretending to translate them would mean inventing a code per third-party message.
+            // JobMessage.Text stores no JSON, so this row renders through the same legacy-text branch
+            // the pre-REQ-UI-056 rows do, which keeps that branch exercised on every install.
+            failureReason = JobMessage.Text(exception.Message);
             logger.LogError(exception, "Job {JobName} ({JobKind}) failed", jobName, jobKind);
         }
 
@@ -139,7 +143,7 @@ public sealed class JobRunner : IJobRunner
         var detail = result.Detail ?? ComposeDetail(collector);
         if (collector.WasItemListSampled)
         {
-            detail += $" · item list capped at {JobProgressCollector.SuccessItemCap} successes (all failures kept)";
+            detail = detail.Then("JobRunItemsCapped", JobProgressCollector.SuccessItemCap);
         }
 
         run.ItemsProcessed = collector.Processed;
@@ -151,13 +155,19 @@ public sealed class JobRunner : IJobRunner
     private async Task<ScheduleRun> CloseAsync(
         ScheduleRun run,
         RunOutcome outcome,
-        string? detail,
-        string? failureReason,
+        JobMessage? detail,
+        JobMessage? failureReason,
         IReadOnlyList<ScheduleRunItem> items)
     {
         run.Outcome = outcome;
-        run.Detail = detail;
-        run.FailureReason = failureReason;
+
+        // REQ-UI-056: both halves, always. The codes are what a Hindi reader sees; the English is the
+        // audit copy the helper host logs, a database browser shows, and a future build falls back to
+        // if it no longer recognises a code.
+        run.Detail = detail?.ToInvariantString();
+        run.DetailJson = detail?.ToStorage();
+        run.FailureReason = failureReason?.ToInvariantString();
+        run.FailureReasonJson = failureReason?.ToStorage();
         run.CompletedUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         if (items.Count > 0)
@@ -172,19 +182,25 @@ public sealed class JobRunner : IJobRunner
         return run;
     }
 
-    private static string ComposeDetail(JobProgressCollector collector)
+    /// <summary>Composes the detail line for a handler that did not supply one.</summary>
+    /// <param name="collector">The run's counts.</param>
+    /// <returns>The detail as codes and arguments.</returns>
+    /// <remarks>
+    /// Each count is its own SEGMENT rather than a clause glued into one sentence, so a translator
+    /// sees three whole phrases and the separator stays punctuation — see <see cref="JobMessage"/>.
+    /// The zero arms are dropped rather than printed, which is why this is not one code with three
+    /// holes.
+    /// </remarks>
+    private static JobMessage ComposeDetail(JobProgressCollector collector)
     {
-        var parts = new List<string> { $"{collector.Processed} processed" };
+        var detail = JobMessage.Of("JobRunDetailProcessed", collector.Processed);
         if (collector.FailedCount > 0)
         {
-            parts.Add($"{collector.FailedCount} failed");
+            detail = detail.Then("JobRunDetailFailed", collector.FailedCount);
         }
 
-        if (collector.SkippedCount > 0)
-        {
-            parts.Add($"{collector.SkippedCount} skipped");
-        }
-
-        return string.Join(" · ", parts);
+        return collector.SkippedCount > 0
+            ? detail.Then("JobRunDetailSkipped", collector.SkippedCount)
+            : detail;
     }
 }

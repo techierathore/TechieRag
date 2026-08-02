@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieDesk.Services;
 using TechieDesk.Services.Hosting;
+using TechieDesk.Services.Localization;
 using TechieDesk.Services.Web;
 using TechieDesk.Tests.Support;
 using TechieRag;
@@ -35,8 +36,21 @@ public sealed class WebIngestionServiceTests : IDisposable
     private const string SeedUrl = "https://example.com/";
     private const string WorkspaceName = "Research";
 
+    /// <summary>
+    /// REQ-UI-055: the run summary and the skip reasons are resource keys now, so this suite reads
+    /// them back through the REAL English resources rather than against literals in the service.
+    /// </summary>
+    /// <remarks>
+    /// Static because the nested harness builds the service, and holding the culture at English for
+    /// this class is what keeps the substring assertions below meaningful.
+    /// </remarks>
+    private static readonly ResourceHarness Resources = new("en");
+
     private readonly string directory =
         Path.Combine(Path.GetTempPath(), $"techiedesk-webingest-{Guid.NewGuid():N}");
+
+    /// <summary>Gets the delegate the ingestion service and the outcome summary resolve through.</summary>
+    private static LocalizeText Localize => Resources.Localize;
 
     /// <summary>
     /// REQ-RAG-016: one URL becomes one document that the workspace can actually see.
@@ -158,7 +172,7 @@ public sealed class WebIngestionServiceTests : IDisposable
             f.Url == "https://example.com/gallery" && f.Reason.Contains("no readable text", StringComparison.OrdinalIgnoreCase));
 
         // The summary is what the screen and the toast both show. It must name the skips.
-        Assert.Contains("skipped", outcome.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("skipped", outcome.SummaryText(Localize), StringComparison.OrdinalIgnoreCase);
         Assert.Equal(2, (await harness.ListWorkspaceDocumentsAsync()).Count);
     }
 
@@ -174,13 +188,13 @@ public sealed class WebIngestionServiceTests : IDisposable
             [new CrawlFailure("https://b", "gone")]);
         var clean = new WebIngestionOutcome([new WebIngestedDocument("d1", "A", "https://a")], []);
 
-        Assert.Contains("Nothing was ingested", nothing.Summary, StringComparison.Ordinal);
+        Assert.Contains("Nothing was ingested", nothing.SummaryText(Localize), StringComparison.Ordinal);
         Assert.False(nothing.Succeeded);
 
-        Assert.Contains("skipped", partial.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("skipped", partial.SummaryText(Localize), StringComparison.OrdinalIgnoreCase);
         Assert.True(partial.IsPartial);
 
-        Assert.Equal("Ingested 1 document.", clean.Summary);
+        Assert.Equal("Ingested 1 document.", clean.SummaryText(Localize));
         Assert.False(clean.IsPartial);
         Assert.Empty(WebIngestionOutcome.Empty.Ingested);
     }
@@ -453,6 +467,7 @@ public sealed class WebIngestionServiceTests : IDisposable
                 linker,
                 new YouTubeTranscriptReader(new HttpClient(new StubHttpMessageHandler(
                     (request, _) => YouTubeResponse(request, captions)))),
+                Localize,
                 NullLogger<WebIngestionService>.Instance);
 
             return new Harness(rag, manager, workspace.WorkspaceId, fetcher, fetcherFactory, service);

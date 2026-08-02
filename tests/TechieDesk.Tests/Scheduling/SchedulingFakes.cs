@@ -198,13 +198,14 @@ public sealed class FakeScheduleRunRepository : IScheduleRunRepository
             .ToList());
 
     /// <inheritdoc />
-    public Task<int> CloseAbandonedRunsAsync(string reason, DateTime asOfUtc)
+    public Task<int> CloseAbandonedRunsAsync(JobMessage reason, DateTime asOfUtc)
     {
         var closed = 0;
         foreach (var run in Runs.Where(run => run.Outcome == RunOutcome.Running))
         {
             run.Outcome = RunOutcome.Failed;
-            run.FailureReason = reason;
+            run.FailureReason = reason.ToInvariantString();
+            run.FailureReasonJson = reason.ToStorage();
             run.CompletedUtc = asOfUtc;
             closed++;
         }
@@ -221,7 +222,7 @@ public sealed class FakeJobHandler : IScheduledJobHandler
         (_, _) => Task.FromResult(JobRunResult.Completed);
 
     /// <summary>Gets or sets the payload validation result.</summary>
-    public string? PayloadError { get; set; }
+    public JobMessage? PayloadError { get; set; }
 
     /// <summary>Gets how many times the handler ran.</summary>
     public int RunCount { get; private set; }
@@ -230,16 +231,17 @@ public sealed class FakeJobHandler : IScheduledJobHandler
     public string JobKind { get; set; } = "Test";
 
     /// <inheritdoc />
-    public string DisplayName => "Test action";
+    public string DisplayNameKey => "JobKindMaintenanceName";
 
     /// <inheritdoc />
-    public string Description => "Does whatever the test told it to.";
+    public string DescriptionKey => "JobKindMaintenanceDescription";
 
     /// <inheritdoc />
-    public string DescribeAction(string? payload) => $"Test action ({payload ?? "no payload"})";
+    public JobMessage DescribeAction(string? payload) =>
+        JobMessage.Of("JobKindMaintenanceAction", payload ?? string.Empty);
 
     /// <inheritdoc />
-    public string? ValidatePayload(string? payload) => PayloadError;
+    public JobMessage? ValidatePayload(string? payload) => PayloadError;
 
     /// <inheritdoc />
     public Task<JobRunResult> RunAsync(JobRunContext context, CancellationToken cancellationToken)

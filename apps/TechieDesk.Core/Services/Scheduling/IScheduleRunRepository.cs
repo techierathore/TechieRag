@@ -49,5 +49,5 @@ public interface IScheduleRunRepository
     /// scheduler's "already running" guard would refuse to start that job again — a single crash
     /// would silently disable an automation for good.
     /// </remarks>
-    Task<int> CloseAbandonedRunsAsync(string reason, DateTime asOfUtc);
+    Task<int> CloseAbandonedRunsAsync(JobMessage reason, DateTime asOfUtc);
 }

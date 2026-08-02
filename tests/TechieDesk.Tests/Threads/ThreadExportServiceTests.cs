@@ -1,5 +1,6 @@
 using TechieDesk.Services.Files;
 using TechieDesk.Services.Threads;
+using TechieDesk.Tests.Support;
 using TechieRag.Models;
 using Xunit;
 
@@ -16,6 +17,7 @@ public sealed class ThreadExportServiceTests : IDisposable
         Path.Combine(Path.GetTempPath(), "techiedesk-export-tests", Guid.NewGuid().ToString("N"));
 
     private readonly ThreadExporter exporter = new();
+    private readonly ResourceHarness resources = new("en");
 
     /// <summary>Creates the per-test scratch directory the fake save services write into.</summary>
     public ThreadExportServiceTests() => Directory.CreateDirectory(workingDirectory);
@@ -23,6 +25,8 @@ public sealed class ThreadExportServiceTests : IDisposable
     /// <summary>Removes the per-test scratch directory.</summary>
     public void Dispose()
     {
+        resources.Dispose();
+
         if (Directory.Exists(workingDirectory))
         {
             Directory.Delete(workingDirectory, recursive: true);
@@ -77,7 +81,8 @@ public sealed class ThreadExportServiceTests : IDisposable
         return (thread, messages);
     }
 
-    private ThreadExportService BuildService(IFileSaveService saveService) => new(exporter, saveService);
+    private ThreadExportService BuildService(IFileSaveService saveService) =>
+        new(exporter, saveService, resources.Localize);
 
     /// <summary>
     /// Exporting as Markdown through a save service that writes the file reports Saved, names the

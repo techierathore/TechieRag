@@ -82,9 +82,25 @@ key** (`NavQdrantAdmin`), not a caption.
    `(ok, detail)` — and `navLabel` in `sweep-results.json` — reads `id=nav-…` or `label=…`,
    so every result records which mechanism actually navigated that screen.
 
-**⚠ Which one is live is an OPEN QUESTION — check, do not assume.** REQ-UI-053 added the
-ids on 2026-08-01; whether they reach the macOS accessibility tree **has not yet been
-measured on a running head**, and the desk evidence points the wrong way:
+**⚠ ANSWERED 2026-08-02 — the ids do NOT reach the accessibility tree.** Measured on a
+freshly built Release head with `python3 tests/appium/nav.py ids`: **0 of 23**, every sidebar
+link reporting `identifier=<empty>`, which is the outcome the desk evidence below predicted.
+The sweep is therefore running **entirely on the resource-key label fallback** — confirmed in
+the same run, where `sweep-results.json` recorded `navLabel: label=बैकअप और रीस्टोर` under
+`AppearanceLanguage='hi'` and both graded screens still arrived.
+
+Two consequences, both load-bearing:
+
+- **REQ-NFR-014's English-literal guard is not theoretical.** The label path is the ONLY path,
+  so one English literal in a selector table is one screen that stops being reachable the next
+  time somebody translates something.
+- Keep `NAV_IDS` and the `id`s in `MainLayout.razor` anyway — they cost nothing, they are the
+  standard testability handle, and `SidebarSweepCoverageTests` holds the two halves in step. The
+  next thing to try is a NATIVE fix (a `WKWebView` AX shim, or a `Go`-menu entry per route), not
+  another HTML attribute. **Do not** reach for `aria-label` as a smuggling channel: it overwrites
+  the accessible name and breaks REQ-NFR-005 to serve a test.
+
+The desk evidence that predicted it, kept because it explains *why*:
 
 - The `id` reaches the DOM. Proven by rendering `SidebarMenuButton` through
   `HtmlRenderer` — the unmatched attribute splats onto the anchor:
@@ -163,8 +179,25 @@ carries `{0}` placeholders is matched on all of its literal fragments.
 > invalidates any harness that identifies it by English text.* It has now broken `sidebar()`
 > (REQ-UI-050), `go_menu()` (REQ-UI-052) and `run_sweep.CHROMELESS` (which identified `/login`
 > by a literal REQ-UI-052 had just translated). **Anything in this harness still matching a
-> product string literally is a latent break.** A test asserting no selector is an English
-> literal is the durable fix and is not yet written.
+> product string literally is a latent break.**
+>
+> **WRITTEN 2026-08-02 (REQ-NFR-014): `tests/TechieDesk.Tests/Harness/HarnessSelectorLiteralTests.cs`.**
+> It runs with `dotnet test` — no session, no macOS, no head — so it fires on the change that
+> breaks it rather than on the next sweep. A selector is culture-invariant only if it is a
+> **resource key that exists in `AppStrings.resx`** or an **`AutomationId` that
+> `MainLayout.razor` really renders**; anything else fails. The catch-all behind it flags any
+> string constant in `tests/appium/*.py` that is **byte-identical to an English value in
+> `AppStrings.resx`** — which is exactly what a caption becomes the moment somebody localizes
+> the surface, so REQ-UI-052 would have gone red on the commit that added `LoginSubheading`.
+> Docstrings and f-strings are excluded structurally. Five exemptions exist, all documented in
+> the test; four are `menu_check.STANDARD_TITLES`, which names macOS's OWN stock menus and
+> therefore follows the **system** language, not `AppearanceLanguage`.
+>
+> Its sibling `SidebarSweepCoverageTests.cs` closes the other half: `run_sweep.SIDEBAR`,
+> `nav.NAV_IDS` and the `<SidebarMenuButton>`s in `MainLayout.razor` must agree as SETS, on key,
+> route and identifier. Adding a screen without adding its `SIDEBAR` row fails there — which is
+> what `/settings/backup` needed, having shipped and gone ungraded for days under an all-clean
+> sweep.
 
 ### Why not the other two designs
 
@@ -240,6 +273,12 @@ means *developer mode*, not a missing permission.
   both widths. `SIDEBAR` = `(slug, route, resource-key)`.
 - `update_devguides.py` — writes observed render/visual tags back into `docs/devguides/`
   (verify-phase §6b).
+- **`tests/TechieDesk.Tests/Harness/`** (not python, but part of this harness) — REQ-NFR-014's two
+  static guards over the tables above. `SidebarSweepCoverageTests` proves `SIDEBAR` / `NAV_IDS` /
+  `MainLayout.razor` agree as sets; `HarnessSelectorLiteralTests` proves no selector is an English
+  literal. Both run under `dotnet test`, need no session, and gate `verify-phase` §4c. **If either
+  is red, the §4a/§4b results from this harness are not trustworthy** — an incomplete table means
+  screens were never graded at all.
 - `menu_check.py` — REQ-UI-054. Asserts UIKit really DREW the menu bar `MainPage` declares.
   Reads the declaration out of `MainPage.xaml.cs` (so it cannot drift from the product),
   resolves every caption through `strings.py`, then checks the live menu bar — titles and

@@ -23,7 +23,15 @@ public sealed record ScheduleInterpretation(ScheduleDraft? Draft, string? Error 
 /// <param name="JobKind">The handler key.</param>
 /// <param name="DisplayName">The action's human name.</param>
 /// <param name="Description">What it does.</param>
-public sealed record AvailableAction(string JobKind, string DisplayName, string Description);
+/// <remarks>
+/// <b>Both display members are resource KEYS, not names (REQ-UI-056).</b> This record feeds two
+/// audiences at once: the model, which is sent the ENGLISH names because the prompt is machine text
+/// and translating it would change what the model is asked for, and the user, who reads the same
+/// action list back in a refusal ("I only know how to …"). Carrying keys lets each consumer resolve
+/// for its own audience — <c>JobMessage.Neutral</c> for the prompt, the reader's localizer for the
+/// refusal. Before this, a Hindi refusal named the actions in English.
+/// </remarks>
+public sealed record AvailableAction(string JobKind, string DisplayNameKey, string DescriptionKey);
 
 /// <summary>
 /// Turns a natural-language instruction into a reviewable schedule draft, using the configured local

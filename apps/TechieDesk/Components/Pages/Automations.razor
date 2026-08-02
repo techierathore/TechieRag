@@ -4,6 +4,7 @@
 @inject IScheduleService Schedules
 @inject IScheduleInterpreter Interpreter
 @inject IBackgroundJobService BackgroundJobs
+@inject IJobRunner JobRunner
 @inject ISchedulerHelper SchedulerHelper
 @inject ISchedulerPreferencesStore PreferencesStore
 @inject ToastService ToastService
@@ -76,7 +77,7 @@
                         <div class="flex items-center gap-2 text-sm">
                             <Spinner Size="SpinnerSize.Small" />
                             <span class="font-medium">@job.JobName</span>
-                            <span class="text-muted-foreground">@(job.Message ?? Localizer["AutoWorking"].Value)</span>
+                            <span class="text-muted-foreground">@(job.Message?.Resolve(Localize) ?? Localizer["AutoWorking"].Value)</span>
                             <span class="ml-auto text-muted-foreground">@DescribeCounts(job)</span>
                             <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
                                     OnClick="@(() => CancelJob(job.ScheduleRunId))">@Localizer["AutoStop"]</Button>
@@ -151,12 +152,33 @@
                                 </DataTableColumn>
                                 <DataTableColumn TData="Schedule" TValue="string"
                                                  Property="@(row => row.Name)" Header="@Localizer["AutoColJob"]" Sortable />
+                                @* REQ-UI-056: DESCRIBED LIVE from JobPayload, not bound to the stored
+                                   ActionSummary. Same reasoning as the schedule column below. *@
                                 <DataTableColumn TData="Schedule" TValue="string"
-                                                 Property="@(row => row.ActionSummary)" Header="@Localizer["AutoColWhatItDoes"]" />
-                                @* ⚠ BRD-140: this column shows ScheduleText, the confirmed sentence.
-                                   It must never be bound to CronExpression. *@
+                                                 Property="@(row => row.ActionSummary)" Header="@Localizer["AutoColWhatItDoes"]">
+                                    <CellTemplate Context="row">
+                                        @DescribeAction(row)
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                @* ⚠ BRD-140: this column shows the schedule as a SENTENCE. It must never
+                                   be bound to CronExpression.
+
+                                   REQ-UI-056: it is now DESCRIBED LIVE — CronDescriber.Describe over the
+                                   stored CronExpression — rather than bound to Schedule.ScheduleText.
+                                   ScheduleText stays exactly what BRD-140 says it is: the record of the
+                                   words the owner CONFIRMED, kept for the audit trail and echoed back by
+                                   IScheduleService on save. But it is English, it was written once at
+                                   save time, and painting it here made a Hindi install show an English
+                                   schedule forever. Describing live costs one parse per row, cannot
+                                   produce cron (CronDescriber has no raw-expression fallback, on
+                                   purpose), and falls back to the confirmed text if the stored
+                                   expression will not parse. *@
                                 <DataTableColumn TData="Schedule" TValue="string"
-                                                 Property="@(row => row.ScheduleText)" Header="@Localizer["AutoColRuns"]" />
+                                                 Property="@(row => row.ScheduleText)" Header="@Localizer["AutoColRuns"]">
+                                    <CellTemplate Context="row">
+                                        @DescribeSchedule(row)
+                                    </CellTemplate>
+                                </DataTableColumn>
                                 <DataTableColumn TData="Schedule" TValue="string"
                                                  Property="@(row => row.Name)" Header="@Localizer["AutoColLastRun"]">
                                     <CellTemplate Context="row">
@@ -530,11 +552,11 @@
     <DialogContent Class="max-w-2xl">
         <DialogHeader>
             <DialogTitle>@(selectedRun?.JobName ?? Localizer["AutoRunFallbackTitle"].Value)</DialogTitle>
-            <DialogDescription>@(selectedRun?.Detail ?? Localizer["AutoNoSummaryRecorded"].Value)</DialogDescription>
+            <DialogDescription>@(DescribeDetail(selectedRun) ?? Localizer["AutoNoSummaryRecorded"].Value)</DialogDescription>
         </DialogHeader>
 
         <div class="space-y-3 py-2">
-            @if (selectedRun?.FailureReason is { Length: > 0 } reason)
+            @if (DescribeFailure(selectedRun) is { Length: > 0 } reason)
             {
                 <Alert Variant="AlertVariant.Danger" AccentBorder="true">
                     <AlertTitle>@Localizer["AutoWhyItDidNotFinish"]</AlertTitle>
@@ -555,9 +577,12 @@
                             <Badge Variant="@ItemVariant(item.Status)">@item.Status</Badge>
                             <div class="min-w-0 flex-1">
                                 <div class="truncate font-medium">@item.ItemName</div>
-                                @if (!string.IsNullOrWhiteSpace(item.Reason))
+                                @{
+                                    var itemReason = JobMessage.Render(item.Reason, item.ReasonJson, Localize);
+                                }
+                                @if (!string.IsNullOrWhiteSpace(itemReason))
                                 {
-                                    <div class="text-xs text-muted-foreground">@item.Reason</div>
+                                    <div class="text-xs text-muted-foreground">@itemReason</div>
                                 }
                             </div>
                         </div>
@@ -653,6 +678,58 @@
     private string InterpreterAvailability => Interpreter.IsModelAvailable
         ? Localizer["AutoInterpreterLocal"].Value
         : Localizer["AutoInterpreterNoModel"].Value;
+
+    /// <summary>
+    /// Resolves a resource key for the service layer, which returns KEYS and never sentences.
+    /// </summary>
+    /// <remarks>
+    /// The one adapter REQ-UI-051 sanctions: <c>(key, args) =&gt; Localizer[key, args]</c>. Everything
+    /// on this page that renders a <see cref="JobMessage"/> — a stored run detail, a per-item reason,
+    /// a live progress line, a described schedule — goes through it, so there is exactly one place
+    /// the reader's language enters.
+    /// </remarks>
+    private LocalizeText Localize => (key, arguments) =>
+        arguments.Length == 0 ? Localizer[key].Value : Localizer[key, arguments].Value;
+
+    /// <summary>
+    /// Renders a schedule's timing as a sentence in the reader's language (REQ-UI-056 / BRD-140).
+    /// </summary>
+    /// <remarks>
+    /// The stored <see cref="Schedule.ScheduleText"/> is the CONFIRMATION record and is the fallback,
+    /// not the source: an expression that will not parse — hand-edited, or written by a newer build —
+    /// must still show the owner the words they agreed to rather than a blank cell. CronDescriber
+    /// itself never emits cron syntax, so BRD-140 holds on both branches.
+    /// </remarks>
+    private string DescribeSchedule(Schedule schedule) =>
+        CronDescriber.TryDescribe(schedule.CronExpression, Localize) ?? schedule.ScheduleText;
+
+    /// <summary>
+    /// Renders what a schedule does, in the reader's language, by asking its handler to describe the
+    /// stored payload again (REQ-UI-056).
+    /// </summary>
+    /// <remarks>
+    /// Falls back to the stored <see cref="Schedule.ActionSummary"/> when this build has no handler
+    /// for the schedule's kind — a connector removed from the build, or a schedule written by a
+    /// newer one. That row's action genuinely cannot be re-described, and the confirmed English is a
+    /// better answer than an empty cell.
+    /// </remarks>
+    private string DescribeAction(Schedule schedule) =>
+        JobRunner.FindHandler(schedule.JobKind)?.DescribeAction(schedule.JobPayload).Resolve(Localize)
+        ?? schedule.ActionSummary;
+
+    /// <summary>Renders a run's stored summary line (REQ-UI-056).</summary>
+    /// <remarks>
+    /// <see cref="JobMessage.Render"/> is the whole persisted-English policy: coded rows render in the
+    /// reader's language, and a row with no codes prints its stored text exactly as written. The
+    /// second branch is permanent — it is what keeps a history written before this release readable
+    /// instead of blank.
+    /// </remarks>
+    private string? DescribeDetail(ScheduleRun? run) =>
+        run is null ? null : JobMessage.Render(run.Detail, run.DetailJson, Localize);
+
+    /// <summary>Renders why a run failed, coded when it can be and stored text when it cannot.</summary>
+    private string? DescribeFailure(ScheduleRun? run) =>
+        run is null ? null : JobMessage.Render(run.FailureReason, run.FailureReasonJson, Localize);
 
     private string NextRunsPreview => draft is { NextRunsUtc.Count: > 0 }
         ? string.Join(", ", draft.NextRunsUtc.Select(run => run.ToLocalTime().ToString("ddd dd MMM HH:mm")))
@@ -837,7 +914,7 @@
             else
             {
                 ToastService.Success(
-                    run.Detail ?? run.Outcome.ToString(),
+                    DescribeDetail(run) ?? run.Outcome.ToString(),
                     Localizer["AutoRunOutcomeToastTitle", schedule.Name, run.Outcome]);
             }
 

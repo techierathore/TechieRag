@@ -63,23 +63,23 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
     public string JobKind => Kind;
 
     /// <inheritdoc />
-    public string DisplayName => "Sync a connector";
+    public string DisplayNameKey => "JobKindConnectorName";
 
     /// <inheritdoc />
-    public string Description =>
-        "Reads a repository, wiki or mailbox and adds what changed to the document library.";
+    public string DescriptionKey => "JobKindConnectorDescription";
 
     /// <inheritdoc />
-    public string DescribeAction(string? payload) =>
-        ConnectorJobPayload.TryParse(payload)?.Describe() ?? "Sync a connector (configuration missing)";
+    public JobMessage DescribeAction(string? payload) =>
+        ConnectorJobPayload.TryParse(payload)?.Describe()
+        ?? JobMessage.Of("ConnectorActionConfigurationMissing");
 
     /// <inheritdoc />
-    public string? ValidatePayload(string? payload)
+    public JobMessage? ValidatePayload(string? payload)
     {
         var parsed = ConnectorJobPayload.TryParse(payload);
         if (parsed is null)
         {
-            return "This connector run has no readable configuration.";
+            return JobMessage.Of("ConnectorRunNoReadableConfiguration");
         }
 
         var invalid = parsed.Validate();
@@ -100,7 +100,7 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
         var payload = ConnectorJobPayload.TryParse(context.Payload);
         if (payload is null)
         {
-            return JobRunResult.Failed("This connector run has no readable configuration.");
+            return JobRunResult.FailedWith("ConnectorRunNoReadableConfiguration");
         }
 
         var invalid = payload.Validate();
@@ -124,11 +124,13 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
         {
             resolved = await resolver.ResolveAsync(payload, cancellationToken).ConfigureAwait(false);
         }
-        catch (ConnectorException exception)
+        catch (Exception exception) when (exception is ConnectorException or ConnectorSetupException)
         {
-            // Nothing has been attempted, so this is a run failure and not a partial result.
+            // Nothing has been attempted, so this is a run failure and not a partial result. Both
+            // exception types are caught because only one of them can carry codes: the library's is
+            // sealed and English-only, so its words go through verbatim (REQ-UI-056).
             logger.LogError(exception, "Connector {ConnectorId} could not be opened", payload.ConnectorId);
-            return JobRunResult.Failed(exception.Message);
+            return JobRunResult.Failed(ConnectorSetupException.ReasonFor(exception));
         }
 
         return await WalkAsync(context, payload, resolver, sink, resolved, cancellationToken)
@@ -174,14 +176,14 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
                 observed.IngestedCount);
             throw;
         }
-        catch (ConnectorException exception)
+        catch (Exception exception) when (exception is ConnectorException or ConnectorSetupException)
         {
             // The source died part-way. Whatever reached the library stays there and stays recorded;
             // the run itself is Failed, and the reason names the source-level problem rather than
             // blaming the last item.
             await KeepPartialSyncAsync(resolver, payload, resolved, observed).ConfigureAwait(false);
             logger.LogError(exception, "Connector run '{JobName}' stopped", context.JobName);
-            return JobRunResult.Failed(exception.Message);
+            return JobRunResult.Failed(ConnectorSetupException.ReasonFor(exception));
         }
     }
 
@@ -206,7 +208,11 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
             var status = failure.Reason.StartsWith(LibrarySkipPrefix, StringComparison.Ordinal)
                 ? RunItemStatus.Skipped
                 : RunItemStatus.Failed;
-            progress.RecordItem(status, failure.ItemId, failure.ItemName, failure.Reason);
+
+            // The library's own wording, carried through verbatim: it is not ours to translate, and
+            // inventing a code per library message would misrepresent what is translatable.
+            progress.RecordItem(
+                status, failure.ItemId, failure.ItemName, JobMessage.Text(failure.Reason));
         }
 
         foreach (var item in result.Unchanged.Where(item => recorded.Add(item.Id)))
@@ -215,7 +221,9 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
                 RunItemStatus.Skipped,
                 item.Id,
                 item.Name,
-                $"Unchanged since the previous run (version {item.Version ?? "unknown"}).");
+                item.Version is { } version
+                    ? JobMessage.Of("ConnectorItemUnchangedWithVersion", version)
+                    : JobMessage.Of("ConnectorItemUnchanged"));
         }
     }
 
@@ -263,12 +271,16 @@ public sealed class ConnectorJobHandler : IScheduledJobHandler
     /// <summary>Composes the run-history detail line.</summary>
     /// <param name="observed">The decorator, which counted what was ingested.</param>
     /// <param name="reachedLimit">Whether a run budget stopped the walk early.</param>
-    /// <returns>A one-line summary for the run history.</returns>
-    private static string ComposeDetail(ObservedConnector observed, bool reachedLimit)
+    /// <returns>A one-line summary for the run history, as codes and arguments.</returns>
+    /// <remarks>
+    /// This is the sentence 5 of the 5 rows on the development install already hold in English
+    /// ("2 ingested of 2 listed"). It is the worked example of why REQ-UI-056's stored unit had to be
+    /// a code PLUS arguments: no bare key can reproduce the two numbers.
+    /// </remarks>
+    private static JobMessage ComposeDetail(ObservedConnector observed, bool reachedLimit)
     {
-        var detail = $"{observed.IngestedCount} ingested of {observed.ListedCount} listed";
-        return reachedLimit
-            ? $"{detail} · stopped at this run's budget, so the source was not fully read"
-            : detail;
+        var detail = JobMessage.Of(
+            "ConnectorRunDetailIngestedOfListed", observed.IngestedCount, observed.ListedCount);
+        return reachedLimit ? detail.Then("ConnectorRunDetailReachedBudget") : detail;
     }
 }

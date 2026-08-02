@@ -627,6 +627,13 @@ else
 }
 
 @code {
+    /// <summary>
+    /// Resolves a resource key for the service layer, which returns KEYS and never sentences
+    /// (REQ-UI-051, extended to <c>JobMessage</c> by REQ-UI-056).
+    /// </summary>
+    private LocalizeText Localize => (key, arguments) =>
+        arguments.Length == 0 ? Localizer[key].Value : Localizer[key, arguments].Value;
+
     /// <summary>The "read a whole space" choice of the Confluence scope control.</summary>
     private const string ScopeSpace = "space";
 
@@ -1106,7 +1113,9 @@ else
 
         savedJustNow = false;
         testRan = false;
-        saveError = registry.Validate(registration);
+        // REQ-UI-056: the registry returns CODES, so the resolution into the operator's language
+        // happens here, at the one place that renders.
+        saveError = registry.Validate(registration)?.Resolve(Localize);
         if (saveError is not null)
         {
             return;
@@ -1127,6 +1136,11 @@ else
             removeStoredToken = false;
             savedJustNow = true;
             ToastService.Success(Localizer["ConnEditToastSavedBody"], Localizer["ConnEditToastSavedTitle"]);
+        }
+        catch (ConnectorSetupException ex)
+        {
+            // REQ-UI-056: codes resolved here; the library's ConnectorException below cannot be.
+            saveError = ex.Reason.Resolve(Localize);
         }
         catch (ConnectorException ex)
         {
@@ -1162,7 +1176,7 @@ else
 
         try
         {
-            testFailure = await registry.TestAsync(savedId);
+            testFailure = (await registry.TestAsync(savedId))?.Resolve(Localize);
             testRan = true;
             if (testFailure is null)
             {
@@ -1208,7 +1222,7 @@ else
                 return;
             }
 
-            var invalid = jobs.Validate(payload);
+            var invalid = jobs.Validate(payload)?.Resolve(Localize);
             if (invalid is not null)
             {
                 saveError = invalid;
@@ -1218,6 +1232,12 @@ else
             await jobs.StartAsync(payload);
             ToastService.Success(Localizer["ConnEditToastSyncStartedBody"], Localizer["ConnEditToastSyncStartedTitle"]);
             Nav.NavigateTo($"/workspace/{Slug}/connectors");
+        }
+        catch (ConnectorSetupException ex)
+        {
+            var reason = ex.Reason.Resolve(Localize);
+            saveError = reason;
+            ToastService.Error(reason, Localizer["ConnEditToastSyncFailTitle"]);
         }
         catch (ConnectorException ex)
         {

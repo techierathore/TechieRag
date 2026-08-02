@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieDesk.Services.Support;
+using TechieDesk.Tests.Support;
 using TechieDeskDb;
 using Xunit;
 
@@ -21,6 +22,7 @@ namespace TechieDesk.Tests.SupportIssues;
 public sealed class SupportAttachmentStoreTests : IDisposable
 {
     private readonly string sandbox;
+    private readonly ResourceHarness resources = new("en");
     private readonly SupportAttachmentStore store;
 
     /// <summary>Points the data directory at a private sandbox for one test.</summary>
@@ -36,12 +38,15 @@ public sealed class SupportAttachmentStoreTests : IDisposable
             })
             .Build();
 
-        store = new SupportAttachmentStore(configuration, NullLogger<SupportAttachmentStore>.Instance);
+        store = new SupportAttachmentStore(
+            configuration, resources.Localize, NullLogger<SupportAttachmentStore>.Instance);
     }
 
     /// <summary>Removes the sandbox.</summary>
     public void Dispose()
     {
+        resources.Dispose();
+
         try
         {
             if (Directory.Exists(sandbox))

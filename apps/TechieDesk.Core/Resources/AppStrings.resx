@@ -11513,4 +11513,436 @@ If no other copy is running, quit this message and start TechieDesk again — th
     <value>Add a connector</value>
     <comment>Browser tab title for the connector editor when adding a new connector (REQ-UI-055).</comment>
   </data>
+  <data name="JobKindMaintenanceName" xml:space="preserve">
+    <value>Local database maintenance</value>
+    <comment>Name of the built-in maintenance action, listed in the schedule authoring dialog and named in the interpreter's refusal (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindMaintenanceDescription" xml:space="preserve">
+    <value>Compacts TechieDesk's local databases so deleted documents and chunks give their disk space back.</value>
+    <comment>One-line description of the maintenance action, shown when choosing an action (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindMaintenanceAction" xml:space="preserve">
+    <value>Compact the local databases</value>
+    <comment>The action summary shown in the schedules grid for a maintenance schedule (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindConnectorName" xml:space="preserve">
+    <value>Sync a connector</value>
+    <comment>Name of the connector-sync action, listed in the schedule authoring dialog (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindConnectorDescription" xml:space="preserve">
+    <value>Reads a repository, wiki or mailbox and adds what changed to the document library.</value>
+    <comment>One-line description of the connector-sync action, shown when choosing an action (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunNoHandler" xml:space="preserve">
+    <value>No installed component handles jobs of kind '{0}'.</value>
+    <comment>Run failure when a schedule names a job kind whose component is no longer installed. {0} is the stored job kind, wire vocabulary, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunCancelled" xml:space="preserve">
+    <value>The run was cancelled.</value>
+    <comment>Run failure reason recorded when the operator stopped the run (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunDetailProcessed" xml:space="preserve">
+    <value>{0} processed</value>
+    <comment>One segment of a run's summary line. {0} is a count in Latin digits (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunDetailFailed" xml:space="preserve">
+    <value>{0} failed</value>
+    <comment>One segment of a run's summary line, present only when something failed. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunDetailSkipped" xml:space="preserve">
+    <value>{0} skipped</value>
+    <comment>One segment of a run's summary line, present only when something was skipped. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunItemsCapped" xml:space="preserve">
+    <value>item list capped at {0} successes (all failures kept)</value>
+    <comment>Appended to a run's summary when the per-item list hit its retention cap. {0} is the cap (REQ-UI-056).</comment>
+  </data>
+  <data name="SchedulerRunAbandonedByProcess" xml:space="preserve">
+    <value>The application stopped while this run was in progress.</value>
+    <comment>Failure reason written against a run left open by a process that quit or crashed (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDataDirectoryMissingForSave" xml:space="preserve">
+    <value>The data directory {0} does not exist, so there is nothing to compact.</value>
+    <comment>Refusal shown in the confirm dialog when a maintenance schedule is saved on a machine with no data directory. {0} is a file path, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDataDirectoryMissing" xml:space="preserve">
+    <value>The data directory {0} does not exist.</value>
+    <comment>Run failure when the maintenance job finds no data directory. {0} is a file path (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceCompactingOne" xml:space="preserve">
+    <value>Compacting {0} database</value>
+    <comment>Live progress line while maintenance runs, singular. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceCompactingMany" xml:space="preserve">
+    <value>Compacting {0} databases</value>
+    <comment>Live progress line while maintenance runs, plural. Hindi does not form a plural with an 's', so this is a separate key rather than a suffix (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceItemCompacted" xml:space="preserve">
+    <value>Compacted from {0} to {1}</value>
+    <comment>Per-item result for one compacted database: the size before and after. {0} and {1} are byte sizes. Written as a sentence rather than as '{0} → {1}', because a resource whose whole value is punctuation is exactly what LocalizationTests.EveryHindiStringIsWrittenInDevanagari rejects, correctly (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDetailOneDatabase" xml:space="preserve">
+    <value>{0} database</value>
+    <comment>One segment of the maintenance run's summary line, singular. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDetailDatabases" xml:space="preserve">
+    <value>{0} databases</value>
+    <comment>One segment of the maintenance run's summary line, plural (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDetailReclaimed" xml:space="preserve">
+    <value>{0} reclaimed</value>
+    <comment>One segment of the maintenance run's summary line: how much disk space came back. {0} is a byte size (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRunNoReadableConfiguration" xml:space="preserve">
+    <value>This connector run has no readable configuration.</value>
+    <comment>Refusal when a schedule's connector payload cannot be parsed at all (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionConfigurationMissing" xml:space="preserve">
+    <value>Sync a connector (configuration missing)</value>
+    <comment>Action summary shown in the schedules grid when the connector payload cannot be read (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncIntoLibrary" xml:space="preserve">
+    <value>Sync a connector into the document library</value>
+    <comment>Action summary for an unnamed connector syncing into the library (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncIntoWorkspace" xml:space="preserve">
+    <value>Sync a connector into workspace {0}</value>
+    <comment>Action summary for an unnamed connector syncing into a workspace. {0} is the workspace id, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncNamedIntoLibrary" xml:space="preserve">
+    <value>Sync '{0}' into the document library</value>
+    <comment>Action summary for a named connector syncing into the library. {0} is the connector's name as the operator typed it (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncNamedIntoWorkspace" xml:space="preserve">
+    <value>Sync '{0}' into workspace {1}</value>
+    <comment>Action summary for a named connector syncing into a workspace. {0} is the connector name, {1} the workspace id (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadNoConnector" xml:space="preserve">
+    <value>The run does not say which connector to read.</value>
+    <comment>Refusal when a connector payload names no connector (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadNoConnectorType" xml:space="preserve">
+    <value>The run does not say what kind of connector to read.</value>
+    <comment>Refusal when a connector payload names no connector type (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadItemLimitTooLow" xml:space="preserve">
+    <value>The item limit must be at least 1, otherwise the run can never fetch anything.</value>
+    <comment>Refusal when a connector payload's item cap is zero or negative (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadPageLimitTooLow" xml:space="preserve">
+    <value>The page limit must be at least 1, otherwise the run can never list anything.</value>
+    <comment>Refusal when a connector payload's page cap is zero or negative (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadSizeLimitTooLow" xml:space="preserve">
+    <value>The per-item size limit must be greater than zero.</value>
+    <comment>Refusal when a connector payload's per-item size cap is zero or negative (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoTypesInstalled" xml:space="preserve">
+    <value>No connector types are installed in this build of TechieDesk.</value>
+    <comment>Refusal from the placeholder resolver used by a build that ships no connectors (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsUnknownType" xml:space="preserve">
+    <value>'{0}' is not a kind of connector this build can run.</value>
+    <comment>Refusal when a stored connector type is not one this build knows. {0} is the stored type key, wire vocabulary, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoLongerSaved" xml:space="preserve">
+    <value>The connector '{0}' is no longer saved, so there is nothing to read.</value>
+    <comment>Run failure when the connector a schedule names has been deleted. {0} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoLongerSavedAddAgain" xml:space="preserve">
+    <value>The connector '{0}' is no longer saved, so there is nothing to read. Add it again on the connectors screen.</value>
+    <comment>The same refusal shown at save time, where the operator can act on it. {0} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoLongerSavedShort" xml:space="preserve">
+    <value>That connector is no longer saved.</value>
+    <comment>Result of testing a connector that has since been deleted (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorTypeMismatch" xml:space="preserve">
+    <value>This run expects a {0} connector, but '{1}' is a {2} connector.</value>
+    <comment>Refusal when a schedule's stored connector type no longer matches the saved connector. {0} and {2} are wire type keys, {1} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorCredentialUnreadable" xml:space="preserve">
+    <value>The saved access token for '{0}' could not be read from this machine's credential store. Re-enter the token on the connector and run it again.</value>
+    <comment>Run failure when a connector claims a credential the OS store no longer holds. {0} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRegistrationNeedsName" xml:space="preserve">
+    <value>The connector needs a name, so it can be told apart from the others.</value>
+    <comment>Refusal when a connector is saved with no display name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNameAlreadyTaken" xml:space="preserve">
+    <value>A connector called '{0}' already exists — names have to be unique, so give this one a different name.</value>
+    <comment>Refusal when a connector's name collides with another. {0} is the name the operator typed (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailNeedsSource" xml:space="preserve">
+    <value>A mail connector needs either an IMAP server or the path to a local .mbox file.</value>
+    <comment>Refusal when a mail connector names neither a server nor an archive (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailBothSources" xml:space="preserve">
+    <value>This connector names both an IMAP server and an .mbox file. Choose one — they are different mailboxes, and reading both under one connector would merge two sources into one set of citations.</value>
+    <comment>Refusal when a mail connector names both a server and an archive (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMboxNotFullPath" xml:space="preserve">
+    <value>'{0}' is not a full path to an .mbox file.</value>
+    <comment>Refusal when a mailbox archive path is relative. {0} is the path as typed, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailNeedsUsername" xml:space="preserve">
+    <value>A mail connector needs the account name to sign in with, usually the address.</value>
+    <comment>Refusal when an IMAP connector has no account name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailCleartextPort" xml:space="preserve">
+    <value>Port {0} is a cleartext mail port, and this connector refuses it: your mailbox password and every message would cross the network unencrypted. Use 993, the implicit-TLS IMAP port.</value>
+    <comment>Refusal when a mail connector is pointed at a cleartext port. {0} is the port number (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailCleartextScheme" xml:space="preserve">
+    <value>'imap://' is the cleartext scheme and is refused. Enter the host name on its own — the connection is always TLS.</value>
+    <comment>Refusal when a mail host is entered with the cleartext URL scheme (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsRepositoryNeedsPath" xml:space="preserve">
+    <value>A repository connector needs a project path, for example 'owner/repository'.</value>
+    <comment>Refusal when a repository connector has no project path. The example is wire vocabulary and stays in Latin script (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsRepositoryPathNotOwnerRepo" xml:space="preserve">
+    <value>'{0}' is not a project path; it needs an owner or group, for example 'owner/repository'.</value>
+    <comment>Refusal when a repository project path has no owner segment. {0} is the path as typed (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsApiUrlNotAbsolute" xml:space="preserve">
+    <value>The API base URL must be an absolute http or https address.</value>
+    <comment>Refusal for a malformed repository API base URL. A whole key per URL role, because the role is a noun the sentence is built around (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsWebUrlNotAbsolute" xml:space="preserve">
+    <value>The web base URL must be an absolute http or https address.</value>
+    <comment>Refusal for a malformed repository web base URL (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsSiteUrlNotAbsolute" xml:space="preserve">
+    <value>The site URL must be an absolute http or https address.</value>
+    <comment>Refusal for a malformed Confluence site URL (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsUrlPrivateNetwork" xml:space="preserve">
+    <value>'{0}' is on a private network. Turn on 'allow this connector to reach my own network' if that is deliberate — it lets this connector send its credential to an address inside your network.</value>
+    <comment>Refusal when a connector URL points at a private-network host without the opt-in. {0} is the host name, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsConfluenceNeedsSiteUrl" xml:space="preserve">
+    <value>A Confluence connector needs a site URL, for example 'https://acme.atlassian.net/wiki'.</value>
+    <comment>Refusal when a Confluence connector has no site URL. The example URL is wire vocabulary (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsConfluenceNeedsOneOf" xml:space="preserve">
+    <value>A Confluence connector needs exactly one of a space key or a page id — a space is a different walk from a page tree.</value>
+    <comment>Refusal when a Confluence connector names both a space and a page, or neither (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressListing" xml:space="preserve">
+    <value>Listing items in {0}…</value>
+    <comment>Live progress line while a connector lists its source. {0} is the source name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressListed" xml:space="preserve">
+    <value>Listed {0} item(s) in {1}</value>
+    <comment>Live progress line once a listing page is in. {0} is a count, {1} the source name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressReading" xml:space="preserve">
+    <value>Reading {0}</value>
+    <comment>Live progress line while one item is fetched. {0} is the item's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressIngested" xml:space="preserve">
+    <value>Ingested {0} ({1} of {2} listed)</value>
+    <comment>Live progress line after an item is ingested. {0} is the item name, {1} the ingested count, {2} the listed count (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemNoReadableText" xml:space="preserve">
+    <value>The item held no readable text.</value>
+    <comment>Per-item skip reason for an item with no extractable text (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedToLibrary" xml:space="preserve">
+    <value>Added to the document library.</value>
+    <comment>Per-item note for a document ingested into the library alone. One of the sentences already persisted in English on installed machines (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedToWorkspace" xml:space="preserve">
+    <value>Added to workspace {0}.</value>
+    <comment>Per-item note for a document linked into a workspace. {0} is the workspace id, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedNoLinkerHost" xml:space="preserve">
+    <value>Added to the document library; not linked to workspace {0} because workspace linking is not available in this host.</value>
+    <comment>Per-item note when the scheduler helper host ingests without a workspace linker. {0} is the workspace id (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedLinkNotWritten" xml:space="preserve">
+    <value>Added to the document library; the link to workspace {0} could not be written because workspace persistence is not configured.</value>
+    <comment>Per-item note when a workspace link could not be persisted. {0} is the workspace id (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemReplacedPreviousCopy" xml:space="preserve">
+    <value>Replaced the previously ingested copy.</value>
+    <comment>Appended to a per-item note when a changed item superseded its earlier document (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemUnchanged" xml:space="preserve">
+    <value>Unchanged since the previous run.</value>
+    <comment>Per-item skip reason for an item the source reports as unchanged and gives no version for (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemUnchangedWithVersion" xml:space="preserve">
+    <value>Unchanged since the previous run (version {0}).</value>
+    <comment>Per-item skip reason for an unchanged item, naming the source's version. {0} is the version string, never translated. One of the sentences already persisted in English on installed machines (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRunDetailIngestedOfListed" xml:space="preserve">
+    <value>{0} ingested of {1} listed</value>
+    <comment>A connector run's summary line. {0} is the ingested count, {1} the listed count. This is the exact sentence 5 rows of run history already hold in English, and the reason the stored unit had to carry ARGUMENTS and not just a key (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRunDetailReachedBudget" xml:space="preserve">
+    <value>stopped at this run's budget, so the source was not fully read</value>
+    <comment>Appended to a connector run's summary when a run budget stopped the walk early (REQ-UI-056).</comment>
+  </data>
+  <data name="WebValidationEnterUrl" xml:space="preserve">
+    <value>Enter a URL first.</value>
+    <comment>Add from web: the address field is empty (REQ-UI-055 / REQ-RAG-016).</comment>
+  </data>
+  <data name="WebValidationNoWorkspace" xml:space="preserve">
+    <value>No workspace is selected, so there is nowhere to put the result.</value>
+    <comment>Add from web: no workspace on the request (REQ-UI-055).</comment>
+  </data>
+  <data name="WebValidationNotYouTube" xml:space="preserve">
+    <value>'{0}' is not a YouTube video URL. Paste a watch, youtu.be, shorts or embed link.</value>
+    <comment>Add from web: the video source was given a non-YouTube address. {0} is the URL, never translated (REQ-UI-055 / REQ-RAG-018).</comment>
+  </data>
+  <data name="WebValidationNotAbsoluteUrl" xml:space="preserve">
+    <value>'{0}' is not an absolute http or https URL. Include the scheme, e.g. https://example.com.</value>
+    <comment>Add from web: the address has no scheme. {0} is the URL, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebValidationPrivateHost" xml:space="preserve">
+    <value>'{0}' is a private-network address. Turn on 'Allow intranet and private addresses' if you really mean to read from your own network.</value>
+    <comment>Add from web: the seed host is private and the SSRF toggle is off. {0} is the host, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebValidationDepthRange" xml:space="preserve">
+    <value>Crawl depth must be between 0 and {0}.</value>
+    <comment>Add from web: the crawl depth is out of the bound this surface accepts. {0} is the maximum (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebValidationPageRange" xml:space="preserve">
+    <value>The page limit must be between 1 and {0}.</value>
+    <comment>Add from web: the page budget is out of the bound this surface accepts. {0} is the maximum (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebValidationNotAWebSource" xml:space="preserve">
+    <value>'{0}' is not a web source.</value>
+    <comment>Add from web: the request named a source kind this build does not ingest. {0} is the enum token, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebProgressReadingCaptions" xml:space="preserve">
+    <value>Reading the caption track…</value>
+    <comment>Add from web: live progress while a YouTube transcript is fetched (REQ-UI-055 / REQ-RAG-018).</comment>
+  </data>
+  <data name="WebProgressAddingDocuments" xml:space="preserve">
+    <value>Adding {0} document(s) to the workspace…</value>
+    <comment>Add from web: live progress while ingested documents are linked to the workspace. {0} is the count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebProgressFetching" xml:space="preserve">
+    <value>Fetching {0}</value>
+    <comment>Add from web: live progress for one page request in flight. {0} is the shortened URL, never translated (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebProgressRead" xml:space="preserve">
+    <value>Read '{0}' ({1} of at most {2})</value>
+    <comment>Add from web: live progress after a page came back. {0} is the page title, {1} the pages done, {2} the page budget (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebSkipNoWorkspacePersistence" xml:space="preserve">
+    <value>Embedded, but workspace persistence is not configured, so it was not added to this workspace.</value>
+    <comment>Add from web: per-item skip reason shown in the results table's Detail column (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSkipLinkFailed" xml:space="preserve">
+    <value>Embedded, but adding it to the workspace failed: {0}</value>
+    <comment>Add from web: per-item skip reason shown in the results table's Detail column. {0} is the underlying error, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryNothing" xml:space="preserve">
+    <value>Nothing was ingested.</value>
+    <comment>Add from web: run summary when the run produced nothing at all (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryNothingSkipped" xml:space="preserve">
+    <value>Nothing was ingested — {0} could not be read.</value>
+    <comment>Add from web: run summary when everything was skipped. {0} is a translated item count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryIngested" xml:space="preserve">
+    <value>Ingested {0}.</value>
+    <comment>Add from web: run summary for a clean run. {0} is a translated document count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryIngestedWithSkips" xml:space="preserve">
+    <value>Ingested {0}; {1} skipped.</value>
+    <comment>Add from web: run summary for a partial run — never phrased as a success. {0} is a translated document count, {1} a translated item count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountDocument" xml:space="preserve">
+    <value>{0} document</value>
+    <comment>Singular document count inside an Add from web summary. {0} is 1 (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountDocuments" xml:space="preserve">
+    <value>{0} documents</value>
+    <comment>Plural document count inside an Add from web summary. Hindi does not form a plural with an s (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountItem" xml:space="preserve">
+    <value>{0} item</value>
+    <comment>Singular source-item count inside an Add from web summary. {0} is 1 (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountItems" xml:space="preserve">
+    <value>{0} items</value>
+    <comment>Plural source-item count inside an Add from web summary. Hindi does not form a plural with an s (REQ-UI-055).</comment>
+  </data>
+  <data name="SupportAttachmentLimitsSummary" xml:space="preserve">
+    <value>PNG, JPG, PDF, LOG · 10 MB each</value>
+    <comment>Support: the attachment limits shown beside the drop zone and quoted back in a type refusal. The four format tokens are file-type names and stay in Latin script in every language (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedNoName" xml:space="preserve">
+    <value>That file can't be attached — it has no file name.</value>
+    <comment>Support: a dropped or pasted payload arrived with no file name (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedType" xml:space="preserve">
+    <value>"{0}" can't be attached — support accepts {1}.</value>
+    <comment>Support: the file's type is outside the allowlist. {0} is the file name, {1} the translated limits summary (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedEmpty" xml:space="preserve">
+    <value>"{0}" can't be attached — the file is empty.</value>
+    <comment>Support: a zero-byte attachment. {0} is the file name (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedTooLarge" xml:space="preserve">
+    <value>"{0}" is {1} — the limit is {2}.</value>
+    <comment>Support: the declared size is over the cap. {0} is the file name, {1} its size, {2} the cap (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedOverLimit" xml:space="preserve">
+    <value>"{0}" is larger than the {1} attachment limit.</value>
+    <comment>Support: the bytes streaming in passed the cap, so the partial file was deleted. {0} is the file name, {1} the cap (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedOutsideRoot" xml:space="preserve">
+    <value>That attachment can't be staged — its name resolves outside the support attachments folder.</value>
+    <comment>Support: the sanitised path escaped the attachments root (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="ChatExportFailedDetail" xml:space="preserve">
+    <value>Export failed: {0}</value>
+    <comment>Chat: the save panel itself threw. {0} is the underlying error, never translated (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="ChatExportNotSaved" xml:space="preserve">
+    <value>The export could not be saved.</value>
+    <comment>Chat: the platform save service reported a failure with no reason of its own (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="ChatExportNoFileWritten" xml:space="preserve">
+    <value>The export reported success but no file was written.</value>
+    <comment>Chat: a save service claimed success and produced nothing — the defect REQ-FN-010 exists for (REQ-UI-055).</comment>
+  </data>
+  <data name="ChatExportEmptyFile" xml:space="preserve">
+    <value>The export produced an empty file.</value>
+    <comment>Chat: the file exists but is zero bytes (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="ChatExportSaved" xml:space="preserve">
+    <value>Exported "{0}" as {1} to {2}.</value>
+    <comment>Chat: the confirmed export toast. {0} is the thread title, {1} the format name (Markdown/JSON, never translated), {2} the file path (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="AgentsInvalidHandle" xml:space="preserve">
+    <value>A handle must be 1–32 letters, digits or hyphens, for example @analyst.</value>
+    <comment>Workspace agents: the handle typed in the agent editor does not match the allowed shape. The example handle stays in Latin script — it is a real handle (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="AgentsDisplayNameRequired" xml:space="preserve">
+    <value>An agent needs a display name.</value>
+    <comment>Workspace agents: the display-name field was left empty in the agent editor (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="AgentsHandleAlreadyUsed" xml:space="preserve">
+    <value>@{0} is already used by "{1}" in this workspace.</value>
+    <comment>Workspace agents: a handle collision caught before the database constraint. {0} is the handle, {1} the clashing agent's display name — both user data, never translated (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="AgentsBuiltInNotDeletable" xml:space="preserve">
+    <value>The built-in @agent cannot be deleted. Reset it to its defaults instead.</value>
+    <comment>Workspace agents: delete was attempted on the built-in agent. @agent is the literal handle and stays in Latin script (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="DictationPermissionDenied" xml:space="preserve">
+    <value>Microphone or speech access was refused. Grant it in System Settings › Privacy &amp; Security › Microphone (and Speech Recognition), then try again.</value>
+    <comment>Chat composer: macOS refused microphone or speech-recognition access. The System Settings pane names stay in Latin script — that is what the OS shows, and a translated path name would send the user looking for a pane that does not exist (REQ-UI-055 / REQ-UI-035).</comment>
+  </data>
+  <data name="FlowsRunNeedsLlmProvider" xml:space="preserve">
+    <value>This flow has a step that calls a model and no LLM provider is configured, so nothing was run. Configure a model in LLM settings first.</value>
+    <comment>Workspace flows: the run was refused because a model-calling node has no provider. LLM stays in Latin script as a protocol noun (REQ-UI-055 / REQ-RAG-024).</comment>
+  </data>
 </root>

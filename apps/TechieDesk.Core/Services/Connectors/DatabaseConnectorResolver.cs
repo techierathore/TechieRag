@@ -1,3 +1,4 @@
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors;
 using TechieRag.Connectors.Confluence;
 using TechieRag.Connectors.Email;
@@ -74,13 +75,13 @@ public sealed class DatabaseConnectorResolver : IConnectorResolver, IDisposable
     /// read is dispatched to the thread pool rather than blocked on inline, so a call from the Blazor
     /// dispatcher cannot deadlock on its own synchronization context.
     /// </remarks>
-    public string? Validate(ConnectorJobPayload payload)
+    public JobMessage? Validate(ConnectorJobPayload payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
 
         if (!ConnectorTypes.IsKnown(payload.ConnectorType))
         {
-            return $"'{payload.ConnectorType}' is not a kind of connector this build can run.";
+            return JobMessage.Of("ConnectorSettingsUnknownType", payload.ConnectorType);
         }
 
         var definition = Task
@@ -90,14 +91,16 @@ public sealed class DatabaseConnectorResolver : IConnectorResolver, IDisposable
 
         if (definition is null)
         {
-            return $"The connector '{payload.DisplayName}' is no longer saved, so there is nothing "
-                + "to read. Add it again on the connectors screen.";
+            return JobMessage.Of("ConnectorNoLongerSavedAddAgain", payload.DisplayName);
         }
 
         if (!definition.ConnectorType.Equals(payload.ConnectorType, StringComparison.Ordinal))
         {
-            return $"This run expects a {payload.ConnectorType} connector, but "
-                + $"'{definition.DisplayName}' is a {definition.ConnectorType} connector.";
+            return JobMessage.Of(
+                "ConnectorTypeMismatch",
+                payload.ConnectorType,
+                definition.DisplayName,
+                definition.ConnectorType);
         }
 
         return definition.ReadSettings().Validate(definition.ConnectorType);
@@ -113,15 +116,15 @@ public sealed class DatabaseConnectorResolver : IConnectorResolver, IDisposable
         var definition = await repository
             .GetAsync(payload.ConnectorId, cancellationToken)
             .ConfigureAwait(false)
-            ?? throw new ConnectorException(
+            ?? throw new ConnectorSetupException(
                 payload.ConnectorType,
-                $"The connector '{payload.DisplayName}' is no longer saved, so there is nothing to read.");
+                JobMessage.Of("ConnectorNoLongerSaved", payload.DisplayName));
 
         var settings = definition.ReadSettings();
         var invalid = settings.Validate(definition.ConnectorType);
         if (invalid is not null)
         {
-            throw new ConnectorException(definition.ConnectorType, invalid);
+            throw new ConnectorSetupException(definition.ConnectorType, invalid);
         }
 
         var token = ResolveCredential(definition);
@@ -174,7 +177,7 @@ public sealed class DatabaseConnectorResolver : IConnectorResolver, IDisposable
     /// <summary>Reads this connector's token, failing loudly when it should be there and is not.</summary>
     /// <param name="definition">The saved connector.</param>
     /// <returns>The token, or <see langword="null"/> when the connector reads anonymously.</returns>
-    /// <exception cref="ConnectorException">The row says a credential exists and the store has none.</exception>
+    /// <exception cref="ConnectorSetupException">The row says a credential exists and the store has none.</exception>
     private string? ResolveCredential(ConnectorDefinition definition)
     {
         if (!definition.HasCredential)
@@ -199,10 +202,9 @@ public sealed class DatabaseConnectorResolver : IConnectorResolver, IDisposable
         // "ConnectorCredentialsEncryptedAtRest" in front of an operator. Dropping it loses nothing
         // the operator cannot see: the connector editor states where tokens are kept, localized, in
         // the alert directly above the token field, which is where they are about to re-enter it.
-        throw new ConnectorException(
+        throw new ConnectorSetupException(
             definition.ConnectorType,
-            $"The saved access token for '{definition.DisplayName}' could not be read from this "
-            + "machine's credential store. Re-enter the token on the connector and run it again.");
+            JobMessage.Of("ConnectorCredentialUnreadable", definition.DisplayName));
     }
 
     /// <summary>Builds the library connector this definition names.</summary>
@@ -231,9 +233,9 @@ public sealed class DatabaseConnectorResolver : IConnectorResolver, IDisposable
                 transport,
                 settings.ToConfluenceOptions(token),
                 loggerFactory.CreateLogger<ConfluenceConnector>()),
-            _ => throw new ConnectorException(
+            _ => throw new ConnectorSetupException(
                 definition.ConnectorType,
-                $"'{definition.ConnectorType}' is not a kind of connector this build can run."),
+                JobMessage.Of("ConnectorSettingsUnknownType", definition.ConnectorType)),
         };
     }
 

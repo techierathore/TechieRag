@@ -97,15 +97,26 @@ public sealed class ServiceStringCoverageTests
     /// <c>total &lt;= 0</c>, run this one test, and read the count out of the failure message.
     /// </para>
     /// <para>
-    /// What remains at 330 is NOT all defect. A large share is deliberate machine-facing text that
+    /// What remains at 189 is NOT all defect. A large share is deliberate machine-facing text that
     /// this counter cannot distinguish from user-visible prose — model-facing tool descriptions and
     /// schemas, launchd plist fragments, schtasks arguments, pmset/airport tokens, SQL, developer
     /// exception text. That indistinguishability is precisely why this is a ratchet and not a zero
     /// gate. The remaining USER-VISIBLE subset is tracked by REQ-UI-055, not by driving this number
     /// to zero.
     /// </para>
+    /// <para>
+    /// Lowered 330 -> 189 on 2026-08-02 (REQ-UI-055 / REQ-UI-056), and the arithmetic is recorded
+    /// because two of the three contributions are not conversions. Clusters converted 118 literals
+    /// (42 across Services/** excluding Connectors and Scheduling; 76 across those two directories),
+    /// taking 330 -> 212. The remaining 212 -> 189 is an INSTRUMENT FIX, not work: <see
+    /// cref="ServiceStringCoverage"/>'s machine-facing regex matched <c>logger.Log…</c> but not
+    /// <c>logger?.Log…</c>, so 23 pure log templates in SingleInstanceGuard, InstallIdentityStore
+    /// and AppStartup had been counted as prose all along. Widening it to <c>\??</c> made the
+    /// counter measure what it always claimed to measure. Those 23 were never a localization debt,
+    /// and no code changed to remove them.
+    /// </para>
     /// </remarks>
-    private const int ServiceEnglishCeiling = 330;
+    private const int ServiceEnglishCeiling = 189;
 
     /// <summary>
     /// Every file REQ-UI-051 converted stays free of English prose.

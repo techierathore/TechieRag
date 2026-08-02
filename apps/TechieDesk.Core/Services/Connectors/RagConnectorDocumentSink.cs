@@ -1,3 +1,4 @@
+using TechieDesk.Services.Scheduling;
 using TechieDesk.Services.Web;
 using TechieRag;
 using TechieRag.Connectors;
@@ -71,7 +72,7 @@ public sealed class RagConnectorDocumentSink : IConnectorDocumentSink
 
         if (string.IsNullOrWhiteSpace(document.Text))
         {
-            return ConnectorIngestOutcome.Skipped("The item held no readable text.");
+            return ConnectorIngestOutcome.Skipped(JobMessage.Of("ConnectorItemNoReadableText"));
         }
 
         var superseded = documents is null || string.IsNullOrWhiteSpace(payload.ConnectorId)
@@ -97,8 +98,12 @@ public sealed class RagConnectorDocumentSink : IConnectorDocumentSink
             .ConfigureAwait(false);
 
         var note = await LinkAsync(documentId, payload, cancellationToken).ConfigureAwait(false);
+
+        // A second SEGMENT rather than a sentence glued onto the first: "where it landed" and "and it
+        // replaced the previous copy" are two independent statements, and only one of them is
+        // conditional (REQ-UI-056).
         return ConnectorIngestOutcome.Ingested(
-            documentId, replaced ? $"{note} Replaced the previously ingested copy." : note);
+            documentId, replaced ? note.Then("ConnectorItemReplacedPreviousCopy") : note);
     }
 
     /// <summary>Removes the document this item used to be, now that its replacement exists.</summary>
@@ -198,18 +203,17 @@ public sealed class RagConnectorDocumentSink : IConnectorDocumentSink
     /// <param name="payload">The run's payload.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The note recorded against the item, saying where the document actually ended up.</returns>
-    private async Task<string> LinkAsync(
+    private async Task<JobMessage> LinkAsync(
         string documentId, ConnectorJobPayload payload, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(payload.WorkspaceId))
         {
-            return "Added to the document library.";
+            return JobMessage.Of("ConnectorItemAddedToLibrary");
         }
 
         if (linker is null)
         {
-            return $"Added to the document library; not linked to workspace {payload.WorkspaceId} "
-                + "because workspace linking is not available in this host.";
+            return JobMessage.Of("ConnectorItemAddedNoLinkerHost", payload.WorkspaceId);
         }
 
         var linked = await linker
@@ -218,7 +222,7 @@ public sealed class RagConnectorDocumentSink : IConnectorDocumentSink
 
         if (linked)
         {
-            return $"Added to workspace {payload.WorkspaceId}.";
+            return JobMessage.Of("ConnectorItemAddedToWorkspace", payload.WorkspaceId);
         }
 
         // Reported, never swallowed. A document in the library that the workspace cannot see is
@@ -227,7 +231,6 @@ public sealed class RagConnectorDocumentSink : IConnectorDocumentSink
             "Document {DocumentId} was ingested but could not be linked to workspace {WorkspaceId}",
             documentId,
             payload.WorkspaceId);
-        return $"Added to the document library; the link to workspace {payload.WorkspaceId} "
-            + "could not be written because workspace persistence is not configured.";
+        return JobMessage.Of("ConnectorItemAddedLinkNotWritten", payload.WorkspaceId);
     }
 }

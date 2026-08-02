@@ -1,3 +1,4 @@
+using TechieDesk.Services.Localization;
 using TechieDeskDb;
 
 namespace TechieDesk.Services.Support;
@@ -25,14 +26,19 @@ public sealed class SupportAttachmentStore : ISupportAttachmentStore
     private const int CopyBufferSize = 81920;
 
     private readonly IConfiguration configuration;
+    private readonly LocalizeText localize;
     private readonly ILogger<SupportAttachmentStore> logger;
 
     /// <summary>Initializes a new instance of the <see cref="SupportAttachmentStore"/> class.</summary>
     /// <param name="configuration">Application configuration, read for the data-directory override.</param>
+    /// <param name="localize">Resolves the refusal sentences this store throws (REQ-UI-055).</param>
     /// <param name="logger">Logger.</param>
-    public SupportAttachmentStore(IConfiguration configuration, ILogger<SupportAttachmentStore> logger)
+    /// <exception cref="ArgumentNullException"><paramref name="localize"/> is <see langword="null"/>.</exception>
+    public SupportAttachmentStore(
+        IConfiguration configuration, LocalizeText localize, ILogger<SupportAttachmentStore> logger)
     {
         this.configuration = configuration;
+        this.localize = localize ?? throw new ArgumentNullException(nameof(localize));
         this.logger = logger;
     }
 
@@ -73,8 +79,10 @@ public sealed class SupportAttachmentStore : ISupportAttachmentStore
         var extension = Path.GetExtension(safeName);
         if (string.IsNullOrEmpty(extension) || !SupportAttachmentPolicy.AllowedExtensions.Contains(extension))
         {
-            throw new SupportAttachmentRejectedException(
-                $"\"{fileName}\" can't be attached — support accepts {SupportAttachmentPolicy.LimitsSummary}.");
+            throw new SupportAttachmentRejectedException(localize(
+                "SupportAttachmentRejectedType",
+                fileName,
+                localize(SupportAttachmentPolicy.LimitsSummaryKey)));
         }
 
         var directory = DraftDirectory(draftKey);
@@ -96,9 +104,10 @@ public sealed class SupportAttachmentStore : ISupportAttachmentStore
                     written += read;
                     if (written > SupportAttachmentPolicy.MaxFileSizeBytes)
                     {
-                        throw new SupportAttachmentRejectedException(
-                            $"\"{fileName}\" is larger than the "
-                            + $"{SupportAttachmentPolicy.FormatSize(SupportAttachmentPolicy.MaxFileSizeBytes)} attachment limit.");
+                        throw new SupportAttachmentRejectedException(localize(
+                            "SupportAttachmentRejectedOverLimit",
+                            fileName,
+                            SupportAttachmentPolicy.FormatSize(SupportAttachmentPolicy.MaxFileSizeBytes)));
                     }
 
                     await file.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
@@ -114,7 +123,8 @@ public sealed class SupportAttachmentStore : ISupportAttachmentStore
         if (written == 0)
         {
             DeleteQuietly(target);
-            throw new SupportAttachmentRejectedException($"\"{fileName}\" can't be attached — the file is empty.");
+            throw new SupportAttachmentRejectedException(
+                localize("SupportAttachmentRejectedEmpty", fileName));
         }
 
         var resolvedType = string.IsNullOrWhiteSpace(contentType) ? ContentTypeFor(safeName) : contentType;
@@ -199,8 +209,7 @@ public sealed class SupportAttachmentStore : ISupportAttachmentStore
 
         if (!Path.GetFullPath(path).StartsWith(boundary, comparison))
         {
-            throw new SupportAttachmentRejectedException(
-                "That attachment can't be staged — its name resolves outside the support attachments folder.");
+            throw new SupportAttachmentRejectedException(localize("SupportAttachmentRejectedOutsideRoot"));
         }
     }
 

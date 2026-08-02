@@ -42,7 +42,9 @@ public class SpeechServiceRegistrationTests
         var service = new UnsupportedDictationService();
 
         Assert.False(service.IsSupported);
-        Assert.Equal(UnsupportedDictationService.Reason, service.UnsupportedReason);
+        // REQ-UI-055: the fallback carries no reason of its own; the mic button renders
+        // UnsupportedDictationService.ReasonKey in the reader's language instead.
+        Assert.Null(service.UnsupportedReason);
         Assert.Equal(DictationPermission.Unsupported, await service.RequestPermissionAsync());
         await service.StartAsync(new DictationCallbacks());
         await service.StopAsync();

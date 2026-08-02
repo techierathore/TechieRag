@@ -1,3 +1,5 @@
+using TechieDesk.Services.Scheduling;
+
 namespace TechieDesk.Services.Connectors;
 
 /// <summary>
@@ -133,7 +135,7 @@ public interface IConnectorRegistry
     /// <summary>Checks a registration before anything is written.</summary>
     /// <param name="registration">What the operator submitted.</param>
     /// <returns><see langword="null"/> when it is usable, otherwise the reason it is not.</returns>
-    string? Validate(ConnectorRegistration registration);
+    JobMessage? Validate(ConnectorRegistration registration);
 
     /// <summary>Adds or changes a connector, storing its token in the OS credential store.</summary>
     /// <param name="registration">What the operator submitted.</param>
@@ -168,5 +170,5 @@ public interface IConnectorRegistry
     /// configuration a destructive act; listing is the cheapest call that still proves the base URL,
     /// the project or space, and the credential are all right.
     /// </remarks>
-    Task<string?> TestAsync(string connectorId, CancellationToken cancellationToken = default);
+    Task<JobMessage?> TestAsync(string connectorId, CancellationToken cancellationToken = default);
 }

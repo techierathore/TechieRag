@@ -57,10 +57,11 @@ public sealed class GuardrailDecision
     /// <summary>A verdict that lets the step proceed.</summary>
     public static readonly GuardrailDecision Allowed = new(true, null);
 
-    private GuardrailDecision(bool isAllowed, string? reason)
+    private GuardrailDecision(bool isAllowed, string? reason, FlowMessage? message = null)
     {
         IsAllowed = isAllowed;
         Reason = reason;
+        Message = message;
     }
 
     /// <summary>Gets whether the guarded step may proceed.</summary>
@@ -71,6 +72,18 @@ public sealed class GuardrailDecision
     /// tool call, so a refusal is never a silent no-op.
     /// </summary>
     public string? Reason { get; }
+
+    /// <summary>
+    /// Gets the localizable form of <see cref="Reason"/> — a stable code plus its arguments — or
+    /// null when the guardrail supplied only English (REQ-RAG-050).
+    /// </summary>
+    /// <remarks>
+    /// The reason a person reads on a screen. A guardrail that wants its refusal to be readable in
+    /// a language this library does not ship should block with
+    /// <see cref="Block(FlowMessage)"/>; <see cref="Block(string)"/> stays for the many hosts whose
+    /// refusal text is already theirs to translate.
+    /// </remarks>
+    public FlowMessage? Message { get; }
 
     /// <summary>Creates an allowing verdict.</summary>
     /// <returns>The shared allowing verdict.</returns>
@@ -84,6 +97,23 @@ public sealed class GuardrailDecision
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         return new GuardrailDecision(false, reason);
+    }
+
+    /// <summary>
+    /// Creates a blocking verdict whose reason a consumer can translate (REQ-RAG-050).
+    /// </summary>
+    /// <param name="message">The refusal, as a stable code plus its arguments.</param>
+    /// <returns>A blocking verdict carrying both the code and the English wording.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="message"/> is null.</exception>
+    /// <remarks>
+    /// <see cref="Reason"/> is still populated, from <see cref="FlowMessage.Text"/>, so every
+    /// existing reader — the model's tool result, the log, a consumer built against the old shape —
+    /// is unaffected. The code is additional, never a replacement.
+    /// </remarks>
+    public static GuardrailDecision Block(FlowMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        return new GuardrailDecision(false, message.Text, message);
     }
 }
 
@@ -100,8 +130,8 @@ public sealed class GuardrailDecision
 /// (REQ-NFR-013) is app code the library cannot reference. It plugs in as an
 /// <see cref="IFlowGuardrail"/> placed in <see cref="FlowRuntime.HostGuardrails"/>, whose
 /// <see cref="InspectAsync"/> at <see cref="GuardrailStage.ToolCall"/> calls
-/// <c>EgressGate.AllowExternalAsync</c> and returns <see cref="GuardrailDecision.Block"/> when the
-/// user declines. Because host guardrails are supplied at run time and are applied to EVERY node
+/// <c>EgressGate.AllowExternalAsync</c> and returns <see cref="GuardrailDecision.Block(FlowMessage)"/>
+/// when the user declines. Because host guardrails are supplied at run time and are applied to EVERY node
 /// and EVERY tool call, a flow cannot become a route to an egress-marked tool that skips the gate:
 /// there is no property on <see cref="FlowDefinition"/> that turns them off, and removing a node's
 /// own guardrail ids does not remove them.</para>

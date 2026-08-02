@@ -197,7 +197,7 @@ public sealed class ConnectorJobServiceTests : IAsyncDisposable
     {
         await using var harness = await Harness.CreateAsync(directory);
 
-        var rejected = await Assert.ThrowsAsync<ConnectorException>(
+        var rejected = await Assert.ThrowsAsync<ConnectorSetupException>(
             () => harness.Service.StartAsync(new ConnectorJobPayload()));
 
         Assert.Equal("The run does not say which connector to read.", rejected.Message);
@@ -216,7 +216,9 @@ public sealed class ConnectorJobServiceTests : IAsyncDisposable
         Assert.Empty(resolver.AvailableTypes);
         Assert.Equal(
             "No connector types are installed in this build of TechieDesk.",
-            resolver.Validate(new ConnectorJobPayload { ConnectorId = "x", ConnectorType = "y" }));
+            resolver
+                .Validate(new ConnectorJobPayload { ConnectorId = "x", ConnectorType = "y" })
+                ?.ToInvariantString());
     }
 
     /// <summary>Renders a run's summary in English, through the real localizer.</summary>

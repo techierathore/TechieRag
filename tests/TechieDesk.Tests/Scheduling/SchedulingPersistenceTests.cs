@@ -195,12 +195,17 @@ public sealed class SchedulingPersistenceTests : IDisposable
             Outcome = RunOutcome.Running
         });
 
-        var closed = await runs.CloseAbandonedRunsAsync("the process stopped", DateTime.UtcNow);
+        var closed = await runs.CloseAbandonedRunsAsync(
+            JobMessage.Of("SchedulerRunAbandonedByProcess"), DateTime.UtcNow);
 
         Assert.Equal(1, closed);
         var stored = Assert.Single(await runs.ListRecentAsync(10));
         Assert.Equal(RunOutcome.Failed, stored.Outcome);
-        Assert.Equal("the process stopped", stored.FailureReason);
+
+        // REQ-UI-056: both halves land — the English audit copy AND the codes that render it in the
+        // reader's language.
+        Assert.Equal("The application stopped while this run was in progress.", stored.FailureReason);
+        Assert.NotNull(stored.FailureReasonJson);
     }
 
     /// <summary>The scheduler preferences round-trip through the instance-setting table.</summary>

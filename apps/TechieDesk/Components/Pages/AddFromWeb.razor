@@ -1,4 +1,5 @@
 @page "/workspace/{Slug}/documents/web"
+@using TechieDesk.Services.Localization
 @using TechieDesk.Services.Web
 @using TechieRag.Web
 @implements IDisposable
@@ -270,7 +271,7 @@ else
         <Alert Variant="@OutcomeVariant" Class="mb-4">
             <Alert.Icon><LucideIcon aria-hidden="true" Name="@OutcomeIcon" Size="16" /></Alert.Icon>
             <AlertTitle>@OutcomeTitle</AlertTitle>
-            <AlertDescription>@outcome.Summary</AlertDescription>
+            <AlertDescription>@outcome.SummaryText(Localize)</AlertDescription>
         </Alert>
 
         @* The mockup's Jobs table (Source · Target · Status · …), holding THIS run's items rather
@@ -479,6 +480,17 @@ else
         }
     }
 
+    /// <summary>
+    /// REQ-UI-055: resolves a service-supplied resource key in the reader's language.
+    /// </summary>
+    /// <remarks>
+    /// The delegate <c>WebIngestionRequest.Validate</c> and <c>WebIngestionOutcome.SummaryText</c>
+    /// take. Both compose a sentence out of fragments and out of user data — a URL, a host, a
+    /// pluralized count — which is the case <see cref="LocalizeText"/> exists for: the composition
+    /// rule stays in the service that owns it, and only the resolution happens here.
+    /// </remarks>
+    private LocalizeText Localize => (key, arguments) => Localizer[key, arguments!].Value;
+
     /// <summary>Returns to the Connectors hub, this screen's parent in the nav and the breadcrumb.</summary>
     private void GoBackToConnectors() => Nav.NavigateTo($"/workspace/{Slug}/connectors");
 
@@ -611,7 +623,7 @@ else
         }
 
         var request = BuildRequest();
-        validationError = request.Validate();
+        validationError = request.Validate(Localize);
         if (validationError is not null)
         {
             return;
@@ -638,17 +650,17 @@ else
 
             if (outcome.Succeeded && outcome.Skipped.Count == 0)
             {
-                ToastService.Success(outcome.Summary, Localizer["WebToastAddedTitle"]);
+                ToastService.Success(outcome.SummaryText(Localize), Localizer["WebToastAddedTitle"]);
             }
             else if (outcome.Succeeded)
             {
                 // Partial success gets an ERROR toast, not a success one: the whole point is that
                 // the operator must look at the skipped list.
-                ToastService.Error(outcome.Summary, Localizer["WebToastPartlyIngestedTitle"]);
+                ToastService.Error(outcome.SummaryText(Localize), Localizer["WebToastPartlyIngestedTitle"]);
             }
             else
             {
-                ToastService.Error(outcome.Summary, Localizer["WebNothingIngestedTitle"]);
+                ToastService.Error(outcome.SummaryText(Localize), Localizer["WebNothingIngestedTitle"]);
             }
         }
         catch (OperationCanceledException)

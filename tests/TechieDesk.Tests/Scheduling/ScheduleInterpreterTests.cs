@@ -89,7 +89,10 @@ public sealed class ScheduleInterpreterTests
         var result = await interpreter.InterpretAsync("post to Slack every hour");
 
         Assert.False(result.Succeeded);
-        Assert.Contains("Test action", result.Error);
+        // REQ-UI-056: the handler names a resource KEY and the interpreter resolves it, so the
+        // refusal lists what the READER's language calls each action rather than an English literal
+        // the handler happened to carry.
+        Assert.Contains("Local database maintenance", result.Error, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -100,7 +103,7 @@ public sealed class ScheduleInterpreterTests
     public async Task AnInvalidPayloadIsCaughtBeforeSavingNotAtFirstRun()
     {
         var interpreter = Build(Payload(payload: """{"workspace":"Nope"}"""), out var handler);
-        handler.PayloadError = "There is no workspace called 'Nope'.";
+        handler.PayloadError = JobMessage.Text("There is no workspace called 'Nope'.");
 
         var result = await interpreter.InterpretAsync("sync Nope every hour");
 

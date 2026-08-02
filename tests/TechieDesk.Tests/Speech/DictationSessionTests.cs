@@ -45,11 +45,11 @@ public class DictationSessionTests
         var session = new DictationSession();
         session.BeginStart(string.Empty);
 
-        session.MarkPermissionDenied();
+        session.MarkPermissionDenied("Microphone access was refused. Grant it in System Settings.");
 
         Assert.Equal(DictationStatus.Idle, session.Status);
         Assert.True(session.CanToggle);
-        Assert.Equal(DictationSession.DeniedHint, session.Message);
+        Assert.Equal("Microphone access was refused. Grant it in System Settings.", session.Message);
         Assert.Contains("System Settings", session.Message);
     }
 

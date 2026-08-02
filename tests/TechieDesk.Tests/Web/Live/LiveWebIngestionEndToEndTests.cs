@@ -5,7 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieDesk.Services;
 using TechieDesk.Services.Hosting;
+using TechieDesk.Services.Localization;
 using TechieDesk.Services.Web;
+using TechieDesk.Tests.Support;
 using TechieRag;
 using TechieRag.Embedded;
 using TechieRag.Models;
@@ -39,6 +41,15 @@ public sealed class LiveWebIngestionEndToEndTests : IDisposable
     private const string SinglePageUrl = "https://example.com/";
     private const string CrawlSeedUrl = "https://quotes.toscrape.com/";
     private const string VideoUrl = "https://www.youtube.com/watch?v=aircAruvnKk";
+
+    /// <summary>
+    /// REQ-UI-055: the run summary and the validation refusals are resource keys now, so this suite
+    /// reads them back through the REAL English resources.
+    /// </summary>
+    private static readonly ResourceHarness Resources = new("en");
+
+    /// <summary>Gets the delegate the ingestion service and the outcome summary resolve through.</summary>
+    private static LocalizeText Localize => Resources.Localize;
 
     private readonly string directory =
         Path.Combine(Path.GetTempPath(), $"techiedesk-liveweb-{Guid.NewGuid():N}");
@@ -131,7 +142,7 @@ public sealed class LiveWebIngestionEndToEndTests : IDisposable
             var skipped = Assert.Single(outcome.Skipped);
             Assert.Contains("caption", skipped.Reason, StringComparison.OrdinalIgnoreCase);
             Assert.False(outcome.Succeeded);
-            Assert.DoesNotContain("Ingested", outcome.Summary, StringComparison.Ordinal);
+            Assert.DoesNotContain("Ingested", outcome.SummaryText(Localize), StringComparison.Ordinal);
 
             // Nothing half-written: no empty document left behind for the user to find.
             Assert.Empty(inWorkspace);
@@ -166,7 +177,7 @@ public sealed class LiveWebIngestionEndToEndTests : IDisposable
         using var listener = LoopbackServer.Start();
 
         var request = harness.Request(WebIngestionSource.Page, listener.DisguisedUrl);
-        Assert.Null(request.Validate());
+        Assert.Null(request.Validate(Localize));
 
         var outcome = await harness.Service.IngestAsync(request);
 
@@ -262,6 +273,7 @@ public sealed class LiveWebIngestionEndToEndTests : IDisposable
                 provider.GetRequiredService<IWebContentFetcherFactory>(),
                 linker,
                 provider.GetRequiredService<YouTubeTranscriptReader>(),
+                Localize,
                 NullLogger<WebIngestionService>.Instance);
 
             return new Harness(rag, provider, manager, workspace.WorkspaceId, service);

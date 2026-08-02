@@ -1,5 +1,8 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Localization;
+using TechieDesk.Resources;
+using TechieDesk.Services.Localization;
 using TechieRag.Web;
 
 namespace TechieDesk.Services.Web;
@@ -51,6 +54,19 @@ public static class WebIngestionServiceCollectionExtensions
         {
             AllowAutoRedirect = true,
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+        });
+
+        // REQ-UI-055: the ingestion service composes the progress lines, the skip reasons and the
+        // run summary a person reads, so it resolves resource keys through this delegate. TryAdd, and
+        // idempotent AddLocalization, so hosting order against AddTechieDeskScheduling does not
+        // matter — but registering it HERE is what stops web ingestion depending on the scheduler
+        // having been added first.
+        services.AddLocalization();
+        services.TryAddSingleton<LocalizeText>(provider =>
+        {
+            var localizer = provider.GetRequiredService<IStringLocalizer<AppStrings>>();
+            return (key, arguments) =>
+                arguments.Length == 0 ? localizer[key].Value : localizer[key, arguments].Value;
         });
 
         services.TryAddSingleton<IWebContentFetcherFactory, HttpWebContentFetcherFactory>();

@@ -1,5 +1,3 @@
-using TechieDesk.Services.Localization;
-
 namespace TechieDesk.Services.Scheduling;
 
 /// <summary>The machine's power source, as far as the app can tell.</summary>
@@ -32,8 +30,8 @@ public sealed record RunConditions(
 
 /// <summary>The outcome of testing run conditions.</summary>
 /// <param name="IsAllowed">Whether the run may proceed.</param>
-/// <param name="Reason">Why it may not, in plain language. Null when allowed.</param>
-public sealed record RunConditionVerdict(bool IsAllowed, string? Reason = null)
+/// <param name="Reason">Why it may not, as codes and arguments. Null when allowed.</param>
+public sealed record RunConditionVerdict(bool IsAllowed, JobMessage? Reason = null)
 {
     /// <summary>Gets a verdict permitting the run.</summary>
     public static RunConditionVerdict Allowed { get; } = new(true);
@@ -66,23 +64,24 @@ public interface IRunEnvironmentProbe
 /// run" is an automation that silently stops working on a machine where a shell-out is unavailable —
 /// and stops without ever saying so. Blocking requires positive evidence that a condition is
 /// violated.</para>
-/// <para><b>REQ-UI-055.</b> The reason is written into the run history and read there by a person
-/// asking "why did this not run last night", so it is composed from resource keys. It is a historical
-/// record, written in the language the app was running in at the time — nothing parses it back, the
-/// <see cref="RunOutcome"/> enum is what the history is queried on.</para>
+/// <para><b>REQ-UI-055, corrected by REQ-UI-056.</b> The reason is written into the run history and
+/// read there by a person asking "why did this not run last night", so it is composed from resource
+/// keys. REQ-UI-055 resolved those keys HERE and stored the sentence, which made the row a historical
+/// record "written in the language the app was running in at the time" — meaning a user who later
+/// switched language read their own history in a language they had stopped using. It now returns the
+/// codes and arguments and the run-details dialog resolves them, so the row has no language of its
+/// own. That is also why this class no longer takes a <see cref="LocalizeText"/> at all: there is
+/// nothing left here that could render.</para>
 /// </remarks>
 public sealed class RunConditionEvaluator
 {
     private readonly IRunEnvironmentProbe probe;
-    private readonly LocalizeText localize;
 
     /// <summary>Initializes the evaluator.</summary>
     /// <param name="probe">Reads the machine state.</param>
-    /// <param name="localize">Resolves a resource key into the reader's language.</param>
-    public RunConditionEvaluator(IRunEnvironmentProbe probe, LocalizeText localize)
+    public RunConditionEvaluator(IRunEnvironmentProbe probe)
     {
         this.probe = probe;
-        this.localize = localize;
     }
 
     /// <summary>Tests the conditions.</summary>
@@ -94,7 +93,7 @@ public sealed class RunConditionEvaluator
 
         if (conditions.RequireMainsPower && probe.GetPowerState() == PowerState.Battery)
         {
-            return new RunConditionVerdict(false, localize("SchedulerSkipOnBattery"));
+            return new RunConditionVerdict(false, JobMessage.Of("SchedulerSkipOnBattery"));
         }
 
         if (!conditions.RestrictToNamedNetworks || conditions.AllowedNetworks is not { Count: > 0 } allowed)
@@ -118,6 +117,6 @@ public sealed class RunConditionEvaluator
 
         // The network's own name goes through verbatim: it is what the user called their WiFi, not
         // something this app gets to translate.
-        return new RunConditionVerdict(false, localize("SchedulerSkipNotOnAllowedNetwork", current));
+        return new RunConditionVerdict(false, JobMessage.Of("SchedulerSkipNotOnAllowedNetwork", current));
     }
 }

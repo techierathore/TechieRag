@@ -31,7 +31,7 @@ public sealed class JobProgressCollector : IJobProgressReporter
     private int skipped;
     private int retainedSuccesses;
     private int? total;
-    private string? message;
+    private JobMessage? message;
 
     /// <summary>Initializes the collector for one run.</summary>
     /// <param name="scheduleRunId">The open run row.</param>
@@ -72,7 +72,7 @@ public sealed class JobProgressCollector : IJobProgressReporter
     public bool WasItemListSampled { get; private set; }
 
     /// <inheritdoc />
-    public void Report(int processed, int? total, string? message)
+    public void Report(int processed, int? total, JobMessage? message)
     {
         JobProgressSnapshot snapshot;
         lock (gate)
@@ -89,7 +89,7 @@ public sealed class JobProgressCollector : IJobProgressReporter
     }
 
     /// <inheritdoc />
-    public void RecordItem(RunItemStatus status, string itemId, string itemName, string? reason = null)
+    public void RecordItem(RunItemStatus status, string itemId, string itemName, JobMessage? reason = null)
     {
         JobProgressSnapshot snapshot;
         lock (gate)
@@ -121,7 +121,13 @@ public sealed class JobProgressCollector : IJobProgressReporter
                     ItemId = itemId,
                     ItemName = itemName,
                     Status = status,
-                    Reason = reason,
+
+                    // Both halves of the REQ-UI-056 pair are written together: the codes so a later
+                    // reader gets their own language, and the English rendering so the row still
+                    // says something in a database browser, in the helper host's log, and to a build
+                    // that no longer knows the code.
+                    Reason = reason?.ToInvariantString(),
+                    ReasonJson = reason?.ToStorage(),
                     RecordedUtc = timeProvider.GetUtcNow().UtcDateTime
                 });
             }

@@ -67,7 +67,7 @@ public sealed class ConnectorJobService : IConnectorJobService
         .ToList();
 
     /// <inheritdoc />
-    public string? Validate(ConnectorJobPayload payload)
+    public JobMessage? Validate(ConnectorJobPayload payload)
     {
         ArgumentNullException.ThrowIfNull(payload);
 
@@ -91,7 +91,7 @@ public sealed class ConnectorJobService : IConnectorJobService
         var invalid = Validate(payload);
         if (invalid is not null)
         {
-            throw new ConnectorException(payload.ConnectorType, invalid);
+            throw new ConnectorSetupException(payload.ConnectorType, invalid);
         }
 
         var name = string.IsNullOrWhiteSpace(payload.DisplayName) ? payload.ConnectorId : payload.DisplayName;

@@ -1,3 +1,5 @@
+using TechieDesk.Services.Localization;
+
 namespace TechieDesk.Services.Agents;
 
 /// <summary>
@@ -19,22 +21,33 @@ public sealed class AgentRegistry : IAgentRegistry
 {
     private readonly IAgentRepository agents;
     private readonly IWorkspaceSkillRepository skills;
+    private readonly LocalizeText localize;
     private readonly TimeProvider timeProvider;
 
     /// <summary>Initializes the registry.</summary>
     /// <param name="agents">Agent persistence.</param>
     /// <param name="skills">Workspace skill-catalogue persistence.</param>
+    /// <param name="localize">Resolves the refusal sentences the agent editor toasts (REQ-UI-055).</param>
     /// <param name="timeProvider">Clock used for created/updated/last-used stamps.</param>
+    /// <remarks>
+    /// REQ-UI-055 / BRD-91: the three <see cref="InvalidOperationException"/> messages below are not
+    /// developer text. The agent editor catches them and puts <c>ex.Message</c> straight into a
+    /// toast body, so on a Hindi install they were the only English on the screen. The HANDLE and
+    /// the clashing display name inside them stay verbatim — they are what the user typed.
+    /// </remarks>
     public AgentRegistry(
         IAgentRepository agents,
         IWorkspaceSkillRepository skills,
+        LocalizeText localize,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(agents);
         ArgumentNullException.ThrowIfNull(skills);
+        ArgumentNullException.ThrowIfNull(localize);
 
         this.agents = agents;
         this.skills = skills;
+        this.localize = localize;
         this.timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -88,20 +101,19 @@ public sealed class AgentRegistry : IAgentRegistry
         agent.Handle = AgentMentionParser.Normalize(agent.Handle);
         if (!AgentMentionParser.IsValidHandle(agent.Handle))
         {
-            throw new InvalidOperationException(
-                "A handle must be 1–32 letters, digits or hyphens, for example @analyst.");
+            throw new InvalidOperationException(localize("AgentsInvalidHandle"));
         }
 
         if (string.IsNullOrWhiteSpace(agent.DisplayName))
         {
-            throw new InvalidOperationException("An agent needs a display name.");
+            throw new InvalidOperationException(localize("AgentsDisplayNameRequired"));
         }
 
         var clash = await agents.FindByHandleAsync(agent.WorkspaceId, agent.Handle).ConfigureAwait(false);
         if (clash is not null && clash.WorkspaceAgentId != agent.WorkspaceAgentId)
         {
             throw new InvalidOperationException(
-                $"@{agent.Handle} is already used by \"{clash.DisplayName}\" in this workspace.");
+                localize("AgentsHandleAlreadyUsed", agent.Handle, clash.DisplayName));
         }
 
         var now = UtcNow();
@@ -130,8 +142,7 @@ public sealed class AgentRegistry : IAgentRegistry
 
         if (target.IsBuiltIn)
         {
-            throw new InvalidOperationException(
-                "The built-in @agent cannot be deleted. Reset it to its defaults instead.");
+            throw new InvalidOperationException(localize("AgentsBuiltInNotDeletable"));
         }
 
         await agents.DeleteAsync(workspaceAgentId).ConfigureAwait(false);

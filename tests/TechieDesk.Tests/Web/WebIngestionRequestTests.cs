@@ -1,4 +1,5 @@
 using TechieDesk.Services.Web;
+using TechieDesk.Tests.Support;
 using Xunit;
 
 namespace TechieDesk.Tests.Web;
@@ -11,15 +12,24 @@ namespace TechieDesk.Tests.Web;
 /// use, so these are simultaneously the inline form errors and the service's guard. The one that
 /// matters most is the private-network case: the SSRF guard is only a guard if the DEFAULT refuses.
 /// </remarks>
-public sealed class WebIngestionRequestTests
+public sealed class WebIngestionRequestTests : IDisposable
 {
+    /// <summary>
+    /// REQ-UI-055: <c>Validate</c> returns sentences resolved from the REAL English resources, so
+    /// the substring assertions below still describe what the card actually shows.
+    /// </summary>
+    private readonly ResourceHarness resources = new("en");
+
+    /// <summary>Restores the ambient UI culture the harness moved.</summary>
+    public void Dispose() => resources.Dispose();
+
     /// <summary>An empty address is refused, not treated as an empty crawl.</summary>
     [Fact]
     public void UrlIsRequired()
     {
         var request = Build(WebIngestionSource.Page, string.Empty);
 
-        Assert.Equal("Enter a URL first.", request.Validate());
+        Assert.Equal("Enter a URL first.", request.Validate(resources.Localize));
     }
 
     /// <summary>A request with no workspace has nowhere to put its result and is refused.</summary>
@@ -33,7 +43,7 @@ public sealed class WebIngestionRequestTests
             Url = "https://example.com",
         };
 
-        Assert.Contains("workspace", request.Validate(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("workspace", request.Validate(resources.Localize), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>A scheme-less or relative address is refused with the fix in the message.</summary>
@@ -44,7 +54,7 @@ public sealed class WebIngestionRequestTests
     [InlineData("file:///etc/passwd")]
     public void OnlyAbsoluteHttpAddressesAreAccepted(string candidate)
     {
-        var error = Build(WebIngestionSource.Page, candidate).Validate();
+        var error = Build(WebIngestionSource.Page, candidate).Validate(resources.Localize);
 
         Assert.NotNull(error);
         Assert.Contains("http", error, StringComparison.OrdinalIgnoreCase);
@@ -54,7 +64,7 @@ public sealed class WebIngestionRequestTests
     [Fact]
     public void PublicHttpsPageIsAccepted()
     {
-        Assert.Null(Build(WebIngestionSource.Page, "https://example.com/article").Validate());
+        Assert.Null(Build(WebIngestionSource.Page, "https://example.com/article").Validate(resources.Localize));
     }
 
     /// <summary>
@@ -71,7 +81,7 @@ public sealed class WebIngestionRequestTests
     [InlineData("http://router.local/")]
     public void PrivateNetworkTargetsAreRefusedByDefault(string candidate)
     {
-        var error = Build(WebIngestionSource.Site, candidate).Validate();
+        var error = Build(WebIngestionSource.Site, candidate).Validate(resources.Localize);
 
         Assert.NotNull(error);
         Assert.Contains("private-network", error, StringComparison.OrdinalIgnoreCase);
@@ -90,7 +100,7 @@ public sealed class WebIngestionRequestTests
             AllowPrivateNetworkTargets = true,
         };
 
-        Assert.Null(request.Validate());
+        Assert.Null(request.Validate(resources.Localize));
     }
 
     /// <summary>
@@ -150,7 +160,7 @@ public sealed class WebIngestionRequestTests
             MaxDepth = depth,
         };
 
-        Assert.Contains("depth", request.Validate(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("depth", request.Validate(resources.Localize), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>A page budget of zero or beyond the ceiling is refused.</summary>
@@ -168,7 +178,7 @@ public sealed class WebIngestionRequestTests
             MaxPages = pages,
         };
 
-        Assert.Contains("page limit", request.Validate(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("page limit", request.Validate(resources.Localize), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Depth and page bounds are a crawl concern only; a single page ignores them.</summary>
@@ -184,7 +194,7 @@ public sealed class WebIngestionRequestTests
             MaxPages = 0,
         };
 
-        Assert.Null(request.Validate());
+        Assert.Null(request.Validate(resources.Localize));
     }
 
     /// <summary>Every YouTube URL shape the library recognises is accepted, plus a bare id.</summary>
@@ -196,14 +206,14 @@ public sealed class WebIngestionRequestTests
     [InlineData("dQw4w9WgXcQ")]
     public void YouTubeAddressesAreAccepted(string candidate)
     {
-        Assert.Null(Build(WebIngestionSource.Video, candidate).Validate());
+        Assert.Null(Build(WebIngestionSource.Video, candidate).Validate(resources.Localize));
     }
 
     /// <summary>A page URL pasted into the video field fails there rather than later, over the wire.</summary>
     [Fact]
     public void NonYouTubeAddressIsRefusedForAVideo()
     {
-        var error = Build(WebIngestionSource.Video, "https://vimeo.com/12345").Validate();
+        var error = Build(WebIngestionSource.Video, "https://vimeo.com/12345").Validate(resources.Localize);
 
         Assert.NotNull(error);
         Assert.Contains("YouTube", error, StringComparison.Ordinal);
@@ -232,7 +242,7 @@ public sealed class WebIngestionRequestTests
     {
         var request = Build(WebIngestionSource.Page, "  https://example.com/a  ");
 
-        Assert.Null(request.Validate());
+        Assert.Null(request.Validate(resources.Localize));
         Assert.Equal("https://example.com/a", request.TrimmedUrl);
     }
 

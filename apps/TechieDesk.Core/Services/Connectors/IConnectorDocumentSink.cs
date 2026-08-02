@@ -1,3 +1,4 @@
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors;
 
 namespace TechieDesk.Services.Connectors;
@@ -9,26 +10,27 @@ namespace TechieDesk.Services.Connectors;
 /// <param name="DocumentId">The catalogue id, when it was ingested.</param>
 /// <param name="Reason">
 /// Why, in operator terms — for a skip, why it was not ingested; for an ingest, a short note such as
-/// the workspace it landed in. Never contains a credential.
+/// the workspace it landed in. Never contains a credential. Carried as codes and arguments because
+/// it is written to <c>ScheduleRunItem.Reason</c> and read back long afterwards (REQ-UI-056).
 /// </param>
 /// <remarks>
 /// A skip carries a reason as a matter of type, not of discipline. BRD-65's failure mode is a run
 /// that reports "47 ingested" while 12 items vanished, and the cheapest defence against it is making
 /// "not ingested, no reason given" impossible to express.
 /// </remarks>
-public sealed record ConnectorIngestOutcome(bool WasIngested, string? DocumentId, string Reason)
+public sealed record ConnectorIngestOutcome(bool WasIngested, string? DocumentId, JobMessage Reason)
 {
     /// <summary>Creates the outcome for an item that is now in the catalogue.</summary>
     /// <param name="documentId">The catalogue id.</param>
     /// <param name="reason">A short note about where it landed.</param>
     /// <returns>The ingested outcome.</returns>
-    public static ConnectorIngestOutcome Ingested(string documentId, string reason) =>
+    public static ConnectorIngestOutcome Ingested(string documentId, JobMessage reason) =>
         new(true, documentId, reason);
 
     /// <summary>Creates the outcome for an item that was read but not ingested.</summary>
     /// <param name="reason">Why it was not ingested, in terms an operator can act on.</param>
     /// <returns>The skipped outcome.</returns>
-    public static ConnectorIngestOutcome Skipped(string reason) => new(false, null, reason);
+    public static ConnectorIngestOutcome Skipped(JobMessage reason) => new(false, null, reason);
 }
 
 /// <summary>

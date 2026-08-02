@@ -1,5 +1,9 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Localization;
+using TechieDesk.Resources;
 using TechieDesk.Services.Data;
+using TechieDesk.Services.Localization;
 using TechieDesk.Services.Settings;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -45,6 +49,24 @@ public static class AppDbServiceCollectionExtensions
         // Agents (REQ-UI-045) and the per-workspace skill catalogue (REQ-RAG-022). The registry
         // sits above both repositories because the rules it enforces — the undeletable built-in
         // @agent, handle uniqueness, and the catalogue∩agent intersection — span the two tables.
+        // REQ-UI-055: the registry's refusals are toasted by the agent editor, so it resolves a
+        // LocalizeText. TryAdd and idempotent AddLocalization, so this composes with the identical
+        // registration in AddTechieDeskScheduling / AddTechieDeskWebIngestion whichever runs first —
+        // and it is what keeps AddTechieDeskData self-sufficient, which its own registration test
+        // asserts.
+        // AddLogging as well as AddLocalization: the resource-manager localizer factory takes an
+        // ILoggerFactory, and both are TryAdd-based, so calling them here costs nothing in a host
+        // that already registered logging and is the difference between self-sufficient and
+        // "works only if somebody else went first".
+        services.AddLogging();
+        services.AddLocalization();
+        services.TryAddSingleton<LocalizeText>(provider =>
+        {
+            var localizer = provider.GetRequiredService<IStringLocalizer<AppStrings>>();
+            return (key, arguments) =>
+                arguments.Length == 0 ? localizer[key].Value : localizer[key, arguments].Value;
+        });
+
         services.AddSingleton<TechieDesk.Services.Agents.IAgentRepository, TechieDesk.Services.Agents.AgentRepository>();
         services.AddSingleton<TechieDesk.Services.Agents.IWorkspaceSkillRepository, TechieDesk.Services.Agents.WorkspaceSkillRepository>();
         services.AddSingleton<TechieDesk.Services.Agents.IAgentRegistry, TechieDesk.Services.Agents.AgentRegistry>();

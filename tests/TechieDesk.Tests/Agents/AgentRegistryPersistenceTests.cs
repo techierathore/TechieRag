@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
 using TechieDesk.Services.Agents;
 using TechieDesk.Services.Data;
+using TechieDesk.Tests.Support;
 using TechieDeskDb;
 using Xunit;
 
@@ -24,6 +25,8 @@ public sealed class AgentRegistryPersistenceTests : IDisposable
     private readonly string databasePath =
         Path.Combine(Path.GetTempPath(), $"techiedesk-agents-{Guid.NewGuid():N}.db");
 
+    private readonly ResourceHarness resources = new("en");
+
     /// <summary>Creates the temporary database by applying every shipped SQLite migration.</summary>
     public AgentRegistryPersistenceTests()
     {
@@ -34,6 +37,7 @@ public sealed class AgentRegistryPersistenceTests : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
+        resources.Dispose();
         SqliteConnection.ClearAllPools();
         if (File.Exists(databasePath))
         {
@@ -347,6 +351,7 @@ public sealed class AgentRegistryPersistenceTests : IDisposable
         return new AgentRegistry(
             new AgentRepository(factory),
             new WorkspaceSkillRepository(factory),
+            resources.Localize,
             new FakeTimeProvider(Now));
     }
 

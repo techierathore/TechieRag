@@ -12,7 +12,10 @@ namespace TechieDesk.Services.Scheduling;
 /// <param name="Failed">Items that failed so far.</param>
 /// <param name="Skipped">Items skipped so far.</param>
 /// <param name="Total">Total items expected, or <see langword="null"/> when not yet known.</param>
-/// <param name="Message">What is happening right now, in plain language.</param>
+/// <param name="Message">
+/// What is happening right now, as codes and arguments. Resolved by whichever screen paints it, so a
+/// live progress line reads in the reader's language rather than the handler's (REQ-UI-056).
+/// </param>
 public sealed record JobProgressSnapshot(
     long ScheduleRunId,
     long? ScheduleId,
@@ -23,7 +26,7 @@ public sealed record JobProgressSnapshot(
     int Failed,
     int Skipped,
     int? Total,
-    string? Message)
+    JobMessage? Message)
 {
     /// <summary>
     /// Gets completion as a percentage, or <see langword="null"/> when the total is unknown.

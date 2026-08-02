@@ -78,8 +78,31 @@ public sealed class FlowRunResult
     /// <summary>Gets why the run was blocked, for <see cref="FlowRunOutcome.Blocked"/>.</summary>
     public string? BlockReason { get; init; }
 
+    /// <summary>
+    /// Gets the localizable form of <see cref="BlockReason"/> — a stable code plus its arguments —
+    /// or null when the refusing guardrail supplied only English (REQ-RAG-050).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="BlockReason"/> is painted verbatim in an alert that says why a run stopped, so an
+    /// English clause lands inside an otherwise translated screen. A consumer renders this code when
+    /// it recognises it and falls back to <see cref="BlockReason"/> when it does not.
+    /// </remarks>
+    public FlowMessage? BlockMessage { get; init; }
+
     /// <summary>Gets why the run failed, for <see cref="FlowRunOutcome.Failed"/>.</summary>
     public string? FailureReason { get; init; }
+
+    /// <summary>
+    /// Gets the localizable form of <see cref="FailureReason"/> — a stable code plus its arguments
+    /// (REQ-RAG-050).
+    /// </summary>
+    /// <remarks>
+    /// For a flow refused by <see cref="FlowValidator"/> the argument is the joined English issue
+    /// messages, and the better rendering is available: <see cref="ValidationIssues"/> carries every
+    /// issue's own <see cref="FlowValidationIssue.Code"/>, so a consumer can translate each one and
+    /// join them itself rather than using the argument at all.
+    /// </remarks>
+    public FlowMessage? FailureMessage { get; init; }
 
     /// <summary>
     /// Gets the validation issues that stopped the run before it started. Empty unless the flow was

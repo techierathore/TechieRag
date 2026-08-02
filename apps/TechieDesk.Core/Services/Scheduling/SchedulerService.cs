@@ -1,6 +1,5 @@
 using System.Globalization;
 using Microsoft.Extensions.Options;
-using TechieDesk.Services.Localization;
 
 namespace TechieDesk.Services.Scheduling;
 
@@ -32,7 +31,6 @@ public sealed class SchedulerService : ISchedulerService
     private readonly TimeProvider timeProvider;
     private readonly SchedulerOptions options;
     private readonly ILogger<SchedulerService> logger;
-    private readonly LocalizeText localize;
 
     /// <summary>Initializes the scheduler.</summary>
     /// <param name="scheduleRepository">Schedule persistence.</param>
@@ -43,7 +41,6 @@ public sealed class SchedulerService : ISchedulerService
     /// <param name="timeProvider">Clock.</param>
     /// <param name="options">Poll configuration.</param>
     /// <param name="logger">Logger.</param>
-    /// <param name="localize">Resolves a resource key into the reader's language.</param>
     public SchedulerService(
         IScheduleRepository scheduleRepository,
         IScheduleRunRepository runRepository,
@@ -52,8 +49,7 @@ public sealed class SchedulerService : ISchedulerService
         ISchedulerPreferencesStore preferencesStore,
         TimeProvider timeProvider,
         IOptions<SchedulerOptions> options,
-        ILogger<SchedulerService> logger,
-        LocalizeText localize)
+        ILogger<SchedulerService> logger)
     {
         this.scheduleRepository = scheduleRepository;
         this.runRepository = runRepository;
@@ -63,7 +59,6 @@ public sealed class SchedulerService : ISchedulerService
         this.timeProvider = timeProvider;
         this.options = options.Value;
         this.logger = logger;
-        this.localize = localize;
     }
 
     /// <inheritdoc />
@@ -109,7 +104,7 @@ public sealed class SchedulerService : ISchedulerService
         // read as in flight forever; the in-flight guard is in memory, so it does not block anything,
         // but the history would lie about it.
         var abandoned = await runRepository.CloseAbandonedRunsAsync(
-            "The application stopped while this run was in progress.", nowUtc).ConfigureAwait(false);
+            JobMessage.Of("SchedulerRunAbandonedByProcess"), nowUtc).ConfigureAwait(false);
         if (abandoned > 0)
         {
             logger.LogWarning("Closed {Count} run(s) abandoned by a previous process", abandoned);
@@ -199,7 +194,7 @@ public sealed class SchedulerService : ISchedulerService
             await RecordSkippedAsync(
                 schedule,
                 nowUtc,
-                localize(
+                JobMessage.Of(
                     "SchedulerSkipMissedNoCatchUp",
                     dueUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)))
                 .ConfigureAwait(false);
@@ -224,7 +219,7 @@ public sealed class SchedulerService : ISchedulerService
         return await backgroundJobs.RunScheduleAsync(schedule, trigger).ConfigureAwait(false);
     }
 
-    private async Task RecordSkippedAsync(Schedule schedule, DateTime nowUtc, string? reason)
+    private async Task RecordSkippedAsync(Schedule schedule, DateTime nowUtc, JobMessage? reason)
     {
         // A skip is written to the history rather than only logged. "Why did this not run last
         // night" has to be answerable from the same table that answers "what did it do".
@@ -237,10 +232,13 @@ public sealed class SchedulerService : ISchedulerService
             StartedUtc = nowUtc,
             CompletedUtc = nowUtc,
             Outcome = RunOutcome.Skipped,
-            Detail = reason
+
+            // REQ-UI-056: the codes are what a reader sees, the English is the audit copy.
+            Detail = reason?.ToInvariantString(),
+            DetailJson = reason?.ToStorage()
         };
         await runRepository.StartAsync(run).ConfigureAwait(false);
         await runRepository.CompleteAsync(run).ConfigureAwait(false);
-        logger.LogInformation("Skipped {Name}: {Reason}", schedule.Name, reason);
+        logger.LogInformation("Skipped {Name}: {Reason}", schedule.Name, run.Detail);
     }
 }

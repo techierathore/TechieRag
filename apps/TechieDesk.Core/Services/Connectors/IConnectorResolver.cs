@@ -1,3 +1,4 @@
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors;
 
 namespace TechieDesk.Services.Connectors;
@@ -51,13 +52,21 @@ public interface IConnectorResolver
     /// <summary>Checks a payload against the connector it names, before a schedule is saved.</summary>
     /// <param name="payload">The payload to check.</param>
     /// <returns><see langword="null"/> when the payload is usable, otherwise the reason it is not.</returns>
-    string? Validate(ConnectorJobPayload payload);
+    /// <remarks>
+    /// A <see cref="JobMessage"/> because the same refusal is BOTH shown in the confirm dialog and,
+    /// when the run goes ahead anyway on a schedule saved earlier, persisted as the run's failure
+    /// reason (REQ-UI-056).
+    /// </remarks>
+    JobMessage? Validate(ConnectorJobPayload payload);
 
     /// <summary>Builds the connector this payload names, ready to run.</summary>
     /// <param name="payload">What to read.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The connector and the previous run's sync state.</returns>
-    /// <exception cref="ConnectorException">The connector could not be built — it was deleted, or its credential is gone.</exception>
+    /// <exception cref="ConnectorException">
+    /// The connector could not be built — it was deleted, or its credential is gone. An app-authored
+    /// refusal throws <see cref="ConnectorSetupException"/>, which carries the reason as codes.
+    /// </exception>
     Task<ResolvedConnector> ResolveAsync(ConnectorJobPayload payload, CancellationToken cancellationToken);
 
     /// <summary>Persists what this run saw, for the next run to skip.</summary>

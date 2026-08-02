@@ -1,5 +1,6 @@
 using TechieDesk.Services.Agents;
 using TechieDesk.Services.Agents.Mcp;
+using TechieDesk.Services.Localization;
 using TechieDesk.Services.Web;
 using TechieRag.Abstractions;
 using TechieRag.Mcp;
@@ -34,6 +35,7 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
     private readonly TechieRagManager rag;
     private readonly IWebContentFetcherFactory webFetchers;
     private readonly TimeProvider timeProvider;
+    private readonly LocalizeText localize;
     private readonly ILogger<WorkspaceFlowService> logger;
     private readonly FlowGuardrailCatalog guardrailCatalog = new();
 
@@ -44,6 +46,7 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
     /// <param name="rag">The library manager supplying the configured LLM provider and workspace search.</param>
     /// <param name="webFetchers">Builds the web fetcher the scrape skill uses, with the same policy chat uses.</param>
     /// <param name="timeProvider">Clock, so stored timestamps are testable.</param>
+    /// <param name="localize">Resolves the run-refusal sentence the flows screen renders (REQ-UI-055).</param>
     /// <param name="logger">Diagnostics.</param>
     /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
     public WorkspaceFlowService(
@@ -53,6 +56,7 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
         TechieRagManager rag,
         IWebContentFetcherFactory webFetchers,
         TimeProvider timeProvider,
+        LocalizeText localize,
         ILogger<WorkspaceFlowService> logger)
     {
         this.flows = flows ?? throw new ArgumentNullException(nameof(flows));
@@ -61,6 +65,7 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
         this.rag = rag ?? throw new ArgumentNullException(nameof(rag));
         this.webFetchers = webFetchers ?? throw new ArgumentNullException(nameof(webFetchers));
         this.timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+        this.localize = localize ?? throw new ArgumentNullException(nameof(localize));
         this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -167,10 +172,9 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
         // exactly what the Catalyst head showed on 2026-08-01 before this check existed.
         if (provider is null && FlowCapabilities.NeedsLlmProvider(flow))
         {
-            return FlowOutcomes.Failed(
-                flow.Id,
-                "This flow has a step that calls a model and no LLM provider is configured, so nothing "
-                + "was run. Configure a model in LLM settings first.");
+            // REQ-UI-055: the reason is rendered inside the flows screen's already-localized
+            // failure alert, so an English sentence here shows as English inside Devanagari.
+            return FlowOutcomes.Failed(flow.Id, localize("FlowsRunNeedsLlmProvider"));
         }
 
         // The gate is built from the agent that OWNS the flow's first agent node, falling back to the

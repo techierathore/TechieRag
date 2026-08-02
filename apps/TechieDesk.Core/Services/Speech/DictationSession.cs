@@ -15,10 +15,15 @@ namespace TechieDesk.Services.Speech;
 /// </remarks>
 public sealed class DictationSession
 {
-    /// <summary>The hint shown when macOS has refused microphone or speech access.</summary>
-    public const string DeniedHint =
-        "Microphone or speech access was refused. Grant it in System Settings › Privacy & Security "
-        + "› Microphone (and Speech Recognition), then try again.";
+    /// <summary>Resource key for the hint shown when macOS has refused microphone or speech access.</summary>
+    /// <remarks>
+    /// REQ-UI-055 / BRD-91. This was the sentence itself, assigned straight to
+    /// <see cref="Message"/>, which the composer's mic button renders — so a Hindi chat screen
+    /// showed one English line under the microphone. The session holds a KEY rather than a
+    /// localizer because it is a plain state machine constructed by the component, and the
+    /// component already injects a localizer.
+    /// </remarks>
+    public const string DeniedHintKey = "DictationPermissionDenied";
 
     private string committedText = string.Empty;
 
@@ -50,14 +55,16 @@ public sealed class DictationSession
     /// <summary>
     /// Records that the OS refused microphone or speech access.
     /// </summary>
+    /// <param name="hint">The refusal hint, already resolved in the reader's language — see
+    /// <see cref="DeniedHintKey"/>.</param>
     /// <remarks>
     /// This is NOT permanent — the user can grant access in System Settings and come back — so the
     /// session returns to Idle rather than Blocked, and the button stays clickable.
     /// </remarks>
-    public void MarkPermissionDenied()
+    public void MarkPermissionDenied(string hint)
     {
         Status = DictationStatus.Idle;
-        Message = DeniedHint;
+        Message = hint;
     }
 
     /// <summary>

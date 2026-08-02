@@ -191,7 +191,7 @@ public sealed class ConnectorStoreTests : IDisposable
 
         host.Secrets.Delete(ConnectorSecretStore.SecretKeyPrefix + connectorId);
 
-        var failure = await Assert.ThrowsAsync<ConnectorException>(
+        var failure = await Assert.ThrowsAsync<ConnectorSetupException>(
             () => host.Resolver.ResolveAsync(payload, CancellationToken.None));
 
         Assert.Contains("could not be read", failure.Message, StringComparison.Ordinal);
@@ -216,7 +216,7 @@ public sealed class ConnectorStoreTests : IDisposable
 
         var rejected = host.Resolver.Validate(payload);
         Assert.NotNull(rejected);
-        Assert.NotEmpty(rejected);
+        Assert.NotEmpty(rejected.ToInvariantString());
     }
 
     /// <summary>A payload naming a type this build cannot run is refused by name.</summary>
@@ -233,7 +233,7 @@ public sealed class ConnectorStoreTests : IDisposable
         });
 
         Assert.NotNull(rejected);
-        Assert.Contains("jira", rejected, StringComparison.Ordinal);
+        Assert.Contains("jira", rejected.ToInvariantString(), StringComparison.Ordinal);
     }
 
     /// <summary>Settings that cannot produce a working connector are refused at save time.</summary>
@@ -249,7 +249,7 @@ public sealed class ConnectorStoreTests : IDisposable
             Settings = new ConnectorSettings { Host = "GitHub" },
         };
         Assert.NotNull(host.Registry.Validate(noProject));
-        await Assert.ThrowsAsync<ConnectorException>(() => host.Registry.SaveAsync(noProject));
+        await Assert.ThrowsAsync<ConnectorSetupException>(() => host.Registry.SaveAsync(noProject));
 
         var bothTargets = new ConnectorRegistration
         {
@@ -278,7 +278,7 @@ public sealed class ConnectorStoreTests : IDisposable
         };
         var refusal = host.Registry.Validate(privateSite);
         Assert.NotNull(refusal);
-        Assert.Contains("private network", refusal, StringComparison.Ordinal);
+        Assert.Contains("private network", refusal.ToInvariantString(), StringComparison.Ordinal);
 
         // The same settings WITH the opt-in are accepted, because the operator said so.
         Assert.Null(host.Registry.Validate(privateSite with

@@ -36,7 +36,7 @@ public class EmailConnectorSettingsTests
         var result = new ConnectorSettings().Validate(ConnectorTypes.Email);
 
         Assert.NotNull(result);
-        Assert.Contains("IMAP server", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("IMAP server", result.ToInvariantString(), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Verifies naming both a server and an archive is refused rather than silently merged.</summary>
@@ -74,7 +74,7 @@ public class EmailConnectorSettingsTests
         var result = (Imap() with { ImapPort = port }).Validate(ConnectorTypes.Email);
 
         Assert.NotNull(result);
-        Assert.Contains("cleartext", result, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("cleartext", result.ToInvariantString(), StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Verifies the cleartext IMAP scheme is refused if typed into the host box.</summary>

@@ -1,3 +1,4 @@
+using TechieDesk.Services.Localization;
 using TechieRag.Web;
 
 namespace TechieDesk.Services.Web;
@@ -20,20 +21,25 @@ public sealed class ProgressReportingWebContentFetcher : IWebContentFetcher
     private readonly IWebContentFetcher inner;
     private readonly IProgress<WebIngestionProgress>? progress;
     private readonly int total;
+    private readonly LocalizeText localize;
     private int attempts;
 
     /// <summary>Initializes a new instance of the <see cref="ProgressReportingWebContentFetcher"/> class.</summary>
     /// <param name="inner">The fetcher that does the real work.</param>
     /// <param name="progress">Where reports go; null disables reporting.</param>
     /// <param name="total">The number of fetches this run may make at most.</param>
+    /// <param name="localize">Resolves the per-page status lines this decorator writes (REQ-UI-055).</param>
+    /// <exception cref="ArgumentNullException"><paramref name="inner"/> or <paramref name="localize"/> is <see langword="null"/>.</exception>
     public ProgressReportingWebContentFetcher(
         IWebContentFetcher inner,
         IProgress<WebIngestionProgress>? progress,
-        int total)
+        int total,
+        LocalizeText localize)
     {
         this.inner = inner ?? throw new ArgumentNullException(nameof(inner));
         this.progress = progress;
         this.total = total;
+        this.localize = localize ?? throw new ArgumentNullException(nameof(localize));
     }
 
     /// <summary>Gets the number of fetches attempted, successful or not.</summary>
@@ -43,7 +49,11 @@ public sealed class ProgressReportingWebContentFetcher : IWebContentFetcher
     public async Task<WebPage> FetchAsync(string url, CancellationToken cancellationToken = default)
     {
         progress?.Report(new WebIngestionProgress(
-            WebIngestionStage.Fetching, url, AttemptCount, total, $"Fetching {Shorten(url)}"));
+            WebIngestionStage.Fetching,
+            url,
+            AttemptCount,
+            total,
+            localize("WebProgressFetching", Shorten(url))));
 
         try
         {
@@ -54,7 +64,7 @@ public sealed class ProgressReportingWebContentFetcher : IWebContentFetcher
                 page.FinalUrl,
                 done,
                 total,
-                $"Read '{page.Title}' ({done} of at most {total})"));
+                localize("WebProgressRead", page.Title, done, total)));
             return page;
         }
         catch (OperationCanceledException)

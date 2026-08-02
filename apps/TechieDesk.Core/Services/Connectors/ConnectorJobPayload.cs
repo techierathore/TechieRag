@@ -1,4 +1,5 @@
 using System.Text.Json;
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors;
 
 namespace TechieDesk.Services.Connectors;
@@ -112,42 +113,54 @@ public sealed record ConnectorJobPayload
     /// Checked at save time as well as at run time (BRD-136). A schedule that names a connector which
     /// no longer exists must be refused in the confirm dialog, not at 07:00 three days later.
     /// </remarks>
-    public string? Validate()
+    public JobMessage? Validate()
     {
         if (string.IsNullOrWhiteSpace(ConnectorId))
         {
-            return "The run does not say which connector to read.";
+            return JobMessage.Of("ConnectorPayloadNoConnector");
         }
 
         if (string.IsNullOrWhiteSpace(ConnectorType))
         {
-            return "The run does not say what kind of connector to read.";
+            return JobMessage.Of("ConnectorPayloadNoConnectorType");
         }
 
         if (MaxItems <= 0)
         {
-            return "The item limit must be at least 1, otherwise the run can never fetch anything.";
+            return JobMessage.Of("ConnectorPayloadItemLimitTooLow");
         }
 
         if (MaxPages <= 0)
         {
-            return "The page limit must be at least 1, otherwise the run can never list anything.";
+            return JobMessage.Of("ConnectorPayloadPageLimitTooLow");
         }
 
-        return MaxItemBytes <= 0
-            ? "The per-item size limit must be greater than zero."
-            : null;
+        return MaxItemBytes <= 0 ? JobMessage.Of("ConnectorPayloadSizeLimitTooLow") : null;
     }
 
     /// <summary>Renders the payload as the one-line action summary shown in the schedules grid.</summary>
-    /// <returns>A plain-language summary. Never JSON, never cron.</returns>
-    public string Describe()
+    /// <returns>A plain-language summary as codes and arguments. Never JSON, never cron.</returns>
+    /// <remarks>
+    /// Four codes rather than two with a "where" fragment substituted in. "into the document library"
+    /// and "into workspace X" are different sentences in Hindi, not one sentence with a noun swapped,
+    /// and gluing them is the fragment trap <see cref="Scheduling.CronDescriber"/> records at length.
+    /// The connector NAME and the workspace ID go through as arguments because they are data.
+    /// </remarks>
+    public JobMessage Describe()
     {
         var name = string.IsNullOrWhiteSpace(DisplayName) ? ConnectorId : DisplayName;
-        var where = string.IsNullOrWhiteSpace(WorkspaceId) ? "the document library" : $"workspace {WorkspaceId}";
-        return string.IsNullOrWhiteSpace(name)
-            ? $"Sync a connector into {where}"
-            : $"Sync '{name}' into {where}";
+        var toLibrary = string.IsNullOrWhiteSpace(WorkspaceId);
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return toLibrary
+                ? JobMessage.Of("ConnectorActionSyncIntoLibrary")
+                : JobMessage.Of("ConnectorActionSyncIntoWorkspace", WorkspaceId);
+        }
+
+        return toLibrary
+            ? JobMessage.Of("ConnectorActionSyncNamedIntoLibrary", name)
+            : JobMessage.Of("ConnectorActionSyncNamedIntoWorkspace", name, WorkspaceId);
     }
 
     /// <summary>Converts the payload's bounds into the library's run options.</summary>

@@ -61,7 +61,7 @@ public sealed class ScheduleInterpreter : IScheduleInterpreter
 
     /// <inheritdoc />
     public IReadOnlyList<AvailableAction> AvailableActions => runner.AvailableHandlers
-        .Select(handler => new AvailableAction(handler.JobKind, handler.DisplayName, handler.Description))
+        .Select(handler => new AvailableAction(handler.JobKind, handler.DisplayNameKey, handler.DescriptionKey))
         .ToList();
 
     /// <inheritdoc />
@@ -169,7 +169,10 @@ public sealed class ScheduleInterpreter : IScheduleInterpreter
         var handler = runner.FindHandler(payload.JobKind);
         if (handler is null)
         {
-            var offered = string.Join(", ", actions.Select(action => action.DisplayName));
+            // In the READER's language. The list of actions the app can do is the whole content of
+            // this refusal, and naming them in English inside a Hindi sentence was the REQ-UI-056
+            // defect this seam change exists to fix.
+            var offered = string.Join(", ", actions.Select(action => localize(action.DisplayNameKey)));
             return ScheduleInterpretation.Failed(localize("ScheduleInterpretUnknownAction", offered));
         }
 
@@ -178,7 +181,7 @@ public sealed class ScheduleInterpreter : IScheduleInterpreter
         {
             // Validated at authoring time, never at first use (BRD-136). A workspace that does not
             // exist must be caught in this dialog, not at 07:00 on Thursday.
-            warnings.Add(payloadError);
+            warnings.Add(payloadError.Resolve(localize));
         }
 
         var zone = TimeZoneInfo.Local;
@@ -205,7 +208,8 @@ public sealed class ScheduleInterpreter : IScheduleInterpreter
 
         if (steps.Count == 1)
         {
-            steps.Add(new ScheduleDraftStep(StepLabel(1), handler.DescribeAction(payload.Payload)));
+            steps.Add(new ScheduleDraftStep(
+                StepLabel(1), handler.DescribeAction(payload.Payload).Resolve(localize)));
         }
 
         steps.Add(new ScheduleDraftStep(
@@ -224,14 +228,16 @@ public sealed class ScheduleInterpreter : IScheduleInterpreter
 
         var draft = new ScheduleDraft
         {
-            Name = string.IsNullOrWhiteSpace(payload.Name) ? handler.DisplayName : payload.Name!.Trim(),
+            Name = string.IsNullOrWhiteSpace(payload.Name)
+                ? localize(handler.DisplayNameKey)
+                : payload.Name!.Trim(),
             Instruction = instruction.Trim(),
             CronExpression = cron.Expression,
             TimeZoneId = zone.Id,
             ScheduleText = scheduleText,
             JobKind = handler.JobKind,
             JobPayload = payload.Payload,
-            ActionSummary = handler.DescribeAction(payload.Payload),
+            ActionSummary = handler.DescribeAction(payload.Payload).Resolve(localize),
             Steps = steps,
             Confidence = payloadError is not null
                 ? DraftConfidence.Low
@@ -336,7 +342,11 @@ public sealed class ScheduleInterpreter : IScheduleInterpreter
             """);
         foreach (var action in actions)
         {
-            builder.AppendLine($"- {action.JobKind}: {action.DisplayName} — {action.Description}");
+            // English on purpose: the prompt is machine text (see the remarks on BuildPrompt), and a
+            // Hindi action list would change the vocabulary the model is asked to select from.
+            builder.AppendLine(
+                $"- {action.JobKind}: {JobMessage.Neutral(action.DisplayNameKey)} "
+                + $"— {JobMessage.Neutral(action.DescriptionKey)}");
         }
 
         builder.AppendLine();

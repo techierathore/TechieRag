@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using TechieDesk.Services.Localization;
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors.Confluence;
 using TechieRag.Connectors.Email;
 using TechieRag.Connectors.Repository;
@@ -192,12 +193,19 @@ public sealed record ConnectorSettings
     /// <summary>Checks these settings against the connector type that will consume them.</summary>
     /// <param name="connectorType">The connector type key.</param>
     /// <returns><see langword="null"/> when the settings are usable, otherwise the reason they are not.</returns>
-    public string? Validate(string? connectorType) => connectorType switch
+    /// <remarks>
+    /// <b>REQ-UI-056.</b> A refusal from here reaches the operator by two different routes — the
+    /// connector editor's save banner, and (through <see cref="IConnectorResolver"/>) a
+    /// <c>ScheduleRun.FailureReason</c> row that is read back weeks later. The second route is why
+    /// this returns codes rather than a sentence: a stored row must render in whatever language the
+    /// person reading the run history has selected, not the one the run happened in.
+    /// </remarks>
+    public JobMessage? Validate(string? connectorType) => connectorType switch
     {
         ConnectorTypes.Repository => ValidateRepository(),
         ConnectorTypes.Confluence => ValidateConfluence(),
         ConnectorTypes.Email => ValidateEmail(),
-        _ => $"'{connectorType}' is not a kind of connector this build can run.",
+        _ => JobMessage.Of("ConnectorSettingsUnknownType", connectorType),
     };
 
     /// <summary>The IMAP folder read when the operator named none. Wire vocabulary, not a label.</summary>
@@ -384,50 +392,42 @@ public sealed record ConnectorSettings
     /// <para>An <c>.mbox</c> archive needs none of this, so it is validated as a path and returns
     /// early — there is no server, no port and no credential in that shape.</para>
     /// </remarks>
-    private string? ValidateEmail()
+    private JobMessage? ValidateEmail()
     {
         var host = Blank(ImapHost);
         var mbox = Blank(MboxPath);
 
         if (host is null && mbox is null)
         {
-            return "A mail connector needs either an IMAP server or the path to a local .mbox file.";
+            return JobMessage.Of("ConnectorSettingsMailNeedsSource");
         }
 
         if (host is not null && mbox is not null)
         {
-            return "This connector names both an IMAP server and an .mbox file. Choose one — they are "
-                + "different mailboxes, and reading both under one connector would merge two sources "
-                + "into one set of citations.";
+            return JobMessage.Of("ConnectorSettingsMailBothSources");
         }
 
         if (mbox is not null)
         {
             return Path.IsPathRooted(mbox)
                 ? null
-                : $"'{mbox}' is not a full path to an .mbox file.";
+                : JobMessage.Of("ConnectorSettingsMboxNotFullPath", mbox);
         }
 
         if (string.IsNullOrWhiteSpace(ImapUsername))
         {
-            return "A mail connector needs the account name to sign in with, usually the address.";
+            return JobMessage.Of("ConnectorSettingsMailNeedsUsername");
         }
 
         var port = ImapPort > 0 ? ImapPort : DefaultImapPort;
         if (port is 143 or 110)
         {
-            return $"Port {port} is a cleartext mail port, and this connector refuses it: your mailbox "
-                + "password and every message would cross the network unencrypted. Use 993, the "
-                + "implicit-TLS IMAP port.";
+            return JobMessage.Of("ConnectorSettingsMailCleartextPort", port);
         }
 
-        if (host!.StartsWith("imap://", StringComparison.OrdinalIgnoreCase))
-        {
-            return "'imap://' is the cleartext scheme and is refused. Enter the host name on its own — "
-                + "the connection is always TLS.";
-        }
-
-        return null;
+        return host!.StartsWith("imap://", StringComparison.OrdinalIgnoreCase)
+            ? JobMessage.Of("ConnectorSettingsMailCleartextScheme")
+            : null;
     }
 
     /// <summary>Renders the one-line mailbox summary. Never the account name paired with a secret.</summary>
@@ -468,32 +468,31 @@ public sealed record ConnectorSettings
     }
 
     /// <summary>Checks the repository-shaped fields.</summary>
-    private string? ValidateRepository()
+    private JobMessage? ValidateRepository()
     {
         if (string.IsNullOrWhiteSpace(ProjectPath))
         {
-            return "A repository connector needs a project path, for example 'owner/repository'.";
+            return JobMessage.Of("ConnectorSettingsRepositoryNeedsPath");
         }
 
         if (!ProjectPath.Contains('/', StringComparison.Ordinal))
         {
-            return $"'{ProjectPath}' is not a project path; it needs an owner or group, "
-                + "for example 'owner/repository'.";
+            return JobMessage.Of("ConnectorSettingsRepositoryPathNotOwnerRepo", ProjectPath);
         }
 
-        return CheckUrl(ApiBaseUrl, "API base URL") ?? CheckUrl(WebBaseUrl, "web base URL");
+        return CheckUrl(ApiBaseUrl, "ConnectorSettingsApiUrlNotAbsolute")
+            ?? CheckUrl(WebBaseUrl, "ConnectorSettingsWebUrlNotAbsolute");
     }
 
     /// <summary>Checks the Confluence-shaped fields.</summary>
-    private string? ValidateConfluence()
+    private JobMessage? ValidateConfluence()
     {
         if (string.IsNullOrWhiteSpace(BaseUrl))
         {
-            return "A Confluence connector needs a site URL, for example "
-                + "'https://acme.atlassian.net/wiki'.";
+            return JobMessage.Of("ConnectorSettingsConfluenceNeedsSiteUrl");
         }
 
-        var badUrl = CheckUrl(BaseUrl, "site URL");
+        var badUrl = CheckUrl(BaseUrl, "ConnectorSettingsSiteUrlNotAbsolute");
         if (badUrl is not null)
         {
             return badUrl;
@@ -501,10 +500,7 @@ public sealed record ConnectorSettings
 
         var hasSpace = !string.IsNullOrWhiteSpace(SpaceKey);
         var hasRoot = !string.IsNullOrWhiteSpace(RootPageId);
-        return hasSpace == hasRoot
-            ? "A Confluence connector needs exactly one of a space key or a page id — a space is a "
-                + "different walk from a page tree."
-            : null;
+        return hasSpace == hasRoot ? JobMessage.Of("ConnectorSettingsConfluenceNeedsOneOf") : null;
     }
 
     /// <summary>
@@ -512,15 +508,23 @@ public sealed record ConnectorSettings
     /// without having said so.
     /// </summary>
     /// <param name="value">The URL, or <see langword="null"/> when not supplied.</param>
-    /// <param name="label">What the URL is, for the message.</param>
+    /// <param name="notAbsoluteCode">
+    /// The resource code naming WHICH URL this is, used when it is not an absolute http address.
+    /// </param>
     /// <returns><see langword="null"/> when usable, otherwise the reason it is not.</returns>
     /// <remarks>
-    /// The private-network check here is a message, not a defence — a public name that resolves to
-    /// loopback walks straight past it, and the enforcement that actually holds is the library's
+    /// <para>The private-network check here is a message, not a defence — a public name that resolves
+    /// to loopback walks straight past it, and the enforcement that actually holds is the library's
     /// connect-time guarded handler. Refusing an obviously private literal at save time tells the
-    /// operator which switch to turn on, instead of failing three days later as "connection refused".
+    /// operator which switch to turn on, instead of failing three days later as "connection
+    /// refused".</para>
+    /// <para><b>A whole code per URL role, not one code with the role in a hole (REQ-UI-056).</b>
+    /// Passing "API base URL" as an ARGUMENT would store an English noun inside a translated
+    /// sentence, because a <see cref="JobMessage"/> argument is DATA carried through verbatim — the
+    /// same trap the <c>QdrantAdmin</c> note in REQ-UI-055 records. Three codes cost three resource
+    /// entries and cannot go wrong.</para>
     /// </remarks>
-    private string? CheckUrl(string? value, string label)
+    private JobMessage? CheckUrl(string? value, string notAbsoluteCode)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -530,13 +534,11 @@ public sealed record ConnectorSettings
         if (!Uri.TryCreate(value.TrimEnd('/'), UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
         {
-            return $"The {label} must be an absolute http or https address.";
+            return JobMessage.Of(notAbsoluteCode);
         }
 
         return !AllowPrivateNetwork && WebCrawlOptions.IsPrivateNetworkHost(uri.Host)
-            ? $"'{uri.Host}' is on a private network. Turn on 'allow this connector to reach my own "
-                + "network' if that is deliberate — it lets this connector send its credential to an "
-                + "address inside your network."
+            ? JobMessage.Of("ConnectorSettingsUrlPrivateNetwork", uri.Host)
             : null;
     }
 

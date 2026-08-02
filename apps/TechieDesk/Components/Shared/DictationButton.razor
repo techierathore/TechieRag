@@ -134,7 +134,7 @@
 
             if (permission == DictationPermission.Denied)
             {
-                session.MarkPermissionDenied();
+                session.MarkPermissionDenied(Localizer[DictationSession.DeniedHintKey].Value);
                 return;
             }
         }

@@ -1,3 +1,4 @@
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors;
 
 namespace TechieDesk.Services.Connectors;
@@ -17,20 +18,20 @@ namespace TechieDesk.Services.Connectors;
 /// </remarks>
 public sealed class NoConnectorsResolver : IConnectorResolver
 {
-    private const string Explanation = "No connector types are installed in this build of TechieDesk.";
+    private const string ExplanationCode = "ConnectorNoTypesInstalled";
 
     /// <inheritdoc />
     public IReadOnlyList<ConnectorTypeDescriptor> AvailableTypes { get; } = [];
 
     /// <inheritdoc />
-    public string? Validate(ConnectorJobPayload payload) => Explanation;
+    public JobMessage? Validate(ConnectorJobPayload payload) => JobMessage.Of(ExplanationCode);
 
     /// <inheritdoc />
     public Task<ResolvedConnector> ResolveAsync(
         ConnectorJobPayload payload, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(payload);
-        throw new ConnectorException(payload.ConnectorType, Explanation);
+        throw new ConnectorSetupException(payload.ConnectorType, JobMessage.Of(ExplanationCode));
     }
 
     /// <inheritdoc />

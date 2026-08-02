@@ -1,4 +1,5 @@
 using System.Linq;
+using TechieDesk.Services.Scheduling;
 using TechieRag.Connectors;
 
 namespace TechieDesk.Services.Connectors;
@@ -89,17 +90,17 @@ public sealed class ConnectorRegistry : IConnectorRegistry
         repository.GetAsync(connectorId, cancellationToken);
 
     /// <inheritdoc />
-    public string? Validate(ConnectorRegistration registration)
+    public JobMessage? Validate(ConnectorRegistration registration)
     {
         ArgumentNullException.ThrowIfNull(registration);
 
         if (!ConnectorTypes.IsKnown(registration.ConnectorType))
         {
-            return $"'{registration.ConnectorType}' is not a kind of connector this build can run.";
+            return JobMessage.Of("ConnectorSettingsUnknownType", registration.ConnectorType);
         }
 
         return string.IsNullOrWhiteSpace(registration.DisplayName)
-            ? "The connector needs a name, so it can be told apart from the others."
+            ? JobMessage.Of("ConnectorRegistrationNeedsName")
             : registration.Settings.Validate(registration.ConnectorType);
     }
 
@@ -112,7 +113,7 @@ public sealed class ConnectorRegistry : IConnectorRegistry
         var invalid = Validate(registration);
         if (invalid is not null)
         {
-            throw new ConnectorException(registration.ConnectorType, invalid);
+            throw new ConnectorSetupException(registration.ConnectorType, invalid);
         }
 
         var connectorId = string.IsNullOrWhiteSpace(registration.ConnectorId)
@@ -133,9 +134,9 @@ public sealed class ConnectorRegistry : IConnectorRegistry
                 !string.Equals(other.ConnectorId, connectorId, StringComparison.Ordinal)
                 && string.Equals(other.DisplayName, wantedName, StringComparison.OrdinalIgnoreCase)))
         {
-            throw new ConnectorException(
+            throw new ConnectorSetupException(
                 registration.ConnectorType,
-                $"A connector called '{wantedName}' already exists — names have to be unique, so give this one a different name.");
+                JobMessage.Of("ConnectorNameAlreadyTaken", wantedName));
         }
 
         var now = DateTime.UtcNow;
@@ -193,13 +194,13 @@ public sealed class ConnectorRegistry : IConnectorRegistry
     }
 
     /// <inheritdoc />
-    public async Task<string?> TestAsync(
+    public async Task<JobMessage?> TestAsync(
         string connectorId, CancellationToken cancellationToken = default)
     {
         var payload = await CreatePayloadAsync(connectorId, cancellationToken).ConfigureAwait(false);
         if (payload is null)
         {
-            return "That connector is no longer saved.";
+            return JobMessage.Of("ConnectorNoLongerSavedShort");
         }
 
         var invalid = resolver.Validate(payload);
@@ -220,14 +221,15 @@ public sealed class ConnectorRegistry : IConnectorRegistry
                 connectorId, resolved.Connector.SourceName, page.Items.Count);
             return null;
         }
-        catch (ConnectorException exception)
+        catch (Exception exception) when (exception is ConnectorException or ConnectorSetupException)
         {
             // The library contract is that this message never contains a credential, so it is safe
             // to put in front of the operator — and it is the only thing that tells them WHICH of
-            // the URL, the project and the token is wrong.
+            // the URL, the project and the token is wrong. A library message has no code and is
+            // carried verbatim; an app-authored refusal keeps its codes (REQ-UI-056).
             logger.LogWarning(
                 "Connector {ConnectorId} could not be reached: {Reason}", connectorId, exception.Message);
-            return exception.Message;
+            return ConnectorSetupException.ReasonFor(exception);
         }
     }
 

@@ -121,20 +121,27 @@ public sealed class SchedulingLocalizationTests : IDisposable
     {
         using var resources = new ResourceHarness(culture);
 
-        var onBattery = new RunConditionEvaluator(
-                new FakeRunEnvironmentProbe(PowerState.Battery, "Home"), resources.Localize)
+        var onBattery = new RunConditionEvaluator(new FakeRunEnvironmentProbe(PowerState.Battery, "Home"))
             .Evaluate(new RunConditions(RequireMainsPower: true));
 
         var offNetwork = new RunConditionEvaluator(
-                new FakeRunEnvironmentProbe(PowerState.Mains, "Airport WiFi"), resources.Localize)
+                new FakeRunEnvironmentProbe(PowerState.Mains, "Airport WiFi"))
             .Evaluate(new RunConditions(RestrictToNamedNetworks: true, AllowedNetworks: ["Home"]));
 
         Assert.False(onBattery.IsAllowed);
         Assert.False(offNetwork.IsAllowed);
-        Assert.Equal(resources.Require("SchedulerSkipOnBattery"), onBattery.Reason);
+
+        // REQ-UI-056: the evaluator returns CODES now, so the culture enters at Resolve rather than
+        // at Evaluate. The assertion is unchanged in what it proves — the skip reason a reader sees
+        // is the one this culture's resource file holds.
+        Assert.Equal(
+            resources.Require("SchedulerSkipOnBattery"), onBattery.Reason!.Resolve(resources.Localize));
 
         // The user named their own WiFi. It is theirs, not ours, and it survives verbatim.
-        Assert.Contains("Airport WiFi", offNetwork.Reason!, StringComparison.Ordinal);
+        Assert.Contains(
+            "Airport WiFi",
+            offNetwork.Reason!.Resolve(resources.Localize),
+            StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -290,7 +290,7 @@
                                 Files="newIssueUploads" FilesChanged="OnNewIssueFilesChangedAsync"
                                 Disabled="isSubmitting" />
                     <FieldDescription>
-                        @Localizer["SupportAttachHintNew", PasteShortcut, HostDescription, SupportAttachmentPolicy.LimitsSummary]
+                        @Localizer["SupportAttachHintNew", PasteShortcut, HostDescription, Localizer[SupportAttachmentPolicy.LimitsSummaryKey]]
                     </FieldDescription>
                     @if (newAttachments.Count > 0)
                     {
@@ -412,7 +412,7 @@
                                         Files="commentUploads" FilesChanged="OnCommentFilesChangedAsync"
                                         Disabled="isCommenting" />
                             <TypographyMuted>
-                                @Localizer["SupportAttachHintComment", PasteShortcut, HostDescription, SupportAttachmentPolicy.LimitsSummary]
+                                @Localizer["SupportAttachHintComment", PasteShortcut, HostDescription, Localizer[SupportAttachmentPolicy.LimitsSummaryKey]]
                             </TypographyMuted>
                             @if (commentAttachments.Count > 0)
                             {
@@ -1091,7 +1091,7 @@
 
             // Checked before a byte is read so an oversize file is refused by name rather than by
             // an OpenReadStream exception the user cannot interpret.
-            var rejection = SupportAttachmentPolicy.GetRejectionReason(item.Name, item.Size);
+            var rejection = SupportAttachmentPolicy.GetRejectionReason(item.Name, item.Size, Localize);
             if (rejection is not null)
             {
                 ToastService.Error(rejection, Localizer["SupportCannotAttachTitle"]);
@@ -1149,7 +1149,7 @@
         try
         {
             var bytes = Convert.FromBase64String(base64);
-            var rejection = SupportAttachmentPolicy.GetRejectionReason(fileName, bytes.LongLength);
+            var rejection = SupportAttachmentPolicy.GetRejectionReason(fileName, bytes.LongLength, Localize);
             if (rejection is not null)
             {
                 ToastService.Error(rejection, Localizer["SupportCannotAttachTitle"]);

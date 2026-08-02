@@ -73,10 +73,14 @@ public sealed class ConnectorJobHandlerTests
 
         await harness.RunAsync();
 
-        Assert.All(harness.Snapshots, snapshot => Assert.False(string.IsNullOrWhiteSpace(snapshot.Message)));
+        Assert.All(harness.Snapshots, snapshot => Assert.NotNull(snapshot.Message));
         Assert.Null(harness.Snapshots[0].PercentComplete);
-        Assert.Contains(harness.Snapshots, snapshot => snapshot.Message!.Contains("Listing items", StringComparison.Ordinal));
-        Assert.Contains(harness.Snapshots, snapshot => snapshot.Message!.Contains("Ingested readme.md", StringComparison.Ordinal));
+        Assert.Contains(
+            harness.Snapshots,
+            snapshot => snapshot.Message!.ToInvariantString().Contains("Listing items", StringComparison.Ordinal));
+        Assert.Contains(
+            harness.Snapshots,
+            snapshot => snapshot.Message!.ToInvariantString().Contains("Ingested readme.md", StringComparison.Ordinal));
         Assert.Equal(100d, harness.Snapshots[^1].PercentComplete);
     }
 
@@ -432,7 +436,7 @@ public sealed class ConnectorJobHandlerTests
         var harness = new Harness();
         var payload = harness.Payload with { WorkspaceId = "ws-7" };
 
-        var described = harness.Handler.DescribeAction(payload.ToJson());
+        var described = harness.Handler.DescribeAction(payload.ToJson()).ToInvariantString();
 
         Assert.Equal("Sync 'Fake repo' into workspace ws-7", described);
         Assert.DoesNotContain('{', described);
@@ -446,7 +450,7 @@ public sealed class ConnectorJobHandlerTests
 
         Assert.Equal(
             "The run does not say which connector to read.",
-            harness.Handler.ValidatePayload(new ConnectorJobPayload().ToJson()));
+            harness.Handler.ValidatePayload(new ConnectorJobPayload().ToJson())?.ToInvariantString());
     }
 
     /// <summary>Renders a run's summary in English, through the real localizer.</summary>

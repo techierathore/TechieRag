@@ -27,6 +27,15 @@ namespace TechieRag.Orchestration;
 /// <para><b>One string in, one string out.</b> The schema is deliberately a single <c>input</c>
 /// property. A sub-agent that took a structured object would need its caller to know its internals,
 /// which is the coupling agent-as-tool exists to avoid.</para>
+/// <para><b>Its English is model-facing, and stays English (REQ-RAG-050).</b> Every sentence this
+/// type produces — the <c>unavailable: …</c> outcomes, the invocation-limit refusal, the schema's
+/// <c>input</c> description — is written FOR THE LLM, either as a tool result it must read and adapt
+/// to or as prompt text it is conditioned on. Translating those would change what the model is told,
+/// per user, which is a correctness problem dressed as a localization one; TechieDesk's
+/// <c>FlowGuardrailCatalog</c> documents the same split. Only text that reaches a
+/// <see cref="FlowStep"/> or a <see cref="FlowRunResult"/> — what a PERSON reads — carries a
+/// <see cref="FlowMessage"/> code, and a nested run's own steps already do, because
+/// <see cref="FlowRunner"/> emits them.</para>
 /// </remarks>
 public sealed class AgentToolHandler : IToolHandler
 {

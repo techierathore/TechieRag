@@ -9,14 +9,31 @@ namespace TechieDesk.Services.Connectors;
 /// <param name="ItemId">The source's identifier, so a retry can name it.</param>
 /// <param name="ItemName">The human-facing name — a path, a page title, a subject line.</param>
 /// <param name="Status">Whether it was ingested, skipped, or failed.</param>
-/// <param name="Reason">Why, in operator terms. Never contains a credential.</param>
+/// <param name="Reason">Why, in operator terms, as stored in English. Never contains a credential.</param>
+/// <param name="ReasonJson">
+/// <paramref name="Reason"/> as resource codes and arguments, or <see langword="null"/> for a row
+/// written before REQ-UI-056 or for a reason that came from the library.
+/// </param>
 /// <param name="RecordedUtc">When the result was recorded.</param>
+/// <remarks>
+/// Both halves travel together so the screen can call <see cref="JobMessage.Render"/> — see
+/// <see cref="DescribeReason"/>. Carrying only the text would have made the hub the one screen that
+/// still showed English on a Hindi install.
+/// </remarks>
 public sealed record ConnectorRunItem(
     string ItemId,
     string ItemName,
     RunItemStatus Status,
     string? Reason,
-    DateTime RecordedUtc);
+    string? ReasonJson,
+    DateTime RecordedUtc)
+{
+    /// <summary>Renders this item's reason in the reader's language.</summary>
+    /// <param name="localize">Resolves a resource code into the reader's language.</param>
+    /// <returns>The reason, or <see langword="null"/> when none was recorded.</returns>
+    public string? DescribeReason(LocalizeText localize) =>
+        JobMessage.Render(Reason, ReasonJson, localize);
+}
 
 /// <summary>
 /// What one connector run did, in full, phrased so it can never overstate itself
@@ -38,8 +55,12 @@ public sealed record ConnectorRunItem(
 /// <param name="Outcome">How it ended, or <see cref="RunOutcome.Running"/> while in flight.</param>
 /// <param name="StartedUtc">When it started.</param>
 /// <param name="CompletedUtc">When it finished, or <see langword="null"/> while in flight.</param>
-/// <param name="Detail">The run's one-line detail as recorded.</param>
-/// <param name="FailureReason">Why the run itself stopped, when it did.</param>
+/// <param name="Detail">The run's one-line detail as recorded, in English.</param>
+/// <param name="DetailJson"><paramref name="Detail"/> as codes and arguments, or null for a legacy row.</param>
+/// <param name="FailureReason">Why the run itself stopped, when it did, in English.</param>
+/// <param name="FailureReasonJson">
+/// <paramref name="FailureReason"/> as codes and arguments, or null when the words were not ours.
+/// </param>
 /// <param name="Items">Every item the run recorded a result for.</param>
 public sealed record ConnectorRunReport(
     long RunId,
@@ -50,7 +71,9 @@ public sealed record ConnectorRunReport(
     DateTime StartedUtc,
     DateTime? CompletedUtc,
     string? Detail,
+    string? DetailJson,
     string? FailureReason,
+    string? FailureReasonJson,
     IReadOnlyList<ConnectorRunItem> Items)
 {
     private readonly IReadOnlyList<ConnectorRunItem> ingested =
@@ -162,10 +185,17 @@ public sealed record ConnectorRunReport(
             run.StartedUtc,
             run.CompletedUtc,
             run.Detail,
+            run.DetailJson,
             run.FailureReason,
+            run.FailureReasonJson,
             items
                 .Select(item => new ConnectorRunItem(
-                    item.ItemId, item.ItemName, item.Status, item.Reason, item.RecordedUtc))
+                    item.ItemId,
+                    item.ItemName,
+                    item.Status,
+                    item.Reason,
+                    item.ReasonJson,
+                    item.RecordedUtc))
                 .ToList());
     }
 
@@ -192,11 +222,14 @@ public sealed record ConnectorRunReport(
     /// <returns>The recorded reason, or "the run failed" in the reader's language.</returns>
     /// <remarks>
     /// <see cref="FailureReason"/> is what the connector or the runner recorded on the run row when
-    /// it stopped. It is a stored value from an earlier moment, so it is shown as it was recorded;
-    /// only the fallback used when nothing was recorded is this type's to translate.
+    /// it stopped. REQ-UI-056 gave it a coded companion, so it is now rendered in the reader's
+    /// language when the row carries codes and shown exactly as recorded when it does not — a run
+    /// stopped by a library error keeps the library's words, and a row written before REQ-UI-056
+    /// keeps its own.
     /// </remarks>
     private string FailureText(LocalizeText localize) =>
-        FailureReason ?? localize("ConnectorRunSummaryRunFailed");
+        JobMessage.Render(FailureReason, FailureReasonJson, localize)
+        ?? localize("ConnectorRunSummaryRunFailed");
 
     /// <summary>Renders a count of catalogue documents in the reader's language.</summary>
     /// <param name="localize">Resolves the singular or plural key.</param>

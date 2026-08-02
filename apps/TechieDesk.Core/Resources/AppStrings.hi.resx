@@ -11511,4 +11511,436 @@
     <value>कनेक्टर जोड़ें</value>
     <comment>Browser tab title for the connector editor when adding a new connector (REQ-UI-055).</comment>
   </data>
+  <data name="JobKindMaintenanceName" xml:space="preserve">
+    <value>स्थानीय डेटाबेस रखरखाव</value>
+    <comment>Name of the built-in maintenance action, listed in the schedule authoring dialog and named in the interpreter's refusal (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindMaintenanceDescription" xml:space="preserve">
+    <value>TechieDesk के स्थानीय डेटाबेस को संकुचित करता है, ताकि हटाए गए दस्तावेज़ और चंक अपनी डिस्क जगह वापस दे दें।</value>
+    <comment>One-line description of the maintenance action, shown when choosing an action (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindMaintenanceAction" xml:space="preserve">
+    <value>स्थानीय डेटाबेस संकुचित करें</value>
+    <comment>The action summary shown in the schedules grid for a maintenance schedule (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindConnectorName" xml:space="preserve">
+    <value>कनेक्टर सिंक करें</value>
+    <comment>Name of the connector-sync action, listed in the schedule authoring dialog (REQ-UI-056).</comment>
+  </data>
+  <data name="JobKindConnectorDescription" xml:space="preserve">
+    <value>रिपॉज़िटरी, विकी या मेलबॉक्स पढ़ता है और जो बदला है उसे दस्तावेज़ लाइब्रेरी में जोड़ता है।</value>
+    <comment>One-line description of the connector-sync action, shown when choosing an action (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunNoHandler" xml:space="preserve">
+    <value>'{0}' प्रकार के काम को संभालने वाला कोई घटक इंस्टॉल नहीं है।</value>
+    <comment>Run failure when a schedule names a job kind whose component is no longer installed. {0} is the stored job kind, wire vocabulary, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunCancelled" xml:space="preserve">
+    <value>यह रन रद्द कर दिया गया।</value>
+    <comment>Run failure reason recorded when the operator stopped the run (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunDetailProcessed" xml:space="preserve">
+    <value>{0} संसाधित</value>
+    <comment>One segment of a run's summary line. {0} is a count in Latin digits (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunDetailFailed" xml:space="preserve">
+    <value>{0} विफल</value>
+    <comment>One segment of a run's summary line, present only when something failed. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunDetailSkipped" xml:space="preserve">
+    <value>{0} छोड़े गए</value>
+    <comment>One segment of a run's summary line, present only when something was skipped. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="JobRunItemsCapped" xml:space="preserve">
+    <value>आइटम सूची {0} सफलताओं पर सीमित की गई (सभी विफलताएँ रखी गईं)</value>
+    <comment>Appended to a run's summary when the per-item list hit its retention cap. {0} is the cap (REQ-UI-056).</comment>
+  </data>
+  <data name="SchedulerRunAbandonedByProcess" xml:space="preserve">
+    <value>यह रन चल ही रहा था कि एप्लिकेशन बंद हो गया।</value>
+    <comment>Failure reason written against a run left open by a process that quit or crashed (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDataDirectoryMissingForSave" xml:space="preserve">
+    <value>डेटा डायरेक्टरी {0} मौजूद नहीं है, इसलिए संकुचित करने के लिए कुछ भी नहीं है।</value>
+    <comment>Refusal shown in the confirm dialog when a maintenance schedule is saved on a machine with no data directory. {0} is a file path, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDataDirectoryMissing" xml:space="preserve">
+    <value>डेटा डायरेक्टरी {0} मौजूद नहीं है।</value>
+    <comment>Run failure when the maintenance job finds no data directory. {0} is a file path (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceCompactingOne" xml:space="preserve">
+    <value>{0} डेटाबेस संकुचित किया जा रहा है</value>
+    <comment>Live progress line while maintenance runs, singular. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceCompactingMany" xml:space="preserve">
+    <value>{0} डेटाबेस संकुचित किए जा रहे हैं</value>
+    <comment>Live progress line while maintenance runs, plural. Hindi does not form a plural with an 's', so this is a separate key rather than a suffix (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceItemCompacted" xml:space="preserve">
+    <value>{0} से घटाकर {1} किया गया</value>
+    <comment>Per-item result for one compacted database: the size before and after. {0} and {1} are byte sizes. Written as a sentence rather than as '{0} → {1}', because a resource whose whole value is punctuation is exactly what LocalizationTests.EveryHindiStringIsWrittenInDevanagari rejects, correctly (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDetailOneDatabase" xml:space="preserve">
+    <value>{0} डेटाबेस</value>
+    <comment>One segment of the maintenance run's summary line, singular. {0} is a count (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDetailDatabases" xml:space="preserve">
+    <value>{0} डेटाबेस</value>
+    <comment>One segment of the maintenance run's summary line, plural (REQ-UI-056).</comment>
+  </data>
+  <data name="MaintenanceDetailReclaimed" xml:space="preserve">
+    <value>{0} वापस मिली</value>
+    <comment>One segment of the maintenance run's summary line: how much disk space came back. {0} is a byte size (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRunNoReadableConfiguration" xml:space="preserve">
+    <value>इस कनेक्टर रन का कॉन्फ़िगरेशन पढ़ा नहीं जा सकता।</value>
+    <comment>Refusal when a schedule's connector payload cannot be parsed at all (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionConfigurationMissing" xml:space="preserve">
+    <value>कनेक्टर सिंक करें (कॉन्फ़िगरेशन मौजूद नहीं)</value>
+    <comment>Action summary shown in the schedules grid when the connector payload cannot be read (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncIntoLibrary" xml:space="preserve">
+    <value>किसी कनेक्टर को दस्तावेज़ लाइब्रेरी में सिंक करें</value>
+    <comment>Action summary for an unnamed connector syncing into the library (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncIntoWorkspace" xml:space="preserve">
+    <value>किसी कनेक्टर को वर्कस्पेस {0} में सिंक करें</value>
+    <comment>Action summary for an unnamed connector syncing into a workspace. {0} is the workspace id, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncNamedIntoLibrary" xml:space="preserve">
+    <value>'{0}' को दस्तावेज़ लाइब्रेरी में सिंक करें</value>
+    <comment>Action summary for a named connector syncing into the library. {0} is the connector's name as the operator typed it (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorActionSyncNamedIntoWorkspace" xml:space="preserve">
+    <value>'{0}' को वर्कस्पेस {1} में सिंक करें</value>
+    <comment>Action summary for a named connector syncing into a workspace. {0} is the connector name, {1} the workspace id (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadNoConnector" xml:space="preserve">
+    <value>यह रन नहीं बताता कि कौन-सा कनेक्टर पढ़ना है।</value>
+    <comment>Refusal when a connector payload names no connector (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadNoConnectorType" xml:space="preserve">
+    <value>यह रन नहीं बताता कि किस प्रकार का कनेक्टर पढ़ना है।</value>
+    <comment>Refusal when a connector payload names no connector type (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadItemLimitTooLow" xml:space="preserve">
+    <value>आइटम सीमा कम से कम 1 होनी चाहिए, वरना रन कभी कुछ ला ही नहीं पाएगा।</value>
+    <comment>Refusal when a connector payload's item cap is zero or negative (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadPageLimitTooLow" xml:space="preserve">
+    <value>पेज सीमा कम से कम 1 होनी चाहिए, वरना रन कभी कुछ सूचीबद्ध ही नहीं कर पाएगा।</value>
+    <comment>Refusal when a connector payload's page cap is zero or negative (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorPayloadSizeLimitTooLow" xml:space="preserve">
+    <value>प्रति-आइटम आकार सीमा शून्य से अधिक होनी चाहिए।</value>
+    <comment>Refusal when a connector payload's per-item size cap is zero or negative (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoTypesInstalled" xml:space="preserve">
+    <value>TechieDesk के इस बिल्ड में कोई कनेक्टर प्रकार इंस्टॉल नहीं है।</value>
+    <comment>Refusal from the placeholder resolver used by a build that ships no connectors (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsUnknownType" xml:space="preserve">
+    <value>'{0}' ऐसा कनेक्टर प्रकार नहीं है जिसे यह बिल्ड चला सके।</value>
+    <comment>Refusal when a stored connector type is not one this build knows. {0} is the stored type key, wire vocabulary, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoLongerSaved" xml:space="preserve">
+    <value>कनेक्टर '{0}' अब सहेजा नहीं है, इसलिए पढ़ने के लिए कुछ भी नहीं है।</value>
+    <comment>Run failure when the connector a schedule names has been deleted. {0} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoLongerSavedAddAgain" xml:space="preserve">
+    <value>कनेक्टर '{0}' अब सहेजा नहीं है, इसलिए पढ़ने के लिए कुछ भी नहीं है। इसे कनेक्टर स्क्रीन पर फिर से जोड़ें।</value>
+    <comment>The same refusal shown at save time, where the operator can act on it. {0} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNoLongerSavedShort" xml:space="preserve">
+    <value>वह कनेक्टर अब सहेजा नहीं है।</value>
+    <comment>Result of testing a connector that has since been deleted (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorTypeMismatch" xml:space="preserve">
+    <value>यह रन {0} कनेक्टर की अपेक्षा करता है, पर '{1}' तो {2} कनेक्टर है।</value>
+    <comment>Refusal when a schedule's stored connector type no longer matches the saved connector. {0} and {2} are wire type keys, {1} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorCredentialUnreadable" xml:space="preserve">
+    <value>'{0}' के लिए सहेजा गया एक्सेस टोकन इस मशीन के क्रेडेंशियल स्टोर से पढ़ा नहीं जा सका। कनेक्टर पर टोकन फिर से दर्ज करें और उसे दोबारा चलाएँ।</value>
+    <comment>Run failure when a connector claims a credential the OS store no longer holds. {0} is the connector's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRegistrationNeedsName" xml:space="preserve">
+    <value>कनेक्टर को एक नाम चाहिए, ताकि उसे बाकियों से अलग पहचाना जा सके।</value>
+    <comment>Refusal when a connector is saved with no display name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorNameAlreadyTaken" xml:space="preserve">
+    <value>'{0}' नाम का कनेक्टर पहले से मौजूद है — नाम अद्वितीय होने चाहिए, इसलिए इसे कोई दूसरा नाम दें।</value>
+    <comment>Refusal when a connector's name collides with another. {0} is the name the operator typed (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailNeedsSource" xml:space="preserve">
+    <value>मेल कनेक्टर को या तो एक IMAP सर्वर चाहिए या किसी स्थानीय .mbox फ़ाइल का पथ।</value>
+    <comment>Refusal when a mail connector names neither a server nor an archive (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailBothSources" xml:space="preserve">
+    <value>यह कनेक्टर एक IMAP सर्वर और एक .mbox फ़ाइल, दोनों बताता है। इनमें से एक चुनें — ये अलग-अलग मेलबॉक्स हैं, और दोनों को एक ही कनेक्टर के अंतर्गत पढ़ने से दो स्रोत एक ही उद्धरण-समूह में मिल जाएँगे।</value>
+    <comment>Refusal when a mail connector names both a server and an archive (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMboxNotFullPath" xml:space="preserve">
+    <value>'{0}' किसी .mbox फ़ाइल का पूरा पथ नहीं है।</value>
+    <comment>Refusal when a mailbox archive path is relative. {0} is the path as typed, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailNeedsUsername" xml:space="preserve">
+    <value>मेल कनेक्टर को साइन इन करने के लिए खाता नाम चाहिए, आम तौर पर वही पता।</value>
+    <comment>Refusal when an IMAP connector has no account name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailCleartextPort" xml:space="preserve">
+    <value>पोर्ट {0} एक क्लियरटेक्स्ट मेल पोर्ट है, और यह कनेक्टर उसे स्वीकार नहीं करता: आपका मेलबॉक्स पासवर्ड और हर संदेश बिना एन्क्रिप्शन के नेटवर्क पर जाएगा। 993 का उपयोग करें, जो इम्प्लिसिट-TLS वाला IMAP पोर्ट है।</value>
+    <comment>Refusal when a mail connector is pointed at a cleartext port. {0} is the port number (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsMailCleartextScheme" xml:space="preserve">
+    <value>'imap://' क्लियरटेक्स्ट स्कीम है और स्वीकार नहीं की जाती। केवल होस्ट नाम दर्ज करें — कनेक्शन हमेशा TLS ही रहता है।</value>
+    <comment>Refusal when a mail host is entered with the cleartext URL scheme (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsRepositoryNeedsPath" xml:space="preserve">
+    <value>रिपॉज़िटरी कनेक्टर को एक प्रोजेक्ट पथ चाहिए, जैसे 'owner/repository'।</value>
+    <comment>Refusal when a repository connector has no project path. The example is wire vocabulary and stays in Latin script (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsRepositoryPathNotOwnerRepo" xml:space="preserve">
+    <value>'{0}' प्रोजेक्ट पथ नहीं है; इसमें एक मालिक या समूह होना चाहिए, जैसे 'owner/repository'।</value>
+    <comment>Refusal when a repository project path has no owner segment. {0} is the path as typed (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsApiUrlNotAbsolute" xml:space="preserve">
+    <value>API बेस URL एक पूर्ण http या https पता होना चाहिए।</value>
+    <comment>Refusal for a malformed repository API base URL. A whole key per URL role, because the role is a noun the sentence is built around (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsWebUrlNotAbsolute" xml:space="preserve">
+    <value>वेब बेस URL एक पूर्ण http या https पता होना चाहिए।</value>
+    <comment>Refusal for a malformed repository web base URL (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsSiteUrlNotAbsolute" xml:space="preserve">
+    <value>साइट URL एक पूर्ण http या https पता होना चाहिए।</value>
+    <comment>Refusal for a malformed Confluence site URL (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsUrlPrivateNetwork" xml:space="preserve">
+    <value>'{0}' एक निजी नेटवर्क पर है। यदि यह जान-बूझकर है तो 'इस कनेक्टर को मेरे अपने नेटवर्क तक पहुँचने दें' चालू करें — इससे यह कनेक्टर अपना क्रेडेंशियल आपके नेटवर्क के भीतर के किसी पते पर भेज सकेगा।</value>
+    <comment>Refusal when a connector URL points at a private-network host without the opt-in. {0} is the host name, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsConfluenceNeedsSiteUrl" xml:space="preserve">
+    <value>Confluence कनेक्टर को एक साइट URL चाहिए, जैसे 'https://acme.atlassian.net/wiki'।</value>
+    <comment>Refusal when a Confluence connector has no site URL. The example URL is wire vocabulary (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorSettingsConfluenceNeedsOneOf" xml:space="preserve">
+    <value>Confluence कनेक्टर को स्पेस की या पेज आईडी, इनमें से ठीक एक चाहिए — स्पेस पढ़ना पेज-ट्री पढ़ने से अलग है।</value>
+    <comment>Refusal when a Confluence connector names both a space and a page, or neither (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressListing" xml:space="preserve">
+    <value>{0} में आइटम सूचीबद्ध किए जा रहे हैं…</value>
+    <comment>Live progress line while a connector lists its source. {0} is the source name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressListed" xml:space="preserve">
+    <value>{1} में {0} आइटम सूचीबद्ध किए गए</value>
+    <comment>Live progress line once a listing page is in. {0} is a count, {1} the source name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressReading" xml:space="preserve">
+    <value>{0} पढ़ा जा रहा है</value>
+    <comment>Live progress line while one item is fetched. {0} is the item's name (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorProgressIngested" xml:space="preserve">
+    <value>{0} इनजेस्ट किया गया ({2} में से {1})</value>
+    <comment>Live progress line after an item is ingested. {0} is the item name, {1} the ingested count, {2} the listed count (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemNoReadableText" xml:space="preserve">
+    <value>इस आइटम में पढ़ने योग्य कोई पाठ नहीं था।</value>
+    <comment>Per-item skip reason for an item with no extractable text (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedToLibrary" xml:space="preserve">
+    <value>दस्तावेज़ लाइब्रेरी में जोड़ा गया।</value>
+    <comment>Per-item note for a document ingested into the library alone. One of the sentences already persisted in English on installed machines (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedToWorkspace" xml:space="preserve">
+    <value>वर्कस्पेस {0} में जोड़ा गया।</value>
+    <comment>Per-item note for a document linked into a workspace. {0} is the workspace id, never translated (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedNoLinkerHost" xml:space="preserve">
+    <value>दस्तावेज़ लाइब्रेरी में जोड़ा गया; वर्कस्पेस {0} से नहीं जोड़ा गया क्योंकि इस होस्ट में वर्कस्पेस लिंकिंग उपलब्ध नहीं है।</value>
+    <comment>Per-item note when the scheduler helper host ingests without a workspace linker. {0} is the workspace id (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemAddedLinkNotWritten" xml:space="preserve">
+    <value>दस्तावेज़ लाइब्रेरी में जोड़ा गया; वर्कस्पेस {0} से जोड़ने वाला लिंक लिखा नहीं जा सका क्योंकि वर्कस्पेस पर्सिस्टेंस कॉन्फ़िगर नहीं है।</value>
+    <comment>Per-item note when a workspace link could not be persisted. {0} is the workspace id (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemReplacedPreviousCopy" xml:space="preserve">
+    <value>पहले इनजेस्ट की गई प्रति को बदल दिया गया।</value>
+    <comment>Appended to a per-item note when a changed item superseded its earlier document (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemUnchanged" xml:space="preserve">
+    <value>पिछले रन के बाद से इसमें कोई बदलाव नहीं हुआ।</value>
+    <comment>Per-item skip reason for an item the source reports as unchanged and gives no version for (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorItemUnchangedWithVersion" xml:space="preserve">
+    <value>पिछले रन के बाद से इसमें कोई बदलाव नहीं हुआ (संस्करण {0})।</value>
+    <comment>Per-item skip reason for an unchanged item, naming the source's version. {0} is the version string, never translated. One of the sentences already persisted in English on installed machines (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRunDetailIngestedOfListed" xml:space="preserve">
+    <value>सूचीबद्ध {1} में से {0} इनजेस्ट किए गए</value>
+    <comment>A connector run's summary line. {0} is the ingested count, {1} the listed count. This is the exact sentence 5 rows of run history already hold in English, and the reason the stored unit had to carry ARGUMENTS and not just a key (REQ-UI-056).</comment>
+  </data>
+  <data name="ConnectorRunDetailReachedBudget" xml:space="preserve">
+    <value>इस रन की सीमा पर रुक गया, इसलिए स्रोत पूरा नहीं पढ़ा गया</value>
+    <comment>Appended to a connector run's summary when a run budget stopped the walk early (REQ-UI-056).</comment>
+  </data>
+  <data name="WebValidationEnterUrl" xml:space="preserve">
+    <value>पहले एक URL डालें।</value>
+    <comment>Add from web: the address field is empty (REQ-UI-055 / REQ-RAG-016).</comment>
+  </data>
+  <data name="WebValidationNoWorkspace" xml:space="preserve">
+    <value>कोई वर्कस्पेस चुना नहीं गया, इसलिए परिणाम रखने की कोई जगह नहीं है।</value>
+    <comment>Add from web: no workspace on the request (REQ-UI-055).</comment>
+  </data>
+  <data name="WebValidationNotYouTube" xml:space="preserve">
+    <value>'{0}' एक YouTube वीडियो URL नहीं है। watch, youtu.be, shorts या embed लिंक पेस्ट करें।</value>
+    <comment>Add from web: the video source was given a non-YouTube address. {0} is the URL, never translated (REQ-UI-055 / REQ-RAG-018).</comment>
+  </data>
+  <data name="WebValidationNotAbsoluteUrl" xml:space="preserve">
+    <value>'{0}' एक पूर्ण http या https URL नहीं है। स्कीम भी लिखें, जैसे https://example.com।</value>
+    <comment>Add from web: the address has no scheme. {0} is the URL, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebValidationPrivateHost" xml:space="preserve">
+    <value>'{0}' एक निजी-नेटवर्क पता है। अगर आप वाकई अपने ही नेटवर्क से पढ़ना चाहते हैं तो 'इंट्रानेट और निजी पते अनुमत करें' चालू करें।</value>
+    <comment>Add from web: the seed host is private and the SSRF toggle is off. {0} is the host, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebValidationDepthRange" xml:space="preserve">
+    <value>क्रॉल गहराई 0 और {0} के बीच होनी चाहिए।</value>
+    <comment>Add from web: the crawl depth is out of the bound this surface accepts. {0} is the maximum (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebValidationPageRange" xml:space="preserve">
+    <value>पेज सीमा 1 और {0} के बीच होनी चाहिए।</value>
+    <comment>Add from web: the page budget is out of the bound this surface accepts. {0} is the maximum (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebValidationNotAWebSource" xml:space="preserve">
+    <value>'{0}' कोई वेब स्रोत नहीं है।</value>
+    <comment>Add from web: the request named a source kind this build does not ingest. {0} is the enum token, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebProgressReadingCaptions" xml:space="preserve">
+    <value>कैप्शन ट्रैक पढ़ा जा रहा है…</value>
+    <comment>Add from web: live progress while a YouTube transcript is fetched (REQ-UI-055 / REQ-RAG-018).</comment>
+  </data>
+  <data name="WebProgressAddingDocuments" xml:space="preserve">
+    <value>{0} दस्तावेज़ वर्कस्पेस में जोड़े जा रहे हैं…</value>
+    <comment>Add from web: live progress while ingested documents are linked to the workspace. {0} is the count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebProgressFetching" xml:space="preserve">
+    <value>{0} लाया जा रहा है</value>
+    <comment>Add from web: live progress for one page request in flight. {0} is the shortened URL, never translated (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebProgressRead" xml:space="preserve">
+    <value>'{0}' पढ़ा गया (अधिकतम {2} में से {1})</value>
+    <comment>Add from web: live progress after a page came back. {0} is the page title, {1} the pages done, {2} the page budget (REQ-UI-055 / REQ-RAG-017).</comment>
+  </data>
+  <data name="WebSkipNoWorkspacePersistence" xml:space="preserve">
+    <value>एम्बेड हो गया, पर वर्कस्पेस परसिस्टेंस कॉन्फ़िगर नहीं है, इसलिए इसे इस वर्कस्पेस में नहीं जोड़ा गया।</value>
+    <comment>Add from web: per-item skip reason shown in the results table's Detail column (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSkipLinkFailed" xml:space="preserve">
+    <value>एम्बेड हो गया, पर इसे वर्कस्पेस में जोड़ना विफल रहा: {0}</value>
+    <comment>Add from web: per-item skip reason shown in the results table's Detail column. {0} is the underlying error, never translated (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryNothing" xml:space="preserve">
+    <value>कुछ भी इनजेस्ट नहीं हुआ।</value>
+    <comment>Add from web: run summary when the run produced nothing at all (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryNothingSkipped" xml:space="preserve">
+    <value>कुछ भी इनजेस्ट नहीं हुआ — {0} पढ़े नहीं जा सके।</value>
+    <comment>Add from web: run summary when everything was skipped. {0} is a translated item count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryIngested" xml:space="preserve">
+    <value>{0} इनजेस्ट किए गए।</value>
+    <comment>Add from web: run summary for a clean run. {0} is a translated document count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebSummaryIngestedWithSkips" xml:space="preserve">
+    <value>{0} इनजेस्ट किए गए; {1} छोड़े गए।</value>
+    <comment>Add from web: run summary for a partial run — never phrased as a success. {0} is a translated document count, {1} a translated item count (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountDocument" xml:space="preserve">
+    <value>{0} दस्तावेज़</value>
+    <comment>Singular document count inside an Add from web summary. {0} is 1 (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountDocuments" xml:space="preserve">
+    <value>{0} दस्तावेज़</value>
+    <comment>Plural document count inside an Add from web summary. Hindi does not form a plural with an s (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountItem" xml:space="preserve">
+    <value>{0} आइटम</value>
+    <comment>Singular source-item count inside an Add from web summary. {0} is 1 (REQ-UI-055).</comment>
+  </data>
+  <data name="WebCountItems" xml:space="preserve">
+    <value>{0} आइटम</value>
+    <comment>Plural source-item count inside an Add from web summary. Hindi does not form a plural with an s (REQ-UI-055).</comment>
+  </data>
+  <data name="SupportAttachmentLimitsSummary" xml:space="preserve">
+    <value>PNG, JPG, PDF, LOG · प्रत्येक 10 MB</value>
+    <comment>Support: the attachment limits shown beside the drop zone and quoted back in a type refusal. The four format tokens are file-type names and stay in Latin script in every language (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedNoName" xml:space="preserve">
+    <value>वह फ़ाइल अटैच नहीं की जा सकती — उसका कोई फ़ाइल नाम नहीं है।</value>
+    <comment>Support: a dropped or pasted payload arrived with no file name (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedType" xml:space="preserve">
+    <value>"{0}" अटैच नहीं की जा सकती — सपोर्ट {1} स्वीकार करता है।</value>
+    <comment>Support: the file's type is outside the allowlist. {0} is the file name, {1} the translated limits summary (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedEmpty" xml:space="preserve">
+    <value>"{0}" अटैच नहीं की जा सकती — फ़ाइल खाली है।</value>
+    <comment>Support: a zero-byte attachment. {0} is the file name (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedTooLarge" xml:space="preserve">
+    <value>"{0}" {1} की है — सीमा {2} है।</value>
+    <comment>Support: the declared size is over the cap. {0} is the file name, {1} its size, {2} the cap (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedOverLimit" xml:space="preserve">
+    <value>"{0}" {1} की अटैचमेंट सीमा से बड़ी है।</value>
+    <comment>Support: the bytes streaming in passed the cap, so the partial file was deleted. {0} is the file name, {1} the cap (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="SupportAttachmentRejectedOutsideRoot" xml:space="preserve">
+    <value>वह अटैचमेंट स्टेज नहीं की जा सकती — उसका नाम सपोर्ट अटैचमेंट फ़ोल्डर के बाहर पहुँचता है।</value>
+    <comment>Support: the sanitised path escaped the attachments root (REQ-UI-055 / REQ-UI-047).</comment>
+  </data>
+  <data name="ChatExportFailedDetail" xml:space="preserve">
+    <value>निर्यात विफल: {0}</value>
+    <comment>Chat: the save panel itself threw. {0} is the underlying error, never translated (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="ChatExportNotSaved" xml:space="preserve">
+    <value>निर्यात सहेजा नहीं जा सका।</value>
+    <comment>Chat: the platform save service reported a failure with no reason of its own (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="ChatExportNoFileWritten" xml:space="preserve">
+    <value>निर्यात ने सफलता बताई पर कोई फ़ाइल नहीं लिखी गई।</value>
+    <comment>Chat: a save service claimed success and produced nothing — the defect REQ-FN-010 exists for (REQ-UI-055).</comment>
+  </data>
+  <data name="ChatExportEmptyFile" xml:space="preserve">
+    <value>निर्यात ने एक खाली फ़ाइल बनाई।</value>
+    <comment>Chat: the file exists but is zero bytes (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="ChatExportSaved" xml:space="preserve">
+    <value>"{0}" को {1} के रूप में {2} पर निर्यात किया गया।</value>
+    <comment>Chat: the confirmed export toast. {0} is the thread title, {1} the format name (Markdown/JSON, never translated), {2} the file path (REQ-UI-055 / REQ-FN-010).</comment>
+  </data>
+  <data name="AgentsInvalidHandle" xml:space="preserve">
+    <value>हैंडल 1–32 अक्षर, अंक या हाइफ़न का होना चाहिए, उदाहरण के लिए @analyst।</value>
+    <comment>Workspace agents: the handle typed in the agent editor does not match the allowed shape. The example handle stays in Latin script — it is a real handle (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="AgentsDisplayNameRequired" xml:space="preserve">
+    <value>एजेंट के लिए एक प्रदर्शन नाम आवश्यक है।</value>
+    <comment>Workspace agents: the display-name field was left empty in the agent editor (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="AgentsHandleAlreadyUsed" xml:space="preserve">
+    <value>@{0} इस वर्कस्पेस में पहले से "{1}" द्वारा उपयोग में है।</value>
+    <comment>Workspace agents: a handle collision caught before the database constraint. {0} is the handle, {1} the clashing agent's display name — both user data, never translated (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="AgentsBuiltInNotDeletable" xml:space="preserve">
+    <value>अंतर्निर्मित @agent हटाया नहीं जा सकता। इसके बजाय इसे इसके डिफ़ॉल्ट पर रीसेट करें।</value>
+    <comment>Workspace agents: delete was attempted on the built-in agent. @agent is the literal handle and stays in Latin script (REQ-UI-055 / REQ-UI-045).</comment>
+  </data>
+  <data name="DictationPermissionDenied" xml:space="preserve">
+    <value>माइक्रोफ़ोन या स्पीच एक्सेस अस्वीकार कर दिया गया। इसे System Settings › Privacy &amp; Security › Microphone (और Speech Recognition) में दें, फिर दोबारा कोशिश करें।</value>
+    <comment>Chat composer: macOS refused microphone or speech-recognition access. The System Settings pane names stay in Latin script — that is what the OS shows, and a translated path name would send the user looking for a pane that does not exist (REQ-UI-055 / REQ-UI-035).</comment>
+  </data>
+  <data name="FlowsRunNeedsLlmProvider" xml:space="preserve">
+    <value>इस फ़्लो में एक चरण मॉडल को कॉल करता है और कोई LLM प्रोवाइडर कॉन्फ़िगर नहीं है, इसलिए कुछ भी नहीं चलाया गया। पहले LLM सेटिंग्स में एक मॉडल कॉन्फ़िगर करें।</value>
+    <comment>Workspace flows: the run was refused because a model-calling node has no provider. LLM stays in Latin script as a protocol noun (REQ-UI-055 / REQ-RAG-024).</comment>
+  </data>
 </root>

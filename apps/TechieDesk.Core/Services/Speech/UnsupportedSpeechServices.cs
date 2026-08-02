@@ -11,14 +11,21 @@ namespace TechieDesk.Services.Speech;
 /// </remarks>
 public sealed class UnsupportedDictationService : IDictationService
 {
-    /// <summary>The reason shown when no platform recognizer is present.</summary>
-    public const string Reason = "Dictation is not available in this build.";
+    /// <summary>Resource key for the reason shown when no platform recognizer is present.</summary>
+    /// <remarks>
+    /// REQ-UI-055 / BRD-91. The reason used to be an English sentence returned from
+    /// <see cref="UnsupportedReason"/> and rendered raw beside the mic button. It is not returned
+    /// at all any more: <see cref="UnsupportedReason"/> is null, which is the contract's "I have no
+    /// reason of my own" answer, and the button falls back to this key — the sentence it was
+    /// already carrying for exactly this case.
+    /// </remarks>
+    public const string ReasonKey = "DictationUnsupported";
 
     /// <inheritdoc/>
     public bool IsSupported => false;
 
     /// <inheritdoc/>
-    public string? UnsupportedReason => Reason;
+    public string? UnsupportedReason => null;
 
     /// <inheritdoc/>
     public Task<DictationPermission> RequestPermissionAsync(CancellationToken cancellationToken = default) =>

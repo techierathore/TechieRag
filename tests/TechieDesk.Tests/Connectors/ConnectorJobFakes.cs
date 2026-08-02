@@ -131,7 +131,7 @@ public sealed class FakeConnectorResolver : IConnectorResolver
     public ConnectorSyncState? PreviousSync { get; set; }
 
     /// <summary>Gets or sets the validation error to report, or <see langword="null"/> to accept.</summary>
-    public string? ValidationError { get; set; }
+    public JobMessage? ValidationError { get; set; }
 
     /// <summary>Gets or sets an exception <see cref="ResolveAsync"/> throws instead of resolving.</summary>
     public Exception? ResolveFailure { get; set; }
@@ -144,7 +144,7 @@ public sealed class FakeConnectorResolver : IConnectorResolver
         [new ConnectorTypeDescriptor("fake", "ConnectorTypeRepositoryName", "ConnectorTypeRepositoryDescription")];
 
     /// <inheritdoc />
-    public string? Validate(ConnectorJobPayload payload) => ValidationError;
+    public JobMessage? Validate(ConnectorJobPayload payload) => ValidationError;
 
     /// <inheritdoc />
     public Task<ResolvedConnector> ResolveAsync(
@@ -195,12 +195,12 @@ public sealed class RecordingDocumentSink : IConnectorDocumentSink
         if (string.IsNullOrWhiteSpace(document.Text))
         {
             return Task.FromResult(
-                ConnectorIngestOutcome.Skipped("The item held no readable text."));
+                ConnectorIngestOutcome.Skipped(JobMessage.Of("ConnectorItemNoReadableText")));
         }
 
         Ingested.Add(document);
         return Task.FromResult(ConnectorIngestOutcome.Ingested(
-            $"doc-{document.Item.Id}", "Added to the document library."));
+            $"doc-{document.Item.Id}", JobMessage.Of("ConnectorItemAddedToLibrary")));
     }
 }
 
@@ -270,7 +270,7 @@ public sealed class SignallingRunRepository : IScheduleRunRepository
             .ToList());
 
     /// <inheritdoc />
-    public Task<int> CloseAbandonedRunsAsync(string reason, DateTime asOfUtc) => Task.FromResult(0);
+    public Task<int> CloseAbandonedRunsAsync(JobMessage reason, DateTime asOfUtc) => Task.FromResult(0);
 }
 
 /// <summary>
@@ -320,6 +320,6 @@ public sealed class SignallingRunRepositoryDecorator : IScheduleRunRepository
         inner.ListItemsAsync(scheduleRunId);
 
     /// <inheritdoc />
-    public Task<int> CloseAbandonedRunsAsync(string reason, DateTime asOfUtc) =>
+    public Task<int> CloseAbandonedRunsAsync(JobMessage reason, DateTime asOfUtc) =>
         inner.CloseAbandonedRunsAsync(reason, asOfUtc);
 }

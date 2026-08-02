@@ -83,7 +83,7 @@ public static class ServiceStringCoverage
     /// a ratchet that excludes generously is a ratchet that misses the next defect.
     /// </remarks>
     private static readonly Regex MachineFacingCall = new(
-        @"[Ll]ogger\s*\.\s*Log|\.\s*ToString\s*\(|ParseExact|nameof\s*\(");
+        @"[Ll]ogger\s*\??\s*\.\s*Log|\.\s*ToString\s*\(|ParseExact|nameof\s*\(");
 
     /// <summary>A literal that is a SQL statement rather than a sentence.</summary>
     /// <remarks>

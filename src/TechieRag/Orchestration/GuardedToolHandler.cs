@@ -24,9 +24,20 @@ namespace TechieRag.Orchestration;
 /// <para><b>The tool list is unchanged.</b> Guarded tools stay visible to the model, exactly as the
 /// app's <c>EgressGate</c> does it: hiding them would change what the model believes it can do and
 /// stop it from telling the user why something did not happen.</para>
+/// <para><b>A refusal has two readers, and they get different things (REQ-RAG-050).</b>
+/// <see cref="ToolResult.Content"/> is read by the MODEL, so it stays a finished English sentence it
+/// can act on. <see cref="ToolResult.ErrorMessage"/> is what a host paints as the detail line of a
+/// trace row, so the same refusal is also published as a <see cref="FlowMessage"/> — a stable code
+/// plus the guardrail id and the reason — through <see cref="RefusalMessage"/>, and stamped onto
+/// <see cref="FlowStep.FailureMessage"/> by <see cref="FlowRunner"/>. Without it a Hindi user meets
+/// an English refusal at the exact moment something went wrong, which is the defect BRD-91 names.</para>
 /// </remarks>
 public sealed class GuardedToolHandler : IToolHandler
 {
+    /// <summary>The stand-in reason for a refusal that named none.</summary>
+    private static readonly FlowMessage NoReasonGiven = FlowMessage.Create(
+        FlowMessageCodes.GuardrailRefusedCall, "The call was refused by a guardrail.");
+
     private readonly IToolHandler inner;
     private readonly FlowGuardrailChain chain;
     private readonly FlowNode node;
@@ -94,13 +105,50 @@ public sealed class GuardedToolHandler : IToolHandler
 
         onBlocked?.Invoke(verdict, toolCall);
 
-        var reason = verdict.Reason ?? "The call was refused by a guardrail.";
+        var refusal = RefusalMessage(verdict);
         return new ToolResult
         {
             ToolCallId = toolCall.Id,
-            Content = $"unavailable: '{toolCall.Name}' was not run. {reason}",
+            Content = $"unavailable: '{toolCall.Name}' was not run. {ReasonText(verdict)}",
             IsSuccess = false,
-            ErrorMessage = $"Blocked by guardrail '{verdict.GuardrailId}': {reason}"
+            ErrorMessage = refusal.Text
         };
     }
+
+    /// <summary>
+    /// Builds the localizable form of a refusal — the same sentence this handler puts on
+    /// <see cref="ToolResult.ErrorMessage"/>, as a code plus its arguments (REQ-RAG-050).
+    /// </summary>
+    /// <param name="verdict">The refusal, normally the one handed to <see cref="OnBlocked"/>.</param>
+    /// <returns>A <see cref="FlowMessage"/> under <see cref="FlowMessageCodes.ToolCallRefusedByGuardrail"/>.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="verdict"/> is null.</exception>
+    /// <remarks>
+    /// <para>Public and static because a host that wraps this handler, or renders a trace rebuilt
+    /// from a persisted run, needs to reconstruct the identical sentence without re-running the
+    /// guardrail.</para>
+    /// <para><b>Argument <c>{1}</c> is a nested sentence, and that is deliberate.</b> A refusal is
+    /// always "this framing, around that guardrail's reason". The framing is the library's and has
+    /// this code; the reason is the GUARDRAIL's and carries its own code on
+    /// <see cref="GuardrailVerdict.Message"/>. A consumer should translate the framing, translate
+    /// <see cref="GuardrailVerdict.Message"/> separately, and substitute the second into the first.
+    /// The English here is the fallback for a consumer that does neither — and for a host guardrail
+    /// that returned a plain <see cref="GuardrailDecision.Block(string)"/> string with no code at
+    /// all, it is the only thing available, which is the host's own choice to make.</para>
+    /// </remarks>
+    public static FlowMessage RefusalMessage(GuardrailVerdict verdict)
+    {
+        ArgumentNullException.ThrowIfNull(verdict);
+
+        return FlowMessage.Create(
+            FlowMessageCodes.ToolCallRefusedByGuardrail,
+            "Blocked by guardrail '{0}': {1}",
+            verdict.GuardrailId ?? string.Empty,
+            ReasonText(verdict));
+    }
+
+    /// <summary>Resolves the English reason to quote, falling back when the refusal carried none.</summary>
+    /// <param name="verdict">The refusal.</param>
+    /// <returns>The reason text; never null.</returns>
+    private static string ReasonText(GuardrailVerdict verdict) =>
+        verdict.Reason ?? verdict.Message?.Text ?? NoReasonGiven.Text;
 }

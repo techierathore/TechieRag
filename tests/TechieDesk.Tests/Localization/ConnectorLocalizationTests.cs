@@ -345,6 +345,8 @@ public sealed class ConnectorLocalizationTests
             DateTime.UtcNow,
             null,
             null,
+            null,
+            null,
             items);
     }
 
@@ -353,7 +355,7 @@ public sealed class ConnectorLocalizationTests
     /// <param name="status">What happened to it.</param>
     /// <returns>The item.</returns>
     private static ConnectorRunItem Item(string id, RunItemStatus status) =>
-        new(id, $"{id}.md", status, null, DateTime.UtcNow);
+        new(id, $"{id}.md", status, null, null, DateTime.UtcNow);
 
     /// <summary>Collects every connector value that is persisted, sent, or switched on.</summary>
     /// <returns>The wire vocabulary, in a stable order.</returns>
