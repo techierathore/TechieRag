@@ -269,10 +269,13 @@ public sealed class EmailConnector : IDataConnector
         }
 
         return new ConnectorItem(
-            // UIDVALIDITY is part of the identity, not decoration. When a server resets it every UID
-            // in the folder refers to a different message, and an id built from the UID alone would
-            // make the whole folder look unchanged.
-            $"{header.Folder}/{header.UidValidity}/{header.Uid}",
+            // A transport that knows its own coordinates are not stable supplies the identity itself;
+            // a file-backed mailbox does, because its folder is a file name (TR-RAG-037).
+            //
+            // Otherwise: UIDVALIDITY is part of the identity, not decoration. When a server resets it
+            // every UID in the folder refers to a different message, and an id built from the UID
+            // alone would make the whole folder look unchanged.
+            header.StableId ?? $"{header.Folder}/{header.UidValidity}/{header.Uid}",
             subject,
             $"imap://{transport.MailboxName}/{Uri.EscapeDataString(header.Folder)};UID={header.Uid}",
             header.Uid,

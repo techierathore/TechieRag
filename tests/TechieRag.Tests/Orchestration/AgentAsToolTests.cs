@@ -212,10 +212,170 @@ public sealed class AgentAsToolTests
             ArgumentsJson = """{"input":"look into widgets"}"""
         });
 
+        // The flag, first. This test named the defect for a release without asserting it: it checked
+        // only that the CONTENT said "unavailable", while IsSuccess silently defaulted to true and
+        // every trace renderer painted the refused run green (REQ-RAG-051).
+        Assert.False(result.IsSuccess);
+        Assert.NotNull(result.ErrorMessage);
+
         Assert.StartsWith("unavailable:", result.Content);
         Assert.Contains("host-gate", result.Content);
         Assert.Equal(0, inner.TurnCount);
     }
+
+    /// <summary>
+    /// A guardrail-refused sub-flow reports <c>IsSuccess = false</c> and names the refusal under a
+    /// translatable code (REQ-RAG-051, first of the two failure modes).
+    /// </summary>
+    [Fact]
+    public async Task ABlockedSubFlowReportsAFailedToolCallCarryingTheRefusalCode()
+    {
+        var inner = new ScriptedLlmProvider("inner", ScriptedLlmProvider.Says("never reached"));
+        var subRuntime = new FlowRuntime(new InMemoryFlowAgentResolver(new FlowAgent("inner", inner)));
+        subRuntime.HostGuardrails.Add(new DelegateFlowGuardrail(
+            "compliance-check", "Refuses everything", [GuardrailStage.Input],
+            (_, _) => Task.FromResult(GuardrailDecision.Block("this workspace does not allow research"))));
+
+        var handler = AgentToolHandler.ForFlow(
+            "run-research", "Runs the research flow", TwoNodeFlow("research", "Research"), subRuntime);
+
+        var result = await handler.ExecuteToolAsync(new ToolCall
+        {
+            Id = "call-1",
+            Name = "run-research",
+            ArgumentsJson = """{"input":"look into widgets"}"""
+        });
+
+        Assert.False(result.IsSuccess);
+
+        // The person-facing half: a stable code, plus the flow, guardrail and reason as arguments so
+        // a translated sentence can put them anywhere.
+        var message = Assert.IsType<FlowMessage>(result.Message);
+        Assert.Equal(FlowMessageCodes.SubFlowBlocked, message.Code);
+        Assert.Equal(
+            ["Research", "compliance-check", "this workspace does not allow research"],
+            message.Arguments);
+        Assert.Equal(message.Text, result.ErrorMessage);
+
+        // The model-facing half is unchanged: still a finished English sentence it can act on.
+        Assert.StartsWith("unavailable:", result.Content);
+        Assert.Equal(0, inner.TurnCount);
+    }
+
+    /// <summary>
+    /// A sub-flow that ran out of steps reports <c>IsSuccess = false</c> too (REQ-RAG-051, second
+    /// failure mode).
+    /// </summary>
+    [Fact]
+    public async Task ABudgetExhaustedSubFlowReportsAFailedToolCall()
+    {
+        // Two agent nodes wired in a cycle, with a budget smaller than the cycle needs to settle.
+        var inner = new ScriptedLlmProvider(
+            "inner",
+            ScriptedLlmProvider.Says("first"),
+            ScriptedLlmProvider.Says("second"),
+            ScriptedLlmProvider.Says("third"),
+            ScriptedLlmProvider.Says("fourth"));
+
+        var loopingFlow = new FlowDefinition
+        {
+            Id = "loop",
+            Name = "Looper",
+            StartNodeId = "a",
+            MaxSteps = 2,
+            // Without this the cycle is a validation ERROR and the run never reaches the budget
+            // check — it would come back as Failed, testing the wrong arm.
+            AllowCycles = true,
+            Nodes =
+            [
+                new FlowNode { Id = "a", Kind = FlowNodeKind.Agent, AgentId = "inner" },
+                new FlowNode { Id = "b", Kind = FlowNodeKind.Agent, AgentId = "inner" }
+            ],
+            Edges =
+            [
+                new FlowEdge { Id = "a-b", FromNodeId = "a", ToNodeId = "b" },
+                new FlowEdge { Id = "b-a", FromNodeId = "b", ToNodeId = "a" }
+            ]
+        };
+
+        var subRuntime = new FlowRuntime(new InMemoryFlowAgentResolver(new FlowAgent("inner", inner)));
+        var handler = AgentToolHandler.ForFlow("run-loop", "Runs the looping flow", loopingFlow, subRuntime);
+
+        var result = await handler.ExecuteToolAsync(new ToolCall
+        {
+            Id = "call-1",
+            Name = "run-loop",
+            ArgumentsJson = """{"input":"go"}"""
+        });
+
+        Assert.False(result.IsSuccess);
+
+        var message = Assert.IsType<FlowMessage>(result.Message);
+        Assert.Equal(FlowMessageCodes.SubFlowStepBudgetExhausted, message.Code);
+        Assert.Equal(["Looper", "2"], message.Arguments);
+        Assert.StartsWith("unavailable:", result.Content);
+    }
+
+    /// <summary>
+    /// The trace row a CALLING agent produces for a refused sub-flow renders as blocked, not green —
+    /// which is the defect as a user meets it (REQ-RAG-051).
+    /// </summary>
+    /// <remarks>
+    /// Asserting on the handler alone would not have caught this. The flag has to survive the trip
+    /// through <c>AgentLoopRunner</c>'s <see cref="AgentStepKind.ToolExecuted"/> step, because that
+    /// step — not the <see cref="ToolResult"/> — is what a trace renderer actually reads.
+    /// </remarks>
+    [Fact]
+    public async Task ARefusedSubFlowRendersAsABlockedTraceRowNotAGreenOne()
+    {
+        var inner = new ScriptedLlmProvider("inner", ScriptedLlmProvider.Says("never reached"));
+        var subRuntime = new FlowRuntime(new InMemoryFlowAgentResolver(new FlowAgent("inner", inner)));
+        subRuntime.HostGuardrails.Add(new DelegateFlowGuardrail(
+            "compliance-check", "Refuses everything", [GuardrailStage.Input],
+            (_, _) => Task.FromResult(GuardrailDecision.Block("not allowed here"))));
+
+        var handler = AgentToolHandler.ForFlow(
+            "run-research", "Runs the research flow", TwoNodeFlow("research", "Research"), subRuntime);
+
+        // The caller asks for the sub-flow, then answers once it has the refusal back.
+        var caller = new ScriptedLlmProvider(
+            "caller",
+            ScriptedLlmProvider.CallsTool("run-research", """{"input":"look into widgets"}"""),
+            ScriptedLlmProvider.Says("I could not run that research."));
+
+        var steps = new List<AgentStep>();
+        var loop = new AgentLoopRunner(caller, handler);
+
+        await loop.RunAsync(
+            [ChatMessage.User("research widgets")],
+            progress: new Progress<AgentStep>(steps.Add));
+
+        var toolRow = Assert.Single(steps, step => step.Kind == AgentStepKind.ToolExecuted);
+
+        // This is the assertion the whole REQ is about. It was true-by-default before the fix.
+        Assert.False(toolRow.IsSuccess);
+
+        var message = Assert.IsType<FlowMessage>(toolRow.FailureMessage);
+        Assert.Equal(FlowMessageCodes.SubFlowBlocked, message.Code);
+        Assert.Contains("compliance-check", message.Arguments);
+    }
+
+    /// <summary>Builds the minimal agent-then-terminal flow the delegation tests reuse.</summary>
+    /// <param name="id">The flow id.</param>
+    /// <param name="name">The flow's display name, which appears in the failure messages.</param>
+    /// <returns>A two-node flow bound to an agent called <c>inner</c>.</returns>
+    private static FlowDefinition TwoNodeFlow(string id, string name) => new()
+    {
+        Id = id,
+        Name = name,
+        StartNodeId = "study",
+        Nodes =
+        [
+            new FlowNode { Id = "study", Kind = FlowNodeKind.Agent, AgentId = "inner" },
+            new FlowNode { Id = "end", Kind = FlowNodeKind.Terminal }
+        ],
+        Edges = [new FlowEdge { Id = "e", FromNodeId = "study", ToNodeId = "end" }]
+    };
 
     /// <summary>A malformed call is a readable tool result, not an exception that ends the turn.</summary>
     [Fact]

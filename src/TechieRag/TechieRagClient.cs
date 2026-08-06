@@ -198,13 +198,7 @@ public class TechieRagClient : ITechieRag
 
         // Embed all chunks
         logger.LogDebug("Embedding {ChunkCount} chunks for document {DocumentId}", chunkList.Count, documentId);
-        var texts = chunkList.Select(c => c.Text).ToList();
-        var vectors = await embeddingProvider.EmbedBatchAsync(texts, cancellationToken);
-
-        for (int i = 0; i < chunkList.Count; i++)
-        {
-            chunkList[i].Vector = vectors[i];
-        }
+        await EmbedAndStampAsync(chunkList, cancellationToken);
 
         // Ensure document record exists
         await EnsureDocumentExistsAsync(documentId, fileName, filePath, cancellationToken);
@@ -296,13 +290,7 @@ public class TechieRagClient : ITechieRag
 
         // Embed all chunks
         logger.LogDebug("Embedding {ChunkCount} chunks for text document {DocumentId}", chunkList.Count, documentId);
-        var texts = chunkList.Select(c => c.Text).ToList();
-        var vectors = await embeddingProvider.EmbedBatchAsync(texts, cancellationToken);
-
-        for (int i = 0; i < chunkList.Count; i++)
-        {
-            chunkList[i].Vector = vectors[i];
-        }
+        await EmbedAndStampAsync(chunkList, cancellationToken);
 
         // Ensure document record exists
         await EnsureDocumentExistsAsync(documentId, documentName, "text-input", cancellationToken);
@@ -499,6 +487,23 @@ public class TechieRagClient : ITechieRag
     /// <para><b>Flow:</b> Delegates to the vector store's ListDocumentsAsync method
     /// to retrieve all document metadata.</para>
     /// </remarks>
+    /// <inheritdoc />
+    /// <remarks>Taken from the configured provider, so it always describes what THIS client writes.</remarks>
+    public string EmbeddingSignature => embeddingProvider.EmbeddingSignature;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Implemented here as well as on the interface. The interface carries a default so existing
+    /// implementations keep compiling, but a default member is reachable only through the interface —
+    /// a caller holding a concrete <see cref="TechieRagClient"/> could not call it at all, which is
+    /// how most consumers and every test hold it.
+    /// </remarks>
+    public async Task<EmbeddingStalenessReport> DetectStaleEmbeddingsAsync(
+        CancellationToken cancellationToken = default) =>
+        EmbeddingStaleness.Analyze(
+            await ListDocumentsAsync(cancellationToken).ConfigureAwait(false), EmbeddingSignature);
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Document>> ListDocumentsAsync(CancellationToken cancellationToken = default)
     {
         logger.LogDebug("Listing all documents");
@@ -825,6 +830,31 @@ public class TechieRagClient : ITechieRag
     /// automatically during chunk upsert. This method ensures the record exists for
     /// stores that may not do so automatically.</para>
     /// </remarks>
+    /// <summary>
+    /// Embeds a document's chunks and stamps each one with what produced its vector (REQ-RAG-052).
+    /// </summary>
+    /// <param name="chunkList">The chunks to embed, mutated in place.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A task that completes when every chunk carries a vector and a signature.</returns>
+    /// <remarks>
+    /// <b>The two steps are together on purpose.</b> Every ingestion route embeds and then stores, so
+    /// a route that embedded here and stamped somewhere else would eventually gain a path that forgot
+    /// the stamp — and an unstamped document is indistinguishable from a pre-2026-08-04 one. Binding
+    /// the stamp to the embedding call makes "vector present, signature absent" unreachable.
+    /// </remarks>
+    private async Task EmbedAndStampAsync(List<TextChunk> chunkList, CancellationToken cancellationToken)
+    {
+        var texts = chunkList.Select(chunk => chunk.Text).ToList();
+        var vectors = await embeddingProvider.EmbedBatchAsync(texts, cancellationToken);
+        var signature = embeddingProvider.EmbeddingSignature;
+
+        for (var i = 0; i < chunkList.Count; i++)
+        {
+            chunkList[i].Vector = vectors[i];
+            chunkList[i].Metadata[DocumentMetadataKeys.EmbeddingSignature] = signature;
+        }
+    }
+
     private async Task EnsureDocumentExistsAsync(
         string documentId,
         string name,

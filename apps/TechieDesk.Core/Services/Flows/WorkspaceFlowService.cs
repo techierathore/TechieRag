@@ -183,6 +183,17 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
         var owner = await ResolveOwningAgentAsync(workspaceId, flow).ConfigureAwait(false);
         var gate = new EgressGate(owner, confirmation);
 
+        // REQ-FN-053: the SAME per-run time limit a chat turn already enforces. A chat turn runs under
+        // `new CancellationTokenSource(agent.TimeLimitSeconds)`; a flow run was started with whatever
+        // the caller passed, and the flows screen passed nothing at all — so any stall anywhere in the
+        // run (a tool with no timeout of its own, an egress prompt whose answer never arrives) hung
+        // the run forever, with no exception to log and no way for the screen to recover. An
+        // unbounded wait is not a neutral default; it is the difference between a rendered failure
+        // and a button stuck on "running".
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(owner.TimeLimitSeconds));
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
+        cancellationToken = linked.Token;
+
         var manager = await rag.GetWorkspaceManagerAsync().ConfigureAwait(false);
 
         await using var toolScope = new FlowToolScope();
@@ -217,7 +228,14 @@ public sealed class WorkspaceFlowService : IWorkspaceFlowService
             agent => BuildToolsAsync(workspaceId, agent, manager, gate, cancellationToken)).ConfigureAwait(false);
 
         var runner = new FlowRunner(flow, runtime, logger: null);
-        return await runner.RunAsync(input, variables: null, progress, cancellationToken).ConfigureAwait(false);
+        var result = await runner.RunAsync(input, variables: null, progress, cancellationToken).ConfigureAwait(false);
+
+        // Tell the two cancellations apart. The runner reports both as `Cancelled`, but "you stopped
+        // it" and "it ran past its time limit" are different facts, and only the second is a defect
+        // the user needs named (REQ-FN-053).
+        return result.Outcome == FlowRunOutcome.Cancelled && timeout.IsCancellationRequested
+            ? FlowOutcomes.Failed(flow.Id, localize("FlowsRunTimedOut", owner.TimeLimitSeconds))
+            : result;
     }
 
     /// <summary>Reads one stored row back, tolerating a document that cannot be parsed.</summary>

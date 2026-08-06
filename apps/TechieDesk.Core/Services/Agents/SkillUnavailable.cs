@@ -1,3 +1,6 @@
+using TechieDesk.Services.Scheduling;
+using TechieRag.Orchestration;
+
 namespace TechieDesk.Services.Agents;
 
 /// <summary>
@@ -27,11 +30,39 @@ public static class SkillUnavailable
     /// </param>
     /// <returns>The marked message handed back to the model.</returns>
     /// <exception cref="ArgumentException">Thrown when <paramref name="reason"/> is blank.</exception>
-    public static string Because(string reason)
+    public static SkillOutcome Because(string reason)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
-        return $"{Marker} {reason.Trim()}";
+        return new SkillOutcome($"{Marker} {reason.Trim()}");
+    }
+
+    /// <summary>
+    /// Builds an unavailability the trace can render in the reader's language (REQ-UI-059 clause 3).
+    /// </summary>
+    /// <param name="reasonKey">An <c>AppStrings</c> key holding the English reason.</param>
+    /// <param name="arguments">The values the key's holes take — paths, tool names, setting labels.</param>
+    /// <returns>The outcome: English for the model, a code for the person.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="reasonKey"/> is blank.</exception>
+    /// <remarks>
+    /// <para><b>One entry, two views.</b> The English handed to the model is rendered from the very
+    /// same resource entry the code names, through the NEUTRAL resource set — so the sentence the
+    /// model reads and the sentence a Hindi user reads can never drift apart into two separately
+    /// maintained strings. That is the same device <c>JobMessage.ToInvariantString</c> already uses
+    /// for the audit column.</para>
+    /// <para>The <see cref="Marker"/> prefix is unchanged and stays English: it is the wire signal
+    /// <see cref="IsUnavailable"/> and the model both key off, not prose.</para>
+    /// </remarks>
+    public static SkillOutcome Coded(string reasonKey, params object?[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reasonKey);
+
+        var english = JobMessage.Neutral(reasonKey, arguments ?? []);
+        var formatted = (arguments ?? []).Select(value => value?.ToString() ?? string.Empty).ToArray();
+
+        return new SkillOutcome(
+            $"{Marker} {english.Trim()}",
+            FlowMessage.Create(reasonKey, english, formatted));
     }
 
     /// <summary>

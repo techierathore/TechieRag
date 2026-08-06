@@ -52,13 +52,12 @@ public static class WebScrapeSkill
     /// <param name="argumentsJson">The tool-call arguments.</param>
     /// <param name="cancellationToken">Token to cancel the fetch.</param>
     /// <returns>The page text, a refusal, or an unavailability report.</returns>
-    private static async Task<string> RunAsync(
+    private static async Task<SkillOutcome> RunAsync(
         IWebContentFetcher? fetcher, string argumentsJson, CancellationToken cancellationToken)
     {
         if (fetcher is null)
         {
-            return SkillUnavailable.Because(
-                "no web fetcher is configured on this install, so pages cannot be read.");
+            return SkillUnavailable.Coded("SkillUnavailableWebFetcher");
         }
 
         var url = SkillArguments.ReadString(argumentsJson, "url");

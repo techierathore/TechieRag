@@ -62,10 +62,13 @@ public abstract class RelationalConversationStore : IConversationStore
                     ThreadId TEXT NOT NULL,
                     Role TEXT NOT NULL,
                     Content TEXT,
+                    ContentJson TEXT,
                     SourcesJson TEXT,
                     CreatedAt TEXT NOT NULL
                 )
                 """).ConfigureAwait(false);
+
+            await AddContentJsonColumnAsync(connection).ConfigureAwait(false);
 
             await connection.ExecuteAsync(
                 "CREATE INDEX IF NOT EXISTS IxTrThreadUserId ON TrThread(UserId)").ConfigureAwait(false);
@@ -77,6 +80,36 @@ public abstract class RelationalConversationStore : IConversationStore
         finally
         {
             initLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Adds <c>TrMessage.ContentJson</c> to a database created before that column existed.
+    /// </summary>
+    /// <param name="connection">The open connection.</param>
+    /// <returns>A task that completes once the column is present.</returns>
+    /// <remarks>
+    /// <para><b>Why an <c>ALTER</c> and not just the <c>CREATE TABLE</c> above.</b>
+    /// <c>CREATE TABLE IF NOT EXISTS</c> does nothing to a table that already exists, so every
+    /// install that has ever run this app would keep the old six columns and silently lose every
+    /// coded message written after the upgrade. An existing install is the ONLY case that matters
+    /// here — the rows this requirement exists to protect are real chat history.</para>
+    /// <para><b>Attempt-and-ignore, because the two providers disagree.</b> PostgreSQL has
+    /// <c>ADD COLUMN IF NOT EXISTS</c>; SQLite does not, and its column-introspection pragma has no
+    /// Postgres equivalent. Running the plain <c>ALTER</c> and swallowing the duplicate-column error
+    /// is the one form that is correct on both and idempotent on every start.</para>
+    /// </remarks>
+    private static async Task AddContentJsonColumnAsync(DbConnection connection)
+    {
+        try
+        {
+            await connection.ExecuteAsync("ALTER TABLE TrMessage ADD COLUMN ContentJson TEXT")
+                .ConfigureAwait(false);
+        }
+        catch (DbException)
+        {
+            // Already there. The only other way this throws is a database that cannot be altered at
+            // all, and that surfaces immediately on the next read rather than being hidden here.
         }
     }
 
@@ -194,7 +227,8 @@ public abstract class RelationalConversationStore : IConversationStore
         string threadId,
         ChatMessage message,
         IReadOnlyList<SearchResult>? sources = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? contentJson = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(threadId);
         ArgumentNullException.ThrowIfNull(message);
@@ -214,8 +248,8 @@ public abstract class RelationalConversationStore : IConversationStore
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync("""
-            INSERT INTO TrMessage (MessageId, ThreadId, Role, Content, SourcesJson, CreatedAt)
-            VALUES (@MessageId, @ThreadId, @Role, @Content, @SourcesJson, @CreatedAt)
+            INSERT INTO TrMessage (MessageId, ThreadId, Role, Content, ContentJson, SourcesJson, CreatedAt)
+            VALUES (@MessageId, @ThreadId, @Role, @Content, @ContentJson, @SourcesJson, @CreatedAt)
             """,
             new
             {
@@ -223,6 +257,7 @@ public abstract class RelationalConversationStore : IConversationStore
                 stored.ThreadId,
                 stored.Role,
                 stored.Content,
+                ContentJson = contentJson,
                 SourcesJson = sourcesJson,
                 CreatedAt = stored.CreatedAt.ToString("o")
             }).ConfigureAwait(false);
@@ -244,7 +279,7 @@ public abstract class RelationalConversationStore : IConversationStore
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         var rows = await connection.QueryAsync<MessageRow>(
-            "SELECT MessageId, ThreadId, Role, Content, SourcesJson, CreatedAt FROM TrMessage WHERE ThreadId = @ThreadId ORDER BY CreatedAt, MessageId",
+            "SELECT MessageId, ThreadId, Role, Content, ContentJson, SourcesJson, CreatedAt FROM TrMessage WHERE ThreadId = @ThreadId ORDER BY CreatedAt, MessageId",
             new { ThreadId = threadId }).ConfigureAwait(false);
 
         return rows.Select(MapMessage).ToList();
@@ -307,6 +342,7 @@ public abstract class RelationalConversationStore : IConversationStore
         ThreadId = row.ThreadId,
         Role = row.Role,
         Content = row.Content,
+        ContentJson = row.ContentJson,
         Sources = row.SourcesJson is null
             ? null
             : JsonSerializer.Deserialize<List<SearchResult>>(row.SourcesJson, SourcesJsonOptions),
@@ -332,6 +368,8 @@ public abstract class RelationalConversationStore : IConversationStore
         public string ThreadId { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public string? Content { get; set; }
+        public string? ContentJson { get; set; }
+
         public string? SourcesJson { get; set; }
         public string CreatedAt { get; set; } = string.Empty;
     }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using TechieRag.Abstractions;
@@ -42,14 +43,14 @@ public sealed class AgentToolHandler : IToolHandler
     /// <summary>The default ceiling on how many times one handler may be invoked.</summary>
     public const int DefaultMaxInvocations = 8;
 
-    private readonly Func<string, IProgress<AgentStep>?, CancellationToken, Task<string>> invoke;
+    private readonly Func<string, IProgress<AgentStep>?, CancellationToken, Task<Invocation>> invoke;
     private readonly ToolDefinition definition;
     private int invocations;
 
     private AgentToolHandler(
         ToolDefinition definition,
         int maxInvocations,
-        Func<string, IProgress<AgentStep>?, CancellationToken, Task<string>> invoke)
+        Func<string, IProgress<AgentStep>?, CancellationToken, Task<Invocation>> invoke)
     {
         this.definition = definition;
         this.invoke = invoke;
@@ -152,7 +153,7 @@ public sealed class AgentToolHandler : IToolHandler
                 progress,
                 cancellationToken).ConfigureAwait(false);
 
-            return response.Content ?? string.Empty;
+            return Invocation.Answer(response.Content ?? string.Empty);
         });
     }
 
@@ -202,14 +203,37 @@ public sealed class AgentToolHandler : IToolHandler
             var runner = new FlowRunner(flow, runtime, loggerFactory?.CreateLogger<FlowRunner>(), depth);
             var result = await runner.RunAsync(input, null, progress, cancellationToken).ConfigureAwait(false);
 
+            // Content stays model-facing English so the calling agent can adapt and finish its turn.
+            // The FlowMessage is the same outcome for the PERSON reading the trace — and carrying it
+            // is what makes the row render as blocked rather than green (REQ-RAG-051).
             return result.Outcome switch
             {
-                FlowRunOutcome.Completed => result.Output ?? string.Empty,
-                FlowRunOutcome.Blocked =>
+                FlowRunOutcome.Completed => Invocation.Answer(result.Output ?? string.Empty),
+
+                FlowRunOutcome.Blocked => Invocation.Unavailable(
                     $"unavailable: the '{flow.Name}' flow was stopped by guardrail '{result.BlockedByGuardrailId}'. {result.BlockReason}",
-                FlowRunOutcome.StepBudgetExhausted =>
+                    FlowMessage.Create(
+                        FlowMessageCodes.SubFlowBlocked,
+                        "The '{0}' flow was stopped by guardrail '{1}': {2}",
+                        flow.Name,
+                        result.BlockedByGuardrailId ?? string.Empty,
+                        result.BlockReason ?? string.Empty)),
+
+                FlowRunOutcome.StepBudgetExhausted => Invocation.Unavailable(
                     $"unavailable: the '{flow.Name}' flow reached its {flow.MaxSteps}-step budget without finishing.",
-                _ => $"unavailable: the '{flow.Name}' flow did not complete. {result.FailureReason}"
+                    FlowMessage.Create(
+                        FlowMessageCodes.SubFlowStepBudgetExhausted,
+                        "The '{0}' flow reached its {1}-step budget without finishing.",
+                        flow.Name,
+                        flow.MaxSteps.ToString(CultureInfo.InvariantCulture))),
+
+                _ => Invocation.Unavailable(
+                    $"unavailable: the '{flow.Name}' flow did not complete. {result.FailureReason}",
+                    FlowMessage.Create(
+                        FlowMessageCodes.SubFlowFailed,
+                        "The '{0}' flow did not complete: {1}",
+                        flow.Name,
+                        result.FailureReason ?? string.Empty))
             };
         });
     }
@@ -239,7 +263,12 @@ public sealed class AgentToolHandler : IToolHandler
                 ToolCallId = toolCall.Id,
                 Content = $"unavailable: '{definition.Name}' has already been called {MaxInvocations} times this turn and will not run again.",
                 IsSuccess = false,
-                ErrorMessage = $"Invocation limit of {MaxInvocations} reached for '{definition.Name}'"
+                ErrorMessage = $"Invocation limit of {MaxInvocations} reached for '{definition.Name}'",
+                Message = FlowMessage.Create(
+                    FlowMessageCodes.SubFlowInvocationLimitReached,
+                    "'{0}' reached its limit of {1} calls for this turn and did not run again.",
+                    definition.Name,
+                    MaxInvocations.ToString(CultureInfo.InvariantCulture))
             };
         }
 
@@ -257,8 +286,18 @@ public sealed class AgentToolHandler : IToolHandler
 
         try
         {
-            var answer = await invoke(input, InnerProgress, cancellationToken).ConfigureAwait(false);
-            return new ToolResult { ToolCallId = toolCall.Id, Content = answer };
+            var outcome = await invoke(input, InnerProgress, cancellationToken).ConfigureAwait(false);
+            return new ToolResult
+            {
+                ToolCallId = toolCall.Id,
+                Content = outcome.Content,
+                // Not defaulted to true any more. An inner run that a guardrail refused, or that ran
+                // out of steps, is NOT a successful tool call, and a trace that renders it green
+                // reports success the run did not achieve (REQ-RAG-051).
+                IsSuccess = outcome.IsSuccess,
+                ErrorMessage = outcome.ErrorMessage,
+                Message = outcome.Message
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -275,6 +314,38 @@ public sealed class AgentToolHandler : IToolHandler
                 ErrorMessage = ex.Message
             };
         }
+    }
+
+    /// <summary>
+    /// What one invocation produced: the sentence the MODEL reads, plus — when the run did not
+    /// succeed — the failure a PERSON reads (REQ-RAG-051).
+    /// </summary>
+    /// <param name="Content">The tool result content, always model-facing English.</param>
+    /// <param name="ErrorMessage">The English failure, or null when the run genuinely succeeded.</param>
+    /// <param name="Message">The localizable form of <paramref name="ErrorMessage"/>.</param>
+    /// <remarks>
+    /// <b>This type exists because a string could not say "this did not work".</b> The delegate used
+    /// to return only the content, so every outcome — including a guardrail refusal and an exhausted
+    /// step budget — was wrapped in a <see cref="ToolResult"/> whose <see cref="ToolResult.IsSuccess"/>
+    /// defaulted to true. The sentence said "unavailable"; the flag said "fine". A trace renders the
+    /// flag, so a refused run painted green, and this type's whole job is to make the two agree.
+    /// </remarks>
+    private readonly record struct Invocation(string Content, string? ErrorMessage, FlowMessage? Message)
+    {
+        /// <summary>Gets whether the inner run reached a normal end.</summary>
+        public bool IsSuccess => ErrorMessage is null;
+
+        /// <summary>An inner run that completed, carrying its answer.</summary>
+        /// <param name="content">The answer.</param>
+        /// <returns>A successful invocation.</returns>
+        public static Invocation Answer(string content) => new(content, null, null);
+
+        /// <summary>An inner run that did not complete, carrying what stopped it.</summary>
+        /// <param name="content">The model-facing <c>unavailable: …</c> sentence.</param>
+        /// <param name="message">The coded, translatable form of the failure.</param>
+        /// <returns>An unsuccessful invocation.</returns>
+        public static Invocation Unavailable(string content, FlowMessage message) =>
+            new(content, message.Text, message);
     }
 
     /// <summary>Reads the <c>input</c> property out of a call's arguments.</summary>

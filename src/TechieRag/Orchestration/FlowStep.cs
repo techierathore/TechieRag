@@ -65,19 +65,12 @@ public class FlowStep : AgentStep
     /// </remarks>
     public FlowMessage? ContentMessage { get; init; }
 
-    /// <summary>
-    /// Gets the localizable form of <see cref="AgentStep.ErrorMessage"/> — a stable code plus its
-    /// arguments (REQ-RAG-050).
-    /// </summary>
-    /// <remarks>
-    /// This is the property that fixes the reported defect. A host's trace renderer paints
-    /// <see cref="AgentStep.ErrorMessage"/> as the detail line under "Blocked by …", so for a
-    /// guardrail refusal it is the whole of what a user is told about why their tool call did not
-    /// run. Rendering this code instead makes that line translatable; falling back to
-    /// <see cref="AgentStep.ErrorMessage"/> when the code is unknown keeps every existing renderer
-    /// working unchanged.
-    /// </remarks>
-    public FlowMessage? FailureMessage { get; init; }
+    // FailureMessage — the localizable form of AgentStep.ErrorMessage — is INHERITED from
+    // AgentStep (REQ-RAG-051). It was declared here first, but the row that most needed it is a
+    // plain AgentStep: the ToolExecuted step AgentLoopRunner emits for a refused call, which
+    // FromAgentStep below re-emits. A code slot only on this subclass had nothing to copy from, so
+    // a refusal GuardedToolHandler had already coded still reached the screen in English. Reading
+    // flowStep.FailureMessage is unchanged for every existing consumer.
 
     /// <summary>
     /// Re-emits a step reported by the single-agent loop, attributed to the node it ran in.
@@ -103,6 +96,9 @@ public class FlowStep : AgentStep
             Content = step.Content,
             IsSuccess = step.IsSuccess,
             ErrorMessage = step.ErrorMessage,
+            // Carry the coded failure across the re-emit. Dropping it here is what left an Agent
+            // node's refused-tool row untranslatable (REQ-RAG-051).
+            FailureMessage = step.FailureMessage,
             NodeId = node.Id,
             NodeName = node.DisplayName,
             NodeKind = node.Kind,

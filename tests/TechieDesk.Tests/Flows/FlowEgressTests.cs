@@ -176,6 +176,82 @@ public sealed class FlowEgressTests
     }
 
     /// <summary>
+    /// A Tool-node run RESUMES and completes after the prompt is answered late, from another thread —
+    /// which is what a real dialog does and what every test above skipped (REQ-FN-053).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Every existing test on this requirement answered synchronously.</b>
+    /// <c>Confirmation.ConfirmAsync</c> returns <c>Task.FromResult</c>, so the gate's
+    /// <c>TaskCompletionSource</c> was already complete before anything awaited it and the resume path
+    /// — the one the defect is on — never ran. That is precisely why a suite this thorough still let a
+    /// P1 hang reach the Catalyst head, and why these two tests defer the answer instead.</para>
+    /// <para>Bounded with <c>WaitAsync</c> so the failure mode is a failing test rather than a hung
+    /// test run.</para>
+    /// </remarks>
+    /// <param name="isAllowed">The answer the user gives; the defect reproduced on both.</param>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AToolNodeRunCompletesAfterTheEgressPromptIsAnsweredLate(bool isAllowed)
+    {
+        var wasCalled = false;
+        var confirmation = new DeferredConfirmation();
+        var runtime = RuntimeWith(ToolsThatRecord(() => wasCalled = true), confirmation);
+
+        var run = new FlowRunner(EgressFlow(), runtime).RunAsync("go");
+
+        // The prompt is raised and the run is genuinely parked on it, as it is on screen.
+        await confirmation.Asked.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(run.IsCompleted, "The run finished without waiting for the answer.");
+
+        confirmation.Answer(isAllowed);
+
+        var result = await run.WaitAsync(TimeSpan.FromSeconds(10));
+
+        // Completed either way: a refused tool call is an unsuccessful ToolResult, not a run-level
+        // stop, so the flow carries on to its terminal node. Only whether the tool RAN differs.
+        Assert.Equal(FlowRunOutcome.Completed, result.Outcome);
+        Assert.Equal(isAllowed, wasCalled);
+
+        // The trace has to move past NodeStarted; stalling there is the reported symptom.
+        Assert.Contains(
+            result.Steps.OfType<FlowStep>(),
+            step => step.Kind is AgentStepKind.ToolExecuted or AgentStepKind.GuardrailBlocked);
+    }
+
+    /// <summary>
+    /// A prompt that is never answered stops being an unbounded hang: the run's cancellation token
+    /// ends it, and the run reports an outcome the screen can render (REQ-FN-053).
+    /// </summary>
+    /// <remarks>
+    /// The flows screen used to call <c>RunAsync</c> with no token at all, so there was nothing to
+    /// end a stalled run — no exception, no result, a button stuck on "running". The service now
+    /// derives one from the owning agent's time limit, exactly as a chat turn does; this test drives
+    /// the same mechanism through an explicit token so it does not have to wait out a real limit.
+    /// </remarks>
+    [Fact]
+    public async Task AnUnansweredEgressPromptEndsWithTheRunsCancellation()
+    {
+        var wasCalled = false;
+        var confirmation = new DeferredConfirmation();
+        var runtime = RuntimeWith(ToolsThatRecord(() => wasCalled = true), confirmation);
+
+        using var deadline = new CancellationTokenSource();
+        var run = new FlowRunner(EgressFlow(), runtime).RunAsync("go", cancellationToken: deadline.Token);
+
+        await confirmation.Asked.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(run.IsCompleted);
+
+        // Nobody ever clicks the dialog. Without a token this is where the run hangs forever.
+        await deadline.CancelAsync();
+
+        var result = await run.WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(wasCalled, "The tool ran even though the prompt was never answered.");
+        Assert.NotEqual(FlowRunOutcome.Completed, result.Outcome);
+    }
+
+    /// <summary>
     /// Asserts the run recorded a refusal by the HOST's egress gate, naming it.
     /// </summary>
     /// <param name="result">The finished run.</param>
@@ -271,6 +347,33 @@ public sealed class FlowEgressTests
         {
             onAsked?.Invoke();
             return Task.FromResult(answer);
+        }
+    }
+
+    /// <summary>
+    /// An <see cref="IEgressConfirmation"/> that does not answer until the test says so — a modal the
+    /// user has not clicked yet (REQ-FN-053).
+    /// </summary>
+    private sealed class DeferredConfirmation : IEgressConfirmation
+    {
+        private readonly TaskCompletionSource asked = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource<bool> answered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        /// <summary>Gets a task that completes once the prompt has been raised.</summary>
+        public Task Asked => asked.Task;
+
+        /// <summary>Answers the outstanding prompt, as clicking a dialog button does.</summary>
+        /// <param name="isAllowed">The user's answer.</param>
+        public void Answer(bool isAllowed) => answered.TrySetResult(isAllowed);
+
+        /// <inheritdoc />
+        public async Task<bool> ConfirmAsync(
+            EgressConfirmationRequest request, CancellationToken cancellationToken)
+        {
+            asked.TrySetResult();
+            await using var registration = cancellationToken.Register(() => answered.TrySetResult(false))
+                .ConfigureAwait(false);
+            return await answered.Task.ConfigureAwait(false);
         }
     }
 }

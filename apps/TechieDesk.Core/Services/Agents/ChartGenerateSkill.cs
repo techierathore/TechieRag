@@ -46,7 +46,7 @@ public static class ChartGenerateSkill
     /// <returns>The skill implementation.</returns>
     public static SkillImplementation Create() =>
         new(SkillCatalog.ChartGenerate, Description, Schema,
-            (argumentsJson, _) => Task.FromResult(Run(argumentsJson)));
+            (argumentsJson, _) => Task.FromResult<SkillOutcome>(Run(argumentsJson)));
 
     /// <summary>Runs one chart call.</summary>
     /// <param name="argumentsJson">The tool-call arguments.</param>

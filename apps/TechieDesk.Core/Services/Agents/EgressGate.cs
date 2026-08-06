@@ -244,13 +244,10 @@ public sealed class EgressGate
     /// of that sentence typed into this file, which is how a control's promise and the text
     /// describing it drift apart; REQ-NFR-013 was raised over exactly that class of disagreement.</para>
     /// </remarks>
-    private string Refusal(string skillName) => SkillUnavailable.Because(
-        confirmation is null
-            ? $"'{skillName}' sends a request off this machine and there is no way to ask for "
-                + "approval here, so nothing was sent. Turn off \""
-                + EgressWording.InEnglish(EgressWording.ConfirmEgressSettingKey)
-                + "\" for this agent to allow it."
-            : $"'{skillName}' sends a request off this machine and approval was declined, so "
-                + "nothing was sent. Answer from what is available locally, or say the request was "
-                + "not approved.");
+    private SkillOutcome Refusal(string skillName) => confirmation is null
+        ? SkillUnavailable.Coded(
+            "SkillUnavailableEgressNoPrompt",
+            skillName,
+            EgressWording.InEnglish(EgressWording.ConfirmEgressSettingKey))
+        : SkillUnavailable.Coded("SkillUnavailableEgressDeclined", skillName);
 }

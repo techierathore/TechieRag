@@ -90,11 +90,17 @@ public interface IConversationStore
     /// <param name="sources">Optional search results cited by the message.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The stored message with its generated identifier.</returns>
+    /// <param name="contentJson">
+    /// The localizable form of the message text — a consumer-defined code plus arguments — or null
+    /// when the text is not the consumer's own words (REQ-UI-059). Optional and defaulted, so no
+    /// existing caller changes.
+    /// </param>
     Task<StoredChatMessage> AddMessageAsync(
         string threadId,
         ChatMessage message,
         IReadOnlyList<SearchResult>? sources = null,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? contentJson = null);
 
     /// <summary>
     /// Retrieves all messages in a thread in chronological order.

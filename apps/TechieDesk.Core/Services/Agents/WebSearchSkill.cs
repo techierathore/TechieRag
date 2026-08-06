@@ -50,20 +50,20 @@ public static class WebSearchSkill
     /// <param name="argumentsJson">The tool-call arguments.</param>
     /// <param name="cancellationToken">Token to cancel the search.</param>
     /// <returns>The formatted results, a refusal, or an unavailability report.</returns>
-    private static async Task<string> RunAsync(
+    private static async Task<SkillOutcome> RunAsync(
         IWebSearchProvider? provider, string argumentsJson, CancellationToken cancellationToken)
     {
         if (provider is null)
         {
-            return SkillUnavailable.Because(
-                "no web search provider is configured. Nominate one in Settings before enabling "
-                + "the Web search skill.");
+            return SkillUnavailable.Coded("SkillUnavailableWebSearchNoProvider");
         }
 
         if (!provider.IsConfigured)
         {
-            return SkillUnavailable.Because(
-                provider.UnavailableReason ?? "the configured web search provider cannot run.");
+            // The provider's own words stay as it gave them; only our default is coded.
+            return provider.UnavailableReason is { Length: > 0 } reason
+                ? SkillUnavailable.Because(reason)
+                : SkillUnavailable.Coded("SkillUnavailableWebSearchBroken");
         }
 
         var query = SkillArguments.ReadString(argumentsJson, "query");

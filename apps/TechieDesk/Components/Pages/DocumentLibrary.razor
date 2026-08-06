@@ -56,6 +56,24 @@ else
         }
     </div>
 
+    @* REQ-RAG-052: documents whose vectors were produced by a different embedding model or a
+       different encoding of the same one. Search still RETURNS them, which is why this needs saying
+       out loud — the results are quietly wrong rather than missing, and nothing else would show it. *@
+    @if (staleness is { IsDeterminable: true, IsStale: true })
+    {
+        <Alert Variant="AlertVariant.Warning" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-triangle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["DocsStaleEmbeddingsTitle"]</AlertTitle>
+            <AlertDescription>
+                <p>@Localizer["DocsStaleEmbeddingsBody", staleness.StaleCount, staleness.TotalDocuments]</p>
+                @if (staleness.IsMixed)
+                {
+                    <p class="mt-1">@Localizer["DocsStaleEmbeddingsMixed"]</p>
+                }
+            </AlertDescription>
+        </Alert>
+    }
+
     @* BGE-M3 offline model readiness — embedding runs locally against the bundled model. *@
     @if (isDownloadingModel)
     {
@@ -274,6 +292,12 @@ else
     private DocRow? pendingDelete;
 
     private bool isDownloadingModel;
+
+    /// <summary>
+    /// Which of this workspace's documents were embedded by something other than the current
+    /// provider (REQ-RAG-052). Null until the first load completes.
+    /// </summary>
+    private EmbeddingStalenessReport? staleness;
     private ModelDownloadProgress? downloadProgress;
 
     // REQ-RAG-033 landed XLSX/PPTX/CSV processors, so those types are now accepted alongside the
@@ -393,6 +417,17 @@ else
                     }
                 }
             }
+
+            // REQ-RAG-052: which of THIS workspace's documents were embedded by something other than
+            // the current provider. Computed from the catalog already fetched above, so it costs no
+            // extra query. Scoped to the workspace on screen rather than the whole store, because a
+            // count the user cannot act on from this page would be noise.
+            staleness = EmbeddingStaleness.Analyze(
+                wsDocs.Select(link => catalog.TryGetValue(link.DocumentId, out var d) ? d : null)
+                      .Where(d => d is not null)
+                      .Select(d => d!)
+                      .ToList(),
+                Rag.EmbeddingSignature);
 
             rows.Clear();
             foreach (var link in wsDocs)

@@ -49,20 +49,21 @@ public static class SqlQuerySkill
     /// <param name="argumentsJson">The tool-call arguments.</param>
     /// <param name="cancellationToken">Token to cancel the query.</param>
     /// <returns>The formatted rows, a refusal, or an unavailability report.</returns>
-    private static async Task<string> RunAsync(
+    private static async Task<SkillOutcome> RunAsync(
         ISqlQueryTarget? target, string argumentsJson, CancellationToken cancellationToken)
     {
         if (target is null)
         {
-            return SkillUnavailable.Because(
-                "no database is nominated for this workspace. Point the SQL skill at a read-only "
-                + "reporting database in Settings before enabling it.");
+            return SkillUnavailable.Coded("SkillUnavailableSqlNoTarget");
         }
 
         if (!target.IsConfigured)
         {
-            return SkillUnavailable.Because(
-                target.UnavailableReason ?? "the nominated database cannot be queried.");
+            // A target that supplied its OWN reason keeps it: those words came from the operator's
+            // configuration, not from us, so they are not ours to translate.
+            return target.UnavailableReason is { Length: > 0 } reason
+                ? SkillUnavailable.Because(reason)
+                : SkillUnavailable.Coded("SkillUnavailableSqlUnreachable");
         }
 
         var sql = SkillArguments.ReadString(argumentsJson, "sql");

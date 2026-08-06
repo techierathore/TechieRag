@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using TechieDesk.Services.Flows;
 using TechieDesk.Services.Localization;
 using TechieRag.Models;
 using TechieRag.Orchestration;
@@ -52,7 +53,8 @@ public sealed record AgentTraceEntry(
     string? DetailKey,
     string? Detail,
     long ElapsedMilliseconds,
-    bool IsSuccess)
+    bool IsSuccess,
+    IReadOnlyList<string>? DetailArguments = null)
 {
     /// <summary>Gets the timing rendered the way the trace panel shows it.</summary>
     /// <remarks>
@@ -85,10 +87,25 @@ public sealed record AgentTraceEntry(
     /// <param name="localize">Resolves a resource key into the reader's language.</param>
     /// <returns>The resolved explanation, the runtime text, or an empty string.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="localize"/> is null.</exception>
+    /// <remarks>
+    /// <b>The arguments are what let a LIBRARY message render here (REQ-UI-058).</b> The detail line
+    /// used to resolve with no arguments, which is fine for a fixed sentence like "the tool failed"
+    /// but cannot express "Blocked by guardrail 'x': y" — so a coded refusal from TechieRag had
+    /// nowhere to put its guardrail id and fell back to English. A null key still means the text is
+    /// runtime data (a model's answer, a tool's output) and is shown as it came.
+    /// </remarks>
     public string DetailText(LocalizeText localize)
     {
         ArgumentNullException.ThrowIfNull(localize);
-        return DetailKey is null ? Detail ?? string.Empty : localize(DetailKey);
+
+        if (DetailKey is null)
+        {
+            return Detail ?? string.Empty;
+        }
+
+        return DetailArguments is { Count: > 0 } arguments
+            ? localize(DetailKey, [.. arguments.Cast<object?>()])
+            : localize(DetailKey);
     }
 }
 
@@ -178,7 +195,7 @@ public sealed class AgentTrace
                 step, elapsed,
                 "TraceTitleToolRequested", [step.ToolName ?? string.Empty],
                 argumentsJson: null,
-                detail: ("TraceDetailToolRequested", null),
+                detail: ("TraceDetailToolRequested", null, null),
                 isSuccess: true),
 
             // The title IS the tool name, so there is no key: a tool name is wire vocabulary handed
@@ -189,7 +206,7 @@ public sealed class AgentTrace
                 step, elapsed,
                 "TraceTitleToolLimitReached", [],
                 argumentsJson: null,
-                detail: ("TraceDetailIterationCeiling", null),
+                detail: ("TraceDetailIterationCeiling", null, null),
                 isSuccess: false),
 
             // REQ-UI-040 / REQ-RAG-042: the seven flow step kinds. Each has its OWN arm, because the
@@ -223,7 +240,7 @@ public sealed class AgentTrace
                 step, elapsed,
                 "TraceTitleStepBudgetExhausted", [],
                 argumentsJson: null,
-                DetailFor(step.ErrorMessage ?? step.Content),
+                FailureDetail(step, NoContentDetailKey),
                 isSuccess: false),
 
             AgentStepKind.FlowCompleted => Entry(
@@ -249,11 +266,16 @@ public sealed class AgentTrace
     private AgentTraceEntry ToolExecuted(AgentStep step, long elapsed)
     {
         var named = !string.IsNullOrWhiteSpace(step.ToolName);
-        var detail = step.IsSuccess
-            ? DetailFor(step.Content)
-            : step.ErrorMessage is { Length: > 0 } error
-                ? (Key: (string?)null, Text: (string?)error)
-                : (Key: "TraceDetailToolFailed", Text: (string?)null);
+        // REQ-UI-059 clause 3: a skill that reported itself UNAVAILABLE returns model-facing English
+        // as its content, and the trace used to paint that verbatim — which is how a Hindi user met
+        // an English refusal. When the skill published a code alongside, render that instead. The
+        // model still receives the untouched English; only what a PERSON reads changes.
+        var detail = step.FailureMessage is { } coded
+                     && FlowMessageText.ResourceKey(coded.Code) is not null
+            ? (FlowMessageText.ResourceKey(coded.Code), (string?)null, (IReadOnlyList<string>?)coded.Arguments)
+            : step.IsSuccess
+                ? DetailFor(step.Content)
+                : FailureDetail(step, "TraceDetailToolFailed");
 
         return Entry(
             step, elapsed,
@@ -282,9 +304,7 @@ public sealed class AgentTrace
         var node = NodeName(step);
         var detail = isSuccess
             ? DetailFor(step.Content)
-            : step.ErrorMessage is { Length: > 0 } error
-                ? (Key: (string?)null, Text: (string?)error)
-                : (Key: "TraceDetailStepFailed", Text: (string?)null);
+            : FailureDetail(step, "TraceDetailStepFailed");
 
         return Entry(
             step, elapsed,
@@ -326,8 +346,8 @@ public sealed class AgentTrace
     private AgentTraceEntry Blocked(AgentStep step, long elapsed)
     {
         var guardrail = step is FlowStep flow ? FirstNonBlank(flow.GuardrailId) : null;
-        var detail = step.ErrorMessage is { Length: > 0 } error
-            ? (Key: (string?)null, Text: (string?)error)
+        var detail = step.FailureMessage is not null || step.ErrorMessage is { Length: > 0 }
+            ? FailureDetail(step, NoContentDetailKey)
             : DetailFor(step.Content);
 
         return Entry(
@@ -354,7 +374,7 @@ public sealed class AgentTrace
         string? titleKey,
         IReadOnlyList<string> titleArguments,
         string? argumentsJson,
-        (string? Key, string? Text) detail,
+        (string? Key, string? Text, IReadOnlyList<string>? Args) detail,
         bool isSuccess) =>
         new(entries.Count + 1,
             step.Iteration,
@@ -365,7 +385,8 @@ public sealed class AgentTrace
             detail.Key,
             detail.Text,
             elapsed,
-            isSuccess);
+            isSuccess,
+            detail.Args);
 
     /// <summary>
     /// Marks a nested flow's row with its depth, so an inner run is visibly inner.
@@ -447,17 +468,46 @@ public sealed class AgentTrace
     /// two is non-null, which is what keeps "nothing came back" translatable while leaving the
     /// tool's own output — which nobody can translate — exactly as the tool produced it.
     /// </returns>
-    private static (string? Key, string? Text) DetailFor(string? content)
+    private static (string? Key, string? Text, IReadOnlyList<string>? Args) DetailFor(string? content)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            return (NoContentDetailKey, null);
+            return (NoContentDetailKey, null, null);
         }
 
         var collapsed = content.Trim();
         return (null, collapsed.Length <= MaxDetailLength
             ? collapsed
-            : collapsed[..MaxDetailLength] + "…");
+            : collapsed[..MaxDetailLength] + "…", null);
+    }
+
+    /// <summary>
+    /// Builds the detail for a step that FAILED, preferring the library's coded message over its
+    /// English (REQ-UI-058).
+    /// </summary>
+    /// <param name="step">The reported step.</param>
+    /// <param name="fallbackKey">The app's own key, used when the step carries no message at all.</param>
+    /// <returns>The detail key, text and arguments.</returns>
+    /// <remarks>
+    /// <b>This is the seam REQ-RAG-050's codes were waiting for.</b> Every failure arm used to read
+    /// <c>step.ErrorMessage</c> — a finished English sentence the library composed — and paint it
+    /// verbatim, which is why a Hindi user met English at the precise moment something was refused.
+    /// <c>AgentStep.FailureMessage</c> carries the same refusal as a code plus its arguments, so
+    /// preferring it is the whole fix. The English remains the fallback for a library build older
+    /// than the code slot, and for a host guardrail that supplied only prose.
+    /// </remarks>
+    private static (string? Key, string? Text, IReadOnlyList<string>? Args) FailureDetail(
+        AgentStep step, string fallbackKey)
+    {
+        if (step.FailureMessage is { } message
+            && FlowMessageText.ResourceKey(message.Code) is { } key)
+        {
+            return (key, null, message.Arguments);
+        }
+
+        return step.ErrorMessage is { Length: > 0 } error
+            ? (null, error, null)
+            : (fallbackKey, null, null);
     }
 
     /// <summary>

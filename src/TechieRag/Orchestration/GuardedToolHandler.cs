@@ -111,7 +111,10 @@ public sealed class GuardedToolHandler : IToolHandler
             ToolCallId = toolCall.Id,
             Content = $"unavailable: '{toolCall.Name}' was not run. {ReasonText(verdict)}",
             IsSuccess = false,
-            ErrorMessage = refusal.Text
+            ErrorMessage = refusal.Text,
+            // Publish the code alongside the English so it survives the trip through
+            // AgentLoopRunner's ToolExecuted step and out to a renderer (REQ-RAG-051).
+            Message = refusal
         };
     }
 

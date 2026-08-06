@@ -120,7 +120,7 @@ public class AgentSkillWiringTests
     /// </summary>
     /// <param name="catalogue">The workspace catalogue to compose against.</param>
     /// <returns>The registry the agent loop would be handed.</returns>
-    private static ToolRegistry ComposeTurn(Dictionary<string, bool> catalogue)
+    private static SkillToolHandler ComposeTurn(Dictionary<string, bool> catalogue)
     {
         var services = new ServiceCollection();
         services.AddLogging();

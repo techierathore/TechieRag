@@ -110,5 +110,5 @@ public class AgentToolPlannerTests
     private static SkillImplementation Implementation(string skillName, string result) =>
         new(skillName, $"Test tool for {skillName}",
             """{"type":"object","properties":{"query":{"type":"string"}}}""",
-            (_, _) => Task.FromResult(result));
+            (_, _) => Task.FromResult<SkillOutcome>(result));
 }

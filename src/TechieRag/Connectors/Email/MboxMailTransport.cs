@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 
 namespace TechieRag.Connectors.Email;
@@ -119,6 +120,8 @@ public sealed class MboxMailTransport : IMailTransport
             // Position is the fallback, not the identity: an archive that gains messages at the
             // front would otherwise renumber every message in it and re-ingest the whole file.
             var uid = message.MessageId ?? $"#{index}";
+            var bytes = Encoding.Latin1.GetBytes(raw);
+
             var header = new MailHeader(
                 FolderName,
                 uid,
@@ -128,14 +131,42 @@ public sealed class MboxMailTransport : IMailTransport
                 message.To,
                 message.Date,
                 raw.Length,
-                message.MessageId);
+                message.MessageId,
+                StableId: StableIdFor(message.MessageId, bytes));
 
-            var entry = new Entry(header, Encoding.Latin1.GetBytes(raw));
+            var entry = new Entry(header, bytes);
             entries.Add(entry);
             byUid[uid] = entry;
             index++;
         }
     }
+
+    /// <summary>
+    /// Builds an identity for one message that owes nothing to where the archive is or what it is
+    /// called (TR-RAG-037 / REQ-RAG-049).
+    /// </summary>
+    /// <param name="messageId">The RFC 5322 Message-ID, when the message carries one.</param>
+    /// <param name="raw">The message's raw bytes, used only when it does not.</param>
+    /// <returns>A stable identifier for this message.</returns>
+    /// <remarks>
+    /// <para><b>The Message-ID when there is one.</b> It is globally unique by definition and travels
+    /// with the message, so the same mail exported twice, renamed, or moved between directories is
+    /// recognised as the one message it is. This transport already preferred it as the UID; the bug
+    /// was that the connector then prefixed the FILE NAME onto it and threw that away.</para>
+    /// <para><b>A content hash when there is not.</b> The old fallback was the message's position in
+    /// the file, which changes whenever anything is prepended — so an archive that gained one message
+    /// at the front re-ingested all of it. Hashing the bytes is stable under both renaming and
+    /// reordering, which is the whole property this identity needs.</para>
+    /// <para>Two byte-identical messages with no Message-ID in one archive collapse to a single
+    /// identity. That is correct: they are the same message, and ingesting it twice is the defect
+    /// this method exists to prevent, not a case worth preserving.</para>
+    /// </remarks>
+    private static string StableIdFor(string? messageId, byte[] raw) =>
+        string.IsNullOrWhiteSpace(messageId)
+            // ToHexString + ToLowerInvariant rather than ToHexStringLower: the library also targets
+            // net8.0, where the latter does not exist.
+            ? $"mbox/sha256:{Convert.ToHexString(SHA256.HashData(raw)).ToLowerInvariant()}"
+            : $"mbox/{messageId}";
 
     /// <summary>Splits an mbox file into individual messages.</summary>
     /// <param name="content">The whole file, read byte-preservingly.</param>

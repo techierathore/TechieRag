@@ -49,20 +49,17 @@ public static class FileOperationsSkill
     /// <param name="argumentsJson">The tool-call arguments.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The result, a refusal, or an unavailability report.</returns>
-    private static async Task<string> RunAsync(
+    private static async Task<SkillOutcome> RunAsync(
         FileOperationsSandbox? sandbox, string argumentsJson, CancellationToken cancellationToken)
     {
         if (sandbox is null)
         {
-            return SkillUnavailable.Because(
-                "no file area is configured for this workspace, so there is nothing an agent may "
-                + "read or write.");
+            return SkillUnavailable.Coded("SkillUnavailableFilesNoArea");
         }
 
         if (!sandbox.IsAvailable)
         {
-            return SkillUnavailable.Because(
-                $"the workspace file area '{sandbox.RootDirectory}' does not exist on this install.");
+            return SkillUnavailable.Coded("SkillUnavailableFilesMissingArea", sandbox.RootDirectory);
         }
 
         var operation = SkillArguments.ReadString(argumentsJson, "operation").Trim().ToLowerInvariant();

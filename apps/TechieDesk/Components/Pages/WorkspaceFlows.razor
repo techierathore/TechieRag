@@ -699,7 +699,7 @@ else
                 {
                     <Alert Variant="AlertVariant.Danger">
                         <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
-                        <AlertDescription>@(Localizer["FlowsRunFailure", runResult.FailureReason ?? string.Empty])</AlertDescription>
+                        <AlertDescription>@(Localizer["FlowsRunFailure", FailureReasonText(runResult)])</AlertDescription>
                     </Alert>
                 }
 
@@ -1520,7 +1520,32 @@ else
     private string BlockedReasonText(FlowRunResult result) =>
         FlowGuardrailCatalog.BlockReasonKey(result.BlockedByGuardrailId) is { } key
             ? Localizer[key].Value
-            : result.BlockReason ?? string.Empty;
+            // REQ-UI-058: an id this catalogue does not own may still carry a library CODE. Reading
+            // it here is what stops a host or sub-flow refusal falling straight through to English.
+            : FlowMessageText.Resolve(result.BlockMessage, result.BlockReason, LocalizeKey)
+              ?? string.Empty;
+
+    /// <summary>
+    /// Renders why a run FAILED, preferring the library's coded message over its English
+    /// (REQ-UI-058).
+    /// </summary>
+    /// <param name="result">The finished run.</param>
+    /// <returns>The sentence to show.</returns>
+    /// <remarks>
+    /// <c>FailureReason</c> is a finished English sentence the library composed;
+    /// <c>FailureMessage</c> is the same fact as a code plus arguments. Painting the former inside an
+    /// otherwise-translated alert is the defect REQ-RAG-050 raised and this closes.
+    /// </remarks>
+    private string FailureReasonText(FlowRunResult result) =>
+        FlowMessageText.Resolve(result.FailureMessage, result.FailureReason, LocalizeKey)
+        ?? string.Empty;
+
+    /// <summary>Adapts this page's localizer to the <c>LocalizeText</c> delegate shape.</summary>
+    /// <param name="key">The resource key.</param>
+    /// <param name="arguments">The values its holes take.</param>
+    /// <returns>The localized sentence.</returns>
+    private string LocalizeKey(string key, params object?[] arguments) =>
+        arguments.Length == 0 ? Localizer[key].Value : Localizer[key, arguments].Value;
 
     private string ConditionKindName(FlowConditionKind kind) => kind switch
     {

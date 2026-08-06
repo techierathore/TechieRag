@@ -164,4 +164,16 @@ public static class FlowMessageCodes
 
     /// <summary>A handoff carried variables. <c>{0}</c> context mode, <c>{1}</c> payload length, <c>{2}</c> variable names.</summary>
     public const string HandoffCarryingVariables = "HandoffCarryingVariables";
+
+    /// <summary>A flow exposed as a tool was stopped by a guardrail. <c>{0}</c> flow name, <c>{1}</c> guardrail id, <c>{2}</c> reason.</summary>
+    public const string SubFlowBlocked = "SubFlowBlocked";
+
+    /// <summary>A flow exposed as a tool ran out of steps. <c>{0}</c> flow name, <c>{1}</c> the step budget.</summary>
+    public const string SubFlowStepBudgetExhausted = "SubFlowStepBudgetExhausted";
+
+    /// <summary>A flow exposed as a tool did not complete. <c>{0}</c> flow name, <c>{1}</c> the failure reason.</summary>
+    public const string SubFlowFailed = "SubFlowFailed";
+
+    /// <summary>A handler exposing an agent or flow hit its per-turn invocation ceiling. <c>{0}</c> tool name, <c>{1}</c> the ceiling.</summary>
+    public const string SubFlowInvocationLimitReached = "SubFlowInvocationLimitReached";
 }

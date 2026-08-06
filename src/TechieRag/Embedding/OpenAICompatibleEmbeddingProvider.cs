@@ -43,6 +43,15 @@ public sealed class OpenAICompatibleEmbeddingProvider : IEmbeddingProvider, IDis
     /// <inheritdoc/>
     public int Dimensions { get; }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Revision 1: this provider's encoding has never changed. A built-in provider publishes a
+    /// real signature because it KNOWS its own identity — leaving it to the interface default
+    /// would report "unknown" and silently switch off staleness detection for every install that
+    /// uses it, which is exactly the defect REQ-RAG-052 was raised for.
+    /// </remarks>
+    public string EmbeddingSignature => Models.EmbeddingStaleness.Signature(Name, ModelName);
+
     /// <inheritdoc/>
     public event EventHandler<EmbeddingCompletedEventArgs>? OnEmbeddingCompleted;
 

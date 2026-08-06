@@ -145,6 +145,101 @@ public sealed class MboxMailTransportTests : IDisposable
         Assert.Single(folders);
     }
 
+    /// <summary>
+    /// Renaming or moving an archive does not change any message's identity, so the next sync
+    /// ingests nothing (TR-RAG-037 / REQ-RAG-049).
+    /// </summary>
+    /// <remarks>
+    /// <para>The reproduction from the defect report, as a test: the same bytes under two names.
+    /// Item identity used to be <c>{folder}/{uidValidity}/{uid}</c>, and for an mbox the folder is
+    /// the archive's file name — so moving a fixture from <c>techiedesk-smoke.mbox</c> to
+    /// <c>req-fn-042-smoke.mbox</c> turned "4 unchanged" into "fetched 5" and put five duplicate
+    /// documents in the vector store.</para>
+    /// <para>Asserted through <see cref="EmailConnector"/> rather than on the transport, because the
+    /// id the connector composes is the one <c>ConnectorRunner</c> keys <c>ItemVersions</c> on — the
+    /// value that actually decides re-ingestion.</para>
+    /// </remarks>
+    [Fact]
+    public async Task MessageIdentitySurvivesRenamingTheArchive()
+    {
+        string[] archive =
+        [
+            "From ada@example.test Fri Jan  2 10:00:00 2026",
+            "From: ada@example.test",
+            "Subject: First",
+            "Message-ID: <1@example.test>",
+            "",
+            "one",
+            "From bob@example.test Fri Jan  3 10:00:00 2026",
+            "From: bob@example.test",
+            "Subject: Second",
+            "Message-ID: <2@example.test>",
+            "",
+            "two"
+        ];
+
+        Write(archive);
+        var before = await IdsFrom(path);
+
+        var renamed = Path.Combine(
+            Path.GetTempPath(), $"techierag-renamed-{Guid.NewGuid():N}.mbox");
+        File.WriteAllText(renamed, string.Join("\n", archive) + "\n");
+
+        try
+        {
+            Assert.Equal(before, await IdsFrom(renamed));
+        }
+        finally
+        {
+            File.Delete(renamed);
+        }
+    }
+
+    /// <summary>
+    /// A message with no Message-ID keeps its identity when the archive gains one at the front —
+    /// the case the old position-based fallback could not survive (REQ-RAG-049).
+    /// </summary>
+    [Fact]
+    public async Task IdentityOfAMessageWithoutAMessageIdSurvivesReordering()
+    {
+        Write(
+            "From ada@example.test Fri Jan  2 10:00:00 2026",
+            "From: ada@example.test",
+            "Subject: Original",
+            "",
+            "body of the original");
+
+        var before = await IdsFrom(path);
+
+        // The same message, now second, in an archive that gained one at the front.
+        Write(
+            "From new@example.test Fri Jan  1 10:00:00 2026",
+            "From: new@example.test",
+            "Subject: Prepended",
+            "Message-ID: <new@example.test>",
+            "",
+            "arrived later, sorted earlier",
+            "From ada@example.test Fri Jan  2 10:00:00 2026",
+            "From: ada@example.test",
+            "Subject: Original",
+            "",
+            "body of the original");
+
+        Assert.Subset(new HashSet<string>(await IdsFrom(path)), new HashSet<string>(before));
+    }
+
+    /// <summary>Reads the connector-composed item ids for one archive, in order.</summary>
+    /// <param name="archivePath">The archive to read.</param>
+    /// <returns>The ids <c>ConnectorRunner</c> would key on.</returns>
+    private static async Task<IReadOnlyList<string>> IdsFrom(string archivePath)
+    {
+        var connector = new EmailConnector(
+            new MboxMailTransport(archivePath), new EmailConnectorOptions());
+
+        var page = await connector.ListAsync(new ConnectorListRequest());
+        return page.Items.Select(item => item.Id).ToList();
+    }
+
     /// <summary>A file that is not there is an honest run-level failure, not an empty mailbox.</summary>
     [Fact]
     public async Task ReportsAMissingFileHonestly()

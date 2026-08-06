@@ -1,3 +1,5 @@
+using TechieRag.Orchestration;
+
 namespace TechieRag.Models;
 
 /// <summary>Identifies what kind of event a single <see cref="AgentStep"/> represents.</summary>
@@ -80,4 +82,22 @@ public class AgentStep
 
     /// <summary>Gets the error message when a tool execution failed; null otherwise.</summary>
     public string? ErrorMessage { get; init; }
+
+    /// <summary>
+    /// Gets the localizable form of <see cref="ErrorMessage"/> — a stable code plus its arguments —
+    /// or null when the failure carried only English (REQ-RAG-050 / REQ-RAG-051).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>It lives on the base step, not on <c>FlowStep</c>, because the row that needed it is
+    /// a plain one.</b> A host's trace renderer paints <see cref="ErrorMessage"/> as the detail line
+    /// under a failed tool row, and <c>AgentLoopRunner</c> emits that row as an
+    /// <see cref="AgentStepKind.ToolExecuted"/> step for EVERY refused call — including the one an
+    /// Agent node produces inside a flow, which is re-emitted by <c>FlowStep.FromAgentStep</c>. With
+    /// the code slot only on the subclass there was nothing for that copy to carry, so a refusal
+    /// that <c>GuardedToolHandler</c> had already coded still reached the screen as English.</para>
+    /// <para>Populated from <see cref="ToolResult.Message"/>, which is where a handler publishes the
+    /// coded form of its own refusal. Null for a failure a handler reported in English only — a
+    /// consumer falls back to <see cref="ErrorMessage"/> and is no worse off than before.</para>
+    /// </remarks>
+    public FlowMessage? FailureMessage { get; init; }
 }

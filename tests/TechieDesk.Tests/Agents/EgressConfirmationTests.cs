@@ -344,7 +344,7 @@ public sealed class EgressConfirmationTests
     /// <param name="agent">The agent whose <see cref="AgentDefinition.ConfirmEgress"/> governs.</param>
     /// <param name="confirmation">How the turn asks the user, or null for a host that cannot ask.</param>
     /// <returns>The registry the agent loop would be handed.</returns>
-    private static ToolRegistry ComposeTurn(
+    private static SkillToolHandler ComposeTurn(
         HttpClient httpClient, AgentDefinition agent, IEgressConfirmation? confirmation)
     {
         var options = new WorkspaceSkillOptions

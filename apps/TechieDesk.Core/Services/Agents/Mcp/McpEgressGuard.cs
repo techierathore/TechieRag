@@ -119,15 +119,13 @@ public sealed class McpEgressGuard : IToolHandler
         // which AgentTracePanel renders as the failed step's detail row. So Content stays English
         // for the model (and so the trace stays a faithful record of what the model was told), and
         // ErrorMessage is resolved in the READER's language, because a person is its only reader.
-        var refusal = SkillUnavailable.Because(
-            $"'{toolCall.Name}' is hosted by an MCP server that is not on this machine, and approval "
-            + "to send the request was declined or could not be asked for, so nothing was sent. "
-            + "Answer from what is available locally, or say the request was not approved.");
+        var refusal = SkillUnavailable.Coded("SkillUnavailableMcpEgress", toolCall.Name);
 
         return new ToolResult
         {
             ToolCallId = toolCall.Id,
-            Content = refusal,
+            Content = refusal.Text,
+            Message = refusal.Message,
             IsSuccess = false,
             ErrorMessage = EgressWording.ForReader(EgressWording.McpCallNotApprovedKey)
         };

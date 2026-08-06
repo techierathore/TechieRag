@@ -543,6 +543,31 @@ public class TechieRagManager : ITechieRag, IDisposable
         return await instance.ListDocumentsAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// Forwarded from the live instance rather than inherited (REQ-RAG-052). The interface default is
+    /// "unknown", which would make <see cref="DetectStaleEmbeddingsAsync"/> report that it cannot
+    /// determine anything — on the one wrapper the whole application goes through, and therefore
+    /// exactly where the check needs to work. Reads the CURRENT instance's provider, so it follows a
+    /// reconfigure.
+    /// </remarks>
+    public string EmbeddingSignature =>
+        currentInstance?.EmbeddingSignature ?? EmbeddingStaleness.UnknownSignature;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Overridden so the instance is BUILT before the check runs. The interface default calls
+    /// <see cref="ListDocumentsAsync"/> — which does build it — but reads
+    /// <see cref="EmbeddingSignature"/> off this wrapper first, and on a cold manager that is still
+    /// null, so the report would come back "cannot determine" purely because of evaluation order.
+    /// </remarks>
+    public async Task<EmbeddingStalenessReport> DetectStaleEmbeddingsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var instance = await GetInstanceAsync().ConfigureAwait(false);
+        return await instance.DetectStaleEmbeddingsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<IngestionStats> GetStatsAsync(CancellationToken cancellationToken = default)
     {
         var instance = await GetInstanceAsync().ConfigureAwait(false);

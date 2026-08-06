@@ -101,6 +101,37 @@ public interface ITechieRag
     Task<IReadOnlyList<Document>> ListDocumentsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets what the configured embedding provider stamps on new vectors (REQ-RAG-052).
+    /// </summary>
+    /// <remarks>
+    /// Defaulted to <see cref="EmbeddingStaleness.UnknownSignature"/> so an implementation outside
+    /// this repository keeps compiling (REQ-NFR-007); an implementation that does not override it
+    /// makes <see cref="DetectStaleEmbeddingsAsync"/> report that it cannot determine anything,
+    /// rather than a clean result nobody established.
+    /// </remarks>
+    string EmbeddingSignature => EmbeddingStaleness.UnknownSignature;
+
+    /// <summary>
+    /// Reports which stored documents were embedded by something other than the current provider
+    /// (REQ-RAG-052).
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The staleness report.</returns>
+    /// <remarks>
+    /// <para><b>What it is for.</b> Changing a provider, a model, or the way a model is encoded puts
+    /// new vectors in a different space from the stored ones, and cosine similarity across the two is
+    /// meaningless. Retrieval does not fail when that happens — it keeps returning results, and they
+    /// are quietly wrong. This is what lets a host say so.</para>
+    /// <para>Implemented in terms of <see cref="ListDocumentsAsync"/> and
+    /// <see cref="EmbeddingSignature"/>, so no vector store needed changing and all three backends are
+    /// covered by the same code.</para>
+    /// </remarks>
+    async Task<EmbeddingStalenessReport> DetectStaleEmbeddingsAsync(
+        CancellationToken cancellationToken = default) =>
+        EmbeddingStaleness.Analyze(
+            await ListDocumentsAsync(cancellationToken).ConfigureAwait(false), EmbeddingSignature);
+
+    /// <summary>
     /// Retrieves statistics about the current vector store state.
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>

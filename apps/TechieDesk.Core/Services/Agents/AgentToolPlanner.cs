@@ -9,7 +9,7 @@ namespace TechieDesk.Services.Agents;
 /// <param name="argumentsJson">The tool-call arguments the model produced.</param>
 /// <param name="cancellationToken">Token to cancel the execution.</param>
 /// <returns>The tool result handed back to the model.</returns>
-public delegate Task<string> SkillInvoker(string argumentsJson, CancellationToken cancellationToken);
+public delegate Task<SkillOutcome> SkillInvoker(string argumentsJson, CancellationToken cancellationToken);
 
 /// <summary>
 /// A skill the running app can actually execute: the catalogue name bound to a real tool.
@@ -46,9 +46,16 @@ public static class AgentToolPlanner
     /// The skills the catalogue-and-agent intersection permits, from <see cref="AgentSkillResolver"/>.
     /// </param>
     /// <param name="implementations">The skills this install can execute.</param>
-    /// <returns>A registry containing only the permitted, implemented skills.</returns>
+    /// <returns>A handler exposing only the permitted, implemented skills.</returns>
+    /// <remarks>
+    /// <b>App-side rather than the library's <c>ToolRegistry</c> (REQ-UI-059 clause 3).</b> A registry
+    /// delegate returns a bare string, so a skill's result reaches the model and the trace as the same
+    /// finished English sentence — there is nowhere to carry the localizable form. Owning the handler
+    /// lets one result carry both audiences: <c>Content</c> for the model, <c>Message</c> for the
+    /// person reading the execution trace. Nothing in the library changed.
+    /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown when either argument is null.</exception>
-    public static ToolRegistry BuildRegistry(
+    public static SkillToolHandler BuildRegistry(
         IReadOnlyCollection<string> permittedSkills,
         IEnumerable<SkillImplementation> implementations)
     {
@@ -56,24 +63,9 @@ public static class AgentToolPlanner
         ArgumentNullException.ThrowIfNull(implementations);
 
         var permitted = new HashSet<string>(permittedSkills, StringComparer.OrdinalIgnoreCase);
-        var registry = new ToolRegistry();
 
-        foreach (var implementation in implementations)
-        {
-            if (!permitted.Contains(implementation.SkillName))
-            {
-                continue;
-            }
-
-            registry.Register(
-                implementation.SkillName,
-                implementation.Description,
-                implementation.ParametersSchema,
-                (argumentsJson, cancellationToken) =>
-                    implementation.Invoke(argumentsJson, cancellationToken));
-        }
-
-        return registry;
+        return new SkillToolHandler(
+            implementations.Where(implementation => permitted.Contains(implementation.SkillName)));
     }
 
     /// <summary>

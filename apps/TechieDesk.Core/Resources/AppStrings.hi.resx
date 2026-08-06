@@ -11943,4 +11943,156 @@
     <value>इस फ़्लो में एक चरण मॉडल को कॉल करता है और कोई LLM प्रोवाइडर कॉन्फ़िगर नहीं है, इसलिए कुछ भी नहीं चलाया गया। पहले LLM सेटिंग्स में एक मॉडल कॉन्फ़िगर करें।</value>
     <comment>Workspace flows: the run was refused because a model-calling node has no provider. LLM stays in Latin script as a protocol noun (REQ-UI-055 / REQ-RAG-024).</comment>
   </data>
+  <data name="FlowsRunTimedOut" xml:space="preserve">
+    <value>यह फ़्लो रन अपनी {0} सेकंड की समय-सीमा पार कर गया और रोक दिया गया। ट्रेस में देखें कि यह किस चरण पर अटका, फिर एजेंट की समय-सीमा बढ़ाएँ या फ़्लो को सरल करें।</value>
+    <comment>Workspace flows: the run hit the owning agent's time limit. {0} is the limit in seconds (REQ-FN-053).</comment>
+  </data>
+  <data name="DocsStaleEmbeddingsTitle" xml:space="preserve">
+    <value>कुछ दस्तावेज़ दोबारा जोड़ने होंगे</value>
+    <comment>Document library: banner shown when stored vectors were produced by a different embedding model or encoding (REQ-RAG-052).</comment>
+  </data>
+  <data name="DocsStaleEmbeddingsBody" xml:space="preserve">
+    <value>यहाँ के {1} में से {0} दस्तावेज़ किसी दूसरे एम्बेडिंग मॉडल — या उसके पुराने संस्करण — से इंडेक्स किए गए थे। खोज उन्हें दिखाती तो है, पर नए प्रश्नों से उनकी तुलना नहीं कर सकती, इसलिए उनके उत्तर और संदर्भ भरोसेमंद नहीं होंगे। उन दस्तावेज़ों को हटाकर दोबारा जोड़ें।</value>
+    <comment>Document library: {0} stale count, {1} total in this workspace (REQ-RAG-052).</comment>
+  </data>
+  <data name="DocsStaleEmbeddingsMixed" xml:space="preserve">
+    <value>इस वर्कस्पेस में इस समय पुराने और नए दोनों इंडेक्स मिले हुए हैं, और यही सबसे अनिश्चित परिणाम देता है — कुछ प्रश्न काम करेंगे और कुछ नहीं। केवल कुछ नहीं, बल्कि हर दस्तावेज़ दोबारा जोड़ने से ही यह ठीक होगा।</value>
+    <comment>Document library: extra line when only part of the corpus was re-ingested (REQ-RAG-052).</comment>
+  </data>
+  <data name="FlowMsgGuardrailRefusedCall" xml:space="preserve">
+    <value>कॉल एक गार्डरेल द्वारा अस्वीकार कर दी गई।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.GuardrailRefusedCall. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgGuardrailReturnedNoDecision" xml:space="preserve">
+    <value>गार्डरेल ने कोई निर्णय नहीं लौटाया, इसलिए चरण अस्वीकार कर दिया गया।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.GuardrailReturnedNoDecision. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgGuardrailFaulted" xml:space="preserve">
+    <value>गार्डरेल पूरा नहीं हो सका ({0}: {1}), इसलिए चरण अस्वीकार कर दिया गया।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.GuardrailFaulted. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgGuardrailResolverMissing" xml:space="preserve">
+    <value>इस फ़्लो को गार्डरेल '{0}' चाहिए, पर यहाँ कोई गार्डरेल रिज़ॉल्वर कॉन्फ़िगर नहीं है, इसलिए चरण अस्वीकार कर दिया गया।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.GuardrailResolverMissing. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgGuardrailUnresolvable" xml:space="preserve">
+    <value>इस फ़्लो को गार्डरेल '{0}' चाहिए, पर वह लोड नहीं हो सका, इसलिए चरण अस्वीकार कर दिया गया।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.GuardrailUnresolvable. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgBlockedByGuardrail" xml:space="preserve">
+    <value>एक गार्डरेल ने रोका।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.BlockedByGuardrail. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgNodeBlockedByGuardrail" xml:space="preserve">
+    <value>गार्डरेल '{0}' ने {1} पर रोका।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.NodeBlockedByGuardrail. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgToolCallBlockedByGuardrail" xml:space="preserve">
+    <value>'{1}' चलने से पहले गार्डरेल '{0}' ने रोका।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.ToolCallBlockedByGuardrail. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgToolCallRefusedByGuardrail" xml:space="preserve">
+    <value>गार्डरेल '{0}' ने रोका: {1}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.ToolCallRefusedByGuardrail. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgFlowNotValidated" xml:space="preserve">
+    <value>फ़्लो मान्य नहीं हुआ, इसलिए कुछ भी नहीं चलाया गया: {0}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.FlowNotValidated. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgStepBudgetExhausted" xml:space="preserve">
+    <value>फ़्लो {0} चरणों की अपनी सीमा तक पहुँच गया और '{1}' चलाने से पहले रुक गया।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.StepBudgetExhausted. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgStepBudgetReached" xml:space="preserve">
+    <value>{0} चरणों की सीमा समाप्त हो गई।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.StepBudgetReached. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgAgentUnavailable" xml:space="preserve">
+    <value>एजेंट '{0}' इस मशीन पर उपलब्ध नहीं है।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.AgentUnavailable. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgAgentUnresolvable" xml:space="preserve">
+    <value>एजेंट '{0}' का पता नहीं लगाया जा सका।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.AgentUnresolvable. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgAgentStepFailed" xml:space="preserve">
+    <value>एजेंट चरण विफल रहा: {0}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.AgentStepFailed. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgToolHandlerMissing" xml:space="preserve">
+    <value>टूल '{0}' उपलब्ध नहीं है: यहाँ कुछ भी टूल नहीं चला सकता।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.ToolHandlerMissing. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgNoToolHandlerConfigured" xml:space="preserve">
+    <value>कोई टूल हैंडलर कॉन्फ़िगर नहीं है।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.NoToolHandlerConfigured. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgRouteToNode" xml:space="preserve">
+    <value>{0} से {1}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.RouteToNode. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgHandoffNoVariables" xml:space="preserve">
+    <value>{0}: {1} वर्ण, कोई वेरिएबल साथ नहीं</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.HandoffNoVariables. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgHandoffCarryingVariables" xml:space="preserve">
+    <value>{0}: {1} वर्ण, साथ में {2}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.HandoffCarryingVariables. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgSubFlowBlocked" xml:space="preserve">
+    <value>'{0}' फ़्लो को गार्डरेल '{1}' ने रोका: {2}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.SubFlowBlocked. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgSubFlowStepBudgetExhausted" xml:space="preserve">
+    <value>'{0}' फ़्लो {1} चरणों की सीमा तक पहुँच गया और पूरा नहीं हुआ।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.SubFlowStepBudgetExhausted. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgSubFlowFailed" xml:space="preserve">
+    <value>'{0}' फ़्लो पूरा नहीं हुआ: {1}</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.SubFlowFailed. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="FlowMsgSubFlowInvocationLimitReached" xml:space="preserve">
+    <value>'{0}' इस बार {1} कॉल की अपनी सीमा तक पहुँच गया और दोबारा नहीं चला।</value>
+    <comment>Library flow message (REQ-UI-058 / REQ-RAG-050): rendered from TechieRag's FlowMessageCodes.SubFlowInvocationLimitReached. Placeholders carry invariant runtime data - guardrail ids, node names, counts - never translated text.</comment>
+  </data>
+  <data name="SkillUnavailableWebFetcher" xml:space="preserve">
+    <value>इस इंस्टॉल पर कोई वेब फ़ेचर कॉन्फ़िगर नहीं है, इसलिए पेज पढ़े नहीं जा सकते।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableSqlNoTarget" xml:space="preserve">
+    <value>इस वर्कस्पेस के लिए कोई डेटाबेस नामित नहीं है। सक्षम करने से पहले सेटिंग्स में SQL स्किल को केवल-पढ़ने योग्य रिपोर्टिंग डेटाबेस पर सेट करें।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableSqlUnreachable" xml:space="preserve">
+    <value>नामित डेटाबेस से क्वेरी नहीं की जा सकती।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableWebSearchNoProvider" xml:space="preserve">
+    <value>कोई वेब सर्च प्रोवाइडर कॉन्फ़िगर नहीं है। वेब सर्च स्किल सक्षम करने से पहले सेटिंग्स में एक चुनें।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableWebSearchBroken" xml:space="preserve">
+    <value>कॉन्फ़िगर किया गया वेब सर्च प्रोवाइडर चल नहीं सकता।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableFilesNoArea" xml:space="preserve">
+    <value>इस वर्कस्पेस के लिए कोई फ़ाइल क्षेत्र कॉन्फ़िगर नहीं है, इसलिए एजेंट के पढ़ने या लिखने के लिए कुछ नहीं है।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableFilesMissingArea" xml:space="preserve">
+    <value>वर्कस्पेस फ़ाइल क्षेत्र '{0}' इस इंस्टॉल पर मौजूद नहीं है।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableEgressNoPrompt" xml:space="preserve">
+    <value>'{0}' इस मशीन से बाहर अनुरोध भेजता है और यहाँ अनुमति माँगने का कोई तरीका नहीं है, इसलिए कुछ नहीं भेजा गया। इसकी अनुमति देने के लिए इस एजेंट हेतु "{1}" बंद करें।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableEgressDeclined" xml:space="preserve">
+    <value>'{0}' इस मशीन से बाहर अनुरोध भेजता है और अनुमति अस्वीकार कर दी गई, इसलिए कुछ नहीं भेजा गया। स्थानीय रूप से जो उपलब्ध है उससे उत्तर दें, या कहें कि अनुरोध स्वीकृत नहीं हुआ।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
+  <data name="SkillUnavailableMcpEgress" xml:space="preserve">
+    <value>'{0}' एक ऐसे MCP सर्वर पर है जो इस मशीन पर नहीं है, और अनुरोध भेजने की अनुमति अस्वीकार कर दी गई या माँगी नहीं जा सकी, इसलिए कुछ नहीं भेजा गया। स्थानीय रूप से जो उपलब्ध है उससे उत्तर दें, या कहें कि अनुरोध स्वीकृत नहीं हुआ।</value>
+    <comment>Skill unavailability (REQ-UI-059 clause 3). Rendered from the NEUTRAL set for the model and localized for the execution trace, so both audiences read one maintained entry. Placeholders carry invariant data - skill names, paths, setting labels.</comment>
+  </data>
 </root>

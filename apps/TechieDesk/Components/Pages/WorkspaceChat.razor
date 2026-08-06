@@ -4,6 +4,7 @@
 @using TechieDesk.Services.Threads
 @using TechieDesk.Services.Web
 @using TrBlazeUI.Components.FileUpload
+@using ChatTranscriptMessage = TechieDesk.Services.Scheduling.JobMessage
 @implements IAsyncDisposable
 @* REQ-NFR-013: this page is the UI half of the egress gate — the agent's ConfirmEgress switch is
    answered by the dialog below, and the outbound call does not happen until it is. *@
@@ -775,7 +776,12 @@ else
         var stored = await store.GetMessagesAsync(thread.ThreadId);
         foreach (var m in stored)
         {
-            messages.Add(new ChatDisplayMessage(m.Role, m.Content ?? string.Empty, ToCitations(m.Sources)));
+            // REQ-UI-059: a coded row renders in the reader's language; a row written before codes
+            // existed prints its stored text verbatim, permanently.
+            messages.Add(new ChatDisplayMessage(
+                m.Role,
+                ChatTranscriptMessage.Render(m.Content, m.ContentJson, LocalizeKey) ?? string.Empty,
+                ToCitations(m.Sources)));
         }
     }
 
@@ -1477,9 +1483,17 @@ else
             var provider = await Rag.GetLlmProviderAsync();
             if (provider is null)
             {
-                string noProvider = Localizer["ChatNoProviderConfiguredMessage"];
-                messages.Add(new ChatDisplayMessage("assistant", noProvider, new List<Citation>()));
-                await store.AddMessageAsync(activeThread.ThreadId, ChatMessage.Assistant(noProvider));
+                // REQ-UI-059: the transcript stores the CODE, not the sentence. Localizing here and
+                // persisting the result froze this row in the language of the day it happened — read
+                // a year later in another language it was still English. The English still goes to
+                // Content, because that column is what the MODEL reads back as history and what a
+                // support engineer sees in a database browser.
+                var noProvider = ChatTranscriptMessage.Of("ChatNoProviderConfiguredMessage");
+                messages.Add(new ChatDisplayMessage("assistant", noProvider.Resolve(LocalizeKey), new List<Citation>()));
+                await store.AddMessageAsync(
+                    activeThread.ThreadId,
+                    ChatMessage.Assistant(noProvider.ToInvariantString()),
+                    contentJson: noProvider.ToStorage());
                 return;
             }
 
@@ -2076,6 +2090,13 @@ else
     private void GoToAgents() => Nav.NavigateTo($"/workspace/{Slug}/agents");
 
     private sealed record Citation(string DocumentName, string Snippet, float Score);
+
+    /// <summary>Adapts this page's localizer to the <c>LocalizeText</c> delegate shape.</summary>
+    /// <param name="key">The resource key.</param>
+    /// <param name="arguments">The values its holes take.</param>
+    /// <returns>The localized sentence.</returns>
+    private string LocalizeKey(string key, params object?[] arguments) =>
+        arguments.Length == 0 ? Localizer[key].Value : Localizer[key, arguments].Value;
 
     private sealed class ChatDisplayMessage
     {

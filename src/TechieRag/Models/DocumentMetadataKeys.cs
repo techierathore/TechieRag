@@ -52,6 +52,21 @@ public static class DocumentMetadataKeys
     public const string IngestedAtUtc = "IngestedAtUtc";
 
     /// <summary>
+    /// Identifies what produced this document's vectors — provider, model and encoding revision
+    /// (REQ-RAG-052).
+    /// </summary>
+    /// <remarks>
+    /// <para>Written by <c>TechieRagClient</c> on every chunk at ingestion, from
+    /// <see cref="Abstractions.IEmbeddingProvider.EmbeddingSignature"/>, and compared by
+    /// <see cref="EmbeddingStaleness.Analyze"/>. Vectors carrying different signatures live in
+    /// different spaces and must not be searched together.</para>
+    /// <para><b>Absent for anything ingested before 2026-08-04</b>, which is the whole point of it —
+    /// a missing stamp is reported as <see cref="EmbeddingStalenessReason.Unstamped"/> and therefore
+    /// stale, never as "probably fine".</para>
+    /// </remarks>
+    public const string EmbeddingSignature = "EmbeddingSignature";
+
+    /// <summary>
     /// Gets every metadata key that describes a document as a whole.
     /// </summary>
     /// <remarks>
@@ -66,7 +81,8 @@ public static class DocumentMetadataKeys
         SourceName,
         ContentType,
         ItemId,
-        IngestedAtUtc
+        IngestedAtUtc,
+        EmbeddingSignature
     ];
 
     /// <summary>
