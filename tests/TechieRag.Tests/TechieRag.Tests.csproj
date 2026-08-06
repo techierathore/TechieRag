@@ -23,6 +23,20 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TechieRag\TechieRag.csproj" />
+    <!--
+      TR-RAG-025: added so the ONNX native load is actually exercised by the suite. It was not
+      referenced before, which is exactly why "TechieRag.Embedded cannot load its native library on a
+      plain net10.0 host" survived every test run — the suites all substitute a stub embedding
+      provider, so nothing ever touched the real one. See OnnxNativeLoadTests.
+    -->
+    <ProjectReference Include="..\..\src\TechieRag.Embedded\TechieRag.Embedded.csproj" />
+    <!--
+      REQ-RAG-036: the opt-in exporter package. Referencing it here is deliberate and it MAKES the
+      egress proof stronger rather than weaker — the OpenTelemetry exporters are loaded and available
+      in this test process, so TechieRagTelemetryExporterTests can show that the shipped default still
+      puts zero bytes on the wire even when an exporter is sitting right there ready to run.
+    -->
+    <ProjectReference Include="..\..\src\TechieRag.Telemetry\TechieRag.Telemetry.csproj" />
   </ItemGroup>
 
 </Project>

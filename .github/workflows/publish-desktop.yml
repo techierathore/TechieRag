@@ -1,0 +1,416 @@
+# REQ-FN-038a — build and publish installable TechieDesk desktop packages.
+#
+# Companion to publish-nuget.yml, which packages the LIBRARY. This one packages the APP, and it
+# cannot reuse that workflow for a structural reason: publish-nuget.yml runs on ubuntu-latest, and a
+# MAUI head must be built on its own OS. macOS builds the Mac Catalyst .app; Windows builds the
+# Windows head. There is no cross-compilation, which is also why the Windows head has never been
+# compiled at all (REQ-FN-035 is PARTIAL for exactly this reason) — this workflow is the first thing
+# that ever builds it.
+#
+# NO SIGNING IDENTITY IS REQUIRED. Artefacts are produced unsigned:
+#   * macOS  — an ad-hoc signed universal .app inside a DMG. Ad-hoc signing is what the toolchain
+#              does by default with no Developer ID; the app runs after the user clears the
+#              quarantine flag (instructions ship inside the DMG).
+#   * Windows — an UNPACKAGED self-contained folder, zipped. Deliberately not MSIX: an unsigned MSIX
+#              cannot be installed by double-clicking without the user first trusting a certificate,
+#              whereas an unpackaged build runs straight out of the folder. MSIX arrives with
+#              REQ-FN-038c, when a code-signing certificate exists.
+#
+# Signing is therefore a SEPARATE requirement (038c) that turns steps on, not a precondition for this
+# workflow existing. That mirrors publish-nuget.yml, which skips its NuGet.org push when NUGET_API_KEY
+# is absent rather than failing the run.
+
+name: Build and Publish TechieDesk Desktop
+
+on:
+  # Deliberately NOT the `v*` tags publish-nuget.yml uses. The library and the app version
+  # independently, and macOS/Windows runners are far more expensive than ubuntu — a library release
+  # should not spend them.
+  push:
+    tags:
+      - 'desktop-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version, e.g. 1.2.0. Leave empty for 0.1.0-ci.<run number>.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  # Required to restore TrBlazeUI.Components / TrBlazeUI.Icons.Lucide from GitHub Packages.
+  packages: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  # ---------------------------------------------------------------------------------------------
+  # One authoritative version for every downstream job, so the DMG, the zip and the release cannot
+  # disagree. Two forms are produced because they have different rules:
+  #   version         - artefact / release naming; may carry a prerelease suffix
+  #   display_version - CFBundleShortVersionString and the Windows version, which must be strictly
+  #                     numeric (a suffix makes the macOS bundle invalid)
+  # ---------------------------------------------------------------------------------------------
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      display_version: ${{ steps.v.outputs.display_version }}
+    steps:
+      - name: Determine version
+        id: v
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/desktop-v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#desktop-v}"
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="0.1.0-ci.${{ github.run_number }}"
+          fi
+          # Strip any prerelease/build suffix for the numeric-only display version.
+          DISPLAY="${VERSION%%-*}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "display_version=$DISPLAY" >> $GITHUB_OUTPUT
+          echo "version=$VERSION  display_version=$DISPLAY"
+
+  # ---------------------------------------------------------------------------------------------
+  # Blocking test gate. Runs on ubuntu and needs NO package-feed credentials: TechieDesk.Tests
+  # references only TechieDesk.Core, which is plain net10.0 and carries no TrBlazeUI or MAUI
+  # dependency. That separation is what REQ-FN-035's TechieDesk.Core extraction bought, and it means
+  # the cheap runner can gate the expensive ones.
+  # ---------------------------------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Test TechieDesk.Core
+        run: dotnet test tests/TechieDesk.Tests/TechieDesk.Tests.csproj --configuration Release --verbosity normal
+
+      - name: Test TechieRag library
+        run: dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release --verbosity normal
+
+  # ---------------------------------------------------------------------------------------------
+  # macOS — universal (x86_64 + arm64) .app, wrapped in a DMG.
+  # ---------------------------------------------------------------------------------------------
+  macos:
+    needs: [version, test]
+    runs-on: macos-15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      DISPLAY_VERSION: ${{ needs.version.outputs.display_version }}
+      # Mapped here so the gate below can test it. GitHub Actions does not allow the `secrets`
+      # context in a job-level `if`, hence the same env-mapping trick publish-nuget.yml uses.
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Mac Catalyst workload
+        run: dotnet workload install maui-maccatalyst
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: macos-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: macos-nuget-
+
+      # nuget.config is gitignored (it holds a PAT in plaintext — REQ-NFR-001), so CI has no package
+      # sources beyond nuget.org and TrBlazeUI would not resolve. GITHUB_TOKEN can read GitHub
+      # Packages owned by this repository's owner, so no owner-supplied secret is needed and the PAT
+      # never has to enter CI.
+      - name: Add TrBlazeUI package source
+        run: |
+          dotnet nuget add source \
+            "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --name TrBlazeUI \
+            --username ${{ github.repository_owner }} \
+            --password ${{ secrets.GITHUB_TOKEN }} \
+            --store-password-in-clear-text
+
+      - name: Restore
+        run: dotnet restore apps/TechieDesk/TechieDesk.csproj
+
+      - name: Publish Mac Catalyst app
+        run: |
+          dotnet publish apps/TechieDesk/TechieDesk.csproj \
+            -f net10.0-maccatalyst \
+            -c Release \
+            -p:CreatePackage=false \
+            -p:ApplicationDisplayVersion=${{ env.DISPLAY_VERSION }} \
+            -p:ApplicationVersion=${{ github.run_number }}
+
+      - name: Locate the .app bundle
+        id: app
+        run: |
+          # The un-suffixed bundle is the universal one; the maccatalyst-arm64 / maccatalyst-x64
+          # siblings are single-architecture. Prefer the universal bundle.
+          APP="apps/TechieDesk/bin/Release/net10.0-maccatalyst/TechieDesk.app"
+          if [[ ! -d "$APP" ]]; then
+            APP=$(find apps/TechieDesk/bin/Release -maxdepth 4 -name "TechieDesk.app" -type d | head -1)
+          fi
+          if [[ -z "$APP" || ! -d "$APP" ]]; then
+            echo "::error::No TechieDesk.app was produced."
+            exit 1
+          fi
+          echo "app=$APP" >> $GITHUB_OUTPUT
+          echo "Found $APP ($(du -sh "$APP" | cut -f1))"
+          file "$APP/Contents/MacOS/TechieDesk"
+          codesign -dv "$APP" 2>&1 | head -5 || true
+
+      # This gate exists because of a real defect it would have caught. The first Release build of
+      # this app produced a perfectly well-formed bundle that aborted with SIGABRT the instant it
+      # launched ("Failed to load AOT module 'Docker.DotNet' ... out of date"), because Release trims
+      # and AOT-compiles while Debug does neither. Structural checks — Info.plist, architectures,
+      # signature — all PASSED on that broken bundle. Only running it finds this class of bug.
+      #
+      # A healthy app opens a window and keeps running, so "still alive after the wait" is the pass
+      # condition and an early exit is the failure.
+      - name: Startup smoke — the app must survive launch
+        run: |
+          set +e
+          APP="${{ steps.app.outputs.app }}"
+          "$APP/Contents/MacOS/TechieDesk" > startup.log 2>&1 &
+          PID=$!
+          sleep 45
+          RESULT=0
+          if kill -0 $PID 2>/dev/null; then
+            echo "Process still alive after 45s — startup completed."
+            kill $PID 2>/dev/null
+          else
+            wait $PID; CODE=$?
+            echo "::error::App exited during startup with code $CODE."
+            RESULT=1
+          fi
+          echo "--- startup output ---"
+          cat startup.log || true
+          # Mono writes its fatal AOT/assembly errors to os_log rather than stderr, but the native
+          # crash banner does reach stderr — match on that.
+          if grep -qE "Native Crash Reporting|Native stacktrace|Failed to load AOT module" startup.log; then
+            echo "::error::Native crash detected during startup."
+            RESULT=1
+          fi
+          exit $RESULT
+
+      - name: Refuse to fake a signed build
+        if: env.MACOS_CERTIFICATE != ''
+        run: |
+          echo "::error::MACOS_CERTIFICATE is set, but Developer ID signing and notarization are"
+          echo "::error::not implemented in this workflow (REQ-FN-038c). Failing rather than"
+          echo "::error::shipping an ad-hoc-signed artefact that looks like a signed one."
+          exit 1
+
+      - name: Build DMG
+        run: |
+          set -euo pipefail
+          APP="${{ steps.app.outputs.app }}"
+          STAGE=$(mktemp -d)
+          cp -R "$APP" "$STAGE/"
+          ln -s /Applications "$STAGE/Applications"
+          cp .github/packaging/macos-INSTALL.txt "$STAGE/INSTALL.txt"
+          mkdir -p artifacts
+          hdiutil create \
+            -volname "TechieDesk ${VERSION}" \
+            -srcfolder "$STAGE" \
+            -ov -format UDZO \
+            "artifacts/TechieDesk-${VERSION}-macos-universal-unsigned.dmg"
+          ls -lh artifacts/
+
+      - name: Upload macOS artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: techiedesk-macos
+          path: artifacts/*.dmg
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------------------------
+  # Windows — unpackaged, self-contained, zipped.
+  #
+  # ⚠ NEVER COMPILED BEFORE. The Windows head exists only as a conditional TFM; MAUI cannot build it
+  # from macOS, so this job is the first thing that ever attempts it and it may well need iteration.
+  # It is intentionally NOT allowed to fail silently — if it breaks, the run goes red and REQ-FN-035
+  # stays PARTIAL honestly rather than being quietly declared done.
+  # ---------------------------------------------------------------------------------------------
+  windows:
+    needs: [version, test]
+    runs-on: windows-2022
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      DISPLAY_VERSION: ${{ needs.version.outputs.display_version }}
+      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~\.nuget\packages
+          key: windows-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: windows-nuget-
+
+      - name: Add TrBlazeUI package source
+        run: >
+          dotnet nuget add source
+          "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          --name TrBlazeUI
+          --username ${{ github.repository_owner }}
+          --password ${{ secrets.GITHUB_TOKEN }}
+          --store-password-in-clear-text
+
+      - name: Restore
+        run: dotnet restore apps/TechieDesk/TechieDesk.csproj
+
+      # WindowsPackageType=None produces a plain runnable folder instead of an MSIX. Self-contained
+      # so the target machine needs no .NET install — the point of a "self-installable" artefact.
+      - name: Publish Windows app (unpackaged, self-contained)
+        run: >
+          dotnet publish apps/TechieDesk/TechieDesk.csproj
+          -f net10.0-windows10.0.19041.0
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:WindowsPackageType=None
+          -p:WindowsAppSDKSelfContained=true
+          -p:ApplicationDisplayVersion=${{ env.DISPLAY_VERSION }}
+          -p:ApplicationVersion=${{ github.run_number }}
+
+      - name: Locate publish output
+        id: out
+        shell: pwsh
+        run: |
+          $dir = "apps/TechieDesk/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish"
+          if (-not (Test-Path $dir)) {
+            $exe = Get-ChildItem -Path apps/TechieDesk/bin/Release -Recurse -Filter TechieDesk.exe |
+                   Select-Object -First 1
+            if (-not $exe) { Write-Error "No TechieDesk.exe was produced."; exit 1 }
+            $dir = $exe.DirectoryName
+          }
+          "dir=$dir" >> $env:GITHUB_OUTPUT
+          Write-Host "Publish output: $dir"
+
+      # Advisory, NOT a gate. The macOS equivalent above is a hard gate because it was validated
+      # against a real crash; this one has never been observed running, and a WinUI app on a headless
+      # runner may fail for display reasons unrelated to the build. It reports without blocking so it
+      # cannot produce false red builds — promote it to a gate once a real run shows what it does.
+      - name: Startup smoke (advisory)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Join-Path "${{ steps.out.outputs.dir }}" "TechieDesk.exe"
+          $p = Start-Process -FilePath $exe -PassThru -RedirectStandardError startup-err.log `
+                             -RedirectStandardOutput startup-out.log
+          Start-Sleep -Seconds 45
+          if ($p.HasExited) {
+            Write-Host "::warning::App exited during startup with code $($p.ExitCode)."
+            Get-Content startup-out.log, startup-err.log -ErrorAction SilentlyContinue
+          } else {
+            Write-Host "Process still alive after 45s — startup completed."
+            Stop-Process -Id $p.Id -Force
+          }
+
+      - name: Refuse to fake a signed build
+        if: env.WINDOWS_CERTIFICATE != ''
+        shell: pwsh
+        run: |
+          Write-Host "::error::WINDOWS_CERTIFICATE is set, but Authenticode signing and MSIX"
+          Write-Host "::error::packaging are not implemented in this workflow (REQ-FN-038c)."
+          exit 1
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Copy-Item .github/packaging/windows-INSTALL.txt `
+                    (Join-Path "${{ steps.out.outputs.dir }}" "INSTALL.txt")
+          Compress-Archive -Path (Join-Path "${{ steps.out.outputs.dir }}" '*') `
+            -DestinationPath "artifacts/TechieDesk-${{ env.VERSION }}-windows-x64-unsigned.zip"
+          Get-ChildItem artifacts
+
+      - name: Upload Windows artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: techiedesk-windows
+          path: artifacts/*.zip
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------------------------
+  # Attach both artefacts to a GitHub Release. Tags only.
+  # ---------------------------------------------------------------------------------------------
+  release:
+    needs: [version, macos, windows]
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artefacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          find artifacts -type f \( -name '*.dmg' -o -name '*.zip' \) -print
+          cat > notes.md <<'EOF'
+          ## TechieDesk VERSION_PLACEHOLDER
+
+          **These builds are UNSIGNED** — the project has no Apple Developer ID or Windows
+          code-signing certificate yet (REQ-FN-038c). They are fully functional; the operating
+          system will warn you on first launch.
+
+          | Platform | Download | First launch |
+          |---|---|---|
+          | macOS 12+ (Intel + Apple Silicon) | `.dmg` | Drag to Applications, then run `xattr -dr com.apple.quarantine /Applications/TechieDesk.app` |
+          | Windows 10 1809+ (x64) | `.zip` | Unzip anywhere and run `TechieDesk.exe`. SmartScreen will warn — "More info" then "Run anyway" |
+
+          Full instructions are in `INSTALL.txt` inside each download.
+
+          ### Known limitation of unsigned macOS builds
+          Sessions and provider API keys are not stored in the Keychain (macOS refuses Keychain
+          access to unsigned Catalyst apps). The app falls back to memory-only for the run and says
+          so in its log — nothing sensitive is written to a file instead. Signing removes this
+          limitation with no code change.
+          EOF
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/" notes.md
+          gh release create "${{ github.ref_name }}" \
+            --title "TechieDesk ${VERSION}" \
+            --notes-file notes.md \
+            $(find artifacts -type f \( -name '*.dmg' -o -name '*.zip' \))

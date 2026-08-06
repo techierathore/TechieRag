@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk DevGuide — index</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieDesk DevGuide — index</h1>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#runtime-findings-worth-knowing-2026-07-29">Runtime findings worth knowing (2026-07-29)</a>
+        </li>
+        <li><a href="#how-to-use-this-guide">1. How to use this guide</a>
+        </li>
+        <li><a href="#architecture-cheat-sheet">2. Architecture cheat-sheet</a>
+        </li>
+        <li><a href="#roles-and-the-menu-map">3. Roles and the menu map</a>
+          <ul>
+            <li><a href="#landing-truth-read-from-the-routing-code-not-inferred">Landing truth — read from the routing code, not inferred</a></li>
+            <li><a href="#navigation-surfaces">Navigation surfaces</a></li>
+            <li><a href="#the-settings-naming-collision-fixed-2026-07-28">The settings naming collision — fixed 2026-07-28</a></li>
+            <li><a href="#orphaned-routes-found-and-now-resolved">Orphaned routes — found, and now resolved</a></li>
+          </ul>
+        </li>
+        <li><a href="#screens">4. Screens</a>
+        </li>
+      </ol>
+    </div>
+
+    <p><em>Generated 2026-07-28 · reflects code as built.</em></p>
+    <blockquote>
+      <p>✅ <strong>Runtime-verified 2026-07-29</strong> — re-swept on the live <strong>Mac Catalyst</strong> head over Appium (<code>mac2</code> driver, session bound by <code>appPath</code> to <code>apps/TechieDesk/bin/Release/net10.0-maccatalyst/TechieDesk.app</code> — the universal bundle, never by bundleId alone). <strong>28 of the 30 screens were driven</strong> at <strong>1600×1240</strong> and <strong>1024×720</strong>, plus every secondary tab and several dialogs. The two that were not: <code>/reset-password</code> (emailed-token only) and <code>/setup</code> (reachable only by deleting the install's single workspace — destructive, not done). Both say so in their area file. Screenshots: <code>test-results/ui-verify/</code>.</p>
+    </blockquote>
+    <h3 id="runtime-findings-worth-knowing-2026-07-29">Runtime findings worth knowing (2026-07-29)<a class="anchor-link" href="#runtime-findings-worth-knowing-2026-07-29">#</a></h3>
+    <ul>
+      <li>🔴 <strong>One render defect.</strong> <code>/workspace/{Slug}/documents</code> → the library table's <strong><code>Size</code> column shows <code>—</code> on every row</strong>. <code>SizeFromMetadata</code> (<code>DocumentLibrary.razor:735</code>) probes five metadata keys and no ingestion path writes any of them. REQ-UI-021 names <em>size</em> as a required column.</li>
+      <li>⚠ <strong>Event-log coverage gap.</strong> <code>IEventLogRepository</code> has exactly one producer — the <code>/admin/settings</code> save. 12 ingested documents and 5 connector runs produced zero events, although the screen promises "auth, ingestion and configuration changes".</li>
+      <li>⚠ <strong>Library icon fallback (TR-032 family).</strong> <code>&lt;LucideIcon Name="alert-circle"&gt;</code> renders a colour ⚠️ <strong>emoji</strong> and <code>Name="shield-alert"</code> a monochrome ⚠ glyph instead of their SVGs; <code>info</code> resolves correctly, so it is name-specific. The emoji even leaks into the accessibility tree as a text node (seen on <code>/register</code>). Cosmetic, library-side. <strong>Zero occurrences of the literal <code>Icon not found: {name}</code> string</strong> were found across all 28 screens.</li>
+      <li>⚠ <strong>Select/DropdownMenu accessibility is inconsistent.</strong> The Selects on <code>/admin/settings</code> and <code>/rag-config</code> surface as <code>AXPopUpButton</code> carrying their value; the <code>LlmSettings</code> Source Select and the <code>LanguagePicker</code> surface as plain <code>AXStaticText</code> with the value absent, and the topbar Theme dropdown's items surface as <code>AXStaticText</code> rather than <code>AXMenuItem</code>.</li>
+      <li>✅ <strong>No overlapping, clipped or off-viewport controls anywhere</strong> at either width. The one geometry hit is a 3×32 px adjacency between two tab hit boxes on <code>/workspace/{Slug}/settings</code> — invisible.</li>
+      <li>✅ <strong>REQ-UI-041's 1024×720 window floor is enforced</strong> — a request for 700×500 clamped to exactly 1024×720. The native <strong>Go</strong> menu is real (<code>td.menu.1</code>) and was used to drive <code>/</code>, <code>/chat</code> and <code>/ingestion</code>.</li>
+    </ul>
+    <h2 id="how-to-use-this-guide">1. How to use this guide<a class="anchor-link" href="#how-to-use-this-guide">#</a></h2>
+    <p>Each area file documents the screens of one navigation area: the route, the Razor file, the controls the page actually mounts (with line numbers), the services it calls, its conditional render guards, and a screenshot of the screen as it really renders.</p>
+    <p>Read it to answer "where does this value come from?" or "why is this control blank?" without reverse-engineering the repo. Every symbol cited was read in the working tree; anything that could not be confirmed is marked rather than invented.</p>
+    <p><strong>What this guide is honest about.</strong> A control listed here is <em>mounted by the Razor page</em>. Where the OBSERVE pass reached the screen, the render verdict is what the running app did. Where it did not, the screen says <code>not observed</code> — an unreached screen is never presented as working.</p>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Area</th><th>Screens</th><th>File</th></tr></thead>
+      <tbody>
+        <tr><td>Workspace</td><td>7</td><td><a href="./TechieDesk-DevGuide-Workspace.md">Workspace</a></td></tr>
+        <tr><td>Account</td><td>8</td><td><a href="./TechieDesk-DevGuide-Account.md">Account</a></td></tr>
+        <tr><td>Operator</td><td>5</td><td><a href="./TechieDesk-DevGuide-Operator.md">Operator</a></td></tr>
+        <tr><td>Console</td><td>8</td><td><a href="./TechieDesk-DevGuide-Console.md">Console</a></td></tr>
+        <tr><td>Shell &amp; landing</td><td>1</td><td><a href="./TechieDesk-DevGuide-Shell.md">Shell</a></td></tr>
+        <tr><td>First run</td><td>1</td><td><a href="./TechieDesk-DevGuide-FirstRun.md">FirstRun</a></td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h2 id="architecture-cheat-sheet">2. Architecture cheat-sheet<a class="anchor-link" href="#architecture-cheat-sheet">#</a></h2>
+    <ul>
+      <li><strong>Head:</strong> <code>apps/TechieDesk</code> — MAUI Blazor Hybrid (<code>net10.0-maccatalyst</code>; the Windows TFM is added only when building on Windows). <code>MainPage.xaml</code> mounts <code>Components/Routes</code> into a <code>BlazorWebView</code>; there is no Kestrel, no SignalR and no HTTP boundary inside the app.</li>
+      <li><strong>Application services:</strong> <code>apps/TechieDesk.Core</code> (plain <code>net10.0</code>) — extracted so the <code>net10.0</code> test project can reference them, since a test project cannot reference a platform-targeted one.</li>
+      <li><strong>Data:</strong> Dapper over SQLite, migrated by DbUp at launch (<code>apps/TechieDeskDb</code>). EF Core is banned.</li>
+      <li><strong>RAG:</strong> the <code>TechieRag</code> library (<code>src/TechieRag</code>) + <code>TechieRag.Embedded</code> (ONNX BGE-M3).</li>
+      <li><strong>Background:</strong> <code>apps/TechieDeskScheduler</code> hosts the <em>same</em> <code>SchedulerService</code> in a headless process so schedules run with the window closed.</li>
+      <li><strong>UI kit:</strong> TrBlazeUI components; icons via <code>LucideIcon</code>.</li>
+    </ul>
+    <h2 id="roles-and-the-menu-map">3. Roles and the menu map<a class="anchor-link" href="#roles-and-the-menu-map">#</a></h2>
+    <p><strong>There is one role.</strong> REQ-FN-041 <strong>deleted</strong> the role/capability stack — <code>CapabilityService</code>, <code>AuthGuard</code>, <code>ProductRoleMapper</code> and the user↔workspace assignment set are gone, not disabled. BRD-129 makes the app account-free: it opens straight into a usable workspace and signing in only activates a licence. The shell shows the local user as <code>Administrator · This Mac</code>.</p>
+    <blockquote>
+      <p>⚠ <strong><code>docs/TechieDesk-UsageGuide.md</code> §4 "Test users" is STALE</strong> — it still lists three AppManager roles (Superadmin / Manager / User) and a case study "CS-4 Roles &amp; authorization" for a role model this build no longer has. That table should be reduced to the single local user plus, separately, any AppManager licence account. Flagged here, not edited: this task documents code, it does not rewrite other docs.</p>
+    </blockquote>
+    <h3 id="landing-truth-read-from-the-routing-code-not-inferred">Landing truth — read from the routing code, not inferred<a class="anchor-link" href="#landing-truth-read-from-the-routing-code-not-inferred">#</a></h3>
+    <ul>
+      <li><strong>App launch → <code>/</code></strong> (<code>Components/Pages/Home.razor:1</code>). <code>/</code> is a <strong>redirect, not a dashboard</strong>. <code>Home.razor:66</code> calls <code>Workspaces.ListForCurrentUserAsync()</code>; if the count is <code>0</code> it navigates to <code>/setup</code> (<code>Home.razor:69</code>), otherwise to <code>/workspace/{slug}</code> of the first workspace (<code>Home.razor:76</code>), both with <code>replace: true</code>.</li>
+      <li><strong>First-run guard</strong> — <code>MainLayout.GuardFirstRunAsync()</code> (<code>MainLayout.razor:519</code>) runs for every route: <code>/setup</code> is exempt (<code>:522</code>), any install with <code>workspaces.Count &gt; 0</code> returns early (<code>:533</code>), otherwise an incomplete setup flag redirects to <code>/setup</code> (<code>:539</code>). Workspaces are checked <em>before</em> the flag, deliberately — a flag-first check threw established installs into the wizard.</li>
+      <li><strong>Sign-in does NOT force a landing.</strong> <code>Auth/Login.razor:128</code> calls <code>SignIn.SignInAsync(...)</code> and on success navigates to <code>SafeReturnUrl</code> (<code>:141</code>) — back where the user came from. There is no post-login dashboard and no route protection anywhere in the shell.</li>
+    </ul>
+    <h3 id="navigation-surfaces">Navigation surfaces<a class="anchor-link" href="#navigation-surfaces">#</a></h3>
+    <p>The sidebar (<code>MainLayout.razor</code>) has four groups — <strong>WORKSPACE · ACCOUNT · OPERATOR · CONSOLE</strong> — covering 18 destinations. A <strong>native macOS menu bar</strong> (<code>MainPage.xaml.cs:69-77</code>) adds a <em>second, non-overlapping</em> surface:</p>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Native "Go" menu</th><th>Route</th><th>Also in sidebar?</th></tr></thead>
+      <tbody>
+        <tr><td>Home ⌘1</td><td><code>/</code></td><td>no (it is a redirect)</td></tr>
+        <tr><td>RAG Chat ⌘2</td><td><code>/chat</code></td><td><strong>no — menu only</strong></td></tr>
+        <tr><td>Document Ingestion ⌘3</td><td><code>/ingestion</code></td><td><strong>no — menu only</strong></td></tr>
+        <tr><td>Token Usage ⌘4</td><td><code>/token-usage</code></td><td>yes</td></tr>
+        <tr><td>Settings ⌘,</td><td><code>/admin/settings</code></td><td>yes (sidebar → App Settings)</td></tr>
+        <tr><td>RAG Configuration</td><td><code>/rag-config</code></td><td>yes (Console)</td></tr>
+        <tr><td>LLM Settings ⌘L</td><td><code>/llm-settings</code></td><td>yes</td></tr>
+        <tr><td>Data &amp; Storage ⌘D</td><td><code>/settings/data</code></td><td>yes</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="the-settings-naming-collision-fixed-2026-07-28">The settings naming collision — fixed 2026-07-28<a class="anchor-link" href="#the-settings-naming-collision-fixed-2026-07-28">#</a></h3>
+    <p>Three screens answered to some form of "settings", and the one a user means by the word was not the one at <code>/settings</code>:</p>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Was</th><th>Screen</th><th>Now</th></tr></thead>
+      <tbody>
+        <tr><td><code>/settings</code></td><td>"TechieRag Configuration" — embedding, vector store, processing</td><td><strong><code>/rag-config</code></strong>, <code>RagConfig.razor</code>, Console sidebar entry</td></tr>
+        <tr><td><code>/admin/settings</code></td><td>"App settings" — the sidebar's App Settings</td><td>unchanged, and <strong>⌘, now opens this</strong></td></tr>
+        <tr><td><code>/settings/data</code>, <code>/settings/updates</code></td><td>Data &amp; Storage, Updates</td><td>unchanged — <code>/settings/*</code> is now purely a namespace</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><code>⌘,</code> is macOS's standard Settings shortcut and previously opened the RAG config screen. It now opens App Settings; RAG Configuration got its own menu entry and sidebar link, since repointing the shortcut would otherwise have stranded it.</p>
+    <blockquote>
+      <p>🔴 <strong>Open defect this rename exposed (logged to REQ-NFR-004).</strong> <code>RagConfig.razor</code> and <code>AdminSettings.razor</code> inject the <strong>same <code>TechieRagConfigService</code></strong> and both write <code>config.Embedding</code> and <code>config.VectorStore</code>, each from its own copy loaded on open. Change the embedding provider on App Settings, then save RAG Configuration from its stale copy, and the first change is <strong>silently reverted</strong>. Each screen also owns fields the other does not (<code>Processing</code>/<code>EnableTelemetry</code> vs <code>Llm</code>), so neither is redundant — the fix is to give the overlapping fields one owner, not to delete a screen.</p>
+    </blockquote>
+    <h3 id="orphaned-routes-found-and-now-resolved">Orphaned routes — found, and now resolved<a class="anchor-link" href="#orphaned-routes-found-and-now-resolved">#</a></h3>
+    <p>On 2026-07-28 four routes were found shipping with <strong>zero inbound links</strong> — no nav entry, no in-app link, absent from the native Go menu — measured across every <code>href=</code>, <code>Href=</code> and <code>NavigateTo(</code> in <code>Components/</code> plus <code>MainPage.xaml.cs</code>. All four have since been dealt with, two different ways:</p>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Route</th><th>Razor file</th><th>Resolution</th></tr></thead>
+      <tbody>
+        <tr><td><code>/tool-demo</code></td><td><code>ToolDemo.razor</code> (321 lines)</td><td>🗑 <strong>deleted</strong> — execution trace survives in <code>WorkspaceChat</code> + <code>WorkspaceAgents</code>; REQ-RAG-006 evidence re-pinned there</td></tr>
+        <tr><td><code>/settings/appearance</code></td><td><code>AppearanceSettings.razor</code> (29 lines)</td><td>🗑 <strong>deleted</strong> — superseded duplicate; both panels mount at <code>AdminSettings.razor:175-176</code></td></tr>
+        <tr><td><code>/text-ingestion</code></td><td><code>TextIngestion.razor</code> (325 lines)</td><td>🔗 <strong>re-linked</strong> into <strong>Console</strong> — sole delivery of REQ-RAG-004 (BRD-6, P0)</td></tr>
+        <tr><td><code>/llm-playground</code></td><td><code>LlmPlayground.razor</code> (395 lines)</td><td>🔗 <strong>re-linked</strong> into <strong>Console</strong> — sole delivery of REQ-RAG-005 (BRD-7, P0)</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>The split matters: the first two were demo pages whose capability lived on elsewhere, so deleting them lost nothing. The last two were the <strong>only</strong> place their P0 capability existed — no <code>Textarea</code>/<code>IngestTextAsync</code> path on <code>DocumentLibrary</code> or <code>AddFromWeb</code>, and <code>LlmSettings</code> is provider configuration, not a playground — so deleting them would have removed BRD-6 and BRD-7 outright. They were re-linked instead, and both are live-verified reachable from the sidebar.</p>
+    <p><strong>No route in this app is currently unreachable.</strong></p>
+    <blockquote>
+      <p>⚠ Two entries were added to the <strong>Console</strong> group that <code>docs/mockups/workspace-chat.html</code> does not contain. Console rather than Workspace was chosen so the mockup-frozen Workspace group (REQ-UI-048) stays intact. It is a deliberate, recorded divergence — worth an owner eye at the next mockup pass.</p>
+    </blockquote>
+    <blockquote>
+      <p>⚠ <code>TechieDesk.Core/Services/Appearance/AppearanceSettings.cs</code> is a <strong>different type</strong> that shares a name with the deleted page. It was not touched.</p>
+    </blockquote>
+    <h2 id="screens">4. Screens<a class="anchor-link" href="#screens">#</a></h2>
+    <p>See the area files in the table above.</p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

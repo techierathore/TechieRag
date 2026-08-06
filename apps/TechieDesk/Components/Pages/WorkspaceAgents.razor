@@ -1,0 +1,1567 @@
+@page "/workspace/{Slug}/agents"
+@using TechieDesk.Services.Agents
+@using TechieDesk.Services.Agents.Mcp
+@using TechieRag.Mcp
+@using TrBlazeUI.Components.NumericInput
+@inject IWorkspaceService Workspaces
+@inject IAgentRegistry Agents
+@* REQ-RAG-023 (BRD-86): the workspace's registered MCP tool servers. *@
+@inject IWorkspaceMcpService WorkspaceMcp
+@inject IWorkspaceSkillRepository Skills
+@inject TechieRagConfigService RagConfig
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<WorkspaceAgents> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["AgentsPageTitle", workspace?.Name ?? Localizer["AgentsWorkspaceFallback"].Value]</PageTitle>
+
+@if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["AgentsWorkspaceNotAvailableTitle"]</AlertTitle>
+        <AlertDescription>@Localizer["AgentsWorkspaceNotAvailableBody"]</AlertDescription>
+    </Alert>
+}
+@* A persistence outage is a different problem from a missing workspace and must say so, rather
+   than telling the user their workspace has vanished (REQ-NFR-010 / BRD-101). *@
+else if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["AgentsRegistryUnavailableTitle"]</AlertTitle>
+        <AlertDescription>
+            @(Localizer["AgentsRegistryUnavailableBody", loadError])
+        </AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["AgentsLoading"]</span>
+    </div>
+}
+else
+{
+    <div class="mb-4 flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@(Localizer["AgentsPageHeading", workspace.Name])</h1>
+            <TypographyMuted>@Localizer["AgentsPageSubtitle"]</TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="GoToChat">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="message-square" Size="16" /></Button.Icon>
+                @Localizer["AgentsOpenChat"]
+            </Button>
+            <Button OnClick="BeginCreate">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                @Localizer["AgentsNewAgent"]
+            </Button>
+        </div>
+    </div>
+
+    <Alert Variant="AlertVariant.Info" Class="mb-4">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="at-sign" Size="16" /></Alert.Icon>
+        <AlertDescription>
+            @Localizer["AgentsInvokeHintLead"] <b>@("@" + AgentDefinition.BuiltInHandle)</b>@Localizer["AgentsInvokeHintTail"]
+        </AlertDescription>
+    </Alert>
+
+    <Tabs DefaultValue="agents">
+        <TabsList Class="grid w-full grid-cols-4">
+            <TabsTrigger Value="agents">@Localizer["AgentsTabAgents"]</TabsTrigger>
+            <TabsTrigger Value="skills">@Localizer["AgentsTabSkillCatalogue"]</TabsTrigger>
+            <TabsTrigger Value="mcp">@Localizer["AgentsTabMcpServers"]</TabsTrigger>
+            <TabsTrigger Value="runs">@Localizer["AgentsTabRunHistory"]</TabsTrigger>
+        </TabsList>
+
+        <!-- Agents (REQ-UI-045) -->
+        <TabsContent Value="agents" ForceMount="true">
+            <Card Class="overflow-hidden">
+                <CardHeader>
+                    <CardTitle>@Localizer["AgentsYourAgentsTitle"]</CardTitle>
+                    <CardDescription>
+                        @Localizer["AgentsYourAgentsDescription"]
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="relative overflow-x-auto">
+                        <DataTable TData="AgentDefinition" Data="@agents" ShowToolbar="false" ShowPagination="false"
+                                   AriaLabel="@Localizer["AgentsTableAriaLabel"]">
+                            <Columns>
+                                <DataTableColumn TData="AgentDefinition" TValue="string" Property="@(a => a.Handle)" Header="@Localizer["AgentsAgent"]">
+                                    <CellTemplate Context="row">
+                                        <div class="font-semibold">@("@" + row.Handle)</div>
+                                        @* REQ-UI-055: the shipped built-in wording is TechieDesk's and is translated;
+                                           a name the operator typed is theirs and comes back verbatim. One line on
+                                           purpose — split, the counter's tag-stripper leaves a phantom English run. *@
+                                        <div class="text-xs text-muted-foreground">
+                                            @(row.HasShippedBuiltInWording ? Localizer[AgentDefinition.BuiltInDisplayNameKey].Value : row.DisplayName)@(row.HasShippedBuiltInWording ? " — " + Localizer[AgentDefinition.BuiltInDescriptionKey].Value : string.IsNullOrWhiteSpace(row.Description) ? "" : " — " + row.Description)
+                                        </div>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="AgentDefinition" TValue="string" Property="@(a => a.Model ?? string.Empty)" Header="@Localizer["AgentsModel"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-sm">@(string.IsNullOrWhiteSpace(row.Model) ? Localizer["AgentsFollowsWorkspaceDefault"].Value : row.Model)</span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="AgentDefinition" TValue="string" Property="@(a => string.Empty)" Header="@Localizer["AgentsSkills"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-sm">@SkillSummary(row)</span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="AgentDefinition" TValue="string" Property="@(a => string.Empty)" Header="@Localizer["AgentsKnowledge"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-sm">@KnowledgeSummary(row)</span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="AgentDefinition" TValue="string" Property="@(a => string.Empty)" Header="@Localizer["AgentsLastUsed"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-sm text-muted-foreground">
+                                            @(row.LastUsedAt is null ? Localizer["AgentsNever"].Value : row.LastUsedAt.Value.ToLocalTime().ToString("d MMM HH:mm"))
+                                        </span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="AgentDefinition" TValue="string" Property="@(a => string.Empty)" Header="@Localizer["AgentsColumnActions"]" HeaderClass="td-th-label-hidden">
+                                    <CellTemplate Context="row">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                    OnClick="@(() => BeginEdit(row))">@Localizer["AgentsEdit"]</Button>
+                                            <DropdownMenu>
+                                                @* REQ-NFR-005: the trigger renders its own button, so the
+                                                   inner content must not be another interactive control. *@
+                                                <DropdownMenuTrigger>
+                                                    <span class="rounded p-1 text-muted-foreground hover:bg-muted">
+                                                        <LucideIcon aria-hidden="true" Name="ellipsis" Size="16" />
+                                                        <span class="sr-only">@(Localizer["AgentsRowActionsFor", "@" + row.Handle])</span>
+                                                    </span>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem OnClick="@(() => RunInChat(row))">
+                                                        <LucideIcon aria-hidden="true" Name="message-square" Size="14" />
+                                                        <span class="ml-2">@Localizer["AgentsRunInChat"]</span>
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem OnClick="@(() => BeginDuplicate(row))">
+                                                        <LucideIcon aria-hidden="true" Name="copy" Size="14" />
+                                                        <span class="ml-2">@Localizer["AgentsDuplicate"]</span>
+                                                    </DropdownMenuItem>
+                                                    @if (row.IsBuiltIn)
+                                                    {
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem OnClick="ResetBuiltInAsync">
+                                                            <LucideIcon aria-hidden="true" Name="rotate-ccw" Size="14" />
+                                                            <span class="ml-2">@Localizer["AgentsResetToDefaults"]</span>
+                                                        </DropdownMenuItem>
+                                                    }
+                                                    else
+                                                    {
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem OnClick="@(() => BeginDelete(row))">
+                                                            <LucideIcon aria-hidden="true" Name="trash-2" Size="14" />
+                                                            <span class="ml-2">@Localizer["AgentsDelete"]</span>
+                                                        </DropdownMenuItem>
+                                                    }
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                            </Columns>
+                        </DataTable>
+                    </div>
+                    @* The built-in agent is not a row anyone created, so its rule is stated rather
+                       than left to be discovered by a delete that refuses. *@
+                    <TypographyMuted Class="mt-3 block">
+                        @(Localizer["AgentsBuiltInNote", "@" + AgentDefinition.BuiltInHandle])
+                    </TypographyMuted>
+                </CardContent>
+            </Card>
+
+            <Card Class="mt-4">
+                <CardHeader>
+                    <CardTitle>@Localizer["AgentsRelationTitle"]</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <TypographyMuted>
+                        @Localizer["AgentsRelationLead"] <b>@Localizer["AgentsTabSkillCatalogue"]</b> @Localizer["AgentsRelationMid"] <i>@Localizer["AgentsRelationScope"]</i> @Localizer["AgentsRelationTail"]
+                    </TypographyMuted>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Skill catalogue (REQ-RAG-022) -->
+        <TabsContent Value="skills" ForceMount="true">
+            <Card>
+                <CardHeader>
+                    <CardTitle>@Localizer["AgentsCatalogueTitle"]</CardTitle>
+                    <CardDescription>
+                        @Localizer["AgentsCatalogueDescription"]
+                    </CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-1">
+                    @foreach (var skill in SkillCatalog.Skills)
+                    {
+                        <div class="flex items-center gap-3 border-b py-3 last:border-b-0">
+                            <Switch Checked="@catalogue[skill.Name]"
+                                    CheckedChanged="@((bool value) => ToggleCatalogueAsync(skill.Name, value))"
+                                    Id="@($"skill-{skill.Name}")" Disabled="@isSavingCatalogue" />
+                            <div class="min-w-0 flex-1">
+                                <Label For="@($"skill-{skill.Name}")" Class="font-semibold">@SkillDisplayName(skill.Name)</Label>
+                                <div class="text-xs text-muted-foreground">@SkillDescription(skill.Name)</div>
+                            </div>
+                            @if (!implementedSkills.Contains(skill.Name))
+                            {
+                                @* Permission and availability are different facts. Saying "not built yet"
+                                   is the honest label; leaving the row looking ready would promise a tool
+                                   this install cannot run. *@
+                                <Badge Variant="BadgeVariant.Outline">@Localizer["AgentsNotBuiltYet"]</Badge>
+                            }
+                            <Badge Variant="@ExposureVariant(skill.Exposure)">@ExposureLabelText(skill.Exposure)</Badge>
+                        </div>
+                    }
+                    <Alert Variant="AlertVariant.Warning" Class="mt-4">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+                        <AlertDescription>
+                            @Localizer["AgentsExposureWarningLead"] <b>@Localizer["AgentsExposureNeedsReview"]</b> @Localizer["AgentsExposureOr"] <b>@Localizer["AgentsExposureLeavesMachine"]</b> @Localizer["AgentsExposureWarningTail"]
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
+
+            @if (builtIn is not null)
+            {
+                <Card Class="mt-4">
+                    <CardHeader>
+                        <CardTitle>@Localizer["AgentsBehaviourTitle"]</CardTitle>
+                        <CardDescription>
+                            @(Localizer["AgentsBehaviourDescription", "@" + AgentDefinition.BuiltInHandle])
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent Class="space-y-4">
+                        <div class="td-llm-pair">
+                            <Field>
+                                <FieldLabel>@Localizer["AgentsMaxToolCalls"]</FieldLabel>
+                                <FieldContent>
+                                    <NumericInput TValue="int" @bind-Value="builtInMaxToolCalls" Min="1" Max="@AgentRegistry.MaxToolCallCeiling" Step="1" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>@Localizer["AgentsTimeLimit"]</FieldLabel>
+                                <FieldContent>
+                                    <NumericInput TValue="int" @bind-Value="builtInTimeLimit" Min="5" Max="@AgentRegistry.TimeLimitCeiling" Step="5" />
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <Switch @bind-Checked="builtIn.ShowTrace" Id="builtin-trace" />
+                            <Label For="builtin-trace">@Localizer["AgentsShowTrace"]</Label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <Switch @bind-Checked="builtIn.ConfirmEgress" Id="builtin-egress" />
+                            <Label For="builtin-egress">@Localizer["AgentsConfirmEgress"]</Label>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <Switch @bind-Checked="builtIn.AllowFollowUp" Id="builtin-followup" />
+                            <Label For="builtin-followup">@Localizer["AgentsAllowFollowUpBuiltIn"]</Label>
+                        </div>
+                        <Button OnClick="SaveBuiltInAsync" Disabled="@isSaving">@(isSaving ? Localizer["Saving"] : Localizer["AgentsSaveBehaviour"])</Button>
+                    </CardContent>
+                </Card>
+            }
+        </TabsContent>
+
+        @* MCP servers — REQ-RAG-023 (BRD-86). Registration, enable/disable, and the tools each
+           server advertises.
+
+           NOT using TrBlazeUI's <Empty>: in 1.0.7 it silently drops Title and Description and
+           renders the icon alone, so the whole explanation below would vanish with no compile
+           error. Reported by the orchestrator 2026-07-27; hand-written markup until it is fixed. *@
+        <TabsContent Value="mcp" ForceMount="true">
+            <Card>
+                <CardHeader>
+                    <CardTitle>@Localizer["McpTitle"]</CardTitle>
+                    <CardDescription>@Localizer["McpDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <Button OnClick="BeginAddMcpServer">
+                            <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                            @Localizer["McpAddServer"]
+                        </Button>
+                    </div>
+
+                    @* REQ-FN-039 / REQ-FN-043: where a token actually lands is not a detail the
+                       operator should discover after it disappears, so the tier in force is stated
+                       before anything is saved. *@
+                    <Alert Variant="@McpCredentialAlertVariant()">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="key-round" Size="16" /></Alert.Icon>
+                        <AlertDescription>@Localizer[McpCredentialNoticeKey()]</AlertDescription>
+                    </Alert>
+
+                    @if (mcpLoadError is not null)
+                    {
+                        <Alert Variant="AlertVariant.Danger">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                            <AlertTitle>@Localizer["McpLoadFailedTitle"]</AlertTitle>
+                            <AlertDescription>@(Localizer["McpLoadFailedBody", mcpLoadError])</AlertDescription>
+                        </Alert>
+                    }
+                    else if (mcpServers.Count == 0)
+                    {
+                        <div class="td-agent-empty">
+                            <LucideIcon aria-hidden="true" Name="server" Size="40" Class="text-muted-foreground" />
+                            <h3 class="text-base font-semibold">@Localizer["AgentsMcpEmptyTitle"]</h3>
+                            <TypographyMuted>@Localizer["AgentsMcpEmptyBody"]</TypographyMuted>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="relative overflow-x-auto">
+                            <DataTable TData="McpServerRecord" Data="@mcpServers" ShowToolbar="false" ShowPagination="false"
+                                       AriaLabel="@Localizer["McpTableAriaLabel"]">
+                                <Columns>
+                                    <DataTableColumn TData="McpServerRecord" TValue="string" Property="@(s => s.ServerName)" Header="@Localizer["McpColumnServer"]">
+                                        <CellTemplate Context="row">
+                                            <div class="font-semibold">@row.ServerName</div>
+                                            <div class="text-xs text-muted-foreground">@McpTarget(row)</div>
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                    <DataTableColumn TData="McpServerRecord" TValue="string" Property="@(s => string.Empty)" Header="@Localizer["McpColumnTransport"]">
+                                        <CellTemplate Context="row">
+                                            <Badge Variant="@McpTransportVariant(row)">@Localizer[McpTransportKey(row)]</Badge>
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                    <DataTableColumn TData="McpServerRecord" TValue="string" Property="@(s => string.Empty)" Header="@Localizer["McpColumnTools"]">
+                                        <CellTemplate Context="row">
+                                            @if (row.AdvertisedTools.Count == 0)
+                                            {
+                                                <span class="text-sm text-muted-foreground">@Localizer["McpToolsNotCheckedYet"]</span>
+                                            }
+                                            else
+                                            {
+                                                <div class="text-sm">@string.Join(", ", row.AdvertisedTools.Select(t => t.Name))</div>
+                                                <div class="text-xs text-muted-foreground">
+                                                    @(Localizer["McpToolsCheckedAt", row.LastCheckedUtc!.Value.ToLocalTime().ToString("d MMM HH:mm")])
+                                                </div>
+                                            }
+                                            @if (row.UnrecoverableSecretKeyNames().Count > 0)
+                                            {
+                                                <div class="text-xs text-destructive">
+                                                    @(Localizer["McpCredentialLost", string.Join(", ", row.UnrecoverableSecretKeyNames())])
+                                                </div>
+                                            }
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                    <DataTableColumn TData="McpServerRecord" TValue="string" Property="@(s => string.Empty)" Header="@Localizer["McpColumnEnabled"]">
+                                        <CellTemplate Context="row">
+                                            <div class="flex items-center gap-2">
+                                                <Switch Checked="@row.IsEnabled"
+                                                        CheckedChanged="@((bool value) => ToggleMcpServerAsync(row, value))"
+                                                        Disabled="@isSavingMcp"
+                                                        Id="@("mcp-enabled-" + row.ServerName)" />
+                                                <Label For="@("mcp-enabled-" + row.ServerName)">
+                                                    @Localizer[row.IsEnabled ? "McpEnabled" : "McpDisabled"]
+                                                </Label>
+                                            </div>
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                    <DataTableColumn TData="McpServerRecord" TValue="string" Property="@(s => string.Empty)" Header="@Localizer["AgentsColumnActions"]" HeaderClass="td-th-label-hidden">
+                                        <CellTemplate Context="row">
+                                            <div class="flex items-center justify-end gap-1">
+                                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                        OnClick="@(() => BeginEditMcpServer(row))">@Localizer["AgentsEdit"]</Button>
+                                                <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Small"
+                                                        OnClick="@(() => BeginRemoveMcpServer(row))">@Localizer["McpRemove"]</Button>
+                                            </div>
+                                        </CellTemplate>
+                                    </DataTableColumn>
+                                </Columns>
+                            </DataTable>
+                        </div>
+                    }
+
+                    <TypographyMuted Class="block">@Localizer["McpScopeNote"]</TypographyMuted>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Run history — persisted runs are not built; the live trace lives in chat. -->
+        <TabsContent Value="runs" ForceMount="true">
+            <Card>
+                <CardContent Class="p-6">
+                    <div class="td-agent-empty">
+                        <LucideIcon aria-hidden="true" Name="history" Size="40" Class="text-muted-foreground" />
+                        <h3 class="text-base font-semibold">@Localizer["AgentsRunsEmptyTitle"]</h3>
+                        <TypographyMuted>
+                            @Localizer["AgentsRunsEmptyBody"]
+                        </TypographyMuted>
+                        <Button Variant="ButtonVariant.Outline" OnClick="GoToChat">@Localizer["AgentsOpenChat"]</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+    </Tabs>
+}
+
+<!-- Agent editor (REQ-UI-045) -->
+<Dialog @bind-Open="showEditor">
+    <DialogContent Class="max-w-3xl">
+        <DialogHeader>
+            <DialogTitle>@(editor is null ? Localizer["AgentsAgent"] : editor.WorkspaceAgentId == 0 && !isEditingBuiltIn ? Localizer["AgentsNewAgent"] : Localizer["AgentsEditorTitleNamed", editor.DisplayName])</DialogTitle>
+            <DialogDescription>
+                @if (editor is not null && AgentMentionParser.IsValidHandle(editorHandle))
+                {
+                    <span>@Localizer["AgentsCalledAsLead"] <b>@("@" + AgentMentionParser.Normalize(editorHandle))</b> @Localizer["AgentsCalledAsTail"]</span>
+                }
+                else
+                {
+                    <span>@Localizer["AgentsHandlePrompt"]</span>
+                }
+            </DialogDescription>
+        </DialogHeader>
+
+        @if (editor is not null)
+        {
+            <Tabs DefaultValue="identity">
+                <TabsList Class="grid w-full grid-cols-4">
+                    <TabsTrigger Value="identity">@Localizer["AgentsTabIdentity"]</TabsTrigger>
+                    <TabsTrigger Value="editorskills">@Localizer["AgentsSkills"]</TabsTrigger>
+                    <TabsTrigger Value="knowledge">@Localizer["AgentsKnowledge"]</TabsTrigger>
+                    <TabsTrigger Value="guardrails">@Localizer["AgentsTabGuardrails"]</TabsTrigger>
+                </TabsList>
+
+                <TabsContent Value="identity" ForceMount="true">
+                    <div class="td-llm-pair">
+                        <Field>
+                            <FieldLabel>@Localizer["AgentsDisplayName"]</FieldLabel>
+                            <FieldContent>
+                                <Input Value="@editor.DisplayName" ValueChanged="OnDisplayNameChanged"
+                                       Placeholder="@Localizer["AgentsDisplayNamePlaceholder"]" AriaLabel="@Localizer["AgentsDisplayName"]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["AgentsHandle"]</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="editorHandle" Placeholder="@Localizer["AgentsHandlePlaceholder"]" AriaLabel="@Localizer["AgentsHandle"]"
+                                       Disabled="@editor.IsBuiltIn" />
+                                <FieldDescription>
+                                    @Localizer["AgentsHandleHelp"]
+                                    @if (editor.IsBuiltIn)
+                                    {
+                                        <span> @Localizer["AgentsBuiltInHandleFixed"]</span>
+                                    }
+                                </FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    </div>
+                    <Field>
+                        <FieldLabel>@Localizer["AgentsDescription"]</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="editor.Description" Placeholder="@Localizer["AgentsDescriptionPlaceholder"]" AriaLabel="@Localizer["AgentsDescription"]" />
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["AgentsInstructions"]</FieldLabel>
+                        <FieldContent>
+                            <Textarea @bind-Value="editor.Instructions" Class="min-h-[120px]"
+                                      Placeholder="@Localizer["AgentsInstructionsPlaceholder"]" />
+                            <FieldDescription>@Localizer["AgentsInstructionsHelp"]</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["AgentsModel"]</FieldLabel>
+                        <FieldContent>
+                            <Select TValue="string" Value="@(editor.Model ?? string.Empty)" ValueChanged="OnEditorModelChanged"
+                                    DisplayTextSelector="ModelTextFor">
+                                <SelectTrigger aria-label="@Localizer["AgentsModelSelectAriaLabel"]">
+                                    <SelectValue Placeholder="@Localizer["AgentsFollowWorkspaceDefault"]" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem TValue="string" Value="@string.Empty" Text="@Localizer["AgentsFollowWorkspaceDefault"]">@Localizer["AgentsFollowWorkspaceDefault"]</SelectItem>
+                                    @foreach (var model in availableModels)
+                                    {
+                                        <SelectItem TValue="string" Value="@model" Text="@model">@model</SelectItem>
+                                    }
+                                </SelectContent>
+                            </Select>
+                        </FieldContent>
+                    </Field>
+                </TabsContent>
+
+                <TabsContent Value="editorskills" ForceMount="true">
+                    @if (editor.UsesEveryEnabledSkill)
+                    {
+                        <Alert Variant="AlertVariant.Info" Class="mb-3">
+                            <AlertDescription>
+                                @Localizer["AgentsFollowCatalogueInfo"]
+                            </AlertDescription>
+                        </Alert>
+                    }
+                    else
+                    {
+                        <TypographyMuted Class="mb-3 block">
+                            @Localizer["AgentsSubsetLead"] <b>@Localizer["AgentsBlocked"]</b> @Localizer["AgentsSubsetTail"]
+                        </TypographyMuted>
+                    }
+
+                    <div class="mb-3 flex items-center gap-3">
+                        <Switch Checked="@editor.UsesEveryEnabledSkill"
+                                CheckedChanged="@((bool value) => editor.UsesEveryEnabledSkill = value)"
+                                Id="editor-followcatalogue" />
+                        <Label For="editor-followcatalogue">@Localizer["AgentsFollowCatalogueLabel"]</Label>
+                    </div>
+
+                    <div class="space-y-1">
+                        @foreach (var state in EditorSkillStates())
+                        {
+                            <div class="@($"flex items-center gap-3 border-b py-2.5 last:border-b-0 {(state.IsAgentToggleEditable ? "" : "opacity-50")}")">
+                                <Switch Checked="@state.AgentSelected"
+                                        CheckedChanged="@((bool value) => ToggleEditorSkill(state.Skill.Name, value))"
+                                        Id="@($"editor-skill-{state.Skill.Name}")"
+                                        Disabled="@(!state.IsAgentToggleEditable || editor.UsesEveryEnabledSkill)" />
+                                <div class="min-w-0 flex-1">
+                                    <Label For="@($"editor-skill-{state.Skill.Name}")" Class="font-semibold">@SkillDisplayName(state.Skill.Name)</Label>
+                                    <div class="text-xs text-muted-foreground">
+                                        @(state.Availability == AgentSkillAvailability.Blocked
+                                            ? Localizer["AgentsSkillOffInCatalogue"].Value
+                                            : SkillDescription(state.Skill.Name))
+                                    </div>
+                                </div>
+                                @switch (state.Availability)
+                                {
+                                    case AgentSkillAvailability.Blocked:
+                                        <Badge Variant="BadgeVariant.Secondary">@Localizer["AgentsBlocked"]</Badge>
+                                        break;
+                                    case AgentSkillAvailability.Unavailable:
+                                        <Badge Variant="BadgeVariant.Outline">@Localizer["AgentsNotBuiltYet"]</Badge>
+                                        break;
+                                    default:
+                                        <Badge Variant="@ExposureVariant(state.Skill.Exposure)">@ExposureLabelText(state.Skill.Exposure)</Badge>
+                                        break;
+                                }
+                            </div>
+                        }
+                    </div>
+                </TabsContent>
+
+                <TabsContent Value="knowledge" ForceMount="true">
+                    <Field>
+                        <FieldLabel>@Localizer["AgentsCanRead"]</FieldLabel>
+                        <FieldContent>
+                            <Select TValue="string" Value="@editor.KnowledgeScope.ToString()" ValueChanged="OnKnowledgeScopeChanged"
+                                    DisplayTextSelector="KnowledgeTextFor">
+                                <SelectTrigger aria-label="@Localizer["AgentsKnowledgeSelectAriaLabel"]">
+                                    <SelectValue Placeholder="@Localizer["AgentsScopeCallingWorkspace"]" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    @foreach (var scope in KnowledgeScopes)
+                                    {
+                                        <SelectItem TValue="string" Value="@scope.ToString()" Text="@KnowledgeLabel(scope)">@KnowledgeLabel(scope)</SelectItem>
+                                    }
+                                </SelectContent>
+                            </Select>
+                        </FieldContent>
+                    </Field>
+                    @if (editor.KnowledgeScope != AgentKnowledgeScope.CallingWorkspace)
+                    {
+                        @* Saying so beats letting the user believe a cross-workspace agent is running. *@
+                        <Alert Variant="AlertVariant.Warning" Class="mb-3">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-triangle" Size="16" /></Alert.Icon>
+                            <AlertDescription>
+                                @Localizer["AgentsScopeNotHonoredLead"] <b>@Localizer["AgentsScopeNotHonoredBold"]</b> @Localizer["AgentsScopeNotHonoredTail"]
+                            </AlertDescription>
+                        </Alert>
+                    }
+                    <div class="flex items-center gap-3">
+                        <Switch @bind-Checked="editor.RestrictToPinned" Id="editor-pinned" />
+                        <Label For="editor-pinned">@Localizer["AgentsRestrictToPinned"]</Label>
+                    </div>
+                    <div class="mt-3 flex items-center gap-3">
+                        <Switch @bind-Checked="editor.AllowGeneralKnowledge" Id="editor-general" />
+                        <Label For="editor-general">@Localizer["AgentsAllowGeneralKnowledge"]</Label>
+                    </div>
+                    <Alert Variant="AlertVariant.Info" Class="mt-4">
+                        <AlertDescription>
+                            @Localizer["AgentsGeneralKnowledgeNote"]
+                        </AlertDescription>
+                    </Alert>
+                </TabsContent>
+
+                <TabsContent Value="guardrails" ForceMount="true">
+                    <div class="td-llm-pair">
+                        <Field>
+                            <FieldLabel>@Localizer["AgentsMaxToolCalls"]</FieldLabel>
+                            <FieldContent>
+                                <NumericInput TValue="int" @bind-Value="editorMaxToolCalls" Min="1" Max="@AgentRegistry.MaxToolCallCeiling" Step="1" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["AgentsTimeLimit"]</FieldLabel>
+                            <FieldContent>
+                                <NumericInput TValue="int" @bind-Value="editorTimeLimit" Min="5" Max="@AgentRegistry.TimeLimitCeiling" Step="5" />
+                            </FieldContent>
+                        </Field>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <Switch @bind-Checked="editor.ShowTrace" Id="editor-trace" />
+                        <Label For="editor-trace">@Localizer["AgentsShowTrace"]</Label>
+                    </div>
+                    <div class="mt-3 flex items-center gap-3">
+                        <Switch @bind-Checked="editor.ConfirmEgress" Id="editor-egress" />
+                        <Label For="editor-egress">@Localizer["AgentsConfirmEgress"]</Label>
+                    </div>
+                    <div class="mt-3 flex items-center gap-3">
+                        <Switch @bind-Checked="editor.AllowFollowUp" Id="editor-followup" />
+                        <Label For="editor-followup">@Localizer["AgentsAllowFollowUpAgent"]</Label>
+                    </div>
+                </TabsContent>
+            </Tabs>
+        }
+
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showEditor = false)">@Localizer["Cancel"]</Button>
+            <Button OnClick="SaveEditorAsync" Disabled="@isSaving">@(isSaving ? Localizer["Saving"] : Localizer["AgentsSaveAgent"])</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- Delete confirm (REQ-UI-045) -->
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@(Localizer["AgentsDeleteTitle", "@" + (pendingDelete?.Handle ?? string.Empty)])</DialogTitle>
+            <DialogDescription>
+                @Localizer["AgentsDeleteBody"]
+            </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">@Localizer["AgentsDelete"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* MCP server editor (REQ-RAG-023) *@
+<Dialog @bind-Open="showMcpEditor">
+    <DialogContent Class="max-w-3xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer[mcpDraft?.IsExisting == true ? "McpEditorEditTitle" : "McpEditorNewTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["McpEditorDescription"]</DialogDescription>
+        </DialogHeader>
+
+        @if (mcpDraft is not null)
+        {
+            <div class="space-y-4">
+                <Field>
+                    <FieldLabel>@Localizer["McpFieldName"]</FieldLabel>
+                    <FieldContent>
+                        <Input @bind-Value="mcpDraft.Name" Placeholder="@Localizer["McpFieldNamePlaceholder"]"
+                               AriaLabel="@Localizer["McpFieldName"]" />
+                        <TypographyMuted>@Localizer["McpFieldNameHelp"]</TypographyMuted>
+                    </FieldContent>
+                </Field>
+
+                @* Two buttons rather than a Select: the transport decides whether this registration
+                   can execute a local process, and TR-024 makes a Select's trigger paint its raw
+                   bound value on first paint — "Stdio" instead of the sentence that explains it. *@
+                <Field>
+                    <FieldLabel>@Localizer["McpFieldTransport"]</FieldLabel>
+                    <FieldContent>
+                        <div class="flex flex-wrap gap-2">
+                            <Button Variant="@(mcpDraft.Transport == McpTransportKind.Http ? ButtonVariant.Default : ButtonVariant.Outline)"
+                                    OnClick="@(() => mcpDraft.Transport = McpTransportKind.Http)">
+                                @Localizer["McpTransportHttp"]
+                            </Button>
+                            <Button Variant="@(mcpDraft.Transport == McpTransportKind.Stdio ? ButtonVariant.Default : ButtonVariant.Outline)"
+                                    OnClick="@(() => mcpDraft.Transport = McpTransportKind.Stdio)">
+                                @Localizer["McpTransportStdio"]
+                            </Button>
+                        </div>
+                    </FieldContent>
+                </Field>
+
+                @if (mcpDraft.Transport == McpTransportKind.Http)
+                {
+                    <Field>
+                        <FieldLabel>@Localizer["McpFieldEndpoint"]</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="mcpDraft.Endpoint" Placeholder="@Localizer["McpFieldEndpointPlaceholder"]"
+                                   AriaLabel="@Localizer["McpFieldEndpoint"]" />
+                            <TypographyMuted>@Localizer["McpFieldEndpointHelp"]</TypographyMuted>
+                        </FieldContent>
+                    </Field>
+                }
+                else
+                {
+                    @* Launching a nominated executable is the one thing on this screen that runs
+                       code, so it says so rather than being discovered later. *@
+                    <Alert Variant="AlertVariant.Warning">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                        <AlertDescription>@Localizer["McpStdioWarning"]</AlertDescription>
+                    </Alert>
+
+                    <Field>
+                        <FieldLabel>@Localizer["McpFieldCommand"]</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="mcpDraft.Command" Placeholder="@Localizer["McpFieldCommandPlaceholder"]"
+                                   AriaLabel="@Localizer["McpFieldCommand"]" />
+                            <TypographyMuted>@Localizer["McpFieldCommandHelp"]</TypographyMuted>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["McpFieldArguments"]</FieldLabel>
+                        <FieldContent>
+                            <Textarea @bind-Value="mcpDraft.ArgumentsText" Class="min-h-[90px]"
+                                      Placeholder="@Localizer["McpFieldArgumentsPlaceholder"]"
+                                      AriaLabel="@Localizer["McpFieldArguments"]" />
+                            <TypographyMuted>@Localizer["McpFieldArgumentsHelp"]</TypographyMuted>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["McpFieldWorkingDirectory"]</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="mcpDraft.WorkingDirectory"
+                                   AriaLabel="@Localizer["McpFieldWorkingDirectory"]" />
+                        </FieldContent>
+                    </Field>
+                }
+
+                <Field>
+                    <FieldLabel>@Localizer[mcpDraft.Transport == McpTransportKind.Http ? "McpFieldHeaders" : "McpFieldEnvironment"]</FieldLabel>
+                    <FieldContent>
+                        <TypographyMuted>@Localizer["McpFieldCredentialHelp"]</TypographyMuted>
+                        @foreach (var credential in mcpDraft.Credentials)
+                        {
+                            <div class="mt-2 flex flex-wrap items-center gap-2">
+                                <Input @bind-Value="credential.Name" Class="max-w-[220px]"
+                                       Placeholder="@Localizer["McpCredentialNamePlaceholder"]"
+                                       AriaLabel="@Localizer["McpCredentialNamePlaceholder"]" />
+                                <Input @bind-Value="credential.Value" Type="InputType.Password" Class="max-w-[280px]"
+                                       Placeholder="@Localizer[mcpDraft.IsExisting ? "McpCredentialValueKeepPlaceholder" : "McpCredentialValuePlaceholder"]"
+                                       AriaLabel="@Localizer["McpCredentialValuePlaceholder"]" />
+                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                        OnClick="@(() => mcpDraft.Credentials.Remove(credential))">
+                                    @Localizer["McpRemoveCredential"]
+                                </Button>
+                            </div>
+                        }
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" Class="mt-2"
+                                OnClick="@(() => mcpDraft.AddCredential())">
+                            @Localizer["McpAddCredential"]
+                        </Button>
+                    </FieldContent>
+                </Field>
+
+                <Field>
+                    <FieldLabel>@Localizer["McpFieldAllowedTools"]</FieldLabel>
+                    <FieldContent>
+                        <Textarea @bind-Value="mcpDraft.AllowedToolsText" Class="min-h-[70px]"
+                                  AriaLabel="@Localizer["McpFieldAllowedTools"]" />
+                        <TypographyMuted>@Localizer["McpFieldAllowedToolsHelp"]</TypographyMuted>
+                    </FieldContent>
+                </Field>
+
+                <div class="td-llm-pair">
+                    <Field>
+                        <FieldLabel>@Localizer["McpFieldTimeout"]</FieldLabel>
+                        <FieldContent>
+                            <NumericInput TValue="int" @bind-Value="mcpDraft.TimeoutSeconds" Min="1" Max="3600" Step="5" />
+                        </FieldContent>
+                    </Field>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <Switch @bind-Checked="mcpDraft.IsEnabled" Id="mcp-enabled" />
+                    <Label For="mcp-enabled">@Localizer["McpFieldEnabled"]</Label>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <Button Variant="ButtonVariant.Outline" OnClick="TestMcpServerAsync" Disabled="@isTestingMcp">
+                        <Button.Icon><LucideIcon aria-hidden="true" Name="plug-zap" Size="16" /></Button.Icon>
+                        @(isTestingMcp ? Localizer["McpTesting"] : Localizer["McpTestConnection"])
+                    </Button>
+                </div>
+
+                @if (mcpProblems.Count > 0)
+                {
+                    <Alert Variant="AlertVariant.Danger">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["McpProblemsTitle"]</AlertTitle>
+                        <AlertDescription>
+                            <ul class="list-disc pl-5">
+                                @foreach (var problem in mcpProblems)
+                                {
+                                    <li>@problem</li>
+                                }
+                            </ul>
+                        </AlertDescription>
+                    </Alert>
+                }
+
+                @if (mcpTestTools is not null)
+                {
+                    <Alert Variant="AlertVariant.Success">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-check" Size="16" /></Alert.Icon>
+                        <AlertTitle>@(Localizer["McpTestSucceededTitle", mcpTestTools.Count])</AlertTitle>
+                        <AlertDescription>
+                            @if (mcpTestTools.Count == 0)
+                            {
+                                <span>@Localizer["McpTestNoTools"]</span>
+                            }
+                            else
+                            {
+                                <ul class="list-disc pl-5">
+                                    @foreach (var tool in mcpTestTools)
+                                    {
+                                        <li><b>@tool.Name</b> — @tool.Description</li>
+                                    }
+                                </ul>
+                            }
+                        </AlertDescription>
+                    </Alert>
+                }
+            </div>
+        }
+
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showMcpEditor = false)">@Localizer["Cancel"]</Button>
+            <Button OnClick="SaveMcpServerAsync" Disabled="@isSavingMcp">@(isSavingMcp ? Localizer["Saving"] : Localizer["McpSaveServer"])</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* MCP remove confirm (REQ-RAG-023) *@
+<Dialog @bind-Open="showMcpRemoveDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@(Localizer["McpRemoveTitle", pendingMcpRemove?.ServerName ?? string.Empty])</DialogTitle>
+            <DialogDescription>@Localizer["McpRemoveBody"]</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showMcpRemoveDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmRemoveMcpServerAsync">@Localizer["McpRemove"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private static readonly AgentKnowledgeScope[] KnowledgeScopes =
+    [
+        AgentKnowledgeScope.CallingWorkspace,
+        AgentKnowledgeScope.SpecificWorkspaces,
+        AgentKnowledgeScope.SpecificDocuments
+    ];
+
+    private Workspace? workspace;
+    private bool notFound;
+    private string? loadError;
+    private string? loadedSlug;
+
+    private readonly List<AgentDefinition> agents = new();
+    private Dictionary<string, bool> catalogue = SkillCatalog.Defaults();
+    private readonly List<string> availableModels = new();
+
+    /// <summary>
+    /// The skills this install can actually execute. As of REQ-RAG-022 (2026-07-30) that is all six
+    /// catalogue entries — web search, web scrape, SQL query, chart generation and file operations
+    /// joined RAG search — so no row is badged <c>Not built yet</c> in this build. The check stays
+    /// because the badge is driven by the implementation list, not by a hard-coded assumption: a
+    /// future catalogue entry that lands ahead of its tool must still be labelled honestly.
+    /// </summary>
+    private readonly HashSet<string> implementedSkills =
+        new(WorkspaceSkillTools.ImplementedSkillNames, StringComparer.OrdinalIgnoreCase);
+
+    private AgentDefinition? builtIn;
+    private int builtInMaxToolCalls = AgentDefinition.DefaultMaxToolCalls;
+    private int builtInTimeLimit = AgentDefinition.DefaultTimeLimitSeconds;
+
+    private AgentDefinition? editor;
+    private string editorHandle = string.Empty;
+    private int editorMaxToolCalls = AgentDefinition.DefaultMaxToolCalls;
+    private int editorTimeLimit = AgentDefinition.DefaultTimeLimitSeconds;
+    private bool isEditingBuiltIn;
+
+    private bool showEditor;
+    private bool showDeleteDialog;
+    private bool isSaving;
+    private bool isSavingCatalogue;
+    private AgentDefinition? pendingDelete;
+
+    // ---- MCP servers (REQ-RAG-023) -------------------------------------------------------------
+
+    private readonly List<McpServerRecord> mcpServers = new();
+    private readonly List<string> mcpProblems = new();
+    private string? mcpLoadError;
+    private McpServerDraft? mcpDraft;
+    private string? mcpOriginalName;
+    private IReadOnlyList<McpAdvertisedTool>? mcpTestTools;
+    private McpServerRecord? pendingMcpRemove;
+    private bool showMcpEditor;
+    private bool showMcpRemoveDialog;
+    private bool isSavingMcp;
+    private bool isTestingMcp;
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug) return;
+        loadedSlug = Slug;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+        agents.Clear();
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            await RefreshAgentsAsync();
+            await LoadAvailableModelsAsync();
+            await RefreshMcpServersAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load agents for {Slug}", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    private async Task RefreshAgentsAsync()
+    {
+        if (workspace is null) return;
+
+        agents.Clear();
+        agents.AddRange(await Agents.ListAsync(workspace.WorkspaceId));
+        catalogue = new Dictionary<string, bool>(
+            await Skills.GetCatalogueAsync(workspace.WorkspaceId), StringComparer.OrdinalIgnoreCase);
+
+        builtIn = agents.FirstOrDefault(a => a.IsBuiltIn);
+        if (builtIn is not null)
+        {
+            builtInMaxToolCalls = builtIn.MaxToolCalls;
+            builtInTimeLimit = builtIn.TimeLimitSeconds;
+        }
+    }
+
+    /// <summary>
+    /// Offers the models the app is actually configured with, matching the composer's per-turn
+    /// model list so an agent cannot be pointed at a provider that is not set up.
+    /// </summary>
+    private async Task LoadAvailableModelsAsync()
+    {
+        availableModels.Clear();
+        try
+        {
+            var config = await RagConfig.LoadConfigAsync();
+            AddModel(config.Llm.Model);
+            if (config.LlmFallback is not null)
+            {
+                AddModel(config.LlmFallback.Model);
+            }
+        }
+        catch (Exception ex)
+        {
+            // A missing provider config must not stop the editor rendering.
+            Logger.LogWarning(ex, "Could not read the LLM configuration for the agent model list");
+        }
+    }
+
+    private void AddModel(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model)) return;
+        var trimmed = model.Trim();
+        if (!availableModels.Contains(trimmed, StringComparer.Ordinal))
+        {
+            availableModels.Add(trimmed);
+        }
+    }
+
+    // ---- Skill catalogue (REQ-RAG-022) ---------------------------------------------------------
+
+    private async Task ToggleCatalogueAsync(string skillName, bool enabled)
+    {
+        if (workspace is null || isSavingCatalogue) return;
+
+        isSavingCatalogue = true;
+        try
+        {
+            await Skills.SetAsync(workspace.WorkspaceId, skillName, enabled, DateTime.UtcNow);
+            catalogue[skillName] = enabled;
+
+            var skillLabel = SkillDisplayName(skillName);
+            ToastService.Success(
+                enabled
+                    ? Localizer["AgentsSkillEnabledToast", skillLabel].Value
+                    : Localizer["AgentsSkillDisabledToast", skillLabel].Value,
+                Localizer["AgentsCatalogueUpdated"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to toggle skill {Skill}", skillName);
+            ToastService.Error(ex.Message, Localizer["AgentsToggleSaveFailed"].Value);
+        }
+        finally
+        {
+            isSavingCatalogue = false;
+        }
+    }
+
+    // ---- MCP servers (REQ-RAG-023) -------------------------------------------------------------
+
+    /// <summary>
+    /// Reloads this workspace's registrations. Reads the database only — no MCP server is contacted,
+    /// so opening this screen never makes an outbound call (REQ-NFR-008).
+    /// </summary>
+    private async Task RefreshMcpServersAsync()
+    {
+        if (workspace is null) return;
+
+        mcpLoadError = null;
+        mcpServers.Clear();
+
+        try
+        {
+            mcpServers.AddRange(await WorkspaceMcp.ListAsync(workspace.WorkspaceId));
+        }
+        catch (Exception ex)
+        {
+            // A registration store outage must not take the whole Agents screen down with it.
+            Logger.LogError(ex, "Failed to load MCP servers for {Slug}", Slug);
+            mcpLoadError = ex.Message;
+        }
+    }
+
+    private void BeginAddMcpServer()
+    {
+        mcpDraft = McpServerDraft.ForNewServer();
+        mcpOriginalName = null;
+        mcpProblems.Clear();
+        mcpTestTools = null;
+        showMcpEditor = true;
+    }
+
+    private void BeginEditMcpServer(McpServerRecord record)
+    {
+        // Edit a copy: cancelling must leave the listed registration untouched.
+        mcpDraft = McpServerDraft.From(record);
+        mcpOriginalName = record.ServerName;
+        mcpProblems.Clear();
+        mcpTestTools = record.AdvertisedTools.Count > 0 ? record.AdvertisedTools : null;
+        showMcpEditor = true;
+    }
+
+    /// <summary>
+    /// Connects to the server the editor describes and shows what it advertises, saving nothing
+    /// (REQ-RAG-023).
+    /// </summary>
+    private async Task TestMcpServerAsync()
+    {
+        if (workspace is null || mcpDraft is null || isTestingMcp) return;
+
+        isTestingMcp = true;
+        mcpProblems.Clear();
+        mcpTestTools = null;
+
+        try
+        {
+            var report = await WorkspaceMcp.TestAsync(workspace.WorkspaceId, mcpDraft);
+            if (report.IsSuccess)
+            {
+                mcpTestTools = report.Tools;
+                await RefreshMcpServersAsync();
+            }
+            else
+            {
+                mcpProblems.AddRange(report.Problems);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MCP test connection failed");
+            mcpProblems.Add(ex.Message);
+        }
+        finally
+        {
+            isTestingMcp = false;
+        }
+    }
+
+    private async Task SaveMcpServerAsync()
+    {
+        if (workspace is null || mcpDraft is null || isSavingMcp) return;
+
+        isSavingMcp = true;
+        mcpProblems.Clear();
+
+        try
+        {
+            var outcome = await WorkspaceMcp.SaveAsync(workspace.WorkspaceId, mcpDraft);
+            if (!outcome.IsSuccess)
+            {
+                mcpProblems.AddRange(outcome.Problems);
+                return;
+            }
+
+            // Renaming a server is a new registration under the new name, so the old row has to go
+            // or the workspace quietly keeps both — and the agent would be offered the stale one.
+            var renamedFrom = mcpOriginalName;
+            if (!string.IsNullOrEmpty(renamedFrom)
+                && !string.Equals(renamedFrom, mcpDraft.Name.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                await WorkspaceMcp.RemoveAsync(workspace.WorkspaceId, renamedFrom);
+            }
+
+            showMcpEditor = false;
+            await RefreshMcpServersAsync();
+            ToastService.Success(
+                Localizer["McpSavedToast", mcpDraft.Name.Trim()].Value,
+                Localizer["Saved"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save MCP server");
+            mcpProblems.Add(ex.Message);
+        }
+        finally
+        {
+            isSavingMcp = false;
+        }
+    }
+
+    private async Task ToggleMcpServerAsync(McpServerRecord record, bool isEnabled)
+    {
+        if (workspace is null || isSavingMcp) return;
+
+        isSavingMcp = true;
+        try
+        {
+            await WorkspaceMcp.SetEnabledAsync(workspace.WorkspaceId, record.ServerName, isEnabled);
+            await RefreshMcpServersAsync();
+            ToastService.Success(
+                Localizer[isEnabled ? "McpEnabledToast" : "McpDisabledToast", record.ServerName].Value,
+                Localizer["Saved"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to toggle MCP server {Server}", record.ServerName);
+            ToastService.Error(ex.Message, Localizer["SaveFailed"].Value);
+        }
+        finally
+        {
+            isSavingMcp = false;
+        }
+    }
+
+    private void BeginRemoveMcpServer(McpServerRecord record)
+    {
+        pendingMcpRemove = record;
+        showMcpRemoveDialog = true;
+    }
+
+    private async Task ConfirmRemoveMcpServerAsync()
+    {
+        if (workspace is null || pendingMcpRemove is null) return;
+
+        var serverName = pendingMcpRemove.ServerName;
+        showMcpRemoveDialog = false;
+        pendingMcpRemove = null;
+
+        try
+        {
+            await WorkspaceMcp.RemoveAsync(workspace.WorkspaceId, serverName);
+            await RefreshMcpServersAsync();
+            ToastService.Success(Localizer["McpRemovedToast", serverName].Value, Localizer["Saved"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to remove MCP server {Server}", serverName);
+            ToastService.Error(ex.Message, Localizer["SaveFailed"].Value);
+        }
+    }
+
+    /// <summary>Names the endpoint or executable a registration points at, for the list.</summary>
+    /// <param name="record">The registration.</param>
+    /// <returns>The endpoint URL, or the command path.</returns>
+    private static string McpTarget(McpServerRecord record) =>
+        record.Registration.Server.Transport == McpTransportKind.Http
+            ? record.Registration.Server.Endpoint ?? string.Empty
+            : record.Registration.Server.Command ?? string.Empty;
+
+    /// <summary>Picks the resource key naming a registration's transport.</summary>
+    /// <param name="record">The registration.</param>
+    /// <returns>The resource key.</returns>
+    private static string McpTransportKey(McpServerRecord record) =>
+        record.Registration.Server.Transport == McpTransportKind.Http
+            ? "McpTransportHttp"
+            : "McpTransportStdio";
+
+    /// <summary>
+    /// Badges a stdio registration more prominently than an HTTP one: it is the transport that runs
+    /// a local executable, and that is worth seeing at a glance in the list.
+    /// </summary>
+    /// <param name="record">The registration.</param>
+    /// <returns>The badge variant.</returns>
+    private static BadgeVariant McpTransportVariant(McpServerRecord record) =>
+        record.Registration.Server.Transport == McpTransportKind.Stdio
+            ? BadgeVariant.Secondary
+            : BadgeVariant.Outline;
+
+    /// <summary>Picks the resource key describing where MCP credentials actually land.</summary>
+    /// <returns>The resource key.</returns>
+    private string McpCredentialNoticeKey() => WorkspaceMcp.CredentialProtection switch
+    {
+        McpCredentialProtection.Keychain => "McpCredentialsKeychain",
+        McpCredentialProtection.EncryptedSidecar => "McpCredentialsSidecar",
+        _ => "McpCredentialsMemoryOnly"
+    };
+
+    /// <summary>Colours the credential notice by how much protection is actually in force.</summary>
+    /// <returns>The alert variant.</returns>
+    private AlertVariant McpCredentialAlertVariant() => WorkspaceMcp.CredentialProtection switch
+    {
+        McpCredentialProtection.Keychain => AlertVariant.Info,
+        McpCredentialProtection.EncryptedSidecar => AlertVariant.Warning,
+        _ => AlertVariant.Danger
+    };
+
+    // ---- Agent editor (REQ-UI-045) -------------------------------------------------------------
+
+    private void BeginCreate()
+    {
+        if (workspace is null) return;
+
+        isEditingBuiltIn = false;
+        editor = new AgentDefinition { WorkspaceId = workspace.WorkspaceId };
+        editor.SelectedSkills.Add(SkillCatalog.RagSearch);
+        editorHandle = string.Empty;
+        editorMaxToolCalls = editor.MaxToolCalls;
+        editorTimeLimit = editor.TimeLimitSeconds;
+        showEditor = true;
+    }
+
+    private void BeginEdit(AgentDefinition agent)
+    {
+        // Edit a copy: cancelling must leave the listed agent untouched.
+        isEditingBuiltIn = agent.IsBuiltIn;
+        editor = agent.Copy();
+        editorHandle = agent.Handle;
+        editorMaxToolCalls = agent.MaxToolCalls;
+        editorTimeLimit = agent.TimeLimitSeconds;
+        showEditor = true;
+    }
+
+    private void BeginDuplicate(AgentDefinition agent)
+    {
+        isEditingBuiltIn = false;
+        editor = agent.Copy();
+        editor.WorkspaceAgentId = 0;
+        editor.IsBuiltIn = false;
+        editor.LastUsedAt = null;
+        editor.CreatedAt = default;
+        editor.DisplayName = Localizer["AgentsDuplicateNameSuffix", agent.DisplayName];
+        editorHandle = AgentMentionParser.SuggestHandle(editor.DisplayName);
+        editorMaxToolCalls = editor.MaxToolCalls;
+        editorTimeLimit = editor.TimeLimitSeconds;
+        showEditor = true;
+    }
+
+    /// <summary>
+    /// Keeps the handle in step with the display name while the handle is still untouched, so
+    /// creating "Contract Analyst" offers @@contract-analyst rather than an empty required field.
+    /// </summary>
+    /// <param name="value">The new display name.</param>
+    private void OnDisplayNameChanged(string? value)
+    {
+        if (editor is null) return;
+
+        var previousSuggestion = AgentMentionParser.SuggestHandle(editor.DisplayName);
+        editor.DisplayName = value ?? string.Empty;
+
+        if (!editor.IsBuiltIn
+            && (string.IsNullOrWhiteSpace(editorHandle) || editorHandle == previousSuggestion))
+        {
+            editorHandle = AgentMentionParser.SuggestHandle(editor.DisplayName);
+        }
+    }
+
+    private void OnEditorModelChanged(string? value)
+    {
+        if (editor is null) return;
+        editor.Model = string.IsNullOrWhiteSpace(value) ? null : value;
+    }
+
+    private void OnKnowledgeScopeChanged(string? value)
+    {
+        if (editor is null) return;
+        editor.KnowledgeScope = Enum.TryParse<AgentKnowledgeScope>(value, out var parsed)
+            ? parsed
+            : AgentKnowledgeScope.CallingWorkspace;
+    }
+
+    private IReadOnlyList<AgentSkillState> EditorSkillStates() =>
+        editor is null
+            ? []
+            : AgentSkillResolver.Describe(
+                catalogue, editor.SelectedSkills, editor.UsesEveryEnabledSkill, implementedSkills);
+
+    private void ToggleEditorSkill(string skillName, bool selected)
+    {
+        if (editor is null) return;
+
+        // The catalogue is the outer boundary: an agent can never turn on what it forbids. The
+        // switch is already disabled for those rows; this is the guard behind the disabled state.
+        if (!catalogue.TryGetValue(skillName, out var permitted) || !permitted)
+        {
+            return;
+        }
+
+        if (selected)
+        {
+            editor.SelectedSkills.Add(skillName);
+        }
+        else
+        {
+            editor.SelectedSkills.Remove(skillName);
+        }
+    }
+
+    private async Task SaveEditorAsync()
+    {
+        if (editor is null || workspace is null || isSaving) return;
+
+        isSaving = true;
+        try
+        {
+            editor.Handle = editor.IsBuiltIn ? AgentDefinition.BuiltInHandle : editorHandle;
+            editor.MaxToolCalls = editorMaxToolCalls;
+            editor.TimeLimitSeconds = editorTimeLimit;
+            editor.WorkspaceId = workspace.WorkspaceId;
+
+            await Agents.SaveAsync(editor);
+            await RefreshAgentsAsync();
+
+            showEditor = false;
+            ToastService.Success(
+                Localizer["AgentsAgentSavedToast", "@" + editor.Handle].Value,
+                Localizer["AgentsAgentSavedTitle"].Value);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Expected refusals — a taken handle, an unusable handle, a missing name.
+            ToastService.Error(ex.Message, Localizer["AgentsSaveAgentFailed"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save agent");
+            ToastService.Error(ex.Message, Localizer["AgentsSaveAgentFailed"].Value);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SaveBuiltInAsync()
+    {
+        if (builtIn is null || workspace is null || isSaving) return;
+
+        isSaving = true;
+        try
+        {
+            builtIn.MaxToolCalls = builtInMaxToolCalls;
+            builtIn.TimeLimitSeconds = builtInTimeLimit;
+            await Agents.SaveAsync(builtIn);
+            await RefreshAgentsAsync();
+            ToastService.Success(Localizer["AgentsBehaviourSavedToast"].Value, Localizer["Saved"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save built-in agent behaviour");
+            ToastService.Error(ex.Message, Localizer["SaveFailed"].Value);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ResetBuiltInAsync()
+    {
+        if (workspace is null || builtIn is null) return;
+
+        try
+        {
+            var defaults = AgentDefinition.BuiltIn(workspace.WorkspaceId, DateTime.UtcNow);
+            defaults.WorkspaceAgentId = builtIn.WorkspaceAgentId;
+            defaults.CreatedAt = builtIn.CreatedAt;
+
+            if (defaults.WorkspaceAgentId == 0)
+            {
+                // Never edited, so it is already at its defaults — nothing to write.
+                ToastService.Success(
+                    Localizer["AgentsAlreadyDefaultToast"].Value,
+                    Localizer["AgentsNothingToReset"].Value);
+                return;
+            }
+
+            await Agents.SaveAsync(defaults);
+            await RefreshAgentsAsync();
+            ToastService.Success(
+                Localizer["AgentsResetDoneToast"].Value,
+                Localizer["AgentsResetDoneTitle"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to reset the built-in agent");
+            ToastService.Error(ex.Message, Localizer["AgentsResetFailed"].Value);
+        }
+    }
+
+    private void BeginDelete(AgentDefinition agent)
+    {
+        pendingDelete = agent;
+        showDeleteDialog = true;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (pendingDelete is null || workspace is null) return;
+
+        try
+        {
+            await Agents.DeleteAsync(workspace.WorkspaceId, pendingDelete.WorkspaceAgentId);
+            await RefreshAgentsAsync();
+            ToastService.Success(
+                Localizer["AgentsAgentDeletedToast", "@" + pendingDelete.Handle].Value,
+                Localizer["AgentsAgentDeletedTitle"].Value);
+        }
+        catch (InvalidOperationException ex)
+        {
+            ToastService.Error(ex.Message, Localizer["AgentsDeleteFailed"].Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete agent");
+            ToastService.Error(ex.Message, Localizer["AgentsDeleteFailed"].Value);
+        }
+        finally
+        {
+            showDeleteDialog = false;
+            pendingDelete = null;
+        }
+    }
+
+    // ---- Presentation ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Summarises an agent's skills as the intersection actually is, not as the agent asked for it —
+    /// so a row never advertises a skill the catalogue has since revoked.
+    /// </summary>
+    /// <param name="agent">The agent row.</param>
+    /// <returns>The display text.</returns>
+    private string SkillSummary(AgentDefinition agent)
+    {
+        var permitted = AgentSkillResolver.Permitted(catalogue, agent);
+        if (permitted.Count == 0)
+        {
+            return Localizer["AgentsNonePermitted"].Value;
+        }
+
+        var names = permitted
+            .Select(SkillDisplayName)
+            .ToList();
+        return agent.UsesEveryEnabledSkill
+            ? Localizer["AgentsAllEnabledCount", names.Count].Value
+            : string.Join(", ", names);
+    }
+
+    private string KnowledgeSummary(AgentDefinition agent) =>
+        agent.RestrictToPinned
+            ? Localizer["AgentsKnowledgePinnedOnly", workspace?.Name].Value
+            : workspace?.Name ?? Localizer["AgentsThisWorkspace"].Value;
+
+    private string KnowledgeLabel(AgentKnowledgeScope scope) => scope switch
+    {
+        AgentKnowledgeScope.SpecificWorkspaces => Localizer["AgentsScopeSpecificWorkspaces"].Value,
+        AgentKnowledgeScope.SpecificDocuments => Localizer["AgentsScopeSpecificDocuments"].Value,
+        _ => Localizer["AgentsScopeCallingWorkspace"].Value
+    };
+
+    /// <summary>Renders the selected knowledge scope's label on the Select trigger.</summary>
+    /// <param name="value">The bound enum name.</param>
+    /// <returns>The option text.</returns>
+    private string KnowledgeTextFor(string value) =>
+        KnowledgeLabel(Enum.TryParse<AgentKnowledgeScope>(value, out var parsed)
+            ? parsed
+            : AgentKnowledgeScope.CallingWorkspace);
+
+    /// <summary>Renders the selected model on the Select trigger.</summary>
+    /// <param name="value">The bound model id, or an empty string.</param>
+    /// <returns>The option text.</returns>
+    private string ModelTextFor(string value) =>
+        string.IsNullOrWhiteSpace(value) ? Localizer["AgentsFollowWorkspaceDefault"].Value : value;
+
+    private static BadgeVariant ExposureVariant(SkillExposure exposure) => exposure switch
+    {
+        SkillExposure.LeavesMachine => BadgeVariant.Secondary,
+        SkillExposure.NeedsReview => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline
+    };
+
+    /// <summary>
+    /// REQ-UI-051: the localized name of a catalogue skill.
+    /// </summary>
+    /// <param name="name">The invariant tool name — the key handed to the LLM.</param>
+    /// <returns>The label shown on the catalogue and in the agent editor.</returns>
+    /// <remarks>
+    /// <para>
+    /// <see cref="SkillCatalog"/> now carries resource KEYS rather than English, so this is a
+    /// lookup rather than a second copy of the catalogue. The switch it replaced had six arms and
+    /// a fallback to the catalogue's own English — which meant a seventh skill would have shipped
+    /// English on every install, and two call sites on this page (the toggle toast and the agent
+    /// row's skill summary) never went through the switch at all and were English already.
+    /// </para>
+    /// <para>
+    /// A name the catalogue does not know is shown as itself: that is a tool the model named, not
+    /// a label, and there is nothing to look up.
+    /// </para>
+    /// </remarks>
+    private string SkillDisplayName(string name) =>
+        SkillCatalog.Find(name) is { } skill ? Localizer[skill.DisplayNameKey].Value : name;
+
+    /// <summary>REQ-UI-051: the localized one-line explanation of a catalogue skill.</summary>
+    /// <param name="name">The invariant tool name.</param>
+    /// <returns>The description shown under the skill's label.</returns>
+    private string SkillDescription(string name) =>
+        SkillCatalog.Find(name) is { } skill ? Localizer[skill.DescriptionKey].Value : string.Empty;
+
+    /// <summary>REQ-UI-051: the localized exposure badge for a skill.</summary>
+    /// <param name="exposure">The exposure to describe.</param>
+    /// <returns>The badge text.</returns>
+    private string ExposureLabelText(SkillExposure exposure) =>
+        Localizer[SkillCatalog.ExposureLabelKey(exposure)].Value;
+
+    private void GoToChat() => Nav.NavigateTo($"/workspace/{Slug}");
+
+    /// <summary>
+    /// Opens chat with the handle already typed, which is what "run in chat" means once invocation
+    /// is a composer mention rather than a separate run button (REQ-RAG-021).
+    /// </summary>
+    /// <param name="agent">The agent to invoke.</param>
+    private void RunInChat(AgentDefinition agent) =>
+        Nav.NavigateTo($"/workspace/{Slug}?agent={Uri.EscapeDataString(agent.Handle)}");
+}

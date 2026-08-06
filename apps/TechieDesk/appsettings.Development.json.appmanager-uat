@@ -1,0 +1,14 @@
+{
+  "AppManager": {
+    "BaseUrl": "https://192.168.1.14:5101",
+    "ApiKey": "",
+    "ApiSecret": "",
+    "ApplicationId": 1,
+    "TokenRefreshLeadSeconds": 120,
+    "AllowUntrustedServerCertificate": true
+  },
+  "Session": {
+    "IdleTimeoutMinutes": 60,
+    "AbsoluteTimeoutHours": 12
+  }
+}

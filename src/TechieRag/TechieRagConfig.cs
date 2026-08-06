@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TechieRag.Models;
 
 namespace TechieRag;
 
@@ -64,6 +65,12 @@ public class TechieRagConfig
 
     /// <summary>Gets or sets the resilience/retry configuration.</summary>
     public ResilienceConfig Resilience { get; set; } = new();
+
+    /// <summary>Gets or sets the rerank stage configuration.</summary>
+    public RerankConfig Rerank { get; set; } = new();
+
+    /// <summary>Gets or sets the relational persistence configuration for conversation threads and workspaces.</summary>
+    public PersistenceConfig Persistence { get; set; } = new();
 
     /// <summary>
     /// Internal logger factory set by the builder or DI container.
@@ -246,6 +253,31 @@ public class ProcessingConfig
     /// in multiple chunks for better retrieval.
     /// </remarks>
     public int DefaultChunkOverlap { get; set; } = 50;
+
+    /// <summary>
+    /// Gets or sets the chunking strategy used during ingestion.
+    /// </summary>
+    /// <remarks>
+    /// Recursive (default) preserves the historical TextChunker behavior; Token packs by
+    /// estimated token count; Markdown splits on headings and keeps code fences intact;
+    /// Sentence never splits inside a sentence.
+    /// </remarks>
+    public ChunkingStrategy ChunkingStrategy { get; set; } = ChunkingStrategy.Recursive;
+}
+
+/// <summary>
+/// Available text chunking strategies for document ingestion.
+/// </summary>
+public enum ChunkingStrategy
+{
+    /// <summary>Recursive paragraph/sentence/word splitting with overlap (default, backward compatible).</summary>
+    Recursive,
+    /// <summary>Token-budgeted chunking using the ~4 characters-per-token estimate.</summary>
+    Token,
+    /// <summary>Markdown/code-aware chunking: splits on headings, keeps fenced code blocks whole.</summary>
+    Markdown,
+    /// <summary>Sentence-boundary chunking that never splits inside a sentence.</summary>
+    Sentence
 }
 
 /// <summary>
@@ -319,7 +351,38 @@ public enum EmbeddingSource
     /// Supports OpenAI-compatible and Ollama-compatible API formats.
     /// Configure endpoint, API path, and format via EmbeddingConfig.
     /// </remarks>
-    Http
+    Http,
+
+    /// <summary>
+    /// Cohere embed API (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>
+    /// Asymmetric models: documents are embedded with <c>search_document</c> and queries with
+    /// <c>search_query</c>. Requires an API key.
+    /// </remarks>
+    Cohere,
+
+    /// <summary>
+    /// Voyage AI embeddings (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>
+    /// OpenAI-shaped API with an asymmetric <c>input_type</c>. Requires an API key.
+    /// </remarks>
+    Voyage,
+
+    /// <summary>
+    /// Mistral embeddings (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>OpenAI-shaped API, symmetric embeddings. Requires an API key.</remarks>
+    Mistral,
+
+    /// <summary>
+    /// Google Gemini embeddings (REQ-RAG-035).
+    /// </summary>
+    /// <remarks>
+    /// Uses the <c>batchEmbedContents</c> method with a retrieval task type. Requires an API key.
+    /// </remarks>
+    GoogleGemini
 }
 
 /// <summary>
@@ -447,6 +510,20 @@ public class LlmConfig
 
     /// <summary>Gets or sets the maximum context window size in tokens.</summary>
     public int MaxContextTokens { get; set; } = 128000;
+
+    /// <summary>
+    /// Gets or sets the named connector from <c>LlmConnectorCatalog</c> to use, e.g. <c>groq</c>
+    /// (REQ-RAG-034).
+    /// </summary>
+    /// <remarks>
+    /// <para>Lets configuration name a service instead of pasting its base URL. When set and
+    /// <see cref="Endpoint"/> is empty, the connector's endpoint and provider implementation are
+    /// used; an explicit <see cref="Endpoint"/> always wins, so a self-hosted or proxied deployment
+    /// can still override it.</para>
+    /// <para>A new property on a configuration class rather than a new <see cref="LlmSource"/>
+    /// member, so no consumer's existing switch over <see cref="LlmSource"/> changes meaning.</para>
+    /// </remarks>
+    public string? Connector { get; set; }
 }
 
 /// <summary>Configuration for token usage tracking and budgets.</summary>
@@ -466,6 +543,16 @@ public class UsageTrackingConfig
 
     /// <summary>Gets or sets whether to block requests when budget is exceeded.</summary>
     public bool BlockOnExceeded { get; set; }
+
+    /// <summary>
+    /// Gets or sets the per-model pricing table used for cost estimation, keyed by model name.
+    /// </summary>
+    /// <remarks>
+    /// Bindable from the <c>TechieRag:UsageTracking:Pricing</c> configuration section or set
+    /// fluently via TechieRagBuilder.WithModelPricing. Entries here override the built-in
+    /// default pricing; keys match case-insensitively and by substring.
+    /// </remarks>
+    public Dictionary<string, ModelPricing> Pricing { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>Configuration for prompt templates used in RAG operations.</summary>
@@ -486,6 +573,73 @@ public class PromptConfig
 
     /// <summary>Gets or sets the maximum tokens to allocate for context.</summary>
     public int MaxContextTokens { get; set; } = 4000;
+}
+
+/// <summary>Supported reranker sources for the optional rerank stage.</summary>
+public enum RerankSource
+{
+    /// <summary>No reranker configured.</summary>
+    None,
+    /// <summary>Cohere Rerank API (e.g. rerank-v3.5).</summary>
+    Cohere,
+    /// <summary>Jina AI Rerank API (e.g. jina-reranker-v2-base-multilingual).</summary>
+    Jina,
+    /// <summary>Local ONNX cross-encoder (requires the TechieRag.Embedded package).</summary>
+    LocalOnnx,
+    /// <summary>Custom IReranker supplied via TechieRagBuilder.WithReranker.</summary>
+    Custom
+}
+
+/// <summary>Configuration for the optional second-stage rerank of vector search results.</summary>
+public class RerankConfig
+{
+    /// <summary>Gets or sets whether the rerank stage is applied after vector search.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Gets or sets the reranker source type.</summary>
+    public RerankSource Source { get; set; } = RerankSource.None;
+
+    /// <summary>Gets or sets the API endpoint override (defaults per source).</summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>Gets or sets the API key for API rerankers.</summary>
+    public string? ApiKey { get; set; }
+
+    /// <summary>Gets or sets the reranker model name (defaults per source).</summary>
+    public string? Model { get; set; }
+
+    /// <summary>Gets or sets how many results the reranker returns (0 = same as the requested topK).</summary>
+    public int TopN { get; set; }
+
+    /// <summary>Gets or sets how many vector search candidates are fetched for reranking.</summary>
+    public int CandidateCount { get; set; } = 20;
+
+    /// <summary>Gets or sets the local model directory for the ONNX cross-encoder reranker.</summary>
+    public string? ModelPath { get; set; }
+}
+
+/// <summary>Supported relational persistence providers for conversation threads and workspaces.</summary>
+public enum StoreProvider
+{
+    /// <summary>No relational persistence configured.</summary>
+    None,
+    /// <summary>SQLite (embedded, zero configuration).</summary>
+    Sqlite,
+    /// <summary>PostgreSQL.</summary>
+    Postgres
+}
+
+/// <summary>Configuration for the relational persistence layer (TrThread/TrMessage/TrWorkspace tables).</summary>
+public class PersistenceConfig
+{
+    /// <summary>Gets or sets the persistence provider.</summary>
+    public StoreProvider Provider { get; set; } = StoreProvider.None;
+
+    /// <summary>Gets or sets the database connection string.</summary>
+    public string? ConnectionString { get; set; }
+
+    /// <summary>Gets or sets the default user identifier used by persistent conversation memory.</summary>
+    public string DefaultUserId { get; set; } = "default";
 }
 
 /// <summary>Configuration for retry and resilience behavior.</summary>

@@ -88,7 +88,8 @@ public class TomlProcessor : IDocumentProcessor
         var textChunks = TextChunker.ChunkText(
             formattedToml,
             options.MaxChunkSize,
-            options.ChunkOverlap);
+            options.ChunkOverlap,
+            options.Chunker);
 
         var chunkIndex = 0;
         foreach (var chunkText in textChunks)

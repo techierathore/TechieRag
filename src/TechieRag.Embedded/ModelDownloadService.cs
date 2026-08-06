@@ -73,22 +73,22 @@ public enum ModelDownloadStatus
 /// </summary>
 public class ModelDownloadService
 {
-    private static ModelDownloadService? _instance;
-    private static readonly object _lock = new();
+    private static ModelDownloadService? instance;
+    private static readonly object Lock = new();
 
     /// <summary>Gets the singleton instance.</summary>
     public static ModelDownloadService Instance
     {
         get
         {
-            if (_instance == null)
+            if (instance == null)
             {
-                lock (_lock)
+                lock (Lock)
                 {
-                    _instance ??= new ModelDownloadService();
+                    instance ??= new ModelDownloadService();
                 }
             }
-            return _instance;
+            return instance;
         }
     }
 

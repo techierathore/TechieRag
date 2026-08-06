@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    REQ-FN-030 / REQ-FN-035: the development-time migration console. TechieDeskDb became a library
+    so the MAUI head can run DbUp in-process at launch (ADR-007); this project keeps the
+    separately-invokable console the re-scope explicitly retains, for running migrations against a
+    database without starting the app.
+
+      dotnet run [dash][dash]project apps/TechieDeskDb.Cli [dash][dash] [dash][dash]provider Sqlite
+        [dash][dash]connection "Data Source=..."
+      (written with [dash] because an XML comment may not contain a double hyphen)
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TechieDeskDb</RootNamespace>
+    <AssemblyName>TechieDeskDb.Cli</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieDeskDb\TechieDeskDb.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.10" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>

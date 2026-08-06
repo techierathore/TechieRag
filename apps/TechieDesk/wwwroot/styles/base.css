@@ -1,0 +1,905 @@
+/* Base styles for TechieDesk - works with TrBlazeUI + Tailwind */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+    border-color: var(--border);
+}
+
+h1:focus {
+    outline: none;
+}
+
+/* TR-003 workaround: TrBlazeUI SidebarInset renders <main> as a flex item without
+   min-width:0, so over-wide content (tables, pagination bars) stretches the whole
+   shell — including the header — past the viewport on narrow screens. Capping it
+   lets wide content scroll inside the content region instead. */
+main {
+    min-width: 0;
+}
+
+/* The app ships TrBlazeUI's prebuilt CSS but has no Tailwind JIT of its own, so
+   grid-template-column utilities (grid-cols-2, lg:grid-cols-2) are not emitted. These
+   helpers give the auth/profile screens their mockup column layouts and stay responsive:
+   two-up rows for paired fields, and a 2-column card grid that collapses on narrow viewports. */
+.td-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.td-grid-2col {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+    .td-grid-2col {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Wave 3 workspace-chat layout (REQ-UI-016/017): a fixed threads rail + a flexible chat
+   column on wide viewports, collapsing to a single stacked column at ≤767px so nothing
+   overflows horizontally at 390px (REQ-NFR-006). */
+.td-chat-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (min-width: 768px) {
+    .td-chat-grid {
+        grid-template-columns: 264px minmax(0, 1fr);
+    }
+}
+
+/* REQ-UI-022 first-run wizard stepper (Setup.razor). Its 5 step cells use `flex flex-1`
+   inside a `flex justify-between gap-1.5` row, but flex items default to min-width:auto and
+   so refuse to shrink below their label content — at 390px the row grew to 446px and
+   overflowed the viewport by 56px (step 5 "Workspace" clipped). Letting the cells shrink to
+   0 lets flex distribute the width evenly, and letting the long single-word labels
+   ("AppManager", "Workspace") break keeps every label within its cell. The @1280 layout,
+   which has ample room and never overflows, is unchanged — matching
+   docs/mockups/setup-wizard.html. The app ships TrBlazeUI's prebuilt CSS with no Tailwind
+   JIT (min-w-0 / break utilities aren't emitted), so these rules are scoped here to the
+   stepper's existing markup (the `justify-between gap-1.5` row + its `text-[11px]` labels,
+   both unique to this wizard). */
+.flex.justify-between.gap-1\.5 > .flex-1 {
+    min-width: 0;
+}
+
+.text-\[11px\] {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+}
+
+/* A plain 0..1 range input styled as the workspace-settings similarity slider fallback,
+   used where a numeric threshold reads clearer than the TrBlazeUI Slider. */
+.td-range {
+    width: 100%;
+    accent-color: hsl(var(--primary));
+}
+
+/* REQ-RAG-011 / REQ-RAG-033 FileUpload dropzone hint (DocumentLibrary.razor). TrBlazeUI's
+   FileUpload renders the whole Accept filter as one "Accepted: .pdf,.docx,.xlsx,..." line
+   inside a `flex flex-col items-center gap-2 pointer-events-none` column. A long comma list
+   has no break opportunity that the browser will take by default, and the centred column
+   never constrains it, so at 390px the line rendered from -152px to 542px — bleeding off
+   BOTH viewport edges. Adding XLSX/PPTX to the filter lengthened the string, so this is
+   pinned down here. Constraining the column and letting the list break anywhere keeps the
+   hint inside the card; the @1280 layout has ample room and is visually unchanged. Same
+   rationale as the wizard-stepper rules above: no Tailwind JIT, so scope to the markup. */
+.pointer-events-none.flex.flex-col.items-center.gap-2 {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.pointer-events-none.flex.flex-col.items-center.gap-2 > p,
+.pointer-events-none.flex.flex-col.items-center.gap-2 > .text-center {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* ---------------------------------------------------------------------------
+   REQ-NFR-005 (BRD-96) — Accessibility
+   --------------------------------------------------------------------------- */
+
+/* WCAG 2.1 AA 2.4.7 "Focus Visible". The TrBlazeUI markup asks for a focus ring with
+   Tailwind's `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`
+   utilities, but this app ships the library's PREBUILT css and has no Tailwind JIT of its
+   own — so `focus-visible:outline-none` IS emitted (it lives in the prebuilt bundle) while
+   the `--tw-ring-color` that would paint the replacement ring is never set. The measured
+   result on every sidebar nav link, the sidebar toggle and the user-menu button was
+   `outline-style: none` + a fully transparent `rgba(0,0,0,0)` ring: keyboard focus was
+   completely invisible while `:focus-visible` matched. axe cannot detect this (it does not
+   evaluate focus appearance), so it was caught by tabbing the shell and reading the
+   computed style.
+
+   The utility that hides the outline is a class selector (specificity 0,2,0), so a plain
+   element rule (0,1,1) would lose even though base.css is loaded last. Repeating
+   `:focus-visible` lifts these to 0,2,1 so they win on specificity rather than by
+   `!important`, which would also override any genuinely intentional per-component ring. */
+a:focus-visible:focus-visible,
+button:focus-visible:focus-visible,
+input:focus-visible:focus-visible,
+select:focus-visible:focus-visible,
+textarea:focus-visible:focus-visible,
+summary:focus-visible:focus-visible,
+[tabindex="0"]:focus-visible:focus-visible,
+[role="button"]:focus-visible:focus-visible,
+[role="tab"]:focus-visible:focus-visible,
+[role="menuitem"]:focus-visible:focus-visible,
+[role="option"]:focus-visible:focus-visible,
+[role="slider"]:focus-visible:focus-visible,
+[role="combobox"]:focus-visible:focus-visible,
+[role="switch"]:focus-visible:focus-visible,
+[role="checkbox"]:focus-visible:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Programmatic-focus targets must NOT paint that ring. Routes.razor uses
+   <FocusOnNavigate Selector="h1" />, which focuses the page's h1 (tabindex="-1") on every
+   navigation, and the skip link focuses #td-main-content the same way — in both cases the
+   focus move is a screen-reader/keyboard affordance, not a "you are here" indicator, and a
+   box drawn around the whole page title on every load is a visual regression. The file
+   already carried `h1:focus { outline: none }` for exactly this reason; these selectors
+   restate it at the doubled specificity used above so it still wins. This is why the rule
+   above is scoped to [tabindex="0"] (real custom widgets) rather than any [tabindex]. */
+h1:focus:focus-visible,
+h1[tabindex="-1"]:focus:focus-visible,
+#td-main-content:focus:focus-visible {
+    outline: none;
+}
+
+/* The screen-reader-only utility is referenced by the skip link below. Tailwind's `sr-only`
+   is NOT present in the prebuilt bundle (verified by enumerating document.styleSheets), so
+   it is defined here rather than assumed. */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* REQ-NFR-005 / WCAG 1.3.1 + 4.1.2. An action column whose header cell is blank leaves the
+   row buttons under a nameless column header, which is what axe reports as
+   `empty-table-header`. The design wants that cell to LOOK empty, so the header text is
+   supplied via DataTableColumn's Header and hidden here instead.
+
+   The class has to be applied through HeaderClass, which lands on the <th> itself — putting
+   `.sr-only` there would take the cell out of flow and collapse the column, so only the
+   TrBlazeUI header label INSIDE the cell is hidden and the cell keeps its box. */
+th.td-th-label-hidden > div > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* REQ-NFR-005 / WCAG 1.3.1. Blazor's error bar is markup in index.html that sits OUTSIDE the
+   #app root and therefore outside every landmark the layouts render, so axe reported "some
+   page content is not contained by landmarks" on every single route. It is also, without
+   this rule, permanently visible: the standard template ships a `display: none` for it that
+   this app's index.html never carried, and blazor.webview.js is what sets `display: block`
+   when an unhandled error actually occurs. Hiding it restores the intended behaviour AND
+   removes it from the accessibility tree until it has something to say. */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    background: var(--destructive, #b91c1c);
+    color: var(--destructive-foreground, #ffffff);
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+/* WCAG 2.4.1 "Bypass Blocks": the shell renders ~20 sidebar links before the page content,
+   so a keyboard user otherwise tabs through the whole nav on every route. The link is
+   visually hidden until focused, then pinned to the top-left of the viewport. */
+.td-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+}
+
+.td-skip-link:focus {
+    left: 0.5rem;
+    top: 0.5rem;
+    width: auto;
+    height: auto;
+    padding: 0.5rem 0.875rem;
+    border-radius: calc(var(--radius) - 2px);
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* REQ-UI-044 / BRD-137 — the workspace chat transcript's height budget (WorkspaceChat.razor).
+
+   The transcript is the ONLY part of the chat column that is allowed to shrink, so it is sized as
+   "the viewport MINUS everything that has to stay on screen with it" rather than as a share of the
+   viewport. The `min-height:24vh; max-height:56vh` inline box this replaces could not express that:
+   a percentage of the viewport grows and shrinks WITH the chrome it is supposed to be making room
+   for, so one number cannot fit two window heights. Measured on the running app by the 2026-07-31
+   verify sweep: at 1600x1240 (1210 px of web viewport) 56vh = 685 px and the whole column fitted
+   with 180 px to spare; at the REQ-UI-041 floor of 1024x720 (690 px of web viewport) 56vh = 386 px
+   while the chrome below it needed 453 px, so the column ran 149 px past the bottom of the window
+   and the composer's own Attach button, Prompts menu, keyboard hint and mode hint were all
+   reported off-window.
+
+   The 470 px reserve is that measured 453 px plus a 17 px margin, and it is measured at 1024 wide
+   where the composer is at its TALLEST: `.td-composer-mode` is 22rem from 640px up, so at 1024 the
+   control bar wraps onto three rows (mode / chips / Top-K caption) where at 1600 it is one row.
+   Sizing the reserve for the narrow case is deliberate — it is the only case that can overflow.
+
+   It also has to be a real declaration here rather than a utility: the app ships TrBlazeUI's
+   PREBUILT Tailwind CSS with no JIT, so `max-h-[calc(100vh-470px)]` would never be emitted
+   (TR-007). */
+.td-chat-transcript {
+    min-height: 8rem;
+    max-height: calc(100vh - 470px);
+}
+
+/* REQ-UI-044 / BRD-137 workspace chat composer (WorkspaceChat.razor), matching
+   docs/mockups/workspace-chat.html. The app ships TrBlazeUI's PREBUILT Tailwind CSS with no JIT,
+   so arbitrary utilities such as `min-h-[84px]`/`max-h-[272px]` are never emitted (see the
+   REQ-UI-022 note above) — the composer's sizing therefore lives here as real declarations.
+   base.css loads after trblazeui.css, so these override the component's own `min-h-16`. */
+.td-composer-input {
+    min-height: 84px;
+    /* ~12 lines of 1.5 line-height at 0.875rem + vertical padding — the growth cap the JS
+       module reads back from `max-height` so the number is owned in one place. */
+    max-height: 272px;
+    line-height: 1.5;
+    resize: vertical;
+    overflow-y: hidden;
+}
+
+.td-composer-mode {
+    width: 100%;
+}
+
+@media (min-width: 640px) {
+    .td-composer-mode {
+        width: 22rem;
+    }
+}
+
+/* The mode/model/scope chips. Rendered as DropdownMenu triggers, so they must carry their own
+   button-like affordance rather than relying on the Button component (AsChild is not available
+   on a trigger that also needs to stay a single inline control). */
+.td-composer-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border: 1px solid var(--border);
+    border-radius: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.td-composer-chip:hover {
+    background-color: var(--muted);
+}
+
+/* The Top-K/threshold and keyboard-hint captions sit right-aligned on wide viewports and drop
+   onto their own full-width line before they can collide with the chips. */
+.td-composer-meta {
+    flex: 1 1 100%;
+}
+
+@media (min-width: 768px) {
+    .td-composer-meta {
+        flex: 0 1 auto;
+        margin-left: auto;
+    }
+}
+
+/* REQ-UI-043 / BRD-136 LLM settings provider layout (LlmSettings.razor), matching
+   docs/mockups/llm-settings.html — the chat-provider card on the left, the resilience/fallback
+   card on the right. Same reason as the rules above: the app ships TrBlazeUI's PREBUILT Tailwind
+   CSS with no JIT, so `grid-cols-*` and every responsive prefix (`md:`, `lg:`) are absent from
+   the bundle entirely (the shipped file contains no @media rules at all). The breakpoint is 860px
+   rather than 1024px because the shell's 256px sidebar leaves only ~975px of content at a 1280
+   window — at 1024px the mockup's two-up layout would never appear on a normal desktop. */
+.td-llm-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (min-width: 860px) {
+    .td-llm-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+/* The paired Temperature / Max-tokens and retry rows: side by side once there is room, stacked
+   below it so nothing is squeezed at 390-420px. */
+.td-llm-pair {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+@media (min-width: 640px) {
+    .td-llm-pair {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+/* The save-refusal summary list — `list-disc` is not in the prebuilt bundle. */
+.td-llm-errors {
+    list-style: disc;
+    padding-left: 1.25rem;
+}
+
+/* REQ-UI-034 / BRD-85 — the agent execution trace (Components/Shared/AgentTracePanel.razor).
+
+   DELIBERATELY THEME-INDEPENDENT. docs/TechieDesk-UIDesign.md specifies "agent execution trace +
+   code snippets = dark slate mono panels in BOTH themes", so these colours are literal rather than
+   var(--card)/var(--muted) tokens: the panel is machine output and is meant to read as such against
+   a light canvas exactly as it does against a dark one. There is deliberately NO dark-mode override
+   below — that is the requirement, not an omission.
+
+   Same reason as every other rule in this file: the app ships TrBlazeUI's PREBUILT Tailwind CSS
+   with no JIT, so `bg-slate-900`, `text-sky-300` and every arbitrary colour utility are absent from
+   the bundle entirely. The panel's appearance therefore has to be declared here to exist at all. */
+.td-agent-trace {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    border-radius: 0.5rem;
+    background-color: #0f172a;
+    padding: 0.625rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    overflow-x: auto;
+}
+
+.td-agent-trace-step {
+    border: 1px solid #1e293b;
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.625rem;
+    color: #cbd5e1;
+}
+
+/* A failed step is bordered, not merely reworded: a truncated or broken run must be visible at a
+   glance rather than only on reading the detail line. */
+.td-agent-trace-step.is-error {
+    border-color: #7f1d1d;
+    background-color: #1c1214;
+}
+
+.td-agent-trace-head {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.td-agent-trace-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 999px;
+    background-color: #312e81;
+    color: #c7d2fe;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+.td-agent-trace-title {
+    color: #e2e8f0;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.td-agent-trace-time {
+    margin-left: auto;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.td-agent-trace-step.is-error .td-agent-trace-time {
+    color: #fca5a5;
+}
+
+.td-agent-trace-args {
+    margin-top: 0.3125rem;
+    color: #93c5fd;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.td-agent-trace-detail {
+    margin-top: 0.3125rem;
+    color: #cbd5e1;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+/* Hand-written empty state for the Agents screen's not-yet-built tabs. TrBlazeUI 1.0.7's <Empty>
+   silently drops its Title and Description and renders the icon alone (orchestrator, 2026-07-27),
+   which would have turned a deliberate explanation into a blank panel with no compile error. */
+.td-agent-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+/* ---------------------------------------------------------------------------
+   REQ-UI-037 / REQ-UI-038 (BRD-89 / BRD-90) — theme toggle, accent swatches,
+   branding preview.
+
+   Written as real declarations for the same reason as every block above: the app
+   ships TrBlazeUI's PREBUILT Tailwind CSS with no JIT, so arbitrary utilities
+   (`h-8`, `w-8`, `ring-2`, `ring-offset-2`) that are not already in the bundle
+   are never emitted.
+   --------------------------------------------------------------------------- */
+
+/* `space-y-6` and `gap-2.5` are NOT in the prebuilt bundle (grepped: 0 hits each, while
+   `space-y-4` and `space-y-1.5` are present), so a card that asked for them rendered with
+   its sections touching. This is the same class of trap as `md:grid-cols-*`: the class
+   compiles, the element carries it, and nothing happens. */
+.td-stack-6 > * + * {
+    margin-top: 1.5rem;
+}
+
+/* The Light / Dark / Match-system row. TrBlazeUI's RadioGroup renders `grid gap-2`, which stacks
+   its options; the mockup's "(•) Light  ( ) Dark  ( ) System" is a row. Passing `flex` through the
+   component's Class parameter does NOT override it — both are 0,1,0 class selectors, so the winner
+   is whichever the library bundle declares later, and that is `.grid`. base.css is loaded after the
+   bundle, so this rule wins on source order rather than by !important. */
+.td-radio-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+    align-items: center;
+}
+
+/* The topbar moon/sun trigger, matching `.theme-btn` in docs/mockups/*.html. It is the
+   content of a DropdownMenuTrigger, which supplies the <button> — so this styles a
+   <span> and must not itself be interactive. */
+.td-theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--border);
+    background-color: var(--card);
+    color: var(--muted-foreground);
+}
+
+.td-theme-toggle:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+/* The accent swatch row. Real buttons rather than the mockup's decorative spans, so the
+   selected ring has to survive a focus outline landing on the same element — hence a
+   box-shadow ring (which composes with `outline`) rather than an outline of its own. */
+.td-accent-swatch {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    padding: 0;
+    cursor: pointer;
+}
+
+.td-accent-selected {
+    /* The mockup's `.sw.sel`: a gap in the page background, then the accent ring. */
+    box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--primary);
+}
+
+/* The uploaded logo, wherever it is shown. Constrained by HEIGHT with width:auto so a wide
+   wordmark and a square glyph both sit correctly on the same baseline. */
+.td-branding-logo {
+    height: 2.5rem;
+    width: auto;
+    max-width: 12rem;
+    object-fit: contain;
+}
+
+.td-branding-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2rem;
+    width: 2rem;
+    border-radius: calc(var(--radius) - 2px);
+    object-fit: contain;
+}
+
+.td-branding-mark-fallback {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.td-branding-preview {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background-color: var(--muted);
+    padding: 0.875rem 1rem;
+}
+
+/* REQ-UI-026 / BRD-73 operator event log (AdminEvents.razor), matching
+   docs/mockups/admin-events.html. Same reason as every .td- rule above: the app ships TrBlazeUI's
+   PREBUILT Tailwind CSS with no JIT of its own, so grid-template-columns, arbitrary widths and
+   `pt-6` are simply absent from the bundle — the toolbar row, the details grid and the raw-record
+   block carry their layout here as real declarations rather than as utilities that never load. */
+.td-events-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding-top: 1.5rem;
+}
+
+.td-events-date {
+    width: 150px;
+}
+
+.td-events-category {
+    width: 180px;
+}
+
+.td-events-search {
+    flex: 1 1 220px;
+    min-width: 200px;
+}
+
+/* The grid footer: count on the left, Prev/Next on the right, on one rule above the card edge. */
+.td-events-foot {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0.875rem;
+    border-top: 1px solid var(--border);
+}
+
+.td-events-pager {
+    margin-left: 0;
+    margin-right: 0;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+/* The row-details sheet. TrBlazeUI's DialogContent caps itself at max-w-lg, which is far too
+   narrow for a record with a raw payload and a related-events table inside it. */
+.td-dialog-wide {
+    max-width: 960px;
+    width: 100%;
+}
+
+.td-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    line-height: 1.4;
+}
+
+@media (min-width: 640px) {
+    .td-detail-grid {
+        grid-template-columns: 200px minmax(0, 1fr);
+    }
+}
+
+/* "Raw record" — deliberately the mockup's dark code block in BOTH themes: it is a verbatim
+   machine payload, and a payload that restyles itself with the app theme reads as app chrome. */
+.td-raw-record {
+    margin: 0;
+    padding: 0.875rem;
+    border-radius: 0.5rem;
+    background: #0f172a;
+    color: #93c5fd;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    max-height: 22rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* REQ-UI-028 / BRD-75 operator App settings (AdminSettings.razor), matching
+   docs/mockups/admin-settings.html — the Defaults card's two-up field grid. */
+.td-settings-body {
+    padding-top: 1.5rem;
+}
+
+.td-settings-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+@media (min-width: 860px) {
+    .td-settings-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+}
+
+.td-settings-number {
+    width: 140px;
+}
+
+/* REQ-UI-029 / REQ-UI-030 / REQ-UI-031 — Pricing.razor and Billing.razor, matching
+   docs/mockups/pricing.html and docs/mockups/billing.html. The app ships TrBlazeUI's prebuilt
+   CSS with no Tailwind JIT, so the utilities these two screens need — grid-template-columns at a
+   breakpoint, arbitrary widths, space-y-3/space-y-6, uppercase, text-green-600 — are simply not
+   emitted. Written out here for the same reason .td-grid-2col and .td-chat-grid above are. */
+.td-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.td-stack-tight {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Three tier cards side by side, collapsing to one column before they get too narrow to read. */
+.td-tier-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.875rem;
+    align-items: stretch;
+}
+
+@media (min-width: 900px) {
+    .td-tier-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.td-tier-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.td-tier-name {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+.td-tier-price {
+    margin-top: 0.375rem;
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.td-tier-price-suffix {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: normal;
+    color: var(--muted-foreground);
+}
+
+.td-tier-badge-popular {
+    position: absolute;
+    top: -0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.td-tier-badge-current {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+}
+
+.td-tier-features {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+.td-tier-features li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.td-tier-features li.td-tier-excluded {
+    color: var(--muted-foreground);
+}
+
+.td-tier-tick {
+    color: #16a34a;
+    flex-shrink: 0;
+}
+
+html[data-theme="dark"] .td-tier-tick,
+.dark .td-tier-tick {
+    color: #4ade80;
+}
+
+.td-tier-nomark {
+    width: 15px;
+    flex-shrink: 0;
+    text-align: center;
+}
+
+.td-promo-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+
+.td-promo-input {
+    width: 220px;
+}
+
+.td-promo-status {
+    flex: 1 1 240px;
+    min-width: 240px;
+}
+
+.td-currency-select {
+    width: 120px;
+}
+
+/* Billing key/value rows — the mockup's .kv, which is a bordered label/value pair. */
+.td-kv {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.84375rem;
+}
+
+.td-kv:last-child {
+    border-bottom: 0;
+}
+
+.td-kv-key {
+    color: var(--muted-foreground);
+}
+
+.td-kv-value {
+    font-weight: 600;
+}
+
+.td-licence-key {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    background: var(--muted);
+    border-radius: 0.375rem;
+    padding: 0.1875rem 0.625rem;
+    overflow-wrap: anywhere;
+}
+
+.td-plan-amount {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.td-plan-amount-suffix {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: normal;
+    color: var(--muted-foreground);
+}
+
+/* TrBlazeUI's Empty stacks its icon/title/description with Tailwind utilities that this app's
+   prebuilt CSS does not emit, so the three ran together as one sentence on Billing. Laying the
+   container out directly restores the mockup's dashed empty block (docs/mockups/billing.html
+   .empty) whatever the children's own classes do. */
+.td-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 0.375rem;
+    padding: 2rem 1.25rem;
+    border: 1.5px dashed var(--border);
+    border-radius: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.td-empty > * {
+    display: block;
+    max-width: 46ch;
+}
+
+.td-empty svg {
+    color: var(--muted-foreground);
+    opacity: 0.65;
+}
+
+/* The event-log empty state. Written as real declarations for the same reason the markup does not
+   use TrBlazeUI's <Empty>: on a fresh install this panel IS the screen, and it must not depend on
+   utilities that the prebuilt bundle never emitted. */
+.td-events-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: var(--muted-foreground);
+}
+
+.td-events-empty-title {
+    margin-top: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.td-events-empty-text {
+    font-size: 0.8125rem;
+    max-width: 32rem;
+}

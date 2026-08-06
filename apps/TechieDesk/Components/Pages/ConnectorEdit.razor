@@ -1,0 +1,1289 @@
+@page "/workspace/{Slug}/connectors/new"
+@page "/workspace/{Slug}/connectors/{ConnectorId}/edit"
+@using System.Globalization
+@using Microsoft.Extensions.DependencyInjection
+@using TechieDesk.Services.Connectors
+@using TechieRag.Connectors
+@inject IServiceProvider Services
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<ConnectorEdit> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-055: the browser tab title was the last raw English on this screen. ConnectorsHub's
+   PageTitle was localized and this one was missed, which is exactly the shape of gap the service-
+   layer counter exists for — no counter reads PageTitle. *@
+<PageTitle>@(IsEdit ? Localizer["ConnEditPageTitleEdit"] : Localizer["ConnEditPageTitleAdd"]) — @(workspace?.Name ?? Localizer["HubWorkspaceFallback"].Value)</PageTitle>
+
+@* REQ-NFR-010/BRD-101: a backend outage is not "this workspace does not exist". *@
+@if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["ConnEditWorkspaceUnavailableTitle"]</AlertTitle>
+        <AlertDescription>
+            @Localizer["ConnEditWorkspaceUnavailableBody"] @loadError
+        </AlertDescription>
+    </Alert>
+}
+else if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["ConnEditWorkspaceNotFoundTitle"]</AlertTitle>
+        <AlertDescription>@Localizer["ConnEditWorkspaceNotFoundBody"]</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["ConnEditLoadingWorkspace"]</span>
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="GoBackToConnectors">
+            <LucideIcon aria-hidden="true" Name="arrow-left" Size="15" Class="mr-2" />
+            <span>@Localizer["ConnEditBackToConnectors"]</span>
+        </Button>
+        <h1 class="mt-2 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight">@Heading</h1>
+        <TypographyMuted>
+            @Localizer["ConnEditIntro"]
+        </TypographyMuted>
+    </div>
+
+    @if (!canManage)
+    {
+        <Alert Variant="AlertVariant.Warning" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="lock" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["ConnEditViewOnlyTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["ConnEditViewOnlyBody"]
+            </AlertDescription>
+        </Alert>
+    }
+
+    @if (registry is null)
+    {
+        @* Same reasoning as the hub's optional resolve: on a build without AddTechieDeskConnectors()
+           this screen has nothing to write to, and it says so rather than throwing inside the
+           WebView, where an exception is a blank window instead of a message. *@
+        <Alert Variant="AlertVariant.Danger">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["ConnEditNoRegistryTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["ConnEditNoRegistryBody"]
+            </AlertDescription>
+        </Alert>
+    }
+    else if (connectorMissing)
+    {
+        <Alert Variant="AlertVariant.Danger">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["ConnEditMissingTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["ConnEditMissingBody"]
+            </AlertDescription>
+        </Alert>
+    }
+    else if (connectorType is null)
+    {
+        @* Reached when /connectors/new is opened without a ?type= — a hand-typed address or a stale
+           bookmark. A chooser rather than an error: the answer is one press away.
+           Buttons, deliberately not a Select — TR-024 renders a seeded Select's raw value in its
+           trigger, and there is nothing to seed here anyway. *@
+        <Card>
+            <CardHeader>
+                <CardTitle>@Localizer["ConnEditChooserTitle"]</CardTitle>
+                <CardDescription>@Localizer["ConnEditChooserDescription"]</CardDescription>
+            </CardHeader>
+            <CardContent>
+                @if (AvailableTypes.Count == 0)
+                {
+                    <Alert Variant="AlertVariant.Info">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["ConnEditNoTypesTitle"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer["ConnEditNoTypesBody"]
+                        </AlertDescription>
+                    </Alert>
+                }
+                else
+                {
+                    <div class="grid gap-4 md:grid-cols-2">
+                        @foreach (var type in AvailableTypes)
+                        {
+                            <Card>
+                                <CardContent Class="flex h-full flex-col gap-1">
+                                    <span class="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
+                                        <LucideIcon aria-hidden="true" Name="@IconFor(type.ConnectorType)" Size="18" />
+                                    </span>
+                                    <span class="font-semibold">@Localizer[type.DisplayNameKey]</span>
+                                    <TypographyMuted Class="block text-xs">@Localizer[type.DescriptionKey]</TypographyMuted>
+                                    <div class="mt-auto pt-4">
+                                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                OnClick="@(() => ChooseType(type.ConnectorType))">
+                                            <span>@Localizer["ConnEditConfigureThis"]</span>
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        }
+                    </div>
+                }
+            </CardContent>
+        </Card>
+    }
+    else
+    {
+        <Card Class="mb-4">
+            <CardHeader>
+                <CardTitle>@TypeHeading</CardTitle>
+                <CardDescription>@TypeDescription</CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                <div class="space-y-2">
+                    <Label For="connector-name">@Localizer["ConnEditNameLabel"]</Label>
+                    <Input Id="connector-name" @bind-Value="displayName"
+                           Placeholder="@NamePlaceholder"
+                           Disabled="saving" />
+                    <TypographyMuted Class="block text-xs">
+                        @Localizer["ConnEditNameHelp"]
+                    </TypographyMuted>
+                </div>
+
+                <Separator />
+
+                @if (IsRepository)
+                {
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label For="connector-host">@Localizer["ConnEditHostLabel"]</Label>
+                            @* TR-024 sidestepped rather than worked around: the bound VALUE and the item's
+                               text are the same string, so the trigger reads correctly whether the Select
+                               paints its item text or the raw value. RepositoryHost parses case-insensitively,
+                               so "GitHub"/"GitLab" round-trip through ConnectorSettings.Host unchanged. *@
+                            <Select @bind-Value="hostText" TValue="string" Disabled="saving">
+                                <SelectTrigger Id="connector-host">
+                                    <SelectValue Placeholder="GitHub" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem Value="@("GitHub")" Text="GitHub" TValue="string">GitHub</SelectItem>
+                                    <SelectItem Value="@("GitLab")" Text="GitLab" TValue="string">GitLab</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditHostHelp"]
+                            </TypographyMuted>
+                        </div>
+                        <div class="space-y-2">
+                            <Label For="connector-project">@Localizer["ConnEditProjectPathLabel"]</Label>
+                            <Input Id="connector-project" @bind-Value="projectPath"
+                                   Placeholder="@Localizer["ConnEditRepoPathPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                <b>owner/repository</b> @Localizer["ConnEditProjectPathOnGitHub"] <b>group/subgroup/project</b> @Localizer["ConnEditProjectPathOnGitLab"]
+                            </TypographyMuted>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 sm:max-w-sm">
+                        <Label For="connector-branch">@Localizer["ConnEditBranchLabel"]</Label>
+                        @* Deliberately NOT prefilled with "main". ConnectorSettings.Branch is explicit that
+                           null means "ask the host what the default branch is"; substituting "main" reports
+                           every repository still on "master" as empty rather than as misconfigured. *@
+                        <Input Id="connector-branch" @bind-Value="branch"
+                               Placeholder="@Localizer["ConnEditBranchPlaceholder"]" Disabled="saving" />
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditBranchHelp"]
+                        </TypographyMuted>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label For="connector-api-url">@Localizer["ConnEditApiBaseUrlLabel"]</Label>
+                            <Input Id="connector-api-url" Type="InputType.Url" @bind-Value="apiBaseUrl"
+                                   Placeholder="@Localizer["ConnEditApiBaseUrlPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditApiBaseUrlHelp"]
+                            </TypographyMuted>
+                        </div>
+                        <div class="space-y-2">
+                            <Label For="connector-web-url">@Localizer["ConnEditWebBaseUrlLabel"]</Label>
+                            <Input Id="connector-web-url" Type="InputType.Url" @bind-Value="webBaseUrl"
+                                   Placeholder="@Localizer["ConnEditWebBaseUrlPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditWebBaseUrlHelp"]
+                            </TypographyMuted>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label For="connector-include">@Localizer["ConnEditIncludePathsLabel"]</Label>
+                            <Input Id="connector-include" @bind-Value="includeGlobsText"
+                                   Placeholder="@Localizer["ConnEditIncludeGlobPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditIncludePathsHelp"]
+                            </TypographyMuted>
+                        </div>
+                        <div class="space-y-2">
+                            <Label For="connector-exclude">@Localizer["ConnEditExcludePathsLabel"]</Label>
+                            <Input Id="connector-exclude" @bind-Value="excludeGlobsText"
+                                   Placeholder="@Localizer["ConnEditExcludeGlobPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditExcludePathsHelp"]
+                            </TypographyMuted>
+                        </div>
+                    </div>
+                }
+                else if (IsEmail)
+                {
+                    @* ── Mailbox (REQ-RAG-049 / BRD-135) ────────────────────────────────────────
+                       Highest-sensitivity source in the product, so the scope controls below are part
+                       of the requirement, not polish: the defaults read INBOX only, since nothing,
+                       and no attachments. Widening is always a deliberate act. *@
+                    <div class="space-y-2 sm:max-w-sm">
+                        <Label For="connector-mail-source">@Localizer["ConnEditMailSourceLabel"]</Label>
+                        <Select @bind-Value="mailSource" TValue="string" Disabled="saving"
+                                DisplayTextSelector="MailSourceText">
+                            <SelectTrigger Id="connector-mail-source">
+                                <SelectValue Placeholder="@Localizer["ConnEditMailSourceImap"]" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem Value="@MailSourceImap" Text="@Localizer["ConnEditMailSourceImap"]" TValue="string">@Localizer["ConnEditMailSourceImap"]</SelectItem>
+                                <SelectItem Value="@MailSourceMbox" Text="@Localizer["ConnEditMailSourceMbox"]" TValue="string">@Localizer["ConnEditMailSourceMbox"]</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditMailSourceHelp"]
+                        </TypographyMuted>
+                    </div>
+
+                    @if (IsImapMailbox)
+                    {
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label For="connector-imap-host">@Localizer["ConnEditImapHostLabel"]</Label>
+                                <Input Id="connector-imap-host" @bind-Value="imapHost"
+                                       Placeholder="@Localizer["ConnEditImapHostPlaceholder"]" Disabled="saving" />
+                                <TypographyMuted Class="block text-xs">
+                                    @Localizer["ConnEditImapHostHelpLead"] <b>@Localizer["ConnEditImapHostHelpTls"]</b> — @Localizer["ConnEditImapHostHelpRest"]
+                                </TypographyMuted>
+                            </div>
+                            <div class="space-y-2">
+                                <Label For="connector-imap-port">@Localizer["ConnEditImapPortLabel"]</Label>
+                                <Input Id="connector-imap-port" @bind-Value="imapPortText"
+                                       Placeholder="993" Disabled="saving" />
+                                <TypographyMuted Class="block text-xs">
+                                    @Localizer["ConnEditImapPortHelp"]
+                                </TypographyMuted>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="space-y-2">
+                                <Label For="connector-imap-user">@Localizer["ConnEditImapUserLabel"]</Label>
+                                <Input Id="connector-imap-user" @bind-Value="imapUsername"
+                                       Placeholder="@Localizer["ConnEditExampleEmailPlaceholder"]" Disabled="saving" />
+                            </div>
+                            <div class="space-y-2">
+                                <Label For="connector-imap-oauth">@Localizer["ConnEditSignInMethodLabel"]</Label>
+                                <div class="flex items-center gap-2 pt-2">
+                                    <Switch Id="connector-imap-oauth" @bind-Checked="imapUseOAuthBearer"
+                                            Disabled="saving" />
+                                    <TypographyMuted Class="text-xs">
+                                        @Localizer["ConnEditOAuthSwitchLabel"]
+                                    </TypographyMuted>
+                                </div>
+                                <TypographyMuted Class="block text-xs">
+                                    @Localizer["ConnEditOAuthHelpLead"] <b>Gmail</b> @Localizer["ConnEditOAuthHelpAnd"] <b>Microsoft 365</b>: @Localizer["ConnEditOAuthHelpRest"]
+                                </TypographyMuted>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="space-y-2">
+                            <Label For="connector-mbox-path">@Localizer["ConnEditMboxPathLabel"]</Label>
+                            <Input Id="connector-mbox-path" @bind-Value="mboxPath"
+                                   Placeholder="@Localizer["ConnEditMboxPathPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditMboxPathHelp"]
+                            </TypographyMuted>
+                        </div>
+                    }
+
+                    <Separator />
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label For="connector-mail-folders">@Localizer["ConnEditMailFoldersLabel"]</Label>
+                            <Input Id="connector-mail-folders" @bind-Value="mailFoldersText"
+                                   Placeholder="@Localizer["ConnEditMailFoldersPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditMailFoldersHelpLead"] <b>@Localizer["ConnEditMailFoldersHelpBlank"]</b>: @Localizer["ConnEditMailFoldersHelpRest"]
+                            </TypographyMuted>
+                        </div>
+                        <div class="space-y-2">
+                            <Label For="connector-mail-since">@Localizer["ConnEditMailSinceLabel"]</Label>
+                            <Input Id="connector-mail-since" @bind-Value="mailSinceText"
+                                   Placeholder="2025-01-01" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                <b>yyyy-mm-dd</b>. @Localizer["ConnEditMailSinceHelp"]
+                            </TypographyMuted>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label For="connector-mail-sender">@Localizer["ConnEditMailSenderLabel"]</Label>
+                            <Input Id="connector-mail-sender" @bind-Value="mailSenderContains"
+                                   Placeholder="@("@acme.com")" Disabled="saving" />
+                        </div>
+                        <div class="space-y-2">
+                            <Label For="connector-mail-subject">@Localizer["ConnEditMailSubjectLabel"]</Label>
+                            <Input Id="connector-mail-subject" @bind-Value="mailSubjectContains"
+                                   Placeholder="@Localizer["ConnEditMailSubjectPlaceholder"]" Disabled="saving" />
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 sm:max-w-sm">
+                        <Label For="connector-mail-account">@Localizer["ConnEditMailAccountLabel"]</Label>
+                        <Input Id="connector-mail-account" @bind-Value="mailAccountAddress"
+                               Placeholder="@Localizer["ConnEditExampleEmailPlaceholder"]" Disabled="saving" />
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditMailAccountHelp"]
+                        </TypographyMuted>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <Switch Id="connector-mail-sent" @bind-Checked="mailIncludeSentByMe" Disabled="saving" />
+                            <Label For="connector-mail-sent">@Localizer["ConnEditMailIncludeSentLabel"]</Label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <Switch Id="connector-mail-spam" @bind-Checked="mailIncludeSpam" Disabled="saving" />
+                            <Label For="connector-mail-spam">@Localizer["ConnEditMailIncludeSpamLabel"]</Label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <Switch Id="connector-mail-attachments" @bind-Checked="mailIncludeAttachments" Disabled="saving" />
+                            <Label For="connector-mail-attachments">@Localizer["ConnEditMailIncludeAttachmentsLabel"]</Label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <Switch Id="connector-mail-quoted" @bind-Checked="mailStripQuotedReplies" Disabled="saving" />
+                            <Label For="connector-mail-quoted">@Localizer["ConnEditMailStripQuotedLabel"]</Label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <Switch Id="connector-mail-signatures" @bind-Checked="mailStripSignatures" Disabled="saving" />
+                            <Label For="connector-mail-signatures">@Localizer["ConnEditMailStripSignaturesLabel"]</Label>
+                        </div>
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditMailStripHelp"]
+                        </TypographyMuted>
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-2">
+                        <Label For="connector-base-url">@Localizer["ConnEditSiteUrlLabel"]</Label>
+                        <Input Id="connector-base-url" Type="InputType.Url" @bind-Value="baseUrl"
+                               Placeholder="@Localizer["ConnEditSiteUrlPlaceholder"]" Disabled="saving" />
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditSiteUrlHelpLead"] <b>/wiki</b> @Localizer["ConnEditSiteUrlHelpRest"]
+                        </TypographyMuted>
+                    </div>
+
+                    @* SpaceKey and RootPageId are mutually exclusive in ConnectorSettings, and saving both or
+                       neither is refused. Offered as a choice rather than as two boxes with a hidden rule:
+                       a space walk and a page-tree walk are different jobs, not two ways of typing the same
+                       thing. *@
+                    <div class="space-y-2">
+                        <Label>@Localizer["ConnEditWhatToRead"]</Label>
+                        <RadioGroup @bind-Value="scope" TValue="string" AriaLabel="@Localizer["ConnEditWhatToRead"]"
+                                    Disabled="saving">
+                            <div class="flex items-center space-x-2">
+                                <RadioGroupItem Value="@ScopeSpace" Id="scope-space" TValue="string" />
+                                <Label For="scope-space">@Localizer["ConnEditScopeWholeSpace"]</Label>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <RadioGroupItem Value="@ScopePage" Id="scope-page" TValue="string" />
+                                <Label For="scope-page">@Localizer["ConnEditScopeOnePage"]</Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+
+                    @if (scope == ScopePage)
+                    {
+                        <div class="space-y-2 sm:max-w-sm">
+                            <Label For="connector-page-id">@Localizer["ConnEditPageIdLabel"]</Label>
+                            <Input Id="connector-page-id" @bind-Value="rootPageId"
+                                   Placeholder="123456789" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditPageIdHelp"]
+                            </TypographyMuted>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <Switch @bind-Checked="includeChildPages" Id="include-children" Disabled="saving" />
+                            <Label For="include-children">@Localizer["ConnEditIncludeChildPagesLabel"]</Label>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="space-y-2 sm:max-w-sm">
+                            <Label For="connector-space-key">@Localizer["ConnEditSpaceKeyLabel"]</Label>
+                            <Input Id="connector-space-key" @bind-Value="spaceKey"
+                                   Placeholder="@Localizer["ConnEditSpaceKeyPlaceholder"]" Disabled="saving" />
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["ConnEditSpaceKeyHelp"]
+                            </TypographyMuted>
+                        </div>
+                    }
+
+                    <div class="space-y-2 sm:max-w-sm">
+                        <Label For="connector-email">@Localizer["ConnEditAtlassianEmailLabel"]</Label>
+                        <Input Id="connector-email" Type="InputType.Email" @bind-Value="userEmail"
+                               Placeholder="@Localizer["ConnEditAccountEmailPlaceholder"]" Disabled="saving" />
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditAtlassianEmailHelp"]
+                        </TypographyMuted>
+                    </div>
+                }
+
+                <Separator />
+
+                @* ── Credential ──────────────────────────────────────────────────────────────────
+                   The box is empty on an edit and there is no path that could fill it: the registry
+                   never returns a token and has no method that could. That has to be SAID, or an
+                   operator who cannot see their stored token assumes they have just erased it. *@
+                <div class="space-y-2">
+                    <Label For="connector-token">@CredentialLabel</Label>
+                    <Input Id="connector-token" Type="InputType.Password" @bind-Value="accessToken"
+                           Placeholder="@(hasStoredCredential ? Localizer["ConnEditTokenPlaceholderKeep"].Value : Localizer["ConnEditTokenPlaceholderAnonymous"].Value)"
+                           Disabled="@(saving || removeStoredToken)" />
+                    @if (hasStoredCredential)
+                    {
+                        <TypographyMuted Class="block text-xs">
+                            <b>@Localizer["ConnEditStoredTokenBold"]</b> @Localizer["ConnEditStoredTokenRest"]
+                        </TypographyMuted>
+                    }
+                    else
+                    {
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["ConnEditAnonymousTokenHelp", SubjectNoun]
+                        </TypographyMuted>
+                    }
+                </div>
+
+                @if (hasStoredCredential)
+                {
+                    <div class="flex items-center gap-2">
+                        <Switch @bind-Checked="removeStoredToken" Id="remove-token" Disabled="saving" />
+                        <Label For="remove-token">@Localizer["ConnEditRemoveTokenLabel"]</Label>
+                    </div>
+                }
+
+                @* CredentialsAreDurable false is the unsigned-Mac-Catalyst reality on this machine: the
+                   Keychain refuses with errSecMissingEntitlement, so the store falls back to machine-bound
+                   file encryption. Said BEFORE the connector is scheduled, because the difference between
+                   "configured" and "configured until something restarts" is only discoverable at 07:00. *@
+                @if (registry.CredentialsAreDurable)
+                {
+                    <Alert Variant="AlertVariant.Info">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="key-round" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["ConnEditTokenStoreTitle"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer[registry.CredentialStorageDescriptionKey] @Localizer["ConnEditTokenStoreBody"]
+                        </AlertDescription>
+                    </Alert>
+                }
+                else
+                {
+                    <Alert Variant="AlertVariant.Warning" AccentBorder="true">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["ConnEditTokenNotDurableTitle"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer[registry.CredentialStorageDescriptionKey]
+                            @Localizer["ConnEditTokenNotDurableBody"]
+                        </AlertDescription>
+                    </Alert>
+                }
+
+                <Separator />
+
+                @* REQ-RAG-019/020: the private-network guard is ON by default. Turning it off is an
+                   explicit act, and the risk is stated where the switch is — the same treatment
+                   AddFromWeb gives the crawler's SSRF switch. *@
+                <div class="flex items-center gap-2">
+                    <Switch @bind-Checked="allowPrivateNetwork" Id="allow-private" Disabled="saving" />
+                    <Label For="allow-private">@Localizer["ConnEditAllowPrivateLabel"]</Label>
+                </div>
+
+                @if (allowPrivateNetwork)
+                {
+                    <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["ConnEditPrivateWarnTitle"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer["ConnEditPrivateWarnLead"] <b>localhost</b>, @Localizer["ConnEditPrivateWarnMid"]
+                            <b>Authorization</b> @Localizer["ConnEditPrivateWarnHeader"]
+                            <i>@Localizer["ConnEditPrivateWarnHanded"]</i>. @Localizer["ConnEditPrivateWarnTail", SelfHostedNoun]
+                        </AlertDescription>
+                    </Alert>
+                }
+
+                <div class="flex items-center gap-2">
+                    <Switch @bind-Checked="pinned" Id="pin-connector" Disabled="saving" />
+                    <Label For="pin-connector">@Localizer["ConnEditPinLabel"]</Label>
+                </div>
+
+                <TypographyMuted Class="block text-xs">@TargetDescription</TypographyMuted>
+
+                @if (saveError is not null)
+                {
+                    @* The backend's own words, verbatim. When a private host was refused this message
+                       names the host and names the switch above — paraphrasing it would lose both. *@
+                    <Alert Variant="AlertVariant.Danger">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["ConnEditSaveErrorTitle"]</AlertTitle>
+                        <AlertDescription>@saveError</AlertDescription>
+                    </Alert>
+                }
+
+                @if (savedJustNow)
+                {
+                    <Alert Variant="AlertVariant.Success">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-check" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["Saved"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer["ConnEditSavedBody"]
+                        </AlertDescription>
+                    </Alert>
+                }
+
+                @if (testRan)
+                {
+                    @if (testFailure is null)
+                    {
+                        <Alert Variant="AlertVariant.Success">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-check" Size="16" /></Alert.Icon>
+                            <AlertTitle>@Localizer["ConnEditTestOkTitle"]</AlertTitle>
+                            <AlertDescription>
+                                @Localizer["ConnEditTestOkBody", SubjectNoun]
+                            </AlertDescription>
+                        </Alert>
+                    }
+                    else
+                    {
+                        <Alert Variant="AlertVariant.Danger">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-x" Size="16" /></Alert.Icon>
+                            <AlertTitle>@Localizer["ConnEditTestFailTitle"]</AlertTitle>
+                            <AlertDescription>@testFailure</AlertDescription>
+                        </Alert>
+                    }
+                }
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <Button OnClick="SaveAsync" Disabled="@(saving || !canManage)">
+                        <LucideIcon aria-hidden="true" Name="save" Size="16" Class="mr-2" />
+                        <span>@(IsEdit || savedId is not null ? Localizer["SaveChanges"] : Localizer["ConnEditSaveConnector"])</span>
+                    </Button>
+
+                    @* A test reads the SAVED connector, so it cannot run against a form that has not been
+                       written yet. Said out loud instead of leaving a button that would silently test the
+                       previous configuration. *@
+                    <Button Variant="ButtonVariant.Outline" OnClick="TestAsync"
+                            Disabled="@(savedId is null || saving || testing)">
+                        <LucideIcon aria-hidden="true" Name="flask-conical" Size="16" Class="mr-2" />
+                        <span>@Localizer["ConnEditTestConnection"]</span>
+                    </Button>
+
+                    @if (jobs is not null)
+                    {
+                        <Button Variant="ButtonVariant.Outline" OnClick="SyncNowAsync"
+                                Disabled="@(savedId is null || saving || !canManage)">
+                            <LucideIcon aria-hidden="true" Name="play" Size="16" Class="mr-2" />
+                            <span>@Localizer["ConnEditSyncNow"]</span>
+                        </Button>
+                    }
+
+                    @if (saving || testing || starting)
+                    {
+                        <Spinner Size="SpinnerSize.Small" />
+                    }
+                </div>
+
+                @if (savedId is null)
+                {
+                    <TypographyMuted Class="block text-xs">
+                        @Localizer["ConnEditSaveFirstHint"]
+                    </TypographyMuted>
+                }
+            </CardContent>
+        </Card>
+    }
+}
+
+@code {
+    /// <summary>
+    /// Resolves a resource key for the service layer, which returns KEYS and never sentences
+    /// (REQ-UI-051, extended to <c>JobMessage</c> by REQ-UI-056).
+    /// </summary>
+    private LocalizeText Localize => (key, arguments) =>
+        arguments.Length == 0 ? Localizer[key].Value : Localizer[key, arguments].Value;
+
+    /// <summary>The "read a whole space" choice of the Confluence scope control.</summary>
+    private const string ScopeSpace = "space";
+
+    /// <summary>The "read one page and its tree" choice of the Confluence scope control.</summary>
+    private const string ScopePage = "page";
+
+    @* TR-024 used to be sidestepped here by making the bound VALUE the English label, because a
+       Select trigger paints the raw bound value on first paint. REQ-UI-051 replaced that with
+       DisplayTextSelector: the values are back to invariant codes and the trigger reads the
+       localized text. Neither string is persisted — which shape a saved mailbox is comes from
+       ConnectorSettings.IsMboxMailbox, never from this. *@
+
+    /// <summary>The "connect to a mail server" choice of the mailbox source control (REQ-RAG-049).</summary>
+    private const string MailSourceImap = "imap";
+
+    /// <summary>The "read a local .mbox archive" choice of the mailbox source control.</summary>
+    private const string MailSourceMbox = "mbox";
+
+    /// <summary>REQ-UI-051: the localized name of a mailbox source.</summary>
+    /// <param name="value">The invariant mailbox-source code.</param>
+    /// <returns>The text shown in the option list and on the Select trigger.</returns>
+    private string MailSourceText(string value) => value == MailSourceMbox
+        ? Localizer["ConnEditMailSourceMbox"]
+        : Localizer["ConnEditMailSourceImap"];
+
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    /// <summary>The connector being edited, or <see langword="null"/> on the add route.</summary>
+    [Parameter] public string? ConnectorId { get; set; }
+
+    /// <summary>
+    /// Which kind of connector the hub's tile asked for — see <see cref="ConnectorTypes"/>.
+    /// </summary>
+    /// <remarks>
+    /// The kind arrives in the address rather than being picked here, because the hub's grid already
+    /// asked the question and repeating it would make every add two decisions instead of one. An
+    /// unrecognised or absent value falls through to the chooser rather than to an error.
+    /// </remarks>
+    [SupplyParameterFromQuery(Name = "type")] public string? RequestedType { get; set; }
+
+    /// <summary>
+    /// The saved-connector store, or <see langword="null"/> when this build does not register it.
+    /// </summary>
+    /// <remarks>
+    /// Resolved optionally, exactly as the hub does: <c>@@inject</c> is a required resolve, and on a
+    /// build without <c>AddTechieDeskConnectors()</c> it throws while the component is being built —
+    /// which in a MAUI Blazor Hybrid head tears down the WebView and shows a blank window rather than
+    /// a message. <b>Never cached across circuits</b>: the registry is scoped, and this field lives
+    /// and dies with the component.
+    /// </remarks>
+    private IConnectorRegistry? registry;
+
+    /// <summary>The connector job service, used only by "Sync now", or null when not registered.</summary>
+    private IConnectorJobService? jobs;
+
+    private Workspace? workspace;
+    private bool notFound;
+    private string? loadError;
+    private string? loadedKey;
+    private bool canManage;
+    private bool connectorMissing;
+
+    private string? connectorType;
+    private string? savedId;
+    private string? targetWorkspaceId;
+    private bool targetIsOtherWorkspace;
+
+    private string displayName = string.Empty;
+    private bool pinned;
+
+    private string hostText = "GitHub";
+    private string projectPath = string.Empty;
+    private string branch = string.Empty;
+    private string apiBaseUrl = string.Empty;
+    private string webBaseUrl = string.Empty;
+    private string includeGlobsText = string.Empty;
+    private string excludeGlobsText = string.Empty;
+
+    private string baseUrl = string.Empty;
+    private string scope = ScopeSpace;
+    private string spaceKey = string.Empty;
+    private string rootPageId = string.Empty;
+    private bool includeChildPages = true;
+    private string userEmail = string.Empty;
+
+    // REQ-RAG-049 / BRD-135 — mailbox fields.
+    private string mailSource = MailSourceImap;
+    private string imapHost = string.Empty;
+    private string imapPortText = string.Empty;
+    private string imapUsername = string.Empty;
+    private bool imapUseOAuthBearer;
+    private string mboxPath = string.Empty;
+    private string mailFoldersText = string.Empty;
+    private string mailSinceText = string.Empty;
+    private string mailSenderContains = string.Empty;
+    private string mailSubjectContains = string.Empty;
+    private string mailAccountAddress = string.Empty;
+    private bool mailIncludeSentByMe;
+    private bool mailIncludeSpam;
+    private bool mailIncludeAttachments;
+    private bool mailStripQuotedReplies = true;
+    private bool mailStripSignatures = true;
+
+    private bool allowPrivateNetwork;
+    private string accessToken = string.Empty;
+    private bool hasStoredCredential;
+    private bool removeStoredToken;
+
+    private string? saveError;
+    private bool saving;
+    private bool savedJustNow;
+    private bool testing;
+    private bool testRan;
+    private string? testFailure;
+    private bool starting;
+
+    /// <summary>Gets a value indicating whether this screen opened on the edit route.</summary>
+    private bool IsEdit => !string.IsNullOrWhiteSpace(ConnectorId);
+
+    /// <summary>Gets a value indicating whether the repository fields are the ones on show.</summary>
+    private bool IsRepository => connectorType == ConnectorTypes.Repository;
+
+    /// <summary>Gets a value indicating whether the Confluence fields are the ones on show.</summary>
+    private bool IsConfluence => connectorType == ConnectorTypes.Confluence;
+
+    /// <summary>Gets a value indicating whether the mailbox fields are the ones on show (REQ-RAG-049).</summary>
+    private bool IsEmail => connectorType == ConnectorTypes.Email;
+
+    /// <summary>Gets a value indicating whether the mailbox being edited is a server rather than a file.</summary>
+    private bool IsImapMailbox => IsEmail && mailSource == MailSourceImap;
+
+    /// <summary>Gets the word for this connector's credential, as its own host would name it.</summary>
+    private string CredentialLabel => connectorType switch
+    {
+        ConnectorTypes.Repository => Localizer["ConnEditCredentialAccessToken"].Value,
+        ConnectorTypes.Confluence => Localizer["ConnEditCredentialApiToken"].Value,
+        ConnectorTypes.Email => imapUseOAuthBearer
+            ? Localizer["ConnEditCredentialOAuthToken"].Value
+            : Localizer["ConnEditCredentialMailboxPassword"].Value,
+        _ => Localizer["ConnEditCredentialGeneric"].Value,
+    };
+
+    /// <summary>Gets the word for the thing this connector reads, for prose that names it.</summary>
+    private string SubjectNoun => connectorType switch
+    {
+        ConnectorTypes.Repository => Localizer["ConnEditSubjectRepository"].Value,
+        ConnectorTypes.Confluence => Localizer["ConnEditSubjectSpaceOrPage"].Value,
+        ConnectorTypes.Email => Localizer["ConnEditSubjectMailbox"].Value,
+        _ => Localizer["ConnEditSubjectSource"].Value,
+    };
+
+    /// <summary>Gets the card heading for the chosen connector kind.</summary>
+    private string TypeHeading => connectorType switch
+    {
+        ConnectorTypes.Repository => Localizer["ConnEditTypeHeadingRepository"].Value,
+        ConnectorTypes.Confluence => Localizer["ConnEditTypeHeadingConfluence"].Value,
+        ConnectorTypes.Email => Localizer["ConnEditTypeHeadingMailbox"].Value,
+        _ => Localizer["ConnEditTypeHeadingGeneric"].Value,
+    };
+
+    /// <summary>Gets an example name for the chosen connector kind.</summary>
+    private string NamePlaceholder => connectorType switch
+    {
+        ConnectorTypes.Repository => Localizer["ConnEditNameExampleRepository"].Value,
+        ConnectorTypes.Confluence => Localizer["ConnEditNameExampleConfluence"].Value,
+        ConnectorTypes.Email => Localizer["ConnEditNameExampleMailbox"].Value,
+        _ => Localizer["ConnEditNameExampleGeneric"].Value,
+    };
+
+    /// <summary>Gets the self-hosted example named by the private-network opt-in.</summary>
+    private string SelfHostedNoun => connectorType switch
+    {
+        ConnectorTypes.Repository => Localizer["ConnEditSelfHostedRepository"].Value,
+        ConnectorTypes.Confluence => Localizer["ConnEditSelfHostedConfluence"].Value,
+        ConnectorTypes.Email => Localizer["ConnEditSelfHostedMailServer"].Value,
+        _ => Localizer["ConnEditSelfHostedGeneric"].Value,
+    };
+
+    /// <summary>Gets the connector types this build can save.</summary>
+    private IReadOnlyList<ConnectorTypeDescriptor> AvailableTypes => registry?.AvailableTypes ?? [];
+
+    /// <summary>Gets the page heading, which names the connector once there is one.</summary>
+    private string Heading => IsEdit || savedId is not null
+        ? Localizer[
+            "ConnEditHeadingEdit",
+            string.IsNullOrWhiteSpace(displayName) ? Localizer["ConnEditHeadingUntitled"].Value : displayName].Value
+        : Localizer["ConnEditHeadingAdd"].Value;
+
+    /// <summary>Gets the chosen type's own one-line description, as the build reports it.</summary>
+    /// <remarks>
+    /// REQ-UI-051: <c>ConnectorTypeDescriptor</c> carries resource KEYS, so this resolves one rather
+    /// than rendering whatever English the service happened to hold.
+    /// </remarks>
+    private string TypeDescription =>
+        AvailableTypes.FirstOrDefault(type => type.ConnectorType == connectorType) is { } descriptor
+            ? Localizer[descriptor.DescriptionKey].Value
+            : Localizer["ConnEditTypeNotInstalled"].Value;
+
+    /// <summary>
+    /// Gets the plain-language statement of where this connector's documents land.
+    /// </summary>
+    /// <remarks>
+    /// Said explicitly because a connector is machine-wide while this screen is reached through one
+    /// workspace's address: editing another workspace's connector from here must not silently
+    /// re-target it, and the only way to make that visible is to name the target.
+    /// </remarks>
+    private string TargetDescription => targetIsOtherWorkspace
+        ? Localizer["ConnEditTargetOtherWorkspace"].Value
+        : targetWorkspaceId is null
+            ? Localizer["ConnEditTargetLibraryOnly"].Value
+            : Localizer["ConnEditTargetWorkspace", workspace?.Name ?? string.Empty].Value;
+
+    protected override void OnInitialized()
+    {
+        registry = Services.GetService<IConnectorRegistry>();
+        jobs = Services.GetService<IConnectorJobService>();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Keyed on both route values: the same component instance serves /new and /{id}/edit, and
+        // Blazor reuses it when one address replaces the other.
+        var key = $"{Slug}|{ConnectorId}";
+        if (loadedKey == key)
+        {
+            return;
+        }
+
+        loadedKey = key;
+        await LoadWorkspaceAsync();
+        LoadRequestedType();
+        await LoadConnectorAsync();
+    }
+
+    /// <summary>Reads the workspace the address names.</summary>
+    private async Task LoadWorkspaceAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            canManage = Workspaces.CanManageWorkspaces;
+            targetWorkspaceId = workspace.WorkspaceId;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load workspace {Slug} for the connector editor", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    /// <summary>Applies the <c>?type=</c> the hub's tile supplied, when this build can save it.</summary>
+    private void LoadRequestedType()
+    {
+        if (IsEdit)
+        {
+            return;
+        }
+
+        connectorType = AvailableTypes.Any(type => type.ConnectorType == RequestedType)
+            ? RequestedType
+            : null;
+    }
+
+    /// <summary>Fills the form from the saved connector, on the edit route.</summary>
+    /// <returns>A task that completes when the form is populated.</returns>
+    /// <remarks>
+    /// The token field is deliberately left empty and is never populated from anything — the registry
+    /// returns no token and has no method that could. <see cref="hasStoredCredential"/> is the only
+    /// thing read about it, and it drives the wording next to the field.
+    /// </remarks>
+    private async Task LoadConnectorAsync()
+    {
+        connectorMissing = false;
+        if (registry is null || !IsEdit)
+        {
+            return;
+        }
+
+        try
+        {
+            var definition = await registry.GetAsync(ConnectorId!);
+            if (definition is null)
+            {
+                connectorMissing = true;
+                return;
+            }
+
+            savedId = definition.ConnectorId;
+            connectorType = definition.ConnectorType;
+            displayName = definition.DisplayName;
+            pinned = definition.Pinned;
+            hasStoredCredential = definition.HasCredential;
+            targetWorkspaceId = definition.WorkspaceId;
+            targetIsOtherWorkspace = definition.WorkspaceId is not null
+                && definition.WorkspaceId != workspace?.WorkspaceId;
+
+            ApplySettings(definition.ReadSettings());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to read connector {ConnectorId} for editing", ConnectorId);
+            loadError = ex.Message;
+        }
+    }
+
+    /// <summary>Copies stored settings onto the form fields.</summary>
+    /// <param name="settings">The connector's stored configuration.</param>
+    private void ApplySettings(ConnectorSettings settings)
+    {
+        hostText = settings.ResolveHost().ToString();
+        projectPath = settings.ProjectPath ?? string.Empty;
+        branch = settings.Branch ?? string.Empty;
+        apiBaseUrl = settings.ApiBaseUrl ?? string.Empty;
+        webBaseUrl = settings.WebBaseUrl ?? string.Empty;
+        includeGlobsText = string.Join(", ", settings.IncludeGlobs);
+        excludeGlobsText = string.Join(", ", settings.ExcludeGlobs);
+
+        baseUrl = settings.BaseUrl ?? string.Empty;
+        spaceKey = settings.SpaceKey ?? string.Empty;
+        rootPageId = settings.RootPageId ?? string.Empty;
+        scope = string.IsNullOrWhiteSpace(settings.SpaceKey) && !string.IsNullOrWhiteSpace(settings.RootPageId)
+            ? ScopePage
+            : ScopeSpace;
+        includeChildPages = settings.IncludeChildPages;
+        userEmail = settings.UserEmail ?? string.Empty;
+
+        // REQ-RAG-049. The stored shape decides which mailbox tab opens: a path and no host is an
+        // archive, anything else is a server — the same rule ConnectorSettings.IsMboxMailbox applies.
+        mailSource = settings.IsMboxMailbox ? MailSourceMbox : MailSourceImap;
+        imapHost = settings.ImapHost ?? string.Empty;
+        imapPortText = settings.ImapPort > 0 ? settings.ImapPort.ToString(CultureInfo.InvariantCulture) : string.Empty;
+        imapUsername = settings.ImapUsername ?? string.Empty;
+        imapUseOAuthBearer = settings.ImapUseOAuthBearer;
+        mboxPath = settings.MboxPath ?? string.Empty;
+        mailFoldersText = string.Join(", ", settings.MailFolders);
+        mailSinceText = settings.MailSinceUtc is { } since
+            ? since.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : string.Empty;
+        mailSenderContains = settings.MailSenderContains ?? string.Empty;
+        mailSubjectContains = settings.MailSubjectContains ?? string.Empty;
+        mailAccountAddress = settings.MailAccountAddress ?? string.Empty;
+        mailIncludeSentByMe = settings.MailIncludeSentByMe;
+        mailIncludeSpam = settings.MailIncludeSpam;
+        mailIncludeAttachments = settings.MailIncludeAttachments;
+        mailStripQuotedReplies = settings.MailStripQuotedReplies;
+        mailStripSignatures = settings.MailStripSignatures;
+
+        allowPrivateNetwork = settings.AllowPrivateNetwork;
+    }
+
+    /// <summary>Picks a connector kind from the chooser shown when the address named none.</summary>
+    /// <param name="chosen">The connector type key.</param>
+    private void ChooseType(string chosen)
+    {
+        connectorType = chosen;
+        saveError = null;
+    }
+
+    /// <summary>Builds the settings the form describes, for the chosen connector kind.</summary>
+    /// <returns>The settings to store.</returns>
+    /// <remarks>
+    /// Only the chosen kind's fields are written. Carrying the other kind's values across would put a
+    /// space key on a repository connector, which nothing reads and everything has to ignore.
+    /// </remarks>
+    private ConnectorSettings BuildSettings() => connectorType switch
+    {
+        ConnectorTypes.Repository => new ConnectorSettings
+        {
+            Host = hostText,
+            ProjectPath = Blank(projectPath),
+            Branch = Blank(branch),
+            ApiBaseUrl = Blank(apiBaseUrl),
+            WebBaseUrl = Blank(webBaseUrl),
+            IncludeGlobs = SplitPatterns(includeGlobsText),
+            ExcludeGlobs = SplitPatterns(excludeGlobsText),
+            AllowPrivateNetwork = allowPrivateNetwork,
+        },
+        ConnectorTypes.Email => BuildMailSettings(),
+        _ => new ConnectorSettings
+        {
+            BaseUrl = Blank(baseUrl),
+            SpaceKey = scope == ScopeSpace ? Blank(spaceKey) : null,
+            RootPageId = scope == ScopePage ? Blank(rootPageId) : null,
+            IncludeChildPages = scope == ScopePage && includeChildPages,
+            UserEmail = Blank(userEmail),
+            AllowPrivateNetwork = allowPrivateNetwork,
+        },
+    };
+
+    /// <summary>Builds the mailbox settings the form describes (REQ-RAG-049 / BRD-135).</summary>
+    /// <returns>The settings to store. Never the password — that goes to the OS credential store.</returns>
+    /// <remarks>
+    /// The two mailbox shapes are mutually exclusive by construction, not by validation: choosing the
+    /// archive writes no host and choosing the server writes no path. Writing both would be refused by
+    /// <see cref="ConnectorSettings.Validate"/> anyway, but a form that can only express a legal shape
+    /// is better than one that relies on being told off afterwards.
+    /// </remarks>
+    private ConnectorSettings BuildMailSettings()
+    {
+        var imap = mailSource == MailSourceImap;
+
+        return new ConnectorSettings
+        {
+            ImapHost = imap ? Blank(imapHost) : null,
+            ImapPort = imap && int.TryParse(imapPortText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var port)
+                ? port
+                : 0,
+            ImapUsername = imap ? Blank(imapUsername) : null,
+            ImapUseOAuthBearer = imap && imapUseOAuthBearer,
+            MboxPath = imap ? null : Blank(mboxPath),
+            MailFolders = SplitPatterns(mailFoldersText),
+            MailSinceUtc = DateTimeOffset.TryParse(
+                mailSinceText, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var since)
+                ? since
+                : null,
+            MailSenderContains = Blank(mailSenderContains),
+            MailSubjectContains = Blank(mailSubjectContains),
+            MailAccountAddress = Blank(mailAccountAddress),
+            MailIncludeSentByMe = mailIncludeSentByMe,
+            MailIncludeSpam = mailIncludeSpam,
+            MailIncludeAttachments = mailIncludeAttachments,
+            MailStripQuotedReplies = mailStripQuotedReplies,
+            MailStripSignatures = mailStripSignatures,
+        };
+    }
+
+    /// <summary>
+    /// Decides what this save means for the stored credential: replace, remove, or leave alone.
+    /// </summary>
+    /// <returns>The token to store, an empty string to remove it, or <see langword="null"/> to keep it.</returns>
+    /// <remarks>
+    /// The three cases <see cref="ConnectorRegistration.AccessToken"/> documents, and the reason the
+    /// removal is a separate switch rather than "blank the box": the box is ALWAYS blank on an edit,
+    /// so blank cannot also mean delete without erasing a token every time somebody fixes a typo in a
+    /// branch name.
+    /// </remarks>
+    private string? ResolveTokenChange()
+    {
+        if (!string.IsNullOrWhiteSpace(accessToken))
+        {
+            return accessToken.Trim();
+        }
+
+        return removeStoredToken ? string.Empty : null;
+    }
+
+    /// <summary>Validates and writes the connector, then leaves the screen able to test it.</summary>
+    /// <returns>A task that completes once the connector has been saved or refused.</returns>
+    private async Task SaveAsync()
+    {
+        if (registry is null || workspace is null || connectorType is null || saving || !canManage)
+        {
+            return;
+        }
+
+        var registration = new ConnectorRegistration
+        {
+            ConnectorId = savedId,
+            ConnectorType = connectorType,
+            DisplayName = displayName.Trim(),
+            WorkspaceId = targetWorkspaceId,
+            Pinned = pinned,
+            Settings = BuildSettings(),
+            AccessToken = ResolveTokenChange(),
+        };
+
+        savedJustNow = false;
+        testRan = false;
+        // REQ-UI-056: the registry returns CODES, so the resolution into the operator's language
+        // happens here, at the one place that renders.
+        saveError = registry.Validate(registration)?.Resolve(Localize);
+        if (saveError is not null)
+        {
+            return;
+        }
+
+        saving = true;
+        StateHasChanged();
+
+        try
+        {
+            savedId = await registry.SaveAsync(registration);
+
+            // Read back rather than assume: the row is the authority on whether a credential now
+            // exists, and the wording beside the token field is built entirely from that.
+            var stored = await registry.GetAsync(savedId);
+            hasStoredCredential = stored?.HasCredential ?? false;
+            accessToken = string.Empty;
+            removeStoredToken = false;
+            savedJustNow = true;
+            ToastService.Success(Localizer["ConnEditToastSavedBody"], Localizer["ConnEditToastSavedTitle"]);
+        }
+        catch (ConnectorSetupException ex)
+        {
+            // REQ-UI-056: codes resolved here; the library's ConnectorException below cannot be.
+            saveError = ex.Reason.Resolve(Localize);
+        }
+        catch (ConnectorException ex)
+        {
+            saveError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["ConnEditToastNotSavedTitle"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save connector {ConnectorId}", savedId);
+            saveError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["ConnEditToastNotSavedTitle"]);
+        }
+        finally
+        {
+            saving = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Proves the saved connector can actually reach its source, by listing one page.</summary>
+    /// <returns>A task that completes once the source has answered.</returns>
+    private async Task TestAsync()
+    {
+        if (registry is null || savedId is null || testing)
+        {
+            return;
+        }
+
+        testing = true;
+        testRan = false;
+        testFailure = null;
+        StateHasChanged();
+
+        try
+        {
+            testFailure = (await registry.TestAsync(savedId))?.Resolve(Localize);
+            testRan = true;
+            if (testFailure is null)
+            {
+                ToastService.Success(Localizer["ConnEditToastTestOkBody"], Localizer["ConnEditToastTestOkTitle"]);
+            }
+            else
+            {
+                ToastService.Error(testFailure, Localizer["ConnEditToastTestFailTitle"]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Testing connector {ConnectorId} threw", savedId);
+            testRan = true;
+            testFailure = ex.Message;
+            ToastService.Error(ex.Message, Localizer["ConnEditToastTestFailTitle"]);
+        }
+        finally
+        {
+            testing = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Starts a run of the saved connector and sends the operator to the hub to watch it.</summary>
+    /// <returns>A task that completes once the run has been accepted or refused.</returns>
+    private async Task SyncNowAsync()
+    {
+        if (jobs is null || registry is null || savedId is null || starting || !canManage)
+        {
+            return;
+        }
+
+        starting = true;
+        StateHasChanged();
+
+        try
+        {
+            var payload = await registry.CreatePayloadAsync(savedId);
+            if (payload is null)
+            {
+                connectorMissing = true;
+                return;
+            }
+
+            var invalid = jobs.Validate(payload)?.Resolve(Localize);
+            if (invalid is not null)
+            {
+                saveError = invalid;
+                return;
+            }
+
+            await jobs.StartAsync(payload);
+            ToastService.Success(Localizer["ConnEditToastSyncStartedBody"], Localizer["ConnEditToastSyncStartedTitle"]);
+            Nav.NavigateTo($"/workspace/{Slug}/connectors");
+        }
+        catch (ConnectorSetupException ex)
+        {
+            var reason = ex.Reason.Resolve(Localize);
+            saveError = reason;
+            ToastService.Error(reason, Localizer["ConnEditToastSyncFailTitle"]);
+        }
+        catch (ConnectorException ex)
+        {
+            saveError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["ConnEditToastSyncFailTitle"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to start a run of connector {ConnectorId}", savedId);
+            saveError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["ConnEditToastSyncFailTitle"]);
+        }
+        finally
+        {
+            starting = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Returns to the connectors hub, this screen's parent in the nav and the breadcrumb.</summary>
+    private void GoBackToConnectors() => Nav.NavigateTo($"/workspace/{Slug}/connectors");
+
+    /// <summary>Names a connector type's tile icon, matching the hub's grid.</summary>
+    /// <param name="type">The stable connector-type key.</param>
+    /// <returns>A Lucide icon name.</returns>
+    private static string IconFor(string type) => type.ToLowerInvariant() switch
+    {
+        "repository" => "git-branch",
+        "confluence" => "book-open",
+        "email" => "mail",
+        _ => "plug-2",
+    };
+
+    /// <summary>Normalizes an empty or whitespace field to null, which is what the settings expect.</summary>
+    /// <param name="value">The field's text.</param>
+    /// <returns>The trimmed text, or <see langword="null"/> when nothing was typed.</returns>
+    private static string? Blank(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>Reads a comma- or newline-separated glob list into the form the settings store.</summary>
+    /// <param name="value">What the operator typed.</param>
+    /// <returns>The patterns, in the order given, with blanks dropped.</returns>
+    private static IReadOnlyList<string> SplitPatterns(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split([',', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries
+                    | StringSplitOptions.TrimEntries)
+                .ToList();
+}

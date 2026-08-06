@@ -1,0 +1,1241 @@
+@page "/qdrant-admin"
+@using TechieDesk.Services
+@inject IDockerContainerService DockerService
+@inject IQdrantAdminService QdrantService
+@inject ToastService ToastService
+@inject ILogger<QdrantAdmin> Logger
+@inject IJSRuntime JS
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["NavQdrantAdmin"]</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["QdrantPageHeading"]</h1>
+            <TypographyMuted>@Localizer["QdrantPageSubtitle"]</TypographyMuted>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <Button Variant="ButtonVariant.Outline" OnClick="PullImageAsync" Disabled="@isPullingImage">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="download" Size="16" /></Button.Icon>
+                @(isPullingImage ? Localizer["QdrantPulling"].Value : Localizer["QdrantPullLatestImage"].Value)
+            </Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="RefreshStatusAsync">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="refresh-cw" Size="16" /></Button.Icon>
+                @Localizer["QdrantRefresh"]
+            </Button>
+        </div>
+    </div>
+
+    <!-- REQ-UI-042 / REQ-FN-040: Docker daemon endpoint configuration -->
+    <Card>
+        <CardHeader>
+            <div class="flex flex-wrap items-center gap-2">
+                <CardTitle>@Localizer["QdrantDockerDaemonTitle"]</CardTitle>
+                <span id="daemon-state-badge">
+                    <Badge Variant="@(isDockerAvailable ? BadgeVariant.Default : BadgeVariant.Destructive)">
+                        @(isDockerAvailable ? Localizer["QdrantConnected"].Value : Localizer["QdrantNotConnected"].Value)
+                    </Badge>
+                </span>
+                <span id="daemon-tls-badge">
+                    <Badge Variant="@TlsBadgeVariant">@TlsBadgeText</Badge>
+                </span>
+            </div>
+            <CardDescription>
+                @Localizer["QdrantDaemonCardDescription"]
+            </CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <Field>
+                <FieldLabel>@Localizer["QdrantEndpointLabel"]</FieldLabel>
+                <FieldContent>
+                    <div class="flex flex-wrap items-center gap-2">
+                        @* inline widths: TrBlazeUI ships a purged Tailwind build, so responsive
+                           variants (sm:/lg:) and arbitrary widths are inert — see TR-004. *@
+                        <div style="width:230px;flex:0 0 230px">
+                            @* TR-024 / REQ-UI-051: the bound value is the KIND ENUM, so nothing
+                               translated is ever parsed back into an endpoint or written to config.
+                               DisplayTextSelector is what puts the localized name on the trigger. *@
+                            <Select @bind-Value="daemonKind" TValue="DockerDaemonEndpointKind"
+                                    DisplayTextSelector="DaemonKindText">
+                                <SelectTrigger aria-label="@Localizer["QdrantDaemonKindAriaLabel"]">
+                                    <SelectValue Placeholder="@Localizer["QdrantChooseEndpointKind"]" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem Value="DockerDaemonEndpointKind.LocalSocket" Text="@DaemonKindText(DockerDaemonEndpointKind.LocalSocket)" TValue="DockerDaemonEndpointKind">@DaemonKindText(DockerDaemonEndpointKind.LocalSocket)</SelectItem>
+                                    <SelectItem Value="DockerDaemonEndpointKind.NetworkHost" Text="@DaemonKindText(DockerDaemonEndpointKind.NetworkHost)" TValue="DockerDaemonEndpointKind">@DaemonKindText(DockerDaemonEndpointKind.NetworkHost)</SelectItem>
+                                    <SelectItem Value="DockerDaemonEndpointKind.RemoteTls" Text="@DaemonKindText(DockerDaemonEndpointKind.RemoteTls)" TValue="DockerDaemonEndpointKind">@DaemonKindText(DockerDaemonEndpointKind.RemoteTls)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div style="flex:1 1 240px;min-width:240px">
+                            <Input id="daemon-address"
+                                   AriaLabel="@Localizer["QdrantDaemonAddressAriaLabel"]"
+                                   @bind-Value="daemonAddress"
+                                   Disabled="@(daemonKind == DockerDaemonEndpointKind.LocalSocket)"
+                                   Placeholder="@DaemonAddressPlaceholder"
+                                   Class="font-mono text-sm" />
+                        </div>
+                        <Button id="daemon-test" Variant="ButtonVariant.Outline" OnClick="TestDaemonAsync" Disabled="@isTestingDaemon">
+                            <Button.Icon><LucideIcon aria-hidden="true" Name="plug-zap" Size="16" /></Button.Icon>
+                            @(isTestingDaemon ? Localizer["QdrantTesting"].Value : Localizer["QdrantTestConnection"].Value)
+                        </Button>
+                        <Button id="daemon-apply" OnClick="ApplyDaemonAsync" Disabled="@isTestingDaemon">
+                            <Button.Icon><LucideIcon aria-hidden="true" Name="check" Size="16" /></Button.Icon>
+                            @Localizer["QdrantUseThisDaemon"]
+                        </Button>
+                    </div>
+                    <FieldDescription>
+                        @Localizer["QdrantLocalSocketResolvesPrefix"] <code>@DockerDaemonEndpoint.UnixSocketEndpoint</code> @Localizer["QdrantLocalSocketResolvesMiddle"]
+                        <code>@DockerDaemonEndpoint.WindowsPipeEndpoint</code> @Localizer["QdrantLocalSocketResolvesSuffix"]
+                    </FieldDescription>
+                </FieldContent>
+            </Field>
+
+            <div class="flex items-center gap-3">
+                <Switch @bind-Checked="verifyTls" Id="daemon-verify-tls" Disabled="@(daemonKind != DockerDaemonEndpointKind.RemoteTls)" />
+                <FieldLabel For="daemon-verify-tls">@Localizer["QdrantVerifyTlsLabel"]</FieldLabel>
+            </div>
+
+            <!-- Which daemon is ACTIVE right now -->
+            <div class="rounded border p-4" id="active-daemon"
+                 style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+                <div>
+                    <TypographyMuted>@Localizer["QdrantActiveEndpoint"]</TypographyMuted>
+                    @* inline wrapping: the shipped TrBlazeUI CSS purges break-all (TR-004), so a
+                       long unix:// path would otherwise spill into the next grid column. *@
+                    <div class="font-semibold font-mono text-sm" id="active-daemon-endpoint"
+                         style="overflow-wrap:anywhere;word-break:break-all">@activeEndpointDisplay</div>
+                    <TypographyMuted>@DaemonKindText(activeEndpointKind)</TypographyMuted>
+                </div>
+                <div>
+                    <TypographyMuted>@Localizer["QdrantDaemonVersion"]</TypographyMuted>
+                    <div class="font-semibold" id="active-daemon-version">@(daemonTest?.DaemonVersion ?? "—")</div>
+                </div>
+                <div>
+                    <TypographyMuted>@Localizer["QdrantHostOs"]</TypographyMuted>
+                    <div class="font-semibold" id="active-daemon-os"
+                         style="overflow-wrap:anywhere">@(daemonTest?.HostOperatingSystem ?? "—")</div>
+                </div>
+                <div>
+                    <TypographyMuted>@Localizer["QdrantLastChecked"]</TypographyMuted>
+                    <div class="font-semibold" id="active-daemon-checked">@LastCheckedText</div>
+                </div>
+            </div>
+
+            @if (daemonTest is { Success: false })
+            {
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["QdrantDaemonUnreachableTitle"]</AlertTitle>
+                    <AlertDescription>
+                        @* REQ-UI-055: the service returns a resource key plus machine arguments —
+                           the endpoint tried, a socket error code, the daemon's own response body —
+                           and this is where they become a sentence in the reader's language. *@
+                        <div id="daemon-error" class="text-sm">@DaemonFailureText(daemonTest.Failure)</div>
+                        <div class="mt-1 text-xs opacity-80">
+                            @Localizer["QdrantEndpointTried"] <code>@daemonTest.Endpoint.Display</code>
+                            @if (!string.IsNullOrEmpty(daemonTest.FailureKind))
+                            {
+                                <text> &middot; @daemonTest.FailureKind</text>
+                            }
+                        </div>
+                    </AlertDescription>
+                </Alert>
+            }
+
+            @if (!string.IsNullOrEmpty(daemonSecurityWarningKey))
+            {
+                <Alert Variant="AlertVariant.Warning">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["QdrantUnsafeEndpointTitle"]</AlertTitle>
+                    <AlertDescription><div id="daemon-security-warning">@Localizer[daemonSecurityWarningKey!]</div></AlertDescription>
+                </Alert>
+            }
+
+            <Field>
+                <FieldLabel>@Localizer["QdrantTlsCredentialsLabel"]</FieldLabel>
+                <FieldContent>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <Badge Variant="@(activeUsesTls ? BadgeVariant.Default : BadgeVariant.Outline)">
+                            @(activeUsesTls ? Localizer["QdrantEncryptedChannel"].Value : Localizer["QdrantNoEncryption"].Value)
+                        </Badge>
+                        <Badge Variant="@(activeUsesTls && activeVerifyTls ? BadgeVariant.Default : BadgeVariant.Outline)">
+                            @(activeUsesTls && activeVerifyTls ? Localizer["QdrantCertificateVerified"].Value : Localizer["QdrantCertificateNotVerified"].Value)
+                        </Badge>
+                        <Badge Variant="@(hasClientCertificate ? BadgeVariant.Default : BadgeVariant.Outline)">
+                            @(hasClientCertificate ? Localizer["QdrantClientCertificate"].Value : Localizer["QdrantNoClientCertificate"].Value)
+                        </Badge>
+                    </div>
+                    <FieldDescription>
+                        @Localizer["QdrantCredentialStoreNotePrefix"] <code>Docker:</code> @Localizer["QdrantCredentialStoreNoteSuffix"]
+                    </FieldDescription>
+                </FieldContent>
+            </Field>
+
+            <Alert Variant="AlertVariant.Warning">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                <AlertTitle>@Localizer["QdrantRootWarningTitle"]</AlertTitle>
+                <AlertDescription>
+                    @Localizer["QdrantRootWarningPrefix"] <code>tcp://</code> @Localizer["QdrantRootWarningSuffix"]
+                </AlertDescription>
+            </Alert>
+        </CardContent>
+    </Card>
+
+    <!-- Connection & Endpoint Configuration -->
+    <Card>
+        <CardHeader>
+            <CardTitle>@Localizer["QdrantConnectionTitle"]</CardTitle>
+            <CardDescription>@Localizer["QdrantConnectionDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div class="grid gap-4 md:grid-cols-4 items-end">
+                <Field>
+                    <FieldLabel>@Localizer["QdrantHostLabel"]</FieldLabel>
+                    <FieldContent>
+                        <Input @bind-Value="configHost" Placeholder="@Localizer["QdrantHostPlaceholder"]" />
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>@Localizer["QdrantGrpcPortLabel"]</FieldLabel>
+                    <FieldContent>
+                        <Input Type="InputType.Number" @bind-Value="configPortString" Placeholder="6334" />
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>@Localizer["QdrantApiKeyLabel"]</FieldLabel>
+                    <FieldContent>
+                        <Input Type="InputType.Password" @bind-Value="configApiKey" Placeholder="@Localizer["QdrantApiKeyPlaceholder"]" />
+                    </FieldContent>
+                </Field>
+                <Button OnClick="ApplyEndpointAsync">
+                    <Button.Icon><LucideIcon aria-hidden="true" Name="plug" Size="16" /></Button.Icon>
+                    @Localizer["QdrantConnectButton"]
+                </Button>
+            </div>
+
+            <!-- Status Grid -->
+            <div class="grid gap-4 md:grid-cols-4">
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>@Localizer["QdrantTileDocker"]</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold @(isDockerAvailable ? "text-green-600" : "text-yellow-600")">
+                            @(isDockerAvailable ? Localizer["QdrantAvailable"].Value : Localizer["QdrantNotAvailable"].Value)
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>@Localizer["QdrantTileQdrant"]</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold @(qdrantStatus == QdrantStatusConnected ? "text-green-600" : "text-red-600")">
+                            @QdrantStatusText
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>@Localizer["QdrantVersionLabel"]</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold text-blue-600">@(clusterInfo?.Version ?? Localizer["QdrantNotApplicable"].Value)</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader Class="pb-2">
+                        <CardDescription>@Localizer["QdrantCollectionsLabel"]</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div class="text-xl font-bold text-blue-600">@(clusterInfo?.TotalCollections ?? 0)</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <!-- Connection String -->
+            <Alert Variant="@(qdrantStatus == QdrantStatusConnected ? AlertVariant.Default : AlertVariant.Danger)">
+                <AlertTitle>@Localizer["QdrantConnectionStringTitle"]</AlertTitle>
+                <AlertDescription>
+                    <div class="flex items-center gap-2 mt-2">
+                        <code class="flex-1 text-sm font-mono bg-muted px-3 py-2 rounded break-all">@QdrantService.ConnectionString</code>
+                        <Button Variant="@(copiedConnection ? ButtonVariant.Default : ButtonVariant.Outline)" Size="ButtonSize.Small" OnClick="CopyConnectionString">
+                            @(copiedConnection ? Localizer["QdrantCopied"].Value : Localizer["QdrantCopy"].Value)
+                        </Button>
+                    </div>
+                    @if (qdrantStatus != QdrantStatusConnected && !string.IsNullOrEmpty(QdrantService.LastError))
+                    {
+                        <div class="mt-2 text-sm text-destructive">
+                            <strong>@Localizer["QdrantErrorLabel"]</strong> @QdrantService.LastError
+                        </div>
+                    }
+                </AlertDescription>
+            </Alert>
+        </CardContent>
+    </Card>
+
+    <!-- Docker Containers -->
+    <Card>
+        <CardHeader>
+            <div class="flex items-center justify-between">
+                <CardTitle>@Localizer["QdrantContainersTitle"]</CardTitle>
+                @if (isDockerAvailable)
+                {
+                    <Dialog @bind-Open="showCreateContainerModal">
+                        <DialogTrigger AsChild>
+                            <Button Size="ButtonSize.Small">
+                                <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                                @Localizer["QdrantCreateContainer"]
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>@Localizer["QdrantCreateContainerDialogTitle"]</DialogTitle>
+                                <DialogDescription>@Localizer["QdrantCreateContainerDialogDescription"]</DialogDescription>
+                            </DialogHeader>
+                            <div class="space-y-4 py-4">
+                                <Field>
+                                    <FieldLabel>@Localizer["QdrantContainerNameLabel"]</FieldLabel>
+                                    <FieldContent>
+                                        <Input @bind-Value="newContainerName" Placeholder="@Localizer["QdrantContainerNamePlaceholder"]" />
+                                    </FieldContent>
+                                </Field>
+                                <Field>
+                                    <FieldLabel>@Localizer["QdrantVolumePathLabel"]</FieldLabel>
+                                    <FieldContent>
+                                        <Input @bind-Value="newContainerVolume" Placeholder="@Localizer["QdrantVolumePathPlaceholder"]" />
+                                        <FieldDescription>@Localizer["QdrantVolumeHelp"]</FieldDescription>
+                                    </FieldContent>
+                                </Field>
+                            </div>
+                            <DialogFooter>
+                                <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCreateContainerModal = false)">@Localizer["Cancel"]</Button>
+                                <Button OnClick="CreateContainerAsync" Disabled="@(string.IsNullOrWhiteSpace(newContainerName) || isCreatingContainer)">
+                                    @(isCreatingContainer ? Localizer["QdrantCreating"].Value : Localizer["Create"].Value)
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                }
+            </div>
+        </CardHeader>
+        <CardContent>
+            @if (!isDockerAvailable)
+            {
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["QdrantNoLifecycleTitle"]</AlertTitle>
+                    <AlertDescription>
+                        <div id="container-daemon-error">
+                            @(daemonTest?.Failure is { } failure
+                                ? DaemonFailureText(failure)
+                                : Localizer["QdrantDaemonNotContacted", activeEndpointDisplay].Value)
+                        </div>
+                    </AlertDescription>
+                </Alert>
+            }
+            else if (qdrantContainers.Count == 0)
+            {
+                <TypographyMuted>@Localizer["QdrantNoContainers"]</TypographyMuted>
+            }
+            else
+            {
+                <div class="relative overflow-x-auto" style="overflow-x:auto;max-width:100%">@* inline style: the Tailwind .overflow-x-auto utility is purged from the shipped TrBlazeUI CSS, so the class alone is inert (see docs/TechieRag-TrBlazeUI-Feedback.md TR-004) — inline guarantees wide DataTables clip on narrow viewports *@
+                <DataTable TData="QdrantContainerInfo" Data="@qdrantContainers" ShowPagination="false" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.ContainerName)" Header="@Localizer["QdrantColumnContainer"]" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.ImageName)" Header="@Localizer["QdrantColumnImage"]" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.HttpPort.HasValue ? c.HttpPort.Value.ToString() : "-")" Header="@Localizer["QdrantColumnHttpPort"]" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => c.GrpcPort.HasValue ? c.GrpcPort.Value.ToString() : "-")" Header="@Localizer["QdrantGrpcPortLabel"]" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => string.IsNullOrEmpty(c.StatusText) ? c.Status.ToString() : c.StatusText)" Header="@Localizer["QdrantColumnStatus"]" />
+                        <DataTableColumn TData="QdrantContainerInfo" TValue="string" Property="@(c => "")" Header="@Localizer["QdrantColumnActions"]">
+                            <CellTemplate Context="ct">
+                                <div class="flex flex-wrap gap-2">
+                                    @if (ct.Status == ContainerStatus.Running)
+                                    {
+                                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => StopContainerAsync(ct.ContainerName))">@Localizer["QdrantStop"]</Button>
+                                    }
+                                    else
+                                    {
+                                        <Button Size="ButtonSize.Small" OnClick="@(() => StartContainerAsync(ct.ContainerName))">@Localizer["QdrantStart"]</Button>
+                                    }
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => RestartContainerAsync(ct.ContainerName))">@Localizer["QdrantRestart"]</Button>
+                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="@(() => ViewLogsAsync(ct.ContainerName))">@Localizer["QdrantViewLogs"]</Button>
+                                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="@(() => UseContainer(ct))">
+                                        <LucideIcon aria-hidden="true" Name="plug" Size="14" />
+                                    </Button>
+                                </div>
+                            </CellTemplate>
+                        </DataTableColumn>
+                    </Columns>
+                </DataTable>
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <!-- Collections -->
+    <Card>
+        <CardHeader>
+            <div class="flex items-center justify-between">
+                <CardTitle>@Localizer["QdrantCollectionsLabel"]</CardTitle>
+                <Dialog @bind-Open="showCreateCollectionModal">
+                    <DialogTrigger AsChild>
+                        <Button Size="ButtonSize.Small" Disabled="@(qdrantStatus != QdrantStatusConnected)">
+                            <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                            @Localizer["QdrantNewCollection"]
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>@Localizer["QdrantCreateCollectionDialogTitle"]</DialogTitle>
+                            <DialogDescription>@Localizer["QdrantCreateCollectionDialogDescription"]</DialogDescription>
+                        </DialogHeader>
+                        <div class="space-y-4 py-4">
+                            <Field>
+                                <FieldLabel>@Localizer["QdrantCollectionNameLabel"]</FieldLabel>
+                                <FieldContent>
+                                    <Input @bind-Value="newCollectionName" Placeholder="@Localizer["QdrantCollectionNamePlaceholder"]" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>@Localizer["QdrantVectorDimensionsLabel"]</FieldLabel>
+                                <FieldContent>
+                                    <Input AriaLabel="@Localizer["QdrantVectorDimensionsAriaLabel"]" Type="InputType.Number" @bind-Value="newCollectionDimensionsString" />
+                                    <FieldDescription>@Localizer["QdrantDimensionsHelp"]</FieldDescription>
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>@Localizer["QdrantDistanceMetricLabel"]</FieldLabel>
+                                <FieldContent>
+                                    @* TR-024: the bound value is Qdrant's own metric name and goes
+                                       on the wire, so only the DISPLAY is localized. *@
+                                    <Select @bind-Value="newCollectionDistance" TValue="string"
+                                            DisplayTextSelector="DistanceMetricText">
+                                        <SelectTrigger aria-label="@Localizer["QdrantDistanceMetricAriaLabel"]">
+                                            <SelectValue Placeholder="@Localizer["QdrantSelectMetricPlaceholder"]" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem Value="@("Cosine")" Text="@Localizer["QdrantDistanceCosine"]" TValue="string">@Localizer["QdrantDistanceCosine"]</SelectItem>
+                                            <SelectItem Value="@("Euclid")" Text="@Localizer["QdrantDistanceEuclidean"]" TValue="string">@Localizer["QdrantDistanceEuclidean"]</SelectItem>
+                                            <SelectItem Value="@("Dot")" Text="@Localizer["QdrantDistanceDot"]" TValue="string">@Localizer["QdrantDistanceDot"]</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <DialogFooter>
+                            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCreateCollectionModal = false)">@Localizer["Cancel"]</Button>
+                            <Button OnClick="CreateCollectionAsync" Disabled="@string.IsNullOrWhiteSpace(newCollectionName)">@Localizer["Create"]</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+        </CardHeader>
+        <CardContent>
+            @if (qdrantStatus != QdrantStatusConnected)
+            {
+                <TypographyMuted>@Localizer["QdrantConnectToView"]</TypographyMuted>
+            }
+            else if (collections.Count == 0)
+            {
+                <TypographyMuted>@Localizer["QdrantNoCollections"]</TypographyMuted>
+            }
+            else
+            {
+                <div class="relative overflow-x-auto" style="overflow-x:auto;max-width:100%">@* inline style: the Tailwind .overflow-x-auto utility is purged from the shipped TrBlazeUI CSS, so the class alone is inert (see docs/TechieRag-TrBlazeUI-Feedback.md TR-004) — inline guarantees wide DataTables clip on narrow viewports *@
+                <DataTable TData="CollectionInfo" Data="@collections" ShowPagination="false" ShowToolbar="false">
+                    <Columns>
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.Name)" Header="@Localizer["QdrantColumnName"]" />
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.PointCount.ToString("N0"))" Header="@Localizer["QdrantColumnPoints"]" />
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => c.VectorCount.ToString("N0"))" Header="@Localizer["QdrantColumnVectors"]" />
+                        <DataTableColumn TData="CollectionInfo" TValue="string" Property="@(c => "")" Header="@Localizer["QdrantColumnActions"]">
+                            <CellTemplate Context="col">
+                                <div class="flex gap-2">
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => SelectCollection(col.Name))">@Localizer["QdrantBrowse"]</Button>
+                                    <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Small" OnClick="@(() => DeleteCollectionAsync(col.Name))">@Localizer["QdrantDelete"]</Button>
+                                </div>
+                            </CellTemplate>
+                        </DataTableColumn>
+                    </Columns>
+                </DataTable>
+                </div>
+            }
+        </CardContent>
+    </Card>
+
+    <!-- Collection Detail -->
+    @if (selectedCollection != null && selectedCollectionDetail != null)
+    {
+        <Card>
+            <CardHeader>
+                <div class="flex items-center justify-between">
+                    <CardTitle>@Localizer["QdrantCollectionPrefix"] @selectedCollection</CardTitle>
+                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => selectedCollection = null)">@Localizer["QdrantClose"]</Button>
+                </div>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                <!-- Collection Stats -->
+                <div class="grid gap-4 md:grid-cols-4">
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>@Localizer["QdrantColumnPoints"]</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-2xl font-bold">@selectedCollectionDetail.PointCount.ToString("N0")</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>@Localizer["QdrantVectorSizeLabel"]</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-2xl font-bold">@selectedCollectionDetail.VectorSize</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>@Localizer["QdrantDistanceLabel"]</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-xl font-bold">@selectedCollectionDetail.DistanceMetric</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader Class="pb-2">
+                            <CardDescription>@Localizer["QdrantColumnStatus"]</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="text-xl font-bold @(selectedCollectionDetail.Status == "Green" ? "text-green-600" : "text-yellow-600")">
+                                @selectedCollectionDetail.Status
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <!-- Vectors Table -->
+                <div>
+                    <TypographyH4>@Localizer["QdrantColumnVectors"]</TypographyH4>
+                    @if (currentVectorPage != null && currentVectorPage.Vectors.Count > 0)
+                    {
+                        <div class="relative overflow-x-auto" style="overflow-x:auto;max-width:100%">@* inline style: the Tailwind .overflow-x-auto utility is purged from the shipped TrBlazeUI CSS, so the class alone is inert (see docs/TechieRag-TrBlazeUI-Feedback.md TR-004) — inline guarantees wide DataTables clip on narrow viewports *@
+                        <DataTable TData="VectorSummary" Data="@currentVectorPage.Vectors" ShowPagination="false" ShowToolbar="false">
+                            <Columns>
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => TruncateId(v.Id))" Header="@Localizer["QdrantColumnId"]" />
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => v.DocumentName ?? Localizer["QdrantNotApplicable"].Value)" Header="@Localizer["QdrantColumnDocument"]" />
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => TruncateText(v.ChunkText, 60))" Header="@Localizer["QdrantColumnChunkPreview"]" />
+                                <DataTableColumn TData="VectorSummary" TValue="string" Property="@(v => "")" Header="@Localizer["QdrantColumnActions"]">
+                                    <CellTemplate Context="vec">
+                                        <div class="flex gap-2">
+                                            <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="@(() => ViewVectorAsync(vec.Id))">@Localizer["QdrantView"]</Button>
+                                            <Button Variant="ButtonVariant.Destructive" Size="ButtonSize.Small" OnClick="@(() => DeleteVectorAsync(vec.Id))">@Localizer["QdrantDelete"]</Button>
+                                        </div>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                            </Columns>
+                        </DataTable>
+                        </div>
+
+                        <div class="flex flex-wrap justify-between items-center gap-2 mt-4 pt-4 border-t">
+                            <TypographyMuted>
+                                @Localizer["QdrantShowingVectors", currentVectorPage.Offset + 1, currentVectorPage.Offset + currentVectorPage.Vectors.Count, currentVectorPage.TotalCount.ToString("N0")]
+                            </TypographyMuted>
+                            <div class="flex gap-2">
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="PreviousPage" Disabled="@(currentPageIndex == 0)">
+                                    @Localizer["QdrantPrevious"]
+                                </Button>
+                                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="NextPage"
+                                        Disabled="@(currentVectorPage.NextPageOffset == null)">
+                                    @Localizer["QdrantNext"]
+                                </Button>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <TypographyMuted>@Localizer["QdrantNoVectors"]</TypographyMuted>
+                    }
+                </div>
+            </CardContent>
+        </Card>
+    }
+</div>
+
+<!-- Container Logs Dialog (REQ-FN-040: logs are part of the lifecycle) -->
+<Dialog @bind-Open="showLogsDialog">
+    <DialogContent Class="max-w-3xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer["QdrantContainerLogsTitle", logsContainerName]</DialogTitle>
+            <DialogDescription>@Localizer["QdrantLogsDialogDescription", LogTailLines, activeEndpointDisplay]</DialogDescription>
+        </DialogHeader>
+        <pre id="container-logs" class="text-xs bg-muted px-3 py-2 rounded max-h-[50vh] overflow-auto m-0 whitespace-pre-wrap">@containerLogs</pre>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showLogsDialog = false)">@Localizer["QdrantClose"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<!-- Vector Detail Dialog -->
+<Dialog @bind-Open="showVectorDetailDialog">
+    <DialogContent Class="max-w-2xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer["QdrantVectorDetailsTitle"]</DialogTitle>
+        </DialogHeader>
+        @if (selectedVector != null)
+        {
+            <div class="space-y-4 max-h-[70vh] overflow-auto py-4">
+                <Field>
+                    <FieldLabel>@Localizer["QdrantColumnId"]</FieldLabel>
+                    <FieldContent>
+                        <div class="font-mono text-sm bg-muted px-3 py-2 rounded">@selectedVector.Id</div>
+                    </FieldContent>
+                </Field>
+                @if (!string.IsNullOrEmpty(selectedVector.DocumentName))
+                {
+                    <Field>
+                        <FieldLabel>@Localizer["QdrantColumnDocument"]</FieldLabel>
+                        <FieldContent>
+                            <div class="text-sm bg-muted px-3 py-2 rounded">@selectedVector.DocumentName</div>
+                        </FieldContent>
+                    </Field>
+                }
+                @if (selectedVector.ChunkIndex.HasValue)
+                {
+                    <Field>
+                        <FieldLabel>@Localizer["QdrantChunkIndexLabel"]</FieldLabel>
+                        <FieldContent>
+                            <div class="text-sm bg-muted px-3 py-2 rounded">@selectedVector.ChunkIndex</div>
+                        </FieldContent>
+                    </Field>
+                }
+                @if (!string.IsNullOrEmpty(selectedVector.ChunkText))
+                {
+                    <Field>
+                        <FieldLabel>@Localizer["QdrantChunkTextLabel"]</FieldLabel>
+                        <FieldContent>
+                            <div class="text-sm bg-muted px-3 py-2 rounded max-h-[200px] overflow-auto whitespace-pre-wrap">@selectedVector.ChunkText</div>
+                        </FieldContent>
+                    </Field>
+                }
+                <Field>
+                    <FieldLabel>@Localizer["QdrantPayloadLabel"]</FieldLabel>
+                    <FieldContent>
+                        <pre class="text-xs bg-muted px-3 py-2 rounded max-h-[150px] overflow-auto m-0">@FormatPayload(selectedVector.Payload)</pre>
+                    </FieldContent>
+                </Field>
+                <Field>
+                    <FieldLabel>@Localizer["QdrantVectorFirstValuesLabel"]</FieldLabel>
+                    <FieldContent>
+                        <div class="font-mono text-xs bg-muted px-3 py-2 rounded">
+                            [@string.Join(", ", selectedVector.Vector.Take(10).Select(v => v.ToString("F4")))]...
+                        </div>
+                    </FieldContent>
+                </Field>
+            </div>
+            <DialogFooter>
+                <Button Variant="ButtonVariant.Outline" OnClick="@(() => { selectedVector = null; showVectorDetailDialog = false; })">@Localizer["QdrantClose"]</Button>
+                <Button Variant="ButtonVariant.Destructive" OnClick="@(() => DeleteVectorAsync(selectedVector.Id))">@Localizer["QdrantDelete"]</Button>
+            </DialogFooter>
+        }
+    </DialogContent>
+</Dialog>
+
+@code {
+    // ---- REQ-UI-042: Docker daemon endpoint configuration ----
+    /// <summary>How many trailing log lines the logs dialog reads.</summary>
+    private const int LogTailLines = 200;
+
+    // TR-024: a Select trigger paints the RAW BOUND VALUE on first paint, which is why the option
+    // values used to BE the English labels. REQ-UI-051 replaced that with DisplayTextSelector, so
+    // the bound value is now the culture-invariant enum and only the display text is translated.
+    private DockerDaemonEndpointKind daemonKind = DockerDaemonEndpointKind.LocalSocket;
+    private string daemonAddress = "";
+    private bool verifyTls = true;
+    private bool isTestingDaemon;
+    private bool isPullingImage;
+    private DockerDaemonTestResult? daemonTest;
+    private string activeEndpointDisplay = "";
+    private DockerDaemonEndpointKind activeEndpointKind = DockerDaemonEndpointKind.LocalSocket;
+    private string? daemonSecurityWarningKey;
+    private bool activeUsesTls;
+    private bool activeVerifyTls = true;
+    private bool hasClientCertificate;
+
+    private bool showLogsDialog;
+    private string logsContainerName = "";
+    private string containerLogs = "";
+
+    private string DaemonAddressPlaceholder => daemonKind switch
+    {
+        DockerDaemonEndpointKind.RemoteTls => $"qdrant-host.lan:{DockerDaemonEndpoint.DefaultTlsPort}",
+        DockerDaemonEndpointKind.NetworkHost => $"qdrant-host.lan:{DockerDaemonEndpoint.DefaultPlainPort}",
+        _ => DockerDaemonEndpoint.Local().Display
+    };
+
+    /// <summary>REQ-UI-051 / TR-024: the localized display text for a Qdrant distance metric.</summary>
+    /// <param name="value">The invariant metric name, which is what Qdrant receives.</param>
+    /// <returns>The text painted on the Select trigger.</returns>
+    private string DistanceMetricText(string value) => value switch
+    {
+        "Euclid" => Localizer["QdrantDistanceEuclidean"],
+        "Dot" => Localizer["QdrantDistanceDot"],
+        _ => Localizer["QdrantDistanceCosine"]
+    };
+
+    /// <summary>REQ-UI-051: the localized name of a Docker daemon endpoint kind.</summary>
+    /// <param name="kind">The endpoint kind to name.</param>
+    /// <returns>The text shown in the option list and on the Select trigger.</returns>
+    /// <remarks>
+    /// REQ-UI-055: the key now comes from <see cref="DockerDaemonEndpoint.KindLabelKeyFor"/>, so the
+    /// service and this screen can no longer name the same endpoint two different ways. Only the
+    /// LABEL moves with the culture — the bound value stays the invariant enum, and nothing parses
+    /// this text back into a kind. That was the original defect: the Select's bound value WAS the
+    /// English label and <c>ParseKind</c> turned it back into an endpoint, so a translated install
+    /// would have built a socket path out of Devanagari.
+    /// </remarks>
+    private string DaemonKindText(DockerDaemonEndpointKind kind) =>
+        Localizer[DockerDaemonEndpoint.KindLabelKeyFor(kind)];
+
+    /// <summary>
+    /// REQ-UI-055: resolves the Docker service's failure KEY into the reader's language.
+    /// </summary>
+    /// <param name="failure">The failure the service reported, or null.</param>
+    /// <returns>The translated sentence, or an empty string when there is no failure.</returns>
+    /// <remarks>
+    /// The arguments are deliberately NOT translated: the endpoint that was tried is wire
+    /// vocabulary, and a socket error code, an HTTP status and the daemon's own response body are
+    /// text Docker or the runtime produced. Rewriting those would invent an error nobody emitted.
+    /// </remarks>
+    private string DaemonFailureText(DockerEndpointProblem? failure) =>
+        failure is null ? string.Empty : Localizer[failure.MessageKey, [.. failure.Arguments]].Value;
+
+    private BadgeVariant TlsBadgeVariant => activeUsesTls
+        ? (activeVerifyTls ? BadgeVariant.Default : BadgeVariant.Destructive)
+        : (activeEndpointKind == DockerDaemonEndpointKind.LocalSocket ? BadgeVariant.Secondary : BadgeVariant.Destructive);
+
+    private string TlsBadgeText => activeUsesTls
+        ? (activeVerifyTls ? Localizer["QdrantTlsVerified"] : Localizer["QdrantTlsUnverified"])
+        : (activeEndpointKind == DockerDaemonEndpointKind.LocalSocket
+            ? Localizer["QdrantEndpointKindLocalSocket"]
+            : Localizer["QdrantTlsUnencryptedTcp"]);
+
+    private string LastCheckedText => daemonTest is null
+        ? Localizer["QdrantNotCheckedYet"]
+        : daemonTest.CheckedAt.ToLocalTime().ToString("HH:mm:ss");
+
+    // Connection state
+    private bool isDockerAvailable;
+    // REQ-UI-051: qdrantStatus is a STATE, compared in six places, so it stays culture-invariant
+    // and QdrantStatusText is what the user reads.
+    private const string QdrantStatusChecking = "Checking";
+    private const string QdrantStatusConnected = "Connected";
+    private const string QdrantStatusDisconnected = "Disconnected";
+
+    private string qdrantStatus = QdrantStatusChecking;
+
+    /// <summary>REQ-UI-051: the localized wording of the current connection state.</summary>
+    private string QdrantStatusText => qdrantStatus switch
+    {
+        QdrantStatusConnected => Localizer["QdrantStatusConnected"],
+        QdrantStatusDisconnected => Localizer["QdrantStatusDisconnected"],
+        _ => Localizer["QdrantStatusChecking"]
+    };
+    private QdrantClusterInfo? clusterInfo;
+    private List<QdrantContainerInfo> qdrantContainers = new();
+    private List<CollectionInfo> collections = new();
+
+    // Endpoint configuration
+    private string configHost = "localhost";
+    private int configPort = 6334;
+    private string? configApiKey;
+    private bool copiedConnection;
+
+    private string configPortString
+    {
+        get => configPort.ToString();
+        set { if (int.TryParse(value, out var p)) configPort = p; }
+    }
+
+    // Collection browsing
+    private const int PageSize = 20;
+    private string? selectedCollection;
+    private CollectionDetailInfo? selectedCollectionDetail;
+    private VectorPage? currentVectorPage;
+    private VectorDetail? selectedVector;
+    private bool showVectorDetailDialog;
+
+    // Qdrant scroll is forward-only, so Previous is served from a history of the opaque
+    // cursors used to LOAD each visited page (pageCursors[i] loads page i; [0] is null).
+    private readonly List<string?> pageCursors = new();
+    private int currentPageIndex;
+
+    // Modals
+    private bool showCreateCollectionModal;
+    private string newCollectionName = "";
+    private int newCollectionDimensions = 1024;
+    private string newCollectionDistance = "Cosine";
+
+    private string newCollectionDimensionsString
+    {
+        get => newCollectionDimensions.ToString();
+        set { if (int.TryParse(value, out var d)) newCollectionDimensions = d; }
+    }
+
+    private bool showCreateContainerModal;
+    private string newContainerName = "techierag-qdrant";
+    private string? newContainerVolume;
+    private bool isCreatingContainer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        configHost = QdrantService.Host;
+        configPort = QdrantService.Port;
+
+        var endpoint = await DockerService.GetActiveEndpointAsync();
+        daemonKind = endpoint.Kind;
+        daemonAddress = endpoint.Kind == DockerDaemonEndpointKind.LocalSocket
+            ? ""
+            : $"{endpoint.Uri.Host}:{endpoint.Uri.Port}";
+        verifyTls = endpoint.VerifyTls;
+        ApplyEndpointToView(endpoint);
+
+        await RefreshStatusAsync();
+    }
+
+    /// <summary>
+    /// Mirrors the daemon endpoint the service is actually using into the view, so the screen can
+    /// never show a daemon nobody selected.
+    /// </summary>
+    private void ApplyEndpointToView(DockerDaemonEndpoint endpoint)
+    {
+        activeEndpointDisplay = endpoint.Display;
+        activeEndpointKind = endpoint.Kind;
+        activeUsesTls = endpoint.UsesTls;
+        activeVerifyTls = endpoint.VerifyTls;
+        daemonSecurityWarningKey = endpoint.SecurityWarningKey;
+        hasClientCertificate = DockerService.HasClientCertificate;
+    }
+
+    private async Task TestDaemonAsync()
+    {
+        isTestingDaemon = true;
+        try
+        {
+            // REQ-UI-055: TryFromKind rather than catching ArgumentException. The exception's
+            // message is culture-invariant developer text by design; the toast needs the reader's
+            // language, which only the resource key can give it.
+            if (!DockerDaemonEndpoint.TryFromKind(
+                    daemonKind, daemonAddress, verifyTls, out var candidate, out var problem))
+            {
+                ToastService.Error(
+                    DaemonFailureText(problem), Localizer["QdrantInvalidEndpointTitle"].Value);
+                return;
+            }
+
+            daemonTest = await DockerService.TestConnectionAsync(candidate);
+            isDockerAvailable = daemonTest.Success && candidate.Display == activeEndpointDisplay;
+
+            if (daemonTest.Success)
+            {
+                ToastService.Success(
+                    Localizer["QdrantDaemonAnsweredBody", candidate.Display, daemonTest.DaemonVersion, daemonTest.HostOperatingSystem].Value,
+                    Localizer["QdrantDaemonReachableTitle"].Value);
+            }
+            else
+            {
+                // Honest failure: the operator sees the endpoint that was tried and the real reason.
+                ToastService.Error(
+                    daemonTest.Failure is null
+                        ? Localizer["QdrantUnknownFailure"].Value
+                        : DaemonFailureText(daemonTest.Failure),
+                    Localizer["QdrantDaemonUnreachableShort"].Value);
+                Logger.LogWarning("Docker daemon test failed for {Endpoint}: {Reason}",
+                    candidate.Display, daemonTest.Failure);
+            }
+        }
+        finally
+        {
+            isTestingDaemon = false;
+        }
+    }
+
+    private async Task ApplyDaemonAsync()
+    {
+        // REQ-UI-055: refuse in the reader's language BEFORE the service throws a developer-facing
+        // ArgumentException whose message is deliberately culture-invariant.
+        if (!DockerDaemonEndpoint.TryFromKind(daemonKind, daemonAddress, verifyTls, out _, out var problem))
+        {
+            ToastService.Error(DaemonFailureText(problem), Localizer["QdrantInvalidEndpointTitle"].Value);
+            return;
+        }
+
+        try
+        {
+            var endpoint = await DockerService.ConfigureEndpointAsync(
+                daemonKind, daemonAddress, verifyTls);
+            ApplyEndpointToView(endpoint);
+
+            if (endpoint.HasSecurityWarning)
+            {
+                // TrBlazeUI has no warning-severity toast (TR-023): Destructive is the only variant
+                // that reads as "stop and look", which is right for a root-on-host warning. The
+                // amber Alert on the card carries the durable, correctly-toned message.
+                ToastService.Show(Localizer[endpoint.SecurityWarningKey!].Value,
+                    Localizer["QdrantUnsafeEndpointTitle"].Value,
+                    ToastVariant.Destructive, 10000);
+            }
+
+            await RefreshStatusAsync();
+        }
+        catch (ArgumentException ex)
+        {
+            // Unreachable in practice — the guard above already refused anything TryFromKind
+            // rejects — but a swallowed configuration failure would leave the screen showing a
+            // daemon nobody selected, so it is reported rather than assumed away.
+            ToastService.Error(
+                Localizer["QdrantUnknownFailure"].Value, Localizer["QdrantInvalidEndpointTitle"].Value);
+            Logger.LogError(ex, "Docker daemon endpoint {Kind}/{Address} was rejected on apply",
+                daemonKind, daemonAddress);
+        }
+    }
+
+    private async Task ViewLogsAsync(string containerName)
+    {
+        logsContainerName = containerName;
+        showLogsDialog = true;
+        containerLogs = Localizer["QdrantLoadingLogs"];
+        try
+        {
+            // REQ-UI-055: an empty tail is the service saying "the daemon produced nothing", not a
+            // sentence it composed. The sentence belongs here, where there is a localizer.
+            var tail = await DockerService.GetContainerLogsAsync(containerName, LogTailLines);
+            containerLogs = tail.Length > 0
+                ? tail
+                : Localizer[DockerContainerService.NoLogOutputKey, activeEndpointDisplay, containerName].Value;
+        }
+        catch (Exception ex)
+        {
+            containerLogs = Localizer["QdrantLogsUnreadable", containerName, activeEndpointDisplay, ex.Message];
+            Logger.LogError(ex, "Failed to read logs for {Container}", containerName);
+        }
+    }
+
+    private async Task PullImageAsync()
+    {
+        isPullingImage = true;
+        try
+        {
+            await DockerService.PullQdrantImageAsync();
+            ToastService.Success(Localizer["QdrantImagePulledBody", activeEndpointDisplay].Value, Localizer["QdrantImagePulledTitle"].Value);
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantPullFailedBody", activeEndpointDisplay, ex.Message].Value, Localizer["QdrantPullFailedTitle"].Value);
+            Logger.LogError(ex, "Failed to pull the Qdrant image from {Endpoint}", activeEndpointDisplay);
+        }
+        finally
+        {
+            isPullingImage = false;
+        }
+    }
+
+    private async Task RestartContainerAsync(string containerName)
+    {
+        try
+        {
+            await DockerService.RestartContainerAsync(containerName);
+            ToastService.Success(Localizer["QdrantContainerRestartedBody", containerName].Value, Localizer["QdrantRestartedTitle"].Value);
+            await Task.Delay(1500);
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task RefreshStatusAsync()
+    {
+        try
+        {
+            var endpoint = await DockerService.GetActiveEndpointAsync();
+            ApplyEndpointToView(endpoint);
+
+            daemonTest = await DockerService.TestConnectionAsync();
+            isDockerAvailable = daemonTest.Success;
+
+            if (isDockerAvailable)
+            {
+                qdrantContainers = (await DockerService.ListQdrantContainersAsync()).ToList();
+
+                if (qdrantStatus != QdrantStatusConnected && qdrantContainers.Count > 0)
+                {
+                    var runningContainer = qdrantContainers.FirstOrDefault(c => c.Status == ContainerStatus.Running);
+                    if (runningContainer?.GrpcPort != null)
+                    {
+                        configHost = "localhost";
+                        configPort = runningContainer.GrpcPort.Value;
+                        QdrantService.ConfigureEndpoint(configHost, configPort, configApiKey);
+                    }
+                }
+            }
+
+            var connected = await QdrantService.TestConnectionAsync();
+            qdrantStatus = connected ? QdrantStatusConnected : QdrantStatusDisconnected;
+
+            if (connected)
+            {
+                clusterInfo = await QdrantService.GetClusterInfoAsync();
+                collections = (await QdrantService.ListCollectionsAsync()).ToList();
+            }
+            else
+            {
+                clusterInfo = null;
+                collections.Clear();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to refresh status");
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task ApplyEndpointAsync()
+    {
+        QdrantService.ConfigureEndpoint(configHost, configPort, configApiKey);
+        await RefreshStatusAsync();
+
+        if (qdrantStatus == QdrantStatusConnected)
+        {
+            ToastService.Success(Localizer["QdrantConnectedToBody", configHost, configPort].Value, Localizer["QdrantConnected"].Value);
+        }
+        else
+        {
+            var errorDetail = QdrantService.LastError ?? Localizer["QdrantUnknownError"].Value;
+            ToastService.Error(Localizer["QdrantConnectFailedBody", errorDetail].Value, Localizer["QdrantConnectionFailedTitle"].Value);
+            Logger.LogWarning("Connection failed to {Host}:{Port}. Error: {Error}", configHost, configPort, errorDetail);
+        }
+    }
+
+    private void UseContainer(QdrantContainerInfo container)
+    {
+        if (container.GrpcPort.HasValue)
+        {
+            configHost = "localhost";
+            configPort = container.GrpcPort.Value;
+            _ = ApplyEndpointAsync();
+        }
+    }
+
+    private async Task CopyConnectionString()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", QdrantService.ConnectionString);
+            copiedConnection = true;
+            StateHasChanged();
+            await Task.Delay(2000);
+            copiedConnection = false;
+            StateHasChanged();
+        }
+        catch
+        {
+            ToastService.Error(Localizer["QdrantClipboardFailed"].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task CreateContainerAsync()
+    {
+        try
+        {
+            isCreatingContainer = true;
+            StateHasChanged();
+
+            await DockerService.CreateQdrantContainerAsync(newContainerName, newContainerVolume);
+            showCreateContainerModal = false;
+            ToastService.Success(Localizer["QdrantContainerCreatedBody", newContainerName].Value, Localizer["QdrantCreatedTitle"].Value);
+
+            await Task.Delay(2000);
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+        finally
+        {
+            isCreatingContainer = false;
+        }
+    }
+
+    private async Task StartContainerAsync(string containerName)
+    {
+        try
+        {
+            await DockerService.StartContainerAsync(containerName);
+            ToastService.Success(Localizer["QdrantContainerStartedBody", containerName].Value, Localizer["QdrantStartedTitle"].Value);
+            await Task.Delay(1500);
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task StopContainerAsync(string containerName)
+    {
+        try
+        {
+            await DockerService.StopContainerAsync(containerName);
+            ToastService.Success(Localizer["QdrantContainerStoppedBody", containerName].Value, Localizer["QdrantStoppedTitle"].Value);
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private void ShowCreateCollectionModal()
+    {
+        newCollectionName = "";
+        newCollectionDimensions = 1024;
+        newCollectionDistance = "Cosine";
+        showCreateCollectionModal = true;
+    }
+
+    private async Task CreateCollectionAsync()
+    {
+        try
+        {
+            await QdrantService.CreateCollectionAsync(newCollectionName, newCollectionDimensions, newCollectionDistance);
+            showCreateCollectionModal = false;
+            ToastService.Success(Localizer["QdrantCollectionCreatedBody", newCollectionName].Value, Localizer["QdrantCreatedTitle"].Value);
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task DeleteCollectionAsync(string name)
+    {
+        try
+        {
+            await QdrantService.DeleteCollectionAsync(name);
+            ToastService.Success(Localizer["QdrantCollectionDeletedBody", name].Value, Localizer["QdrantDeletedTitle"].Value);
+            if (selectedCollection == name)
+            {
+                selectedCollection = null;
+                selectedCollectionDetail = null;
+            }
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task SelectCollection(string name)
+    {
+        try
+        {
+            selectedCollection = name;
+            selectedCollectionDetail = await QdrantService.GetCollectionInfoAsync(name);
+            pageCursors.Clear();
+            pageCursors.Add(null); // first page has no cursor
+            currentPageIndex = 0;
+            currentVectorPage = await QdrantService.BrowseVectorsAsync(name, cursor: null, displayOffset: 0, limit: PageSize);
+        }
+        catch (Exception ex)
+        {
+            ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+        }
+    }
+
+    private async Task PreviousPage()
+    {
+        if (selectedCollection != null && currentPageIndex > 0)
+        {
+            currentPageIndex--;
+            currentVectorPage = await QdrantService.BrowseVectorsAsync(
+                selectedCollection,
+                cursor: pageCursors[currentPageIndex],
+                displayOffset: currentPageIndex * PageSize,
+                limit: PageSize);
+        }
+    }
+
+    private async Task NextPage()
+    {
+        // Advance only while the SDK reports a real next-page cursor (forward-only scroll).
+        if (selectedCollection != null && currentVectorPage?.NextPageOffset != null)
+        {
+            var nextCursor = currentVectorPage.NextPageOffset;
+            currentPageIndex++;
+            if (currentPageIndex < pageCursors.Count)
+            {
+                pageCursors[currentPageIndex] = nextCursor;
+            }
+            else
+            {
+                pageCursors.Add(nextCursor);
+            }
+
+            currentVectorPage = await QdrantService.BrowseVectorsAsync(
+                selectedCollection,
+                cursor: nextCursor,
+                displayOffset: currentPageIndex * PageSize,
+                limit: PageSize);
+        }
+    }
+
+    private async Task ViewVectorAsync(string id)
+    {
+        if (selectedCollection != null)
+        {
+            selectedVector = await QdrantService.GetVectorByIdAsync(selectedCollection, id);
+            showVectorDetailDialog = true;
+        }
+    }
+
+    private async Task DeleteVectorAsync(string id)
+    {
+        if (selectedCollection != null)
+        {
+            try
+            {
+                await QdrantService.DeleteVectorAsync(selectedCollection, id);
+                selectedVector = null;
+                showVectorDetailDialog = false;
+                // Reload the current page using its own cursor (the start id of this page).
+                var reloadCursor = currentPageIndex < pageCursors.Count ? pageCursors[currentPageIndex] : null;
+                currentVectorPage = await QdrantService.BrowseVectorsAsync(
+                    selectedCollection,
+                    cursor: reloadCursor,
+                    displayOffset: currentPageIndex * PageSize,
+                    limit: PageSize);
+                ToastService.Success(Localizer["QdrantVectorDeletedBody"].Value, Localizer["QdrantDeletedTitle"].Value);
+            }
+            catch (Exception ex)
+            {
+                ToastService.Error(Localizer["QdrantErrorDetail", ex.Message].Value, Localizer["QdrantErrorTitle"].Value);
+            }
+        }
+    }
+
+    private static string TruncateId(string id) => id.Length > 16 ? id[..16] + "..." : id;
+    private static string TruncateText(string? text, int maxLength) =>
+        string.IsNullOrEmpty(text) ? "N/A" : (text.Length > maxLength ? text[..maxLength] + "..." : text);
+
+    private static string FormatPayload(Dictionary<string, object> payload)
+    {
+        return string.Join("\n", payload.Select(kvp => $"{kvp.Key}: {kvp.Value}"));
+    }
+}

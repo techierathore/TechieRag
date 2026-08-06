@@ -1,0 +1,100 @@
+@* REQ-UI-038 (BRD-90) — the topbar theme control, matching the moon button every mockup carries in
+   `.topbar .right` (docs/mockups/workspace-chat.html line 272) and the View ▸ Appearance menu that
+   offers Light / Dark / Match System.
+
+   SELF-CONTAINED: it injects only ThemeCoordinator, takes no parameters, and renders one inline
+   control. Drop it into the topbar's right-hand cluster, immediately before the plan Badge. It has
+   no layout of its own, so it inherits the flex row it is placed in.
+
+   A dropdown rather than a two-state button because "Match system" is a real third state that the
+   mockup's own View menu offers, and a button that cycles through three states gives no way to see
+   which one is active. *@
+
+@implements IDisposable
+@inject ThemeCoordinator Theme
+@inject IStringLocalizer<AppStrings> Localizer
+
+<DropdownMenu>
+    @* REQ-NFR-005: DropdownMenuTrigger renders the <button> itself, so the trigger content must not
+       be another interactive element — the same nested-interactive fix MainLayout applies to its own
+       triggers. The icon is aria-hidden and the accessible name comes from the sr-only text. *@
+    <DropdownMenuTrigger>
+        <span class="td-theme-toggle" title="@Localizer["ThemeToggleLabel"]">
+            <LucideIcon aria-hidden="true" Name="@IconName" Size="16" />
+            <span class="sr-only">@Localizer["ThemeToggleLabel"]</span>
+        </span>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent Class="w-64">
+        <DropdownMenuLabel>@Localizer["ThemeLabel"]</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        @foreach (var option in Options)
+        {
+            <DropdownMenuItem OnClick="@(() => ChooseAsync(option.Mode))">
+                <LucideIcon aria-hidden="true" Name="@option.Icon" Size="16" />
+                <span class="ml-2">@Localizer[option.ResourceKey]</span>
+                @if (Theme.Current.Mode == option.Mode)
+                {
+                    <LucideIcon aria-hidden="true" Name="check" Size="14" Class="ml-auto" />
+                }
+            </DropdownMenuItem>
+        }
+    </DropdownMenuContent>
+</DropdownMenu>
+
+@code {
+    // The three states the mockup's View ▸ Appearance menu offers, in its order.
+    private static readonly (ThemeMode Mode, string ResourceKey, string Icon)[] Options =
+    [
+        (ThemeMode.Light, "ThemeLight", "sun"),
+        (ThemeMode.Dark, "ThemeDark", "moon"),
+        (ThemeMode.System, "ThemeSystem", "monitor")
+    ];
+
+    private bool isDark;
+
+    // The glyph reports what is ON SCREEN, not what was chosen: under "Match system" the choice is
+    // neither light nor dark, and a monitor icon there would tell the user nothing about the state
+    // they are looking at.
+    private string IconName => isDark ? "moon" : "sun";
+
+    protected override void OnInitialized() => Theme.Changed += HandleThemeChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await RefreshResolvedThemeAsync();
+    }
+
+    private async Task ChooseAsync(ThemeMode mode)
+    {
+        await Theme.SetModeAsync(mode);
+        await RefreshResolvedThemeAsync();
+    }
+
+    private async Task RefreshResolvedThemeAsync()
+    {
+        var resolved = await Theme.IsDarkAsync();
+        if (resolved == isDark)
+        {
+            return;
+        }
+
+        isDark = resolved;
+        StateHasChanged();
+    }
+
+    // Fired when another surface (the Appearance panel) changes the theme, so the glyph and the tick
+    // stay honest without either component knowing about the other.
+    private void HandleThemeChanged() =>
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshResolvedThemeAsync();
+            StateHasChanged();
+        });
+
+    public void Dispose() => Theme.Changed -= HandleThemeChanged;
+}

@@ -61,6 +61,32 @@ public interface ITechieRag
     Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int topK = 5, string? documentFilter = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Performs semantic search using a per-call options object, including the per-call
+    /// rerank switch.
+    /// </summary>
+    /// <param name="query">The natural language query to search for.</param>
+    /// <param name="options">Per-call retrieval options. When null, library defaults are used.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked list of search results with relevance scores.</returns>
+    /// <remarks>
+    /// <para><b>Purpose:</b> REQ-RAG-047 (TR-RAG-005). Reranking used to be global configuration
+    /// only, which made <see cref="Models.Workspace.RerankEnabled"/> inert. This overload carries
+    /// <see cref="SearchOptions.Rerank"/> down to the retrieval pipeline so a single caller —
+    /// notably <see cref="Services.WorkspaceManager"/> — can enable or disable the rerank stage
+    /// per call.</para>
+    /// <para><b>Default implementation:</b> Provided for backward compatibility with existing
+    /// ITechieRag implementers (ADR-005 additive-only). It forwards to the legacy overload and
+    /// therefore <b>ignores</b> <see cref="SearchOptions.Rerank"/>; implementers that wrap or
+    /// delegate to TechieRagClient should override it and forward the options object intact.
+    /// TechieRagClient overrides it with the full implementation.</para>
+    /// </remarks>
+    Task<IReadOnlyList<SearchResult>> SearchAsync(
+        string query,
+        SearchOptions? options,
+        CancellationToken cancellationToken = default) =>
+        SearchAsync(query, options?.TopK ?? 5, options?.DocumentFilter, cancellationToken);
+
+    /// <summary>
     /// Deletes a document and all its chunks from the vector store.
     /// </summary>
     /// <param name="documentId">The ID of the document to delete.</param>
@@ -73,6 +99,37 @@ public interface ITechieRag
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>List of all ingested documents with metadata.</returns>
     Task<IReadOnlyList<Document>> ListDocumentsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets what the configured embedding provider stamps on new vectors (REQ-RAG-052).
+    /// </summary>
+    /// <remarks>
+    /// Defaulted to <see cref="EmbeddingStaleness.UnknownSignature"/> so an implementation outside
+    /// this repository keeps compiling (REQ-NFR-007); an implementation that does not override it
+    /// makes <see cref="DetectStaleEmbeddingsAsync"/> report that it cannot determine anything,
+    /// rather than a clean result nobody established.
+    /// </remarks>
+    string EmbeddingSignature => EmbeddingStaleness.UnknownSignature;
+
+    /// <summary>
+    /// Reports which stored documents were embedded by something other than the current provider
+    /// (REQ-RAG-052).
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The staleness report.</returns>
+    /// <remarks>
+    /// <para><b>What it is for.</b> Changing a provider, a model, or the way a model is encoded puts
+    /// new vectors in a different space from the stored ones, and cosine similarity across the two is
+    /// meaningless. Retrieval does not fail when that happens — it keeps returning results, and they
+    /// are quietly wrong. This is what lets a host say so.</para>
+    /// <para>Implemented in terms of <see cref="ListDocumentsAsync"/> and
+    /// <see cref="EmbeddingSignature"/>, so no vector store needed changing and all three backends are
+    /// covered by the same code.</para>
+    /// </remarks>
+    async Task<EmbeddingStalenessReport> DetectStaleEmbeddingsAsync(
+        CancellationToken cancellationToken = default) =>
+        EmbeddingStaleness.Analyze(
+            await ListDocumentsAsync(cancellationToken).ConfigureAwait(false), EmbeddingSignature);
 
     /// <summary>
     /// Retrieves statistics about the current vector store state.
@@ -196,4 +253,102 @@ public interface ITechieRag
     /// </summary>
     /// <returns>The IConversationMemory instance, or null if not configured.</returns>
     IConversationMemory? GetConversationMemory();
+
+    // === NEW: Streaming envelope, reranking, persistence, and workspaces ===
+
+    /// <summary>
+    /// Performs a complete RAG operation with streaming response, exposing the retrieved
+    /// sources (citations) to the caller.
+    /// </summary>
+    /// <param name="question">The user's question.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="documentFilter">Optional document ID to restrict search scope.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A stream of <see cref="RagStreamEvent"/>: first the sources, then answer
+    /// tokens, and finally a completion event with the aggregated answer.</returns>
+    /// <remarks>
+    /// <para><b>Flow:</b> Retrieval and prompt construction are identical to
+    /// <see cref="AskAsync"/> — the prompt is built via the configured IPromptTemplate.</para>
+    /// <para><b>Default implementation:</b> Provided for backward compatibility with existing
+    /// ITechieRag implementers (ADR-005 additive-only); it composes SearchAsync and
+    /// AskStreamAsync. TechieRagClient overrides it with a single-retrieval implementation.</para>
+    /// </remarks>
+    async IAsyncEnumerable<RagStreamEvent> AskStreamWithSourcesAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var sources = await SearchAsync(question, topK, documentFilter, cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(sources);
+
+        var answer = new System.Text.StringBuilder();
+        await foreach (var token in AskStreamAsync(question, topK, systemPrompt, documentFilter, options, cancellationToken).ConfigureAwait(false))
+        {
+            answer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        yield return RagStreamEvent.FromCompleted(answer.ToString());
+    }
+
+    /// <summary>
+    /// Performs a RAG-powered chat operation with streaming response, exposing the retrieved
+    /// sources (citations) to the caller.
+    /// </summary>
+    /// <param name="userMessage">The latest user message.</param>
+    /// <param name="conversationHistory">Previous messages in the conversation.</param>
+    /// <param name="topK">Maximum number of context chunks to retrieve.</param>
+    /// <param name="systemPrompt">Optional system prompt override.</param>
+    /// <param name="options">Optional LLM completion parameters.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A stream of <see cref="RagStreamEvent"/>: first the sources, then answer
+    /// tokens, and finally a completion event with the aggregated answer.</returns>
+    /// <remarks>
+    /// <para><b>Default implementation:</b> Provided for backward compatibility with existing
+    /// ITechieRag implementers (ADR-005 additive-only); it composes SearchAsync and
+    /// ChatWithRagStreamAsync. TechieRagClient overrides it with a single-retrieval implementation.</para>
+    /// </remarks>
+    async IAsyncEnumerable<RagStreamEvent> ChatWithRagStreamWithSourcesAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var sources = await SearchAsync(userMessage, topK, cancellationToken: cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(sources);
+
+        var answer = new System.Text.StringBuilder();
+        await foreach (var token in ChatWithRagStreamAsync(userMessage, conversationHistory, topK, systemPrompt, options, cancellationToken).ConfigureAwait(false))
+        {
+            answer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        yield return RagStreamEvent.FromCompleted(answer.ToString());
+    }
+
+    /// <summary>
+    /// Gets the configured reranker (if any).
+    /// </summary>
+    /// <returns>The IReranker instance, or null if reranking is not configured (default).</returns>
+    IReranker? GetReranker() => null;
+
+    /// <summary>
+    /// Gets the persistent conversation store (if configured via persistence).
+    /// </summary>
+    /// <returns>The IConversationStore instance, or null if persistence is not configured (default).</returns>
+    IConversationStore? GetConversationStore() => null;
+
+    /// <summary>
+    /// Gets the workspace manager (if configured via persistence).
+    /// </summary>
+    /// <returns>The WorkspaceManager instance, or null if persistence is not configured (default).</returns>
+    Services.WorkspaceManager? GetWorkspaceManager() => null;
 }

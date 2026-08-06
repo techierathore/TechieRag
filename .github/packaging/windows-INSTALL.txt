@@ -1,0 +1,53 @@
+TechieDesk for Windows — installing an UNSIGNED build
+======================================================
+
+This build is not signed with a code-signing certificate (REQ-FN-038c — the
+owner has no certificate yet). Everything in the app works normally; what is
+missing is the signature, so Windows treats it as an unrecognised app.
+
+This is an UNPACKAGED build, not an MSIX installer. That is deliberate: an
+unsigned MSIX cannot be installed by double-clicking unless you first install
+and trust its certificate, whereas this build simply runs. An MSIX installer
+arrives once a certificate exists.
+
+INSTALL
+-------
+1. Unzip this folder anywhere you like — for example
+     C:\Program Files\TechieDesk
+   or somewhere under your user folder if you would rather not need
+   administrator rights.
+
+   Keep the whole folder together. TechieDesk.exe will not run on its own; the
+   surrounding files are the application.
+
+2. Run TechieDesk.exe.
+
+3. SmartScreen will warn: "Windows protected your PC". Click "More info",
+   then "Run anyway". This happens because the app is unsigned, and it stops
+   once the app is signed.
+
+   If you downloaded the zip with a browser, Windows may also mark it as
+   blocked. Right-click the zip BEFORE extracting -> Properties -> tick
+   "Unblock" -> OK, then extract. Unblocking after extraction does not always
+   clear the flag from the extracted files.
+
+4. Optional: right-click TechieDesk.exe -> "Pin to Start" or send a shortcut
+   to your desktop. There is no Start-menu entry, because nothing was
+   installed in the Windows sense — the folder IS the application.
+
+.NET IS NOT REQUIRED
+--------------------
+This build is self-contained: the .NET runtime is included. You do not need to
+install anything else.
+
+YOUR DATA
+---------
+TechieDesk keeps everything under
+    %LOCALAPPDATA%\TechieDesk
+which is outside this folder. Updating the app by replacing the folder does
+not touch your data.
+
+UNINSTALL
+---------
+Delete the folder. To remove your data as well, also delete
+%LOCALAPPDATA%\TechieDesk.

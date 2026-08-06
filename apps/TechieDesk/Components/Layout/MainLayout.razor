@@ -1,0 +1,1173 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ITechieDeskUserContext UserContext
+@inject IRouteGuard RouteGuard
+@inject SessionTokenStore TokenStore
+@inject ISessionStore SessionStore
+@inject ISessionContext SessionContext
+@inject IAppManagerClient AppManager
+@inject TechieDeskAuthenticationStateProvider AuthProvider
+@inject IWorkspaceService Workspaces
+@inject ILicenseService LicenseService
+@using TechieDesk.Services.Setup
+@inject ISetupStateService SetupState
+@* REQ-FN-050: the shell reads the saved RAG config to answer "is an AI provider configured?" for
+   the post-setup hint. Read-only, and only when the answer can change what is on screen. *@
+@inject TechieRagConfigService RagConfig
+@* REQ-FN-049: the shell is the only surface that is on screen for the whole of background
+   initialization, so it is where "still loading" and "this failed" have to be legible. The
+   singleton is written from the thread pool and read here — see AppStartupState. *@
+@using TechieDesk.Services.Hosting
+@inject AppStartupState Startup
+@using TechieDesk.Services.Updates
+@inject TechieDesk.Services.Updates.IUpdateService UpdateService
+@inject TechieDesk.Services.Updates.IUpdatePreferencesStore UpdatePreferences
+@inject TechieDesk.Services.Updates.UpdateLaunchState UpdateLaunch
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject TechieRagManager Rag
+@inject ILogger<MainLayout> Logger
+@* REQ-UI-050 (BRD-91): the shell is on EVERY screen, so it is the highest-leverage place to spend
+   localization effort — a translated page inside an English shell still reads as an English app.
+   Every user-visible string below routes through AppStrings; the nav labels are shared with the
+   breadcrumb map so a screen and its crumb can never drift apart in one language and not another. *@
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-NFR-005 / WCAG 2.4.1: the shell renders ~20 sidebar links ahead of the page content,
+   so without this a keyboard user re-tabs the whole nav on every route. It is the first
+   focusable element in the DOM and is only visible while focused (see .td-skip-link).
+
+   The click is handled by a plain inline `onclick` rather than a bare `href="#..."` fragment
+   or Blazor's @onclick. With <base href="/">, a bare fragment resolves to `/#td-main-content`
+   and Blazor's router intercepts it as a navigation to the ROOT route — measured: activating
+   the link from /settings navigated the app to Home instead of moving focus. Calling
+   preventDefault() in an element-level handler runs before Blazor's document-level click
+   listener and stops the interception, so focus moves without any navigation. Plain JS also
+   avoids an interop round-trip on what must be an instant keyboard affordance. *@
+<a href="#td-main-content" class="td-skip-link"
+   onclick="event.preventDefault();var m=document.getElementById('td-main-content');if(m){m.focus();m.scrollIntoView();}">@Localizer["ShellSkipToMain"]</a>
+
+<SidebarProvider DefaultOpen="true" HeightClass="h-screen">
+    <Sidebar Collapsible="true">
+        <SidebarHeader>
+            @* REQ-UI-037: the lockup reads the operator's own product name and logo when one is set,
+               falling back to TechieDesk's. Deliberately NOT licence-gated — a lapsed licence should
+               stop you CHANGING your branding, not erase your own name from your own window. *@
+            <SidebarHeaderContent>
+                <BrandLockup />
+            </SidebarHeaderContent>
+
+            @* REQ-UI-048 / REQ-UI-014 — the workspace switcher, per docs/TechieDesk-UIDesign.md
+               §"Workspace switcher (2026-07-26)" and docs/mockups/workspace-chat.html: a single
+               trigger naming the workspace you are in, opening a real list of workspaces WITH their
+               chunk counts, then "New workspace…" and "Workspace settings…". It replaces the flat
+               "Workspaces" sidebar group that used to list every workspace inline with a per-row
+               ellipsis menu — that group is what the mockup's one-line switcher is a redesign OF, so
+               keeping both would ship the old shell and the new one at once.
+
+               Rename and Delete moved off that ellipsis menu rather than being dropped: both live on
+               the Workspace Settings screen (its Name field is the rename; its Delete workspace
+               button is the delete), which is exactly where "Workspace settings…" below now leads. *@
+            <div class="td-ws-switcher">
+                <Popover Open="@switcherOpen" OpenChanged="HandleSwitcherOpenChangedAsync">
+                    <PopoverTrigger>
+                        <span class="td-ws-trigger">
+                            <span class="td-ws-dot" aria-hidden="true">@InitialFor(ActiveWorkspaceName)</span>
+                            <span class="td-ws-trigger-name">@ActiveWorkspaceName</span>
+                            <span class="sr-only">@Localizer["ShellSwitchWorkspace"]</span>
+                            <span class="td-ws-chevron" aria-hidden="true">
+                                <LucideIcon Name="chevrons-up-down" Size="14" />
+                            </span>
+                        </span>
+                    </PopoverTrigger>
+                    <PopoverContent Class="w-64 p-1">
+                        <div class="td-ws-grouplabel">@Localizer["ShellWorkspacesGroup"]</div>
+                        @if (workspaces.Count == 0)
+                        {
+                            <div class="td-ws-empty">@Localizer["ShellNoWorkspacesYet"]</div>
+                        }
+                        @foreach (var ws in workspaces)
+                        {
+                            var slug = Workspaces.SlugFor(ws);
+                            <button type="button" class="td-ws-item" @onclick="@(() => SwitchToWorkspace(slug))">
+                                <span class="td-ws-dot" aria-hidden="true">@InitialFor(ws.Name)</span>
+                                <span class="td-ws-item-name">@ws.Name</span>
+                                <span class="td-ws-count">@ChunkCountLabel(ws)</span>
+                            </button>
+                        }
+                        @if (Workspaces.CanManageWorkspaces)
+                        {
+                            <div class="td-ws-sep"></div>
+                            <button type="button" class="td-ws-action" @onclick="BeginCreateWorkspace">@Localizer["ShellNewWorkspaceAction"]</button>
+                            @if (ActiveOrFirstSlug is { Length: > 0 })
+                            {
+                                <button type="button" class="td-ws-action" @onclick="GoToWorkspaceSettings">@Localizer["ShellWorkspaceSettingsAction"]</button>
+                            }
+                        }
+                    </PopoverContent>
+                </Popover>
+            </div>
+        </SidebarHeader>
+        <SidebarContent>
+            @* REQ-UI-048: the nav below follows docs/TechieDesk-UIDesign.md §"Layout shell" and
+               docs/mockups/workspace-chat.html — groups Workspace / Account / Operator / Console,
+               under the workspace switcher. What was here until 2026-07-27 was the TechieRag sample
+               application's nav (General · Data · AI Features · Monitoring, with File Ingestion /
+               LLM Playground / Tool Demo), which survived the MAUI conversion untouched. The demo
+               "Home" entry is gone with it: it pointed at a library landing page that appears in no
+               mockup. Items whose screens do not exist yet are NOT listed — a nav link to a route
+               that 404s is worse than an absent one; each arrives with its screen. *@
+
+            @* REQ-UI-053: every entry below carries a ROUTE-DERIVED `id` — "nav-" plus the route with
+               its slashes turned into hyphens (`/settings/data` → `nav-settings-data`), and the
+               workspace slug dropped because it is per-install data, not an identity
+               (`/workspace/{slug}/agents` → `nav-workspace-agents`). It is a plain HTML attribute
+               and not a MAUI `AutomationId` on purpose: these links are WebKit-rendered DOM inside
+               the BlazorWebView, so no native control exists to hang an AutomationId on — it would
+               splat onto the anchor as a meaningless `automationid=` attribute that nothing reads
+               (the `AriaLabel`/`arialabel=` precedent). `id` is the DOM attribute WebKit itself
+               carries into the accessibility object (`identifierAttribute()`), so it is the only
+               candidate that can ever reach an automation client. Whether it arrives as the macOS
+               `identifier` is WebKit's decision, not ours, and is measured — not assumed — by
+               `python3 tests/appium/nav.py ids` against a running head.
+
+               Why it exists: tests/appium/ could previously only find these links by their DISPLAYED
+               TEXT, which REQ-UI-050 localizes, so REQ-NFR-011 had the harness resolve the current
+               language's labels out of AppStrings*.resx — a UI test coupled to the product's
+               resource KEYS, which any rename breaks. An id is locale-invariant and route-derived,
+               so it survives both re-translation and a resource-key rename.
+
+               These ids are a PUBLIC CONTRACT with tests/appium/nav.py (see its NAV_IDS table and
+               the README): rename a route and you rename an id, and the harness's identifier lookup
+               must be updated in the same change. It falls back to the resource-key label lookup, so
+               a missed rename degrades rather than strands the sweep — but it degrades silently, so
+               do not rely on it. *@
+
+            @* Workspace — scoped to the workspace the switcher above has selected. The mockup shows
+               Chat · Documents · Connectors · Agents · Automations · Workspace Settings. Connectors
+               (REQ-RAG-016/017, REQ-FN-020) and Agents (REQ-UI-045) both exist; Automations
+               (REQ-UI-046) is global and lives under Operator. *@
+            @if (ActiveOrFirstSlug is { Length: > 0 } workspaceSlug)
+            {
+                <SidebarGroup>
+                    <SidebarGroupLabel Class="td-nav-group">@Localizer["NavGroupWorkspace"]</SidebarGroupLabel>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{workspaceSlug}")" Tooltip="@Localizer["NavChat"]" id="nav-workspace-chat">
+                                    <LucideIcon aria-hidden="true" Name="message-square" Size="16" />
+                                    <span>@Localizer["NavChat"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{workspaceSlug}/documents")" Tooltip="@Localizer["NavDocuments"]" id="nav-workspace-documents">
+                                    <LucideIcon aria-hidden="true" Name="file-text" Size="16" />
+                                    <span>@Localizer["NavDocuments"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            @* REQ-RAG-016/017 + REQ-FN-020 — the mockup's "Connectors" entry, now
+                               pointing at the hub the mockup draws (docs/mockups/connectors.html).
+                               Until 2026-07-27 this was labelled "Add from web" and pointed at
+                               /workspace/{slug}/documents/web, because the web ingestion surface was
+                               the only source that existed and calling it "Connectors" would have
+                               promised a multi-source hub the click did not deliver. That is no
+                               longer true: the hub exists, it carries the source grid and the job
+                               monitor, and the web sources are two tiles on it, so the entry takes
+                               the mockup's own name. The web screen keeps its route and is reached
+                               from the hub — and still directly from the document library. *@
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{workspaceSlug}/connectors")" Tooltip="@Localizer["NavConnectors"]" id="nav-workspace-connectors">
+                                    <LucideIcon aria-hidden="true" Name="link" Size="16" />
+                                    <span>@Localizer["NavConnectors"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            @* REQ-UI-045 — the agents screen now exists, so it takes its designed
+                               place in this group. Automations is the last entry the mockup lists
+                               here; it is a global surface and sits under Operator. *@
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{workspaceSlug}/agents")" Tooltip="@Localizer["NavAgents"]" id="nav-workspace-agents">
+                                    <LucideIcon aria-hidden="true" Name="bot" Size="16" />
+                                    <span>@Localizer["NavAgents"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            @* REQ-UI-040 (BRD-92) — the no-code flow builder, beside Agents because a
+                               flow composes the agents defined there and is scoped to the same
+                               workspace. *@
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{workspaceSlug}/flows")" Tooltip="@Localizer["NavFlows"]" id="nav-workspace-flows">
+                                    <LucideIcon aria-hidden="true" Name="workflow" Size="16" />
+                                    <span>@Localizer["NavFlows"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="@($"/workspace/{workspaceSlug}/settings")" Tooltip="@Localizer["NavWorkspaceSettings"]" id="nav-workspace-settings">
+                                    <LucideIcon aria-hidden="true" Name="settings-2" Size="16" />
+                                    <span>@Localizer["NavWorkspaceSettings"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
+            }
+
+            <SidebarGroup>
+                <SidebarGroupLabel Class="td-nav-group">@Localizer["NavGroupAccount"]</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/profile" Tooltip="@Localizer["NavProfile"]" id="nav-profile">
+                                <LucideIcon aria-hidden="true" Name="user" Size="16" />
+                                <span>@Localizer["NavProfile"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/pricing" Tooltip="@Localizer["NavPricing"]" id="nav-pricing">
+                                <LucideIcon aria-hidden="true" Name="credit-card" Size="16" />
+                                <span>@Localizer["NavPricing"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        @* REQ-UI-030/031 and REQ-UI-032/033 — both screens now exist, completing
+                           this group as the design specifies (Profile · Pricing · Billing · Support). *@
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/billing" Tooltip="@Localizer["NavBilling"]" id="nav-billing">
+                                <LucideIcon aria-hidden="true" Name="receipt" Size="16" />
+                                <span>@Localizer["NavBilling"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/support" Tooltip="@Localizer["NavSupport"]" id="nav-support">
+                                <LucideIcon aria-hidden="true" Name="life-buoy" Size="16" />
+                                <span>@Localizer["NavSupport"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        @* REQ-FN-036 / BRD-129: the ONLY route into /login. The app never sends
+                           anyone here — it is a settings-area affordance for activating a licence,
+                           which is what signing in now means. *@
+                        @if (!RouteGuard.IsSignedIn)
+                        {
+                            <SidebarMenuItem>
+                                <SidebarMenuButton Href="/login" Tooltip="@Localizer["ShellSignInTooltip"]" id="nav-login">
+                                    <LucideIcon aria-hidden="true" Name="log-in" Size="16" />
+                                    <span>@Localizer["NavSignIn"]</span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        }
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            @* Operator — Event Log and App Settings are the two the mockup names (REQ-UI-026/028);
+               Automations (REQ-FN-042/REQ-UI-046) is a global surface rather than a workspace one, so
+               it sits here rather than in the Workspace group. Data & Storage and Updates belong to
+               the operator's surface too and live here rather than in the retired "Configuration". *@
+            <SidebarGroup>
+                <SidebarGroupLabel Class="td-nav-group">@Localizer["NavGroupOperator"]</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/admin/events" Tooltip="@Localizer["NavEventLog"]" id="nav-admin-events">
+                                <LucideIcon aria-hidden="true" Name="scroll-text" Size="16" />
+                                <span>@Localizer["NavEventLog"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/admin/settings" Tooltip="@Localizer["NavAppSettings"]" id="nav-admin-settings">
+                                <LucideIcon aria-hidden="true" Name="sliders-horizontal" Size="16" />
+                                <span>@Localizer["NavAppSettings"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/automations" Tooltip="@Localizer["NavAutomations"]" id="nav-automations">
+                                <LucideIcon aria-hidden="true" Name="calendar-clock" Size="16" />
+                                <span>@Localizer["NavAutomations"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/settings/data" Tooltip="@Localizer["NavDataStorage"]" id="nav-settings-data">
+                                <LucideIcon aria-hidden="true" Name="hard-drive" Size="16" />
+                                <span>@Localizer["NavDataStorage"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        @* REQ-FN-046/047 (BRD-144/145): a sibling of Data & Storage, because both
+                           are about where the operator's own data lives and moves. *@
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/settings/backup" Tooltip="@Localizer["NavBackupRestore"]" id="nav-settings-backup">
+                                <LucideIcon aria-hidden="true" Name="archive" Size="16" />
+                                <span>@Localizer["NavBackupRestore"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/settings/updates" Tooltip="@Localizer["NavUpdates"]" id="nav-settings-updates">
+                                <LucideIcon aria-hidden="true" Name="download" Size="16" />
+                                <span>@Localizer["NavUpdates"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+
+            @* Console — the three reskinned library screens, exactly as the design groups them. *@
+            <SidebarGroup>
+                <SidebarGroupLabel Class="td-nav-group">@Localizer["NavGroupConsole"]</SidebarGroupLabel>
+                <SidebarGroupContent>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/qdrant-admin" Tooltip="@Localizer["NavQdrantAdmin"]" id="nav-qdrant-admin">
+                                <LucideIcon aria-hidden="true" Name="database" Size="16" />
+                                <span>@Localizer["NavQdrantAdmin"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/llm-settings" Tooltip="@Localizer["NavLlmSettings"]" id="nav-llm-settings">
+                                <LucideIcon aria-hidden="true" Name="cpu" Size="16" />
+                                <span>@Localizer["NavLlmSettings"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/token-usage" Tooltip="@Localizer["NavTokenUsage"]" id="nav-token-usage">
+                                <LucideIcon aria-hidden="true" Name="bar-chart-3" Size="16" />
+                                <span>@Localizer["NavTokenUsage"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        @* REQ-RAG-004 (BRD-6) + REQ-RAG-005 (BRD-7) — re-linked 2026-07-28.
+
+                           Both screens shipped with ZERO inbound links: no nav entry, no in-app link,
+                           and absent from the native Go menu, so neither P0 capability could be
+                           reached by any user. They survived the REQ-UI-049 sample-app retirement
+                           because deleting them would have removed BRD-6 and BRD-7 outright — nothing
+                           supersedes either (there is no paste-text path on Documents or Add-from-web,
+                           and LLM Settings is provider configuration, not a playground).
+
+                           Console rather than Workspace on purpose: REQ-UI-048 froze the Workspace
+                           group against docs/mockups/workspace-chat.html, and both of these are
+                           machine-wide console tools that ingest into / query the RAG store directly,
+                           not workspace-scoped screens. ⚠ The approved mockup does not contain these
+                           two entries — this is a deliberate divergence to make two P0 requirements
+                           reachable again, and it is the smallest one available. *@
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/text-ingestion" Tooltip="@Localizer["ShellTextIngestionTooltip"]" id="nav-text-ingestion">
+                                <LucideIcon aria-hidden="true" Name="clipboard-paste" Size="16" />
+                                <span>@Localizer["NavTextIngestion"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/llm-playground" Tooltip="@Localizer["NavLlmPlayground"]" id="nav-llm-playground">
+                                <LucideIcon aria-hidden="true" Name="flask-conical" Size="16" />
+                                <span>@Localizer["NavLlmPlayground"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                        @* REQ-UI-049 — "/rag-config", renamed from "/settings" 2026-07-28. Linked
+                           here because repointing ⌘, at App Settings (macOS convention) would
+                           otherwise have left this screen with no way in. Console, not Operator: it
+                           configures the RAG plumbing — embedding source, vector store, processing —
+                           which is what the rest of this group does. *@
+                        <SidebarMenuItem>
+                            <SidebarMenuButton Href="/rag-config" Tooltip="@Localizer["ShellRagConfigTooltip"]" id="nav-rag-config">
+                                <LucideIcon aria-hidden="true" Name="sliders-horizontal" Size="16" />
+                                <span>@Localizer["NavRagConfiguration"]</span>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarGroupContent>
+            </SidebarGroup>
+        </SidebarContent>
+
+        @* REQ-UI-048 — the sidebar footer from docs/mockups/workspace-chat.html: who is at the
+           keyboard, where their data lives, and what they are entitled to. "This Mac" is literal,
+           not a hostname: BRD-129/BRD-132 make the install single-user and the data local, and the
+           line exists to say the documents never left the machine. The plan comes from the same
+           LicenseStatus that feeds the topbar badge, so the two can never disagree. *@
+        <SidebarFooter>
+            <div class="td-shell-footer">
+                <Avatar Size="AvatarSize.Small">
+                    <AvatarFallback>@UserInitials</AvatarFallback>
+                </Avatar>
+                <span class="td-shell-footer-id">
+                    <span class="td-shell-footer-name">@CurrentUser.DisplayName</span>
+                    <span class="td-shell-footer-host">@Localizer["ShellThisMac"]</span>
+                </span>
+                <span class="td-shell-footer-plan">
+                    <Badge Variant="BadgeVariant.Secondary">@PlanLabel</Badge>
+                </span>
+            </div>
+        </SidebarFooter>
+    </Sidebar>
+
+    <SidebarInset>
+        @* REQ-UI-048 — the Breadcrumb topbar (UIDesign §"Layout shell": "SidebarInset main column
+           with a Breadcrumb topbar (license badge + avatar right)"). The mockup's crumb reads
+           "Workspace: Contracts / Chat" — a section that is a link and a current page that is not,
+           which is exactly the BreadcrumbLink/BreadcrumbPage split. *@
+        <header class="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+            @* REQ-NFR-005 / WCAG 4.1.2: the trigger is icon-only, and its icon is rendered by the
+               library, so the name has to be put on the button itself. *@
+            <SidebarTrigger aria-label="@Localizer["ShellSidebarToggle"]" />
+            <Breadcrumb>
+                <BreadcrumbList>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink Href="@CurrentTrail.SectionHref">@CurrentTrail.SectionLabel</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                        <BreadcrumbPage>@CurrentTrail.PageLabel</BreadcrumbPage>
+                    </BreadcrumbItem>
+                </BreadcrumbList>
+            </Breadcrumb>
+            <div class="ml-auto flex items-center gap-3">
+                @* REQ-UI-038 — every mockup carries a theme toggle in this position. *@
+                <ThemeToggle />
+                @* The licence badge. It replaces a badge that printed CurrentUser.Role — a value
+                   REQ-FN-041 retired the meaning of (one install, one owner, no roles to show). *@
+                <a href="/pricing" class="td-license-link">
+                    <Badge Variant="BadgeVariant.Secondary">@PlanLabel</Badge>
+                </a>
+                <DropdownMenu>
+                    @* REQ-NFR-005: same nested-interactive fix as the workspace-actions trigger above.
+                       The `outline-none focus-visible:ring-*` classes are dropped with the inner
+                       button — they resolved to an invisible ring here (no Tailwind JIT to emit
+                       --tw-ring-color), and the trigger now picks up the real focus outline from
+                       the global :focus-visible rule in base.css. *@
+                    <DropdownMenuTrigger>
+                        <span class="flex items-center gap-2 rounded-full">
+                            <Avatar Size="AvatarSize.Small">
+                                <AvatarFallback>@UserInitials</AvatarFallback>
+                            </Avatar>
+                            <span class="sr-only">@Localizer["ShellUserMenu"]</span>
+                        </span>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent Class="w-56">
+                        <DropdownMenuLabel>
+                            <div class="flex flex-col">
+                                <span class="font-semibold">@CurrentUser.DisplayName</span>
+                                <span class="text-xs font-normal text-muted-foreground">@CurrentUser.Email</span>
+                            </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem OnClick="GoToProfile">
+                            <LucideIcon aria-hidden="true" Name="user" Size="16" />
+                            <span class="ml-2">@Localizer["NavProfile"]</span>
+                        </DropdownMenuItem>
+                        @* REQ-FN-036 / BRD-129: sign-in is an OFFER, not a gate. When no account is
+                           active the menu offers to activate a licence; the app is already fully
+                           usable without one, so this is the only way /login is ever reached. *@
+                        @if (RouteGuard.IsSignedIn)
+                        {
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem OnClick="@(() => LogoutAsync(false))">
+                                <LucideIcon aria-hidden="true" Name="log-out" Size="16" />
+                                <span class="ml-2">@Localizer["ShellLogOut"]</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem OnClick="@(() => LogoutAsync(true))">
+                                <LucideIcon aria-hidden="true" Name="log-out" Size="16" />
+                                <span class="ml-2">@Localizer["ShellLogOutAllDevices"]</span>
+                            </DropdownMenuItem>
+                        }
+                        else
+                        {
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem OnClick="GoToSignIn">
+                                <LucideIcon aria-hidden="true" Name="log-in" Size="16" />
+                                <span class="ml-2">@Localizer["ShellSignInActivate"]</span>
+                            </DropdownMenuItem>
+                        }
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        </header>
+        @* REQ-FN-049: the in-shell binding to AppStartupState. Until now the only report of a
+           background-startup failure was a native alert plus a Serilog line — the alert is gone the
+           moment it is dismissed, the log is somewhere the user will never look, and the running
+           shell said nothing at all, so an empty document library looked like an empty install.
+
+           Two states, both non-blocking, because the window is deliberately open BEFORE this work
+           finishes (that is the whole of REQ-FN-049): "still loading" explains an empty-looking
+           screen while it is legitimately still filling, and "did not finish" explains one that
+           never will. Neither gates a route — a failed store still leaves settings, licensing and
+           the wizard usable, and hiding them behind a modal would be a second launch gate.
+
+           Ordered ABOVE the licence and provider strips on purpose: if the store did not come up,
+           that is the fact that explains everything else the user is about to see. *@
+        @if (Startup.Phase == AppStartupPhase.Initializing)
+        {
+            <div class="border-b bg-muted/40 px-4 py-2" role="status" aria-live="polite">
+                <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner Size="SpinnerSize.Small" />
+                    <span>@Localizer["ShellStartupInitializing"]</span>
+                </div>
+            </div>
+        }
+        else if (Startup.Phase == AppStartupPhase.Failed && !startupFailureDismissed)
+        {
+            <div class="border-b bg-destructive/10 px-4 py-2 text-destructive" role="alert">
+                <div class="flex items-center gap-2 text-sm">
+                    <LucideIcon aria-hidden="true" Name="triangle-alert" Size="14" />
+                    <span>@Localizer["ShellStartupFailed"]</span>
+                    @* The exception text, verbatim and unlocalized: it names the file, port or
+                       database that would not open, which is the only part the operator can act on
+                       and the only part no translation could improve. *@
+                    <span class="flex-1 truncate opacity-80">@Startup.FailureMessage</span>
+                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                            aria-label="@Localizer["ShellStartupFailedDismiss"]"
+                            OnClick="DismissStartupFailure">
+                        <LucideIcon aria-hidden="true" Name="x" Size="14" />
+                    </Button>
+                </div>
+            </div>
+        }
+        @* REQ-FN-015/BRD-51: when AppManager is unreachable, a banner makes it explicit that the
+           instance is running on the cached last-known-good license (or degraded once grace ends). *@
+        @if (licenseStatus is { IsFromCache: true })
+        {
+            <div class="border-b px-4 py-2 @(licenseStatus.Availability == LicenseAvailability.GraceExpired ? "bg-destructive/10 text-destructive" : "bg-amber-500/10 text-amber-700 dark:text-amber-400")">
+                <div class="flex items-center gap-2 text-sm">
+                    <LucideIcon aria-hidden="true" Name="wifi-off" Size="14" />
+                    <span>@licenseStatus.Describe(LocalizeLicense)</span>
+                    <a href="/pricing" class="ml-auto underline underline-offset-2">@Localizer["ViewPlans"]</a>
+                </div>
+            </div>
+        }
+        @* REQ-FN-050 acceptance (5): once first-run setup is SETTLED, a missing AI provider is a
+           hint and nothing more — an inline strip the user can dismiss for good, never a redirect
+           back into the wizard. It is not rendered at all for someone who chose embedded-only on
+           purpose (acceptance 4), so the deliberate offline user sees nothing here, ever. *@
+        @if (showProviderHint)
+        {
+            <div class="border-b bg-primary/5 px-4 py-2">
+                <div class="flex items-center gap-2 text-sm">
+                    <LucideIcon aria-hidden="true" Name="sparkles" Size="14" />
+                    <span>@Localizer["ShellNoProviderHint"]</span>
+                    <a href="/llm-settings" class="ml-auto underline underline-offset-2">@Localizer["ShellNoProviderHintAction"]</a>
+                    <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                            aria-label="@Localizer["ShellNoProviderHintDismiss"]"
+                            OnClick="DismissProviderHintAsync">
+                        <LucideIcon aria-hidden="true" Name="x" Size="14" />
+                    </Button>
+                </div>
+            </div>
+        }
+        @* REQ-NFR-005: id is the skip-link target; tabindex="-1" lets it receive programmatic
+           focus from the fragment jump without entering the tab order itself. *@
+        <div id="td-main-content" tabindex="-1" class="flex-1 overflow-auto p-6 md:p-8">
+            @Body
+        </div>
+    </SidebarInset>
+</SidebarProvider>
+
+<!-- REQ-UI-014: create workspace -->
+<Dialog @bind-Open="showCreateDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["NewWorkspaceTitle"]</DialogTitle>
+            <DialogDescription>@Localizer["NewWorkspaceDescription"]</DialogDescription>
+        </DialogHeader>
+        <div class="py-2">
+            <Input @bind-Value="newWorkspaceName" Placeholder="@Localizer["NewWorkspaceNamePlaceholder"]" />
+        </div>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showCreateDialog = false)">@Localizer["Cancel"]</Button>
+            <Button OnClick="ConfirmCreateWorkspaceAsync" Disabled="@string.IsNullOrWhiteSpace(newWorkspaceName)">@Localizer["Create"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+<ToastProvider Position="ToastPosition.BottomRight" />
+<PortalHost />
+
+@code {
+    private TechieDeskUser CurrentUser => UserContext.CurrentUser;
+
+    private IReadOnlyList<Workspace> workspaces = Array.Empty<Workspace>();
+
+    // The slug of the workspace currently being viewed, so the active workspace can reveal its
+    // Documents sub-link (Wave 4). Recomputed on every navigation.
+    private string? activeSlug;
+
+    // REQ-UI-048: the Workspace nav group is scoped to a workspace, so it needs one even when the
+    // current route is not workspace-scoped (Profile, Qdrant Admin, …). Falling back to the first
+    // workspace keeps the group present and useful everywhere instead of making it appear and
+    // vanish as the user moves around — and it is null only on a genuinely empty install, where the
+    // group is correctly hidden rather than linking to /workspace//documents.
+    private string? ActiveOrFirstSlug =>
+        activeSlug ?? (workspaces.Count > 0 ? Workspaces.SlugFor(workspaces[0]) : null);
+
+    private bool showCreateDialog;
+    private string newWorkspaceName = string.Empty;
+
+    // REQ-UI-048: the workspace-switcher popover is CONTROLLED so that picking a workspace, or any
+    // of the two actions below the list, closes it — an uncontrolled popover only closes on an
+    // outside click, which would leave the list hanging over the screen it just navigated to.
+    private bool switcherOpen;
+
+    // Chunk totals per workspace id, shown beside each name in the switcher. Loaded lazily the
+    // first time the popover opens rather than during OnInitializedAsync: the total is a join over
+    // the vector-store document catalogue, so an unreachable or cold store would otherwise stall
+    // the whole shell on every launch for a number nobody has asked to see yet.
+    private readonly Dictionary<string, int> workspaceChunkCounts = new(StringComparer.Ordinal);
+    private bool chunkCountsLoaded;
+
+    // The workspace switcher reflects assignment changes, so it is reloaded on first render and
+    // after every navigation (create/rename/delete happen here or on the settings page).
+    // REQ-FN-013/015: keep the license status fresh (validated at login and periodically on
+    // navigation) so the cached-license banner reflects the live AppManager reachability state.
+    private LicenseStatus? licenseStatus;
+
+    // REQ-UI-055 (BRD-91): the licensing services return a resource KEY plus its arguments, never
+    // an English sentence. This is the single call that turns one into text on this surface.
+    private string LocalizeLicense(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
+
+    // REQ-FN-050: set by GuardFirstRunAsync only when setup is COMPLETE, no provider is configured,
+    // and the user did not deliberately choose embedded-only. It renders a dismissible strip — the
+    // requirement is explicit that a missing provider after setup must never force a redirect.
+    private bool showProviderHint;
+
+    // REQ-FN-049: dismissal of the startup-failure strip is per-circuit and deliberately NOT
+    // persisted. The failure is a fact about THIS launch — if the next launch comes up clean the
+    // strip has nothing to say, and if it fails again the user needs telling again. Persisting it
+    // would silence a real, recurring failure forever on the strength of one impatient click.
+    private bool startupFailureDismissed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWorkspacesAsync();
+        await GuardFirstRunAsync();
+        await RefreshLicenseStatusAsync();
+        await CheckForUpdatesAtLaunchAsync();
+    }
+
+    // REQ-FN-038b. Off unless the operator turned it on (REQ-NFR-008: a stock install makes no
+    // unsolicited outbound call), and claimed once per launch so navigation cannot turn one check
+    // into continuous polling. Failures are logged and never surfaced — an update check that could
+    // not reach the network is not something to interrupt someone's work with; the Updates screen
+    // reports it honestly when they go looking.
+    private async Task CheckForUpdatesAtLaunchAsync()
+    {
+        try
+        {
+            var preferences = await UpdatePreferences.LoadAsync();
+            if (!preferences.AutoCheckOnLaunch || !UpdateLaunch.TryClaimLaunchCheck())
+            {
+                return;
+            }
+
+            var result = await UpdateService.CheckAsync();
+            if (result is { Status: UpdateCheckStatus.UpdateAvailable, Release: not null })
+            {
+                ToastService.Show(
+                    Localizer["ShellUpdateAvailableMessage", result.Release.Version],
+                    Localizer["ShellUpdateAvailableTitle"]);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "The launch update check did not complete");
+        }
+    }
+
+    private async Task RefreshLicenseStatusAsync()
+    {
+        try
+        {
+            licenseStatus = await LicenseService.EnsureFreshAsync();
+        }
+        catch (Exception ex)
+        {
+            // A license read must never take down the shell.
+            Logger.LogWarning(ex, "License status refresh failed; continuing without the banner");
+        }
+    }
+
+    // Wave 5 (REQ-UI-022/023): a fresh instance is routed to the /setup wizard. The wizard itself
+    // renders on AuthLayout, so it never re-enters this guard (no redirect loop).
+    //
+    // REQ-FN-036: the `if (!RouteGuard.IsAuthenticated) return;` head of this method is gone with
+    // the login gate. It only existed because an unauthenticated AppManager visitor was about to be
+    // bounced to /login anyway; with no such bounce, skipping first-run setup for a visitor who has
+    // not signed in would strand a brand-new install on an unconfigured shell.
+    //
+    // REQ-FN-050: what used to sit here was `if (workspaces.Count > 0) { return; }`, ABOVE the flag
+    // check. Its comment described the check as "deliberately SATISFIABLE in the offline/dev state
+    // so the shell keeps serving every existing route" — i.e. it was an escape hatch to stop a
+    // Wave-3 instance that predated the SetupComplete flag from having every route hijacked by a
+    // wizard it had no way to satisfy. What it did NOT anticipate is REQ-FN-009, which
+    // auto-bootstraps a default workspace on first boot: the count is therefore > 0 from the very
+    // first launch, the flag check below was unreachable, and /setup was never shown to anybody.
+    //
+    // Removing it is safe because the thing it was protecting against no longer exists: every exit
+    // from the wizard — a full finish, an offline/embedded-only finish, and the new explicit skip —
+    // writes the completion flag, so ANY install now sees it at most once and never again. The
+    // redirect-loop protection it was conflated with is separate and intact (the /setup route check
+    // below plus the wizard's AuthLayout), and Setup.EnsureWorkspaceAsync already refuses to
+    // duplicate an existing bootstrapped workspace.
+    //
+    // REQ-FN-049 made keying off the workspace count actively DANGEROUS as well as wrong: the
+    // default-workspace bootstrap now runs in background initialization, so `workspaces` can read
+    // empty on a mature install purely because the load has not finished. Any residual dependence on
+    // the count would therefore throw an EXISTING user into the wizard on launch — the very thing
+    // the owner objected to. The count is passed to the gate for reporting and is asserted
+    // irrelevant in both directions by FirstRunGateTests; the flag alone decides.
+    private async Task GuardFirstRunAsync()
+    {
+        var relative = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+        var onSetupRoute = relative.StartsWith("/setup", StringComparison.OrdinalIgnoreCase);
+
+        try
+        {
+            var state = await SetupState.ReadAsync();
+
+            // The live provider state only changes what the user sees in the one case that can end
+            // in a hint. Skipping the read otherwise keeps config I/O off the launch path for a
+            // fresh install, for a deliberate offline install, and for anyone who has dismissed.
+            var providerReadMatters = !onSetupRoute
+                && state.Complete
+                && !state.ChoseEmbeddedOnly
+                && !state.ProviderHintDismissed;
+            var providerConfigured = !providerReadMatters || await IsLlmProviderConfiguredAsync();
+
+            var outcome = FirstRunGate.Decide(new FirstRunContext
+            {
+                SetupComplete = state.Complete,
+                WorkspaceCount = workspaces.Count,
+                ProviderConfigured = providerConfigured,
+                ChoseEmbeddedOnly = state.ChoseEmbeddedOnly,
+                ProviderHintDismissed = state.ProviderHintDismissed,
+                OnSetupRoute = onSetupRoute
+            });
+
+            switch (outcome)
+            {
+                case FirstRunOutcome.ShowWizard:
+                    Nav.NavigateTo("/setup", forceLoad: false, replace: true);
+                    break;
+                case FirstRunOutcome.ShowProviderHint:
+                    showProviderHint = true;
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Never let a setup-state read fault take down the shell — fail open so routes serve.
+            Logger.LogWarning(ex, "First-run setup guard check failed; continuing without redirect");
+        }
+    }
+
+    // REQ-FN-050: "is there an LLM to talk to". Read from the saved RAG config rather than from the
+    // running pipeline so an unreachable-but-configured provider still counts as configured — the
+    // hint is about a MISSING choice, not about a server being down, and a down server is already
+    // reported where the user can act on it.
+    private async Task<bool> IsLlmProviderConfiguredAsync()
+    {
+        try
+        {
+            var config = await RagConfig.LoadConfigAsync();
+            return config.Llm.Source != LlmSource.None;
+        }
+        catch (Exception ex)
+        {
+            // Unknown is not "missing": say configured so an unreadable config never produces a
+            // hint the user cannot act on.
+            Logger.LogWarning(ex, "Could not read the LLM configuration for the first-run hint");
+            return true;
+        }
+    }
+
+    // REQ-FN-050 acceptance (5): dismissal is persisted, so the hint is a one-time nudge for the
+    // life of the install rather than something that returns on the next launch.
+    private async Task DismissProviderHintAsync()
+    {
+        showProviderHint = false;
+        try
+        {
+            await SetupState.DismissProviderHintAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not persist the AI-provider hint dismissal");
+        }
+    }
+
+    private async Task LoadWorkspacesAsync()
+    {
+        try
+        {
+            workspaces = await Workspaces.ListForCurrentUserAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load the workspace switcher list");
+            workspaces = Array.Empty<Workspace>();
+        }
+        finally
+        {
+            // The membership set may have changed with the list, so the counts are re-derived on
+            // the next open rather than shown stale.
+            chunkCountsLoaded = false;
+            workspaceChunkCounts.Clear();
+        }
+    }
+
+    // REQ-UI-048: opening the switcher is what pays for the chunk counts. Nothing else in the shell
+    // needs them, and the popover renders immediately with the names — the counts fill in when the
+    // join completes, so a slow store delays a number, never the menu.
+    private async Task HandleSwitcherOpenChangedAsync(bool open)
+    {
+        switcherOpen = open;
+        if (open)
+        {
+            await LoadWorkspaceChunkCountsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Totals the chunks each workspace can retrieve from: its document memberships joined to the
+    /// global document catalogue, which is where the per-document chunk count lives.
+    /// </summary>
+    private async Task LoadWorkspaceChunkCountsAsync()
+    {
+        if (chunkCountsLoaded)
+        {
+            return;
+        }
+
+        chunkCountsLoaded = true;
+        try
+        {
+            var manager = await Rag.GetWorkspaceManagerAsync();
+            if (manager is null)
+            {
+                return;
+            }
+
+            var chunksByDocument = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var document in await Rag.ListDocumentsAsync())
+            {
+                chunksByDocument[document.Id] = document.ChunkCount;
+            }
+
+            var store = manager.GetStore();
+            foreach (var workspace in workspaces)
+            {
+                var total = 0;
+                foreach (var link in await store.ListDocumentsAsync(workspace.WorkspaceId))
+                {
+                    total += chunksByDocument.TryGetValue(link.DocumentId, out var count) ? count : 0;
+                }
+
+                workspaceChunkCounts[workspace.WorkspaceId] = total;
+            }
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            // A count is decoration. Losing it must never cost the user the switcher itself.
+            Logger.LogWarning(ex, "Failed to total workspace chunk counts for the switcher");
+        }
+    }
+
+    // Rendered blank rather than "0" until the totals are in, so an unknown count is never
+    // mistaken for an empty workspace.
+    private string ChunkCountLabel(Workspace workspace) =>
+        workspaceChunkCounts.TryGetValue(workspace.WorkspaceId, out var count)
+            ? count.ToString("N0")
+            : string.Empty;
+
+    private void SwitchToWorkspace(string slug)
+    {
+        switcherOpen = false;
+        Nav.NavigateTo($"/workspace/{slug}");
+    }
+
+    private void BeginCreateWorkspace()
+    {
+        switcherOpen = false;
+        showCreateDialog = true;
+    }
+
+    private void GoToWorkspaceSettings()
+    {
+        switcherOpen = false;
+        if (ActiveOrFirstSlug is { Length: > 0 } slug)
+        {
+            Nav.NavigateTo($"/workspace/{slug}/settings");
+        }
+    }
+
+    // The name shown on the switcher trigger: the workspace being viewed, else the one the
+    // Workspace nav group is scoped to, else an honest placeholder on an empty install.
+    private string ActiveWorkspaceName
+    {
+        get
+        {
+            if (ActiveOrFirstSlug is not { Length: > 0 } slug)
+            {
+                return Localizer["ShellNoWorkspace"];
+            }
+
+            foreach (var workspace in workspaces)
+            {
+                if (string.Equals(Workspaces.SlugFor(workspace), slug, StringComparison.OrdinalIgnoreCase))
+                {
+                    return workspace.Name;
+                }
+            }
+
+            return slug;
+        }
+    }
+
+    private static string InitialFor(string name) =>
+        string.IsNullOrWhiteSpace(name) ? "?" : name.Trim()[..1].ToUpperInvariant();
+
+    private async Task ConfirmCreateWorkspaceAsync()
+    {
+        if (string.IsNullOrWhiteSpace(newWorkspaceName)) return;
+        try
+        {
+            var created = await Workspaces.CreateWorkspaceAsync(newWorkspaceName);
+            showCreateDialog = false;
+            newWorkspaceName = string.Empty;
+            await LoadWorkspacesAsync();
+            Nav.NavigateTo($"/workspace/{Workspaces.SlugFor(created)}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create workspace");
+            ToastService.Error(ex.Message, Localizer["ShellCreateWorkspaceFailed"]);
+        }
+    }
+
+    // REQ-FN-036 / BRD-129: the shell no longer guards routes against sign-in. It used to call
+    // GuardCurrentRoute() here and on every navigation, which asked IRouteGuard for a
+    // /login?returnUrl=... redirect and pushed an unauthenticated visitor to the login screen
+    // before any page rendered — the launch gate. It is deleted, not disabled: the guard has no
+    // member left that can produce a /login URL. Sign-in activates a licence and is reached
+    // deliberately from the Account area; it never decides whether a route is served.
+    protected override void OnInitialized()
+    {
+        Nav.LocationChanged += HandleLocationChanged;
+
+        // REQ-FN-049: subscribe rather than poll. The phase changes exactly twice at most, and the
+        // shell is constructed while initialization is typically still in flight, so without this
+        // the strip would render "still loading" and stay that way until the next navigation.
+        Startup.Changed += HandleStartupStateChanged;
+        UpdateActiveSlug();
+    }
+
+    // REQ-FN-049: raised on the THREAD-POOL thread that runs background initialization — see
+    // AppStartupState.Changed, which documents that it does not know what kind of host it is in.
+    // InvokeAsync is what marshals it onto the renderer's dispatcher; calling StateHasChanged
+    // directly from here would be a cross-thread render.
+    private void HandleStartupStateChanged(object? sender, EventArgs e) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    private void DismissStartupFailure() => startupFailureDismissed = true;
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateActiveSlug();
+        StateHasChanged();
+
+        // REQ-FN-013: re-validate the license on navigation (EnsureFreshAsync is a no-op until
+        // the configured interval elapses), then re-render if the banner state changed.
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshLicenseStatusAsync();
+            StateHasChanged();
+        });
+    }
+
+    // Parses the active workspace slug from a /workspace/{slug}[/...] route; null elsewhere.
+    private void UpdateActiveSlug()
+    {
+        var relative = Nav.ToBaseRelativePath(Nav.Uri);
+        var path = relative.Split('?', '#')[0].Trim('/');
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        activeSlug = segments.Length >= 2 && string.Equals(segments[0], "workspace", StringComparison.OrdinalIgnoreCase)
+            ? segments[1]
+            : null;
+    }
+
+    // REQ-FN-049: AppStartupState is a SINGLETON and the shell is not, so an unsubscribed handler
+    // would keep every disposed layout alive for the life of the process.
+    public void Dispose()
+    {
+        Nav.LocationChanged -= HandleLocationChanged;
+        Startup.Changed -= HandleStartupStateChanged;
+    }
+
+    private string UserInitials
+    {
+        get
+        {
+            var name = CurrentUser.DisplayName;
+            var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var initials = parts.Length switch
+            {
+                0 => "?",
+                1 => parts[0][..1],
+                _ => $"{parts[0][0]}{parts[^1][0]}"
+            };
+            return initials.ToUpperInvariant();
+        }
+    }
+
+    /// <summary>
+    /// The two rungs of the topbar breadcrumb: a section that is a link, and the current page,
+    /// which is not. Recomputed per render from the route, so it needs no invalidation.
+    /// </summary>
+    /// <param name="SectionLabel">The section rung's text.</param>
+    /// <param name="SectionHref">Where the section rung navigates.</param>
+    /// <param name="PageLabel">The current page rung's text.</param>
+    private sealed record BreadcrumbTrail(string SectionLabel, string SectionHref, string PageLabel);
+
+    // The sections mirror the sidebar groups, so the crumb always names the group the user is in
+    // rather than inventing a second hierarchy. Routes with no screen of their own are absent by
+    // construction — an unmapped route falls back to the app name plus a title-cased last segment.
+    private BreadcrumbTrail CurrentTrail
+    {
+        get
+        {
+            if (activeSlug is { Length: > 0 } slug)
+            {
+                // Longest-match first: "/documents/web" also ends with neither "/documents" nor
+                // "/settings", but it must not fall through to "Chat" — an unmapped workspace route
+                // silently claiming to be the chat screen is the failure this ordering prevents.
+                var page = CurrentPath.EndsWith("/documents/web", StringComparison.OrdinalIgnoreCase) ? Localizer["PageWebSources"]
+                    // The connector add/edit routes end in "/new" and "/edit", so they do NOT match the
+                    // "/connectors" test below and fell through to "Chat" — the precise failure the note
+                    // above warns about. They are matched here, ahead of it.
+                    : CurrentPath.EndsWith("/connectors/new", StringComparison.OrdinalIgnoreCase) ? Localizer["PageAddConnector"]
+                    : CurrentPath.Contains("/connectors/", StringComparison.OrdinalIgnoreCase)
+                      && CurrentPath.EndsWith("/edit", StringComparison.OrdinalIgnoreCase) ? Localizer["PageEditConnector"]
+                    : CurrentPath.EndsWith("/connectors", StringComparison.OrdinalIgnoreCase) ? Localizer["NavConnectors"]
+                    : CurrentPath.EndsWith("/documents", StringComparison.OrdinalIgnoreCase) ? Localizer["NavDocuments"]
+                    : CurrentPath.EndsWith("/agents", StringComparison.OrdinalIgnoreCase) ? Localizer["NavAgents"]
+                    : CurrentPath.EndsWith("/flows", StringComparison.OrdinalIgnoreCase) ? Localizer["NavFlows"]
+                    : CurrentPath.EndsWith("/settings", StringComparison.OrdinalIgnoreCase) ? Localizer["NavWorkspaceSettings"]
+                    : Localizer["NavChat"];
+                return new BreadcrumbTrail(
+                    Localizer["ShellBreadcrumbWorkspace", ActiveWorkspaceName],
+                    $"/workspace/{slug}",
+                    page);
+            }
+
+            return CurrentPath switch
+            {
+                "/" => new BreadcrumbTrail("TechieDesk", "/", Localizer["PageHome"]),
+                "/profile" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["NavProfile"]),
+                "/pricing" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["NavPricing"]),
+                "/login" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["NavSignIn"]),
+                "/register" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["PageRegister"]),
+                "/forgot-password" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["PagePasswordRecovery"]),
+                "/reset-password" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["PageResetPassword"]),
+                "/billing" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["NavBilling"]),
+                "/support" => new BreadcrumbTrail(Localizer["NavGroupAccount"], "/profile", Localizer["NavSupport"]),
+                "/admin/events" => new BreadcrumbTrail(Localizer["NavGroupOperator"], "/admin/events", Localizer["NavEventLog"]),
+                "/admin/settings" => new BreadcrumbTrail(Localizer["NavGroupOperator"], "/admin/events", Localizer["NavAppSettings"]),
+                "/automations" => new BreadcrumbTrail(Localizer["NavGroupOperator"], "/admin/events", Localizer["NavAutomations"]),
+                "/settings/data" => new BreadcrumbTrail(Localizer["NavGroupOperator"], "/settings/data", Localizer["NavDataStorage"]),
+                "/settings/backup" => new BreadcrumbTrail(Localizer["NavGroupOperator"], "/settings/data", Localizer["NavBackupRestore"]),
+                "/settings/updates" => new BreadcrumbTrail(Localizer["NavGroupOperator"], "/settings/data", Localizer["NavUpdates"]),
+                @* REQ-UI-049: "/settings" became "/rag-config" on 2026-07-28, and it belongs to
+                   Console (RAG plumbing) rather than Operator — App Settings is the Operator one. *@
+                "/rag-config" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavRagConfiguration"]),
+                "/setup" => new BreadcrumbTrail("TechieDesk", "/", Localizer["PageFirstRunSetup"]),
+                "/qdrant-admin" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavQdrantAdmin"]),
+                "/llm-settings" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavLlmSettings"]),
+                "/token-usage" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavTokenUsage"]),
+                "/ingestion" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["PageFileIngestion"]),
+                "/text-ingestion" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavTextIngestion"]),
+                "/llm-playground" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavLlmPlayground"]),
+                @* "/tool-demo" removed 2026-07-28 — ToolDemo.razor was deleted with the sample-app
+                   pages (REQ-UI-049); its execution trace lives on in WorkspaceChat/WorkspaceAgents.
+                   "/settings/appearance" was never in this map. *@
+                "/chat" => new BreadcrumbTrail(Localizer["NavGroupConsole"], "/qdrant-admin", Localizer["NavChat"]),
+                _ => new BreadcrumbTrail("TechieDesk", "/", TitleFromPath(CurrentPath))
+            };
+        }
+    }
+
+    // The route path, normalised to a leading slash with no query, fragment or trailing slash.
+    private string CurrentPath =>
+        "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].Trim('/');
+
+    // "/some-new-screen" → "Some New Screen", so a route added without a crumb entry still reads
+    // as a page name instead of a raw URL.
+    private string TitleFromPath(string path)
+    {
+        var last = path.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        if (string.IsNullOrWhiteSpace(last))
+        {
+            return Localizer["PageHome"];
+        }
+
+        var words = last.Split('-', StringSplitOptions.RemoveEmptyEntries)
+            .Select(word => char.ToUpperInvariant(word[0]) + word[1..]);
+        return string.Join(' ', words);
+    }
+
+    // REQ-UI-048: the plan shown on the topbar badge and in the sidebar footer. LicenseName carries
+    // the qualifier in brackets ("Free (offline)") that the licence card wants and a badge does not,
+    // so only the plan itself is kept here.
+    private string PlanLabel
+    {
+        get
+        {
+            var name = licenseStatus?.LicenseName;
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Localizer["ShellPlanFree"];
+            }
+
+            var bracket = name.IndexOf('(');
+            return (bracket > 0 ? name[..bracket] : name).Trim();
+        }
+    }
+
+    private void GoToProfile() => Nav.NavigateTo("/profile");
+
+    // REQ-FN-036: navigating TO /login is a user action, never something the shell does on its own.
+    private void GoToSignIn() => Nav.NavigateTo("/login");
+
+    // REQ-UI-008: logout (optionally across all devices) revokes the session at AppManager and
+    // drops the server-side session(s) — it deactivates the licence, it does not lock the user out
+    // of their own data, so it lands back on Home rather than on a sign-in screen (REQ-FN-036).
+    // The old final hop to /auth/logout existed only to clear the td.sid cookie from a real HTTP
+    // response; that endpoint went with the web host (REQ-FN-035) and there is no cookie left.
+    private async Task LogoutAsync(bool allDevices)
+    {
+        var email = CurrentUser.Email;
+        var userId = CurrentUser.UserId;
+        try
+        {
+            if (TokenStore.HasSession)
+            {
+                await AppManager.LogoutAsync(TokenStore.AccessToken!, TokenStore.RefreshToken, allDevices);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "AppManager logout call failed; clearing local session anyway");
+        }
+        finally
+        {
+            InvalidateSession(allDevices, userId);
+            AuthProvider.NotifySessionChanged();
+            Logger.LogInformation("User {Email} logged out (allDevices: {AllDevices})", email, allDevices);
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+    }
+
+    // "All devices" drops every server-side session for the user, so a second browser holding a
+    // still-valid handle is signed out immediately rather than at its next token refresh.
+    private void InvalidateSession(bool allDevices, int userId)
+    {
+        if (allDevices)
+        {
+            SessionStore.InvalidateAllForUser(userId);
+            return;
+        }
+
+        SessionStore.Invalidate(SessionContext.Handle);
+    }
+}

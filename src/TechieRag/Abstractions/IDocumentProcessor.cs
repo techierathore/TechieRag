@@ -10,8 +10,9 @@ namespace TechieRag.Abstractions;
 /// formats and splitting them into chunks suitable for embedding.</para>
 /// <para><b>Code Flow:</b> TechieRagClient selects the appropriate processor based on file extension,
 /// then calls ProcessAsync to extract and chunk the document content.</para>
-/// <para><b>Implementations:</b> PdfProcessor, DocxProcessor, TextProcessor, MarkdownProcessor,
-/// HtmlProcessor, JsonProcessor, TomlProcessor, CodeProcessor</para>
+/// <para><b>Implementations:</b> PdfProcessor, DocxProcessor, XlsxProcessor, PptxProcessor,
+/// CsvProcessor, TextProcessor, MarkdownProcessor, HtmlProcessor, JsonProcessor, TomlProcessor,
+/// CodeProcessor</para>
 /// </remarks>
 public interface IDocumentProcessor
 {
@@ -68,4 +69,10 @@ public class DocumentProcessingOptions
     /// Gets or sets additional metadata to attach to all chunks from this document.
     /// </summary>
     public Dictionary<string, object>? Metadata { get; set; }
+
+    /// <summary>
+    /// Gets or sets the chunking strategy to use for this document.
+    /// </summary>
+    /// <remarks>Null uses the default recursive strategy (backward compatible).</remarks>
+    public IChunker? Chunker { get; set; }
 }

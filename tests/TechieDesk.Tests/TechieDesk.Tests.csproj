@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="8.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      REQ-FN-041 (2026-07-26): Auth/LoginEndpointTests.cs was DELETED together with its subject,
+      SessionEndpoints — the POST /auth/login and /auth/logout HTTP endpoints, antiforgery validation
+      and cookie writing. Sign-in is now the in-process DesktopSignInService (REQ-FN-039), covered by
+      SecretStoreSessionTests.
+    -->
+
+    <!--
+      REQ-FN-035: points at TechieDesk.Core, not the head. The head is now MAUI
+      (net10.0-maccatalyst / net10.0-windows) and a net10.0 test project cannot reference a
+      platform-targeted project. The application services under test all live in Core, so these
+      tests are unchanged by the host swap.
+    -->
+    <ProjectReference Include="..\..\apps\TechieDesk.Core\TechieDesk.Core.csproj" />
+
+    <!--
+      REQ-FN-048: the migration console is referenced so WorkingDirectoryArtefactTests can drive its
+      REAL logging call site from a sandbox working directory. REQ-FN-034 claimed no path resolves
+      against the working directory while this console still passed Serilog the bare relative
+      "logs/techiedeskdb-.log"; the only guard that could have caught that is one which runs the
+      production code and then looks at what appeared on disk.
+    -->
+    <ProjectReference Include="..\..\apps\TechieDeskDb.Cli\TechieDeskDb.Cli.csproj" />
+  </ItemGroup>
+
+</Project>

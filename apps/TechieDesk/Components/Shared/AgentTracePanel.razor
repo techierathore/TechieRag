@@ -1,0 +1,56 @@
+@using TechieDesk.Services.Agents
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-034 / BRD-85 — the agent execution trace.
+
+   Rendered as a DARK SLATE MONO PANEL IN BOTH THEMES, per docs/TechieDesk-UIDesign.md: "agent
+   execution trace + code snippets = dark slate mono panels in both themes". That is deliberate and
+   is why this markup does not use the theme's card/muted tokens — it is machine output, and it is
+   supposed to look unlike the prose around it in light mode as much as in dark. The colours live in
+   wwwroot/styles/base.css under .td-agent-trace, because the app ships TrBlazeUI's PREBUILT
+   Tailwind CSS with no JIT, so arbitrary colour utilities are never emitted. *@
+
+@if (Entries.Count > 0)
+{
+    <div class="td-agent-trace" role="log" aria-label="@Localizer["TraceRegionLabel"]">
+        @foreach (var entry in Entries)
+        {
+            <div class="@($"td-agent-trace-step{(entry.IsSuccess ? string.Empty : " is-error")}")">
+                <div class="td-agent-trace-head">
+                    <span class="td-agent-trace-num">@entry.Step</span>
+                    <span class="td-agent-trace-title">@entry.Title(Localize)</span>
+                    <span class="td-agent-trace-time">@entry.ElapsedLabel</span>
+                </div>
+                @if (entry.ArgumentsJson is not null)
+                {
+                    <div class="td-agent-trace-args">@entry.ArgumentsJson</div>
+                }
+                @{ var detail = entry.DetailText(Localize); }
+                @if (!string.IsNullOrWhiteSpace(detail))
+                {
+                    <div class="td-agent-trace-detail">@detail</div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The trace entries to render, oldest first.</summary>
+    [Parameter] public IReadOnlyList<AgentTraceEntry> Entries { get; set; } = [];
+
+    /// <summary>
+    /// REQ-UI-051: resolves a trace entry's resource key into the reader's language.
+    /// </summary>
+    /// <param name="key">A key present in <c>AppStrings.resx</c>.</param>
+    /// <param name="arguments">The entry's invariant runtime values — a tool, node or edge id.</param>
+    /// <returns>The translated text.</returns>
+    /// <remarks>
+    /// <see cref="AgentTrace"/> is built by the chat and flow surfaces and handed here, so it
+    /// carries KEYS and arguments rather than sentences. Before REQ-UI-051 this panel rendered
+    /// <c>entry.Title</c> and <c>entry.Detail</c> straight out of the service, and both were
+    /// English on every install — the whole trace, on a screen whose entire job is explaining what
+    /// just went wrong.
+    /// </remarks>
+    private string Localize(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
+}

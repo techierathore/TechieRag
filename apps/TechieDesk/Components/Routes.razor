@@ -1,0 +1,22 @@
+@* REQ-UI-038 (BRD-90): applies the stored theme and accent to <html>. It renders nothing and sits
+   OUTSIDE the Router on purpose — the app has two layouts (MainLayout for the shell, AuthLayout for
+   /login, /register and the first-run wizard), and mounting this in either one would leave the other
+   rendering light on a dark install. Here it runs once per window, for every route. *@
+<ThemeInitializer />
+
+@* REQ-FN-035: was typeof(Program).Assembly — Program was the Blazor Server web host and is gone.
+   Anchoring on this component keeps the router pointed at the head assembly regardless of host. *@
+<Router AppAssembly="typeof(Routes).Assembly">
+    <Found Context="routeData">
+        @* REQ-FN-036 / BRD-129: there is no route protection here and none in the shell. The app
+           opens straight into a usable workspace with no account: launch never resolves to /login,
+           and no route is split into an authenticated and an anonymous variant. /login is an
+           ordinary page like any other — reached only when the user picks "Sign in" from the
+           Account area to activate a licence. What used to live here (a comment describing the
+           IRouteGuard login bounce that MainLayout applied on every navigation) described a gate
+           that no longer exists; IRouteGuard retains only the capability check that REQ-FN-041
+           removes with the rest of the retired role stack. *@
+        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

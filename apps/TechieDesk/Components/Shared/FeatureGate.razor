@@ -1,0 +1,62 @@
+@* REQ-FN-014/BRD-50: renders ChildContent only when the feature is licensed; otherwise renders
+   an upgrade prompt (or a caller-supplied Denied fragment). Reads decisions from IFeatureGate.
+
+   REQ-UI-055 (BRD-91): FeatureDecision no longer carries an English sentence. It carries a resource
+   key (our own copy) or the licence server's verbatim words, and DescribeReason picks between them —
+   which is why this component now injects a localizer it did not need before. *@
+@inject IFeatureGate Gate
+@inject IStringLocalizer<AppStrings> Localizer
+
+@if (decision is null)
+{
+    @if (Loading is not null)
+    {
+        @Loading
+    }
+    else
+    {
+        <Skeleton Class="h-24 w-full rounded-lg" />
+    }
+}
+else if (decision.IsEnabled)
+{
+    @ChildContent
+}
+else if (Denied is not null)
+{
+    @Denied(decision)
+}
+else
+{
+    <UpgradePrompt Feature="@Feature"
+                   RequiredLicense="@decision.RequiredLicense"
+                   Reason="@decision.DescribeReason(Localize)"
+                   Class="@Class" />
+}
+
+@code {
+    /// <summary>The feature code to gate on (e.g. <c>CONNECTORS</c>).</summary>
+    [Parameter, EditorRequired] public string Feature { get; set; } = string.Empty;
+
+    /// <summary>Content rendered when the feature is licensed.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Optional custom content rendered when denied; defaults to an upgrade prompt.</summary>
+    [Parameter] public RenderFragment<FeatureDecision>? Denied { get; set; }
+
+    /// <summary>Optional placeholder while the decision is being resolved.</summary>
+    [Parameter] public RenderFragment? Loading { get; set; }
+
+    /// <summary>Extra CSS classes passed to the default upgrade prompt.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private FeatureDecision? decision;
+
+    /// <summary>The REQ-UI-051 delegate: the ONE place a licensing key becomes a sentence here.</summary>
+    private string Localize(string key, params object?[] arguments) => Localizer[key, arguments!].Value;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        decision = await Gate.EvaluateAsync(Feature);
+    }
+}

@@ -1,0 +1,218 @@
+@* REQ-UI-035 / BRD-87: mic dictation for the chat composer.
+
+   Self-contained by design. It owns the whole dictation lifecycle — permission, capture, live
+   transcript, teardown — and talks to its host through exactly two parameters, Text in and
+   TextChanged out. Mount it in the composer's control row; it needs nothing else from the page.
+
+   BRD-87 says "browser speech recognition". That is no longer true of this product and the
+   requirement was amended on 2026-07-26 to say so: WKWebView, which is what renders these
+   components inside the Mac Catalyst head, has no SpeechRecognition implementation. Recognition
+   therefore happens in IDictationService (CatalystDictationService -> Speech.framework), and this
+   component never touches a Web Speech API. *@
+
+@* Declared here rather than in _Imports so the component stays droppable into any page. *@
+@using TechieDesk.Services.Speech
+@implements IAsyncDisposable
+@inject IDictationService Dictation
+@inject ILogger<DictationButton> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<span class="td-dictation inline-flex items-center gap-2">
+    <Button Variant="@(session.Status == DictationStatus.Listening ? ButtonVariant.Destructive : ButtonVariant.Outline)"
+            Size="@Size"
+            OnClick="ToggleAsync"
+            Disabled="@IsDisabled"
+            AriaLabel="@ButtonLabel"
+            Class="@Class">
+        @if (session.Status == DictationStatus.Starting)
+        {
+            <Spinner Size="SpinnerSize.Small" />
+        }
+        else
+        {
+            <LucideIcon aria-hidden="true" Name="@IconName" Size="16" />
+        }
+        <span class="sr-only">@ButtonLabel</span>
+    </Button>
+
+    @if (session.Status == DictationStatus.Listening)
+    {
+        <span class="td-dictation-live text-xs text-muted-foreground" aria-live="polite">@Localizer["DictationListening"]</span>
+    }
+    else if (session.Message is not null)
+    {
+        <span class="td-dictation-message text-xs text-muted-foreground" role="status">@session.Message</span>
+    }
+</span>
+
+@code {
+    /// <summary>The composer's current text; dictated words are appended to it.</summary>
+    [Parameter] public string? Text { get; set; }
+
+    /// <summary>Raised with the composer text after every transcript revision.</summary>
+    /// <remarks>
+    /// Fires repeatedly while the user speaks, not once at the end: a dictation control that shows
+    /// nothing until the mic closes gives the user no way to tell it is working.
+    /// </remarks>
+    [Parameter] public EventCallback<string> TextChanged { get; set; }
+
+    /// <summary>Disables the button regardless of dictation state (for example while a turn sends).</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>The button size; defaults to the composer's icon size.</summary>
+    [Parameter] public ButtonSize Size { get; set; } = ButtonSize.Icon;
+
+    /// <summary>Extra CSS classes for the button.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>The spoken language as a BCP-47 tag; null uses the system locale.</summary>
+    [Parameter] public string? Language { get; set; }
+
+    private readonly DictationSession session = new();
+    private bool permissionAsked;
+
+    private bool IsDisabled => Disabled || !session.CanToggle;
+
+    private string IconName => session.Status switch
+    {
+        DictationStatus.Listening => "mic",
+        DictationStatus.Blocked => "mic-off",
+        _ => "mic"
+    };
+
+    private string ButtonLabel => session.Status switch
+    {
+        DictationStatus.Listening => Localizer["DictationStop"].Value,
+        DictationStatus.Starting => Localizer["DictationStarting"].Value,
+        DictationStatus.Blocked => Localizer["DictationUnavailable"].Value,
+        _ => Localizer["DictationStart"].Value
+    };
+
+    protected override void OnInitialized()
+    {
+        if (!Dictation.IsSupported)
+        {
+            session.MarkUnsupported(Dictation.UnsupportedReason ?? Localizer["DictationUnsupported"].Value);
+        }
+    }
+
+    /// <summary>Starts dictation when idle, stops it when listening.</summary>
+    private async Task ToggleAsync()
+    {
+        if (session.IsActive)
+        {
+            await StopAsync();
+            return;
+        }
+
+        await StartAsync();
+    }
+
+    /// <summary>Requests permission if needed, then opens the microphone.</summary>
+    private async Task StartAsync()
+    {
+        if (!session.BeginStart(Text))
+        {
+            return;
+        }
+
+        StateHasChanged();
+
+        // The OS prompts on the FIRST request only; a refusal is remembered, so asking again would
+        // silently return Denied without showing the user anything. Ask once per component and send
+        // them to System Settings after that.
+        if (!permissionAsked)
+        {
+            permissionAsked = true;
+            var permission = await Dictation.RequestPermissionAsync();
+
+            if (permission == DictationPermission.Unsupported)
+            {
+                session.MarkUnsupported(Dictation.UnsupportedReason ?? Localizer["DictationUnsupported"].Value);
+                return;
+            }
+
+            if (permission == DictationPermission.Denied)
+            {
+                session.MarkPermissionDenied(Localizer[DictationSession.DeniedHintKey].Value);
+                return;
+            }
+        }
+
+        try
+        {
+            await Dictation.StartAsync(new DictationCallbacks
+            {
+                Language = Language,
+                OnTranscriptUpdated = OnTranscriptAsync,
+                OnFailed = OnFailedAsync
+            });
+            session.MarkListening();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Dictation failed to start (REQ-UI-035)");
+            session.Fail(Localizer["DictationStartFailed"]);
+        }
+    }
+
+    /// <summary>Closes the microphone and keeps whatever was recognised.</summary>
+    private async Task StopAsync()
+    {
+        if (!session.BeginStop())
+        {
+            return;
+        }
+
+        StateHasChanged();
+
+        try
+        {
+            await Dictation.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Dictation failed to stop cleanly (REQ-UI-035)");
+        }
+
+        await TextChanged.InvokeAsync(session.CompleteStop());
+    }
+
+    /// <summary>Pushes a transcript revision into the composer.</summary>
+    /// <param name="transcript">The cumulative transcript so far.</param>
+    private async Task OnTranscriptAsync(string transcript)
+    {
+        await InvokeAsync(async () =>
+        {
+            await TextChanged.InvokeAsync(session.UpdateTranscript(transcript));
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>Surfaces a recognizer failure beside the button.</summary>
+    /// <param name="message">The failure message.</param>
+    private async Task OnFailedAsync(string message)
+    {
+        await InvokeAsync(() =>
+        {
+            session.Fail(message);
+            StateHasChanged();
+        });
+    }
+
+    /// <summary>Releases the microphone if the page is left mid-dictation.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (session.IsActive)
+        {
+            try
+            {
+                await Dictation.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Dictation teardown on dispose failed (REQ-UI-035)");
+            }
+        }
+    }
+}

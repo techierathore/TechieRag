@@ -137,7 +137,10 @@ public class AgentLoopRunner
                     ToolArgumentsJson = toolCall.ArgumentsJson,
                     Content = result.Content,
                     IsSuccess = result.IsSuccess,
-                    ErrorMessage = result.ErrorMessage
+                    ErrorMessage = result.ErrorMessage,
+                    // The handler's coded refusal, so a renderer can translate this row's detail
+                    // line instead of painting the English fallback (REQ-RAG-050 / REQ-RAG-051).
+                    FailureMessage = result.Message
                 });
             }
         }

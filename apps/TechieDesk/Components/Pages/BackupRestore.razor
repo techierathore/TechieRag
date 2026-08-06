@@ -1,0 +1,700 @@
+@page "/settings/backup"
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Maui.Storage
+@using TechieDesk.Services.Backup
+@using TechieDesk.Services.Storage
+@using TechieDeskDb
+@inject BackupService Backup
+@inject ToastService ToastService
+@inject ILogger<BackupRestore> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+@implements IDisposable
+
+@* REQ-FN-046 / REQ-FN-047 (BRD-144/145, ADR-013) — no mockup exists for this screen, so it is
+   built to the docs/mockups/data-storage.html house shape: heading + TypographyMuted subtitle,
+   Badge-labelled cards, inline Alerts for refusals and toasts for outcomes.
+
+   Three decisions worth stating, because each looks like an omission otherwise:
+
+   1. The destination is chosen with DesktopFolderPicker and the file NAME is composed by us, rather
+      than with a save panel. REQ-UI-041 established the native pickers, and MAUI ships no folder or
+      save panel of its own; DesktopFolderPicker is the existing Catalyst wrapper and its security
+      scope is what makes the picked folder writable under sandboxing. There is deliberately no
+      browser download path — REQ-FN-010 proved anchor.download silently does nothing in this
+      WKWebView, so offering one would produce a button that appears to work and does not.
+
+   2. Restore is a two-step flow: pre-flight first, apply second, never one button. Every refusal
+      REQ-FN-047 defines is decided during pre-flight, so the user reads exactly what will change —
+      and every reason it might not — before committing to anything.
+
+   3. The conflict choice defaults to Skip and the Apply button is disabled until the pre-flight has
+      run. Skip is the only choice that cannot lose the user's own work, which is what makes it the
+      right default for a mis-click. *@
+
+<PageTitle>@Localizer["BackupPageTitle"]</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["BackupHeading"]</h1>
+            <TypographyMuted>
+                @Localizer["BackupSubtitle"]
+            </TypographyMuted>
+        </div>
+    </div>
+
+    @* ADR-013: pointing the live data directory at a synced folder corrupts the database and the
+       vector store. Detected cheaply from the path and warned about here, where the user is already
+       thinking about cloud folders — not blocked, because a renamed sync root would be missed and a
+       false positive must never lock anyone out of their own install. *@
+    @if (syncRisk is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-triangle" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["BackupSyncRiskTitle", SyncProductName]</AlertTitle>
+            <AlertDescription>@Localizer[SyncFolderDetector.DataDirectoryRiskKey, SyncProductName]</AlertDescription>
+        </Alert>
+    }
+
+    <!-- Export -->
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["BackupBadgeExport"]</Badge>
+            </div>
+            <CardTitle>@Localizer["BackupCreateTitle"]</CardTitle>
+            <CardDescription>
+                @Localizer["BackupCreateDescBefore"] <code>@BackupArchive.FileExtension</code> @Localizer["BackupCreateDescAfter"]
+            </CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <Field>
+                <FieldLabel>@Localizer["BackupWhatToExport"]</FieldLabel>
+                <FieldContent>
+                    <RadioGroup @bind-Value="exportScope" TValue="string" AriaLabel="@Localizer["BackupWhatToExport"]"
+                                Disabled="isExporting">
+                        <div class="flex items-center space-x-2">
+                            <RadioGroupItem Value="@ScopeInstance" Id="scope-instance" TValue="string" />
+                            <Label For="scope-instance">@Localizer["BackupScopeEverything"]</Label>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <RadioGroupItem Value="@ScopeWorkspace" Id="scope-workspace" TValue="string" />
+                            <Label For="scope-workspace">@Localizer["BackupScopeOneWorkspace"]</Label>
+                        </div>
+                    </RadioGroup>
+                </FieldContent>
+            </Field>
+
+            @if (exportScope == ScopeWorkspace)
+            {
+                <Field>
+                    <FieldLabel>@Localizer["BackupWorkspaceLabel"]</FieldLabel>
+                    <FieldContent>
+                        @if (workspaces.Count == 0)
+                        {
+                            <TypographyMuted>
+                                @Localizer["BackupNoWorkspaces"]
+                            </TypographyMuted>
+                        }
+                        else
+                        {
+                            @* TR-024: without this the trigger paints the raw workspace id. *@
+                            <Select Value="@selectedWorkspaceId" TValue="string"
+                                    ValueChanged="@((string id) => selectedWorkspaceId = id)"
+                                    DisplayTextSelector="WorkspaceOptionText">
+                                <SelectTrigger id="backup-workspace" aria-label="@Localizer["BackupWorkspaceToExport"]">
+                                    <SelectValue Placeholder="@Localizer["BackupChooseWorkspace"]" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    @foreach (var workspace in workspaces)
+                                    {
+                                        <SelectItem Value="@workspace.WorkspaceId" TValue="string"
+                                                    Text="@WorkspaceLabel(workspace)">
+                                            @WorkspaceLabel(workspace)
+                                        </SelectItem>
+                                    }
+                                </SelectContent>
+                            </Select>
+                        }
+                    </FieldContent>
+                    <FieldDescription>
+                        @Localizer["BackupWorkspaceScopeHint"]
+                    </FieldDescription>
+                </Field>
+            }
+
+            <div class="flex flex-wrap items-center gap-2">
+                <Button OnClick="ExportAsync" Disabled="@(isExporting || !CanExport)">
+                    @if (isExporting)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["BackupExporting"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["BackupChooseFolderExport"]</span>
+                    }
+                </Button>
+                @if (lastExport is not null)
+                {
+                    <Button Variant="ButtonVariant.Outline"
+                            OnClick="@(() => Reveal(lastExport.ArchivePath))">@RevealLabel</Button>
+                }
+            </div>
+
+            @if (exportError is not null)
+            {
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["BackupNotWrittenTitle"]</AlertTitle>
+                    <AlertDescription>@exportError</AlertDescription>
+                </Alert>
+            }
+
+            @if (lastExport is not null)
+            {
+                <Alert Variant="AlertVariant.Success">
+                    <AlertTitle>@Localizer["BackupWrittenTitle"]</AlertTitle>
+                    <AlertDescription>
+                        <div class="font-mono text-xs break-all">@lastExport.ArchivePath</div>
+                        <div class="mt-1">
+                            @Localizer["BackupWrittenSummary", DataStorageInspector.FormatSize(lastExport.SizeBytes), lastExport.Manifest.Counts.Workspaces, lastExport.Manifest.Counts.Documents, lastExport.Manifest.Counts.Chunks, lastExport.Manifest.Counts.ChunksWithVector, lastExport.Manifest.Embedding.Describe()]
+                        </div>
+                    </AlertDescription>
+                </Alert>
+            }
+
+            <Alert Variant="AlertVariant.Info">
+                <AlertTitle>@Localizer["BackupCloudSafeTitle"]</AlertTitle>
+                <AlertDescription>
+                    @Localizer["BackupCloudSafeBody"]
+                </AlertDescription>
+            </Alert>
+        </CardContent>
+    </Card>
+
+    <!-- Restore -->
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["BackupBadgeRestore"]</Badge>
+            </div>
+            <CardTitle>@Localizer["BackupRestoreCardTitle"]</CardTitle>
+            <CardDescription>
+                @Localizer["BackupRestoreCardDesc"]
+            </CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div class="flex flex-wrap items-center gap-2">
+                <Button Variant="ButtonVariant.Outline" OnClick="ChooseArchiveAsync"
+                        Disabled="@(isInspecting || isRestoring)">
+                    @if (isInspecting)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["BackupChecking"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["BackupChooseFile"]</span>
+                    }
+                </Button>
+                @if (preflight is not null)
+                {
+                    <span class="font-mono text-xs break-all">@Path.GetFileName(preflight.ArchivePath)</span>
+                }
+            </div>
+
+            @if (preflight is { CanRestore: false })
+            {
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+                    <AlertTitle>@BlockTitle(preflight.BlockReason)</AlertTitle>
+                    @* REQ-UI-055 (BRD-91): the title was localized and the body was not, so a Hindi
+                       user read a Devanagari heading over an English refusal. The service now returns
+                       a resource key and its arguments; this is where both become a sentence. *@
+                    <AlertDescription>@BlockDetailText(preflight)</AlertDescription>
+                </Alert>
+            }
+
+            @if (preflight is not null)
+            {
+                <div class="space-y-3 rounded-md border p-4">
+                    <div class="text-sm font-medium">@Localizer["BackupArchiveHolds"]</div>
+                    @if (preflight.Manifest is { } manifest)
+                    {
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["BackupManifestSummary", manifest.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm"), manifest.AppVersion, manifest.Scope, manifest.Embedding.Describe(), manifest.Counts.Documents, manifest.Counts.Chunks, manifest.Counts.Threads]
+                        </TypographyMuted>
+                    }
+
+                    @if (preflight.Workspaces.Count == 0)
+                    {
+                        <TypographyMuted>@Localizer["BackupArchiveNoWorkspaces"]</TypographyMuted>
+                    }
+                    else
+                    {
+                        <ul class="space-y-1 text-sm">
+                            @foreach (var workspace in preflight.Workspaces)
+                            {
+                                <li class="flex flex-wrap items-center gap-2">
+                                    <span class="font-medium">@workspace.Name</span>
+                                    <TypographyMuted Class="text-xs">
+                                        @Localizer["BackupWorkspaceCounts", workspace.DocumentCount, workspace.ThreadCount]
+                                    </TypographyMuted>
+                                    @if (workspace.AlreadyExists)
+                                    {
+                                        <Badge Variant="BadgeVariant.Destructive">
+                                            @Localizer["BackupAlreadyHereAs", workspace.ExistingName]
+                                        </Badge>
+                                    }
+                                    else
+                                    {
+                                        <Badge Variant="BadgeVariant.Outline">@Localizer["BackupNewBadge"]</Badge>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+
+            @* The conflict choice is only offered when a conflict actually exists, and it is never
+               resolved on the user's behalf. The benchmark's restore was an all-or-nothing rollback
+               with no merge path; the lesson is that the choice must be explicit, not that merging
+               should be silent. *@
+            @if (preflight is { HasConflicts: true })
+            {
+                <Field>
+                    <FieldLabel>@Localizer["BackupConflictLabel"]</FieldLabel>
+                    <FieldContent>
+                        <RadioGroup @bind-Value="conflictChoice" TValue="string"
+                                    AriaLabel="@Localizer["BackupConflictAriaLabel"]"
+                                    Disabled="isRestoring">
+                            <div class="flex items-center space-x-2">
+                                <RadioGroupItem Value="@ConflictSkip" Id="conflict-skip" TValue="string" />
+                                <Label For="conflict-skip">@Localizer["BackupConflictSkip"]</Label>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <RadioGroupItem Value="@ConflictDuplicate" Id="conflict-duplicate" TValue="string" />
+                                <Label For="conflict-duplicate">@Localizer["BackupConflictDuplicate"]</Label>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <RadioGroupItem Value="@ConflictReplace" Id="conflict-replace" TValue="string" />
+                                <Label For="conflict-replace">@Localizer["BackupConflictReplace"]</Label>
+                            </div>
+                        </RadioGroup>
+                    </FieldContent>
+                    <FieldDescription>
+                        @Localizer["BackupConflictHint"]
+                    </FieldDescription>
+                </Field>
+            }
+
+            @* BRD-145a: the archive's vectors come from a different embedding model. They are the
+               same shape as ours, so importing them would degrade search with no error at all. The
+               only way past this is to import the text and re-embed here. *@
+            @if (preflight is { CanReEmbed: true })
+            {
+                <div class="flex items-start gap-3 rounded-md border p-4">
+                    <Checkbox Id="reembed" @bind-Checked="reEmbedAccepted" Disabled="isRestoring" />
+                    <div class="space-y-1">
+                        <Label For="reembed">@Localizer["BackupReEmbedLabel"]</Label>
+                        <TypographyMuted Class="block text-xs">
+                            @Localizer["BackupReEmbedHint"]
+                        </TypographyMuted>
+                    </div>
+                </div>
+            }
+
+            <div class="flex flex-wrap items-center gap-2">
+                <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmRestore"
+                        Disabled="@(!CanRestore || isRestoring)">
+                    @if (isRestoring)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["BackupRestoring"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["BackupRestoreButton"]</span>
+                    }
+                </Button>
+            </div>
+
+            @if (restoreError is not null)
+            {
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["BackupNothingRestoredTitle"]</AlertTitle>
+                    <AlertDescription>@restoreError</AlertDescription>
+                </Alert>
+            }
+
+            @if (lastRestore is not null)
+            {
+                <Alert Variant="AlertVariant.Success">
+                    <AlertTitle>@Localizer["BackupRestoreCompleteTitle"]</AlertTitle>
+                    <AlertDescription>
+                        @Localizer["BackupRestoreSummary", lastRestore.WorkspacesImported, lastRestore.WorkspacesSkipped, lastRestore.DocumentsImported, lastRestore.ChunksImported, lastRestore.ThreadsImported]
+                        @if (lastRestore.VectorsDiscarded > 0)
+                        {
+                            <text> · @Localizer["BackupVectorsDiscarded", lastRestore.VectorsDiscarded]</text>
+                        }
+                        <div class="mt-1">@Localizer["BackupReopenHint"]</div>
+                    </AlertDescription>
+                </Alert>
+            }
+        </CardContent>
+    </Card>
+</div>
+
+@* Restore rewrites this install's workspaces, so it goes through the same confirmation gate as
+   every other destructive action in the app (Automations, Billing). *@
+<AlertDialog @bind-Open="isConfirmOpen">
+    <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>@Localizer["BackupConfirmTitle"]</AlertDialogTitle>
+            <AlertDialogDescription>@ConfirmDescription</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+            <AlertDialogCancel>@Localizer["Cancel"]</AlertDialogCancel>
+            <AlertDialogAction OnClick="RestoreAsync">@Localizer["BackupConfirmAction"]</AlertDialogAction>
+        </AlertDialogFooter>
+    </AlertDialogContent>
+</AlertDialog>
+
+@code {
+    private const string ScopeInstance = "instance";
+    private const string ScopeWorkspace = "workspace";
+    private const string ConflictSkip = "skip";
+    private const string ConflictDuplicate = "duplicate";
+    private const string ConflictReplace = "replace";
+
+    private IReadOnlyList<BackupWorkspaceSummary> workspaces = [];
+    private SyncFolderMatch? syncRisk;
+
+    private string exportScope = ScopeInstance;
+    private string? selectedWorkspaceId;
+    private bool isExporting;
+    private string? exportError;
+    private BackupOutcome? lastExport;
+
+    private RestorePreflight? preflight;
+    private string conflictChoice = ConflictSkip;
+    private bool reEmbedAccepted;
+    private bool isInspecting;
+    private bool isRestoring;
+    private bool isConfirmOpen;
+    private string? restoreError;
+    private RestoreOutcome? lastRestore;
+
+    private CancellationTokenSource? work;
+
+    private static bool IsWindowsHost => OperatingSystem.IsWindows();
+
+    private string RevealLabel => IsWindowsHost ? Localizer["BackupRevealWindows"] : Localizer["BackupRevealMac"];
+
+    private bool CanExport =>
+        exportScope == ScopeInstance || !string.IsNullOrEmpty(selectedWorkspaceId);
+
+    // Apply stays disabled until a pre-flight has cleared the archive, so the button can never be
+    // the thing that discovers a problem.
+    private bool CanRestore =>
+        preflight is not null && (preflight.CanRestore || (preflight.CanReEmbed && reEmbedAccepted));
+
+    private string ConfirmDescription
+    {
+        get
+        {
+            if (preflight is null)
+            {
+                return string.Empty;
+            }
+
+            var incoming = preflight.Workspaces.Count;
+            var conflicts = preflight.Workspaces.Count(workspace => workspace.AlreadyExists);
+            var verb = conflictChoice switch
+            {
+                ConflictReplace => Localizer["BackupConflictReplaceNote"],
+                ConflictDuplicate => Localizer["BackupConflictDuplicateNote"],
+                _ => Localizer["BackupConflictSkipNote"]
+            };
+
+            return conflicts == 0
+                ? Localizer["BackupConfirmNoConflicts", incoming]
+                : Localizer["BackupConfirmWithConflicts", incoming, conflicts, verb];
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        syncRisk = Backup.DetectDataDirectorySyncRisk();
+        LoadWorkspaces();
+    }
+
+    private void LoadWorkspaces()
+    {
+        try
+        {
+            workspaces = Backup.ListWorkspaces();
+            selectedWorkspaceId ??= workspaces.FirstOrDefault()?.WorkspaceId;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Listing workspaces for backup failed");
+            workspaces = [];
+        }
+    }
+
+    private string WorkspaceLabel(BackupWorkspaceSummary workspace) =>
+        Localizer["BackupWorkspaceOption", workspace.Name, workspace.DocumentCount, workspace.ThreadCount];
+
+    /// <summary>REQ-UI-051 / TR-024: the display text for the workspace Select trigger.</summary>
+    /// <param name="workspaceId">The bound workspace id.</param>
+    /// <returns>The workspace's label, or an empty string when nothing is chosen.</returns>
+    private string WorkspaceOptionText(string workspaceId)
+    {
+        var match = workspaces.FirstOrDefault(candidate => candidate.WorkspaceId == workspaceId);
+        return match is null ? string.Empty : WorkspaceLabel(match);
+    }
+
+    /// <summary>
+    /// REQ-UI-055 (BRD-91): resolves the service's restore-refusal KEY into the reader's language.
+    /// </summary>
+    /// <param name="report">The pre-flight report carrying the refusal.</param>
+    /// <returns>The translated explanation, or an empty string when nothing is blocked.</returns>
+    /// <remarks>
+    /// <see cref="RestorePreflight.BlockDetailArguments"/> are archive data — entry names, byte
+    /// counts, format versions, embedding-model identities — and are substituted, never translated.
+    /// </remarks>
+    private string BlockDetailText(RestorePreflight report) =>
+        report.BlockDetailKey is { Length: > 0 } key
+            ? Localizer[key, [.. report.BlockDetailArguments]].Value
+            : string.Empty;
+
+    /// <summary>
+    /// REQ-UI-055: the detected sync product's name — a Latin-script brand, or the translated
+    /// generic phrase when macOS only told us "some cloud-storage client".
+    /// </summary>
+    private string SyncProductName => syncRisk is null
+        ? string.Empty
+        : SyncFolderDetector.ProductName(syncRisk, (key, arguments) => Localizer[key, arguments!].Value);
+
+    private string BlockTitle(RestoreBlockReason reason) => reason switch
+    {
+        RestoreBlockReason.EmbeddingModelMismatch => Localizer["BackupBlockEmbeddingMismatch"],
+        RestoreBlockReason.IntegrityFailed => Localizer["BackupBlockIntegrityFailed"],
+        RestoreBlockReason.UnsafeEntry => Localizer["BackupBlockUnsafeEntry"],
+        RestoreBlockReason.UnsupportedFormatVersion => Localizer["BackupBlockUnsupportedVersion"],
+        _ => Localizer["BackupBlockCannotRestore"]
+    };
+
+    // The destination is a folder the user picks; the file name is composed for them. See the
+    // header comment — there is no save panel on this platform and no working download path.
+    private async Task ExportAsync()
+    {
+        if (!DesktopFolderPicker.IsSupported)
+        {
+            ToastService.Error(
+                Localizer["BackupNoPickerBody"].Value,
+                Localizer["BackupPickerUnavailable"].Value);
+            return;
+        }
+
+        string? folder;
+        try
+        {
+            folder = await DesktopFolderPicker.PickAsync();
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The OS folder picker failed");
+            ToastService.Error(Localizer["BackupFolderPickerFailed", exception.Message].Value,
+                Localizer["BackupPickerUnavailable"].Value);
+            return;
+        }
+
+        // Cancelling the picker returns null and is not a failure; it must raise nothing.
+        if (string.IsNullOrEmpty(folder))
+        {
+            return;
+        }
+
+        var scope = exportScope == ScopeWorkspace ? BackupScope.Workspace : BackupScope.Instance;
+        var workspaceName = workspaces
+            .FirstOrDefault(workspace => workspace.WorkspaceId == selectedWorkspaceId)?.Name;
+        var destination = Path.Combine(folder, BackupService.SuggestFileName(scope, workspaceName));
+        var ids = scope == BackupScope.Workspace && selectedWorkspaceId is not null
+            ? new[] { selectedWorkspaceId }
+            : null;
+
+        isExporting = true;
+        exportError = null;
+        lastExport = null;
+        StateHasChanged();
+
+        work?.Dispose();
+        work = new CancellationTokenSource();
+
+        try
+        {
+            // Off the UI thread: a large instance streams for a while, and BackupService is
+            // deliberately synchronous so its SQLite enumeration stays unbuffered.
+            var token = work.Token;
+            var outcome = await Task.Run(
+                () => Backup.Export(destination, scope, ids, token), token);
+
+            lastExport = outcome;
+            ToastService.Success(
+                Localizer["BackupCreatedBody", DataStorageInspector.FormatSize(outcome.SizeBytes), Path.GetFileName(outcome.ArchivePath)].Value,
+                Localizer["BackupCreatedTitle"].Value);
+        }
+        catch (OperationCanceledException)
+        {
+            exportError = Localizer["BackupExportCancelled"];
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Export to {Destination} failed", destination);
+            exportError = exception.Message;
+            ToastService.Error(exception.Message, Localizer["BackupNotExportedTitle"].Value);
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ChooseArchiveAsync()
+    {
+        FileResult? picked;
+        try
+        {
+            picked = await FilePicker.Default.PickAsync(
+                new PickOptions { PickerTitle = Localizer["BackupPickerTitle"] });
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Logger.LogError(exception, "The OS file picker failed");
+            ToastService.Error(Localizer["BackupFilePickerFailed", exception.Message].Value,
+                Localizer["BackupPickerUnavailable"].Value);
+            return;
+        }
+
+        if (picked is null || !File.Exists(picked.FullPath))
+        {
+            return;
+        }
+
+        await InspectAsync(picked.FullPath);
+    }
+
+    // Pre-flight is strictly read-only: it verifies every entry's checksum, refuses traversing or
+    // unknown entries, and compares embedding-model identity — all before the user is offered a
+    // button that changes anything.
+    private async Task InspectAsync(string archivePath)
+    {
+        isInspecting = true;
+        restoreError = null;
+        lastRestore = null;
+        preflight = null;
+        reEmbedAccepted = false;
+        conflictChoice = ConflictSkip;
+        StateHasChanged();
+
+        work?.Dispose();
+        work = new CancellationTokenSource();
+
+        try
+        {
+            var token = work.Token;
+            preflight = await Task.Run(() => Backup.Preflight(archivePath, token), token);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Inspecting {Archive} failed", archivePath);
+            restoreError = exception.Message;
+        }
+        finally
+        {
+            isInspecting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ConfirmRestore() => isConfirmOpen = true;
+
+    private async Task RestoreAsync()
+    {
+        if (preflight is null)
+        {
+            return;
+        }
+
+        isConfirmOpen = false;
+        isRestoring = true;
+        restoreError = null;
+        StateHasChanged();
+
+        var options = new RestoreChoices
+        {
+            Conflict = conflictChoice switch
+            {
+                ConflictDuplicate => WorkspaceConflictResolution.Duplicate,
+                ConflictReplace => WorkspaceConflictResolution.Replace,
+                _ => WorkspaceConflictResolution.Skip
+            },
+            ReEmbedOnModelMismatch = reEmbedAccepted
+        };
+
+        var archivePath = preflight.ArchivePath;
+
+        work?.Dispose();
+        work = new CancellationTokenSource();
+
+        try
+        {
+            var token = work.Token;
+            var outcome = await Task.Run(() => Backup.Restore(archivePath, options, token), token);
+
+            lastRestore = outcome;
+            LoadWorkspaces();
+            ToastService.Success(
+                Localizer["BackupRestoredBody", outcome.WorkspacesImported, outcome.DocumentsImported].Value,
+                Localizer["BackupRestoreCompleteTitle"].Value);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Restoring {Archive} failed", archivePath);
+            restoreError = exception.Message;
+            ToastService.Error(exception.Message, Localizer["BackupNotRestoredTitle"].Value);
+        }
+        finally
+        {
+            isRestoring = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Reveal(string path)
+    {
+        var outcome = FileManagerReveal.Reveal(path);
+        // REQ-UI-055: the outcome carries a resource key and its values, not a sentence.
+        var message = Localizer[outcome.MessageKey, outcome.Arguments].Value;
+        if (outcome.Launched)
+        {
+            ToastService.Success(message, RevealLabel);
+            return;
+        }
+
+        Logger.LogWarning("Reveal failed for {Path}: {MessageKey}", path, outcome.MessageKey);
+        ToastService.Error(message, Localizer["BackupRevealFailedTitle"].Value);
+    }
+
+    public void Dispose()
+    {
+        work?.Cancel();
+        work?.Dispose();
+    }
+}

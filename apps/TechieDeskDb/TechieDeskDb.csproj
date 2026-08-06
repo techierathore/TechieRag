@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    REQ-FN-035: this was an OutputType=Exe console. A self-contained MAUI application cannot
+    reference a non-self-contained executable (NETSDK1150), and the desktop head must call
+    MigrationRunner in-process at launch (ADR-007). So the migrator is now a library, and the
+    development console moved verbatim to TechieDeskDb.Cli, which references this project — the
+    console entry point REQ-FN-030's re-scope requires is preserved, not dropped.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>TechieDeskDb</RootNamespace>
+    <AssemblyName>TechieDeskDb</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Versioned migration scripts are embedded so the console is a single self-contained migrator (REQ-FN-030). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Scripts\**\*.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      dbup-postgresql was removed on 2026-07-28 with the PostgreSQL path (REQ-FN-029, BRD-102
+      amended 2026-07-26). Only Scripts/Sqlite ever existed, so the Postgres branch could never
+      have applied a single script.
+    -->
+    <PackageReference Include="dbup-core" Version="6.1.1" />
+    <PackageReference Include="dbup-sqlite" Version="6.0.4" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.10" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+  </ItemGroup>
+
+</Project>

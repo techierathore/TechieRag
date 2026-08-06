@@ -1,0 +1,151 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!--
+    REQ-FN-035 (BRD-128): TechieDesk is a MAUI Blazor Hybrid desktop application. It was
+    Microsoft.NET.Sdk.Web (Blazor Server + Kestrel) until 2026-07-26.
+
+    The head keeps the product name per the framework's head-naming rule — the primary executable
+    head is `TechieDesk`, never `TechieDesk.App`. Its application services live in TechieDesk.Core
+    (plain net10.0) so the net10.0 test project can still reference them; see that project's header.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-maccatalyst</TargetFrameworks>
+    <!--
+      The Windows head is a real target (BRD-128 requires macOS AND Windows) but MAUI cannot build a
+      Windows head from macOS, so it is only added when building on Windows. This is the standard
+      MAUI conditional-TFM pattern, not a way of quietly dropping the platform.
+    -->
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TechieDesk</RootNamespace>
+    <AssemblyName>TechieDesk</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCssItems>false</EnableDefaultCssItems>
+
+    <ApplicationTitle>TechieDesk</ApplicationTitle>
+    <ApplicationId>com.techierathore.techiedesk</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieDesk.Core\TechieDesk.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    REQ-FN-038a: run Docker.DotNet and Newtonsoft.Json under the INTERPRETER instead of AOT, in
+    Release on Mac Catalyst only.
+
+    Symptom this fixes — the Release .app built, launched, and aborted instantly with SIGABRT before
+    writing a single log line:
+      error: Failed to load AOT module 'Docker.DotNet' while running in aot-only mode
+             because a dependency cannot be found or it is out of date.
+    Both Docker.DotNet.dll and its only dependency Newtonsoft.Json.dll ARE in the bundle, so this is
+    the "out of date" half of that message, not the "cannot be found" half: Release uses full trimming,
+    which rewrites Newtonsoft.Json, and Docker.DotNet's AOT image no longer matches what it was
+    compiled against. Docker.DotNet 3.125.15 is a netstandard2.1 assembly with no trim annotations,
+    which is exactly the shape that breaks this way.
+
+    Why not <TrimMode>partial</TrimMode>, the usual answer: it would also stop trimming
+    Microsoft.ML.OnnxRuntime, and this project DEPENDS on full trimming there — it is what removes the
+    unused RegisterCustomOps P/Invoke so the native link succeeds without the Debug-only C stub (see
+    the ONNX comments above). Switching trim modes to fix Docker would reintroduce a link failure.
+    Interpreting these two assemblies is the narrow fix: everything else stays AOT and fully trimmed.
+
+    This is a Release-only, Catalyst-only concern. Debug neither trims nor AOT-compiles, which is why
+    every earlier smoke of this app missed it entirely.
+  -->
+  <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' AND '$(Configuration)' == 'Release'">
+    <MtouchInterpreter>Docker.DotNet,Newtonsoft.Json</MtouchInterpreter>
+  </PropertyGroup>
+
+  <!--
+    REQ-FN-035 / REQ-RAG: link ONNX Runtime's native library on Mac Catalyst.
+
+    Microsoft.ML.OnnxRuntime 1.27.0 ships an EMPTY placeholder (`_._`) at
+    build/net9.0-maccatalyst18.0, so it contributes no NativeReference on Catalyst and no native
+    onnxruntime is linked at all — while the managed assembly still P/Invokes it. The link then fails
+    on `_RegisterCustomOps`, which the Xamarin registrar puts in the linker's initial-undefines from
+    that P/Invoke. The symptom looks like a missing custom-ops package; the actual cause is a missing
+    native library.
+
+    The fix is not a linker flag — allowing the symbol to stay undefined would produce an app whose
+    embedder cannot load. The shipped xcframework DOES contain a Mac Catalyst slice
+    (ios-arm64_x86_64-maccatalyst, ~91 MB); ORT simply never wires it up. So this declares the same
+    NativeReference its own iOS targets declare, against the same archive, and the Xamarin build
+    selects the Catalyst slice from the xcframework. This is what keeps the bundled BGE-M3 embedder —
+    and therefore offline RAG (REQ-NFR-008) — working on the desktop head.
+  -->
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">
+    <NativeReference Include="$(NuGetPackageRoot)microsoft.ml.onnxruntime/1.27.0/runtimes/ios/native/onnxruntime.xcframework.zip">
+      <Kind>Static</Kind>
+      <IsCxx>True</IsCxx>
+      <SmartLink>True</SmartLink>
+      <ForceLoad>True</ForceLoad>
+      <LinkerFlags>-lc++</LinkerFlags>
+      <WeakFrameworks>CoreML</WeakFrameworks>
+    </NativeReference>
+  </ItemGroup>
+
+  <!--
+    Debug-only companion to the NativeReference above. In Release the managed linker trims ONNX
+    Runtime's unused RegisterCustomOps P/Invoke and the native link succeeds. In Debug the linker is
+    disabled, so every P/Invoke becomes a REQUIRED native symbol and the link fails on a symbol no
+    shipped ONNX binary defines. Compiling the stub here — rather than committing a .a — keeps a
+    build artefact out of the tree while letting the head be debugged. See the .c file for why a stub
+    is the correct answer and when it must be replaced.
+  -->
+  <Target Name="BuildOnnxCustomOpsStub"
+          Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' AND '$(Configuration)' == 'Debug'"
+          BeforeTargets="_LinkNativeExecutable;_CompileNativeExecutable"
+          Inputs="Platforms/MacCatalyst/onnx-customops-stub.c"
+          Outputs="$(IntermediateOutputPath)onnx-customops-stub.a">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="xcrun clang -target arm64-apple-ios15.0-macabi -c &quot;$(MSBuildThisFileDirectory)Platforms/MacCatalyst/onnx-customops-stub.c&quot; -o &quot;$(IntermediateOutputPath)onnx-customops-stub.o&quot; &amp;&amp; xcrun ar rcs &quot;$(IntermediateOutputPath)onnx-customops-stub.a&quot; &quot;$(IntermediateOutputPath)onnx-customops-stub.o&quot;" />
+  </Target>
+
+  <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst' AND '$(Configuration)' == 'Debug'">
+    <NativeReference Include="$(IntermediateOutputPath)onnx-customops-stub.a">
+      <Kind>Static</Kind>
+      <ForceLoad>True</ForceLoad>
+    </NativeReference>
+  </ItemGroup>
+
+  <!-- TrBlazeUI component library — the Razor components are unchanged by the host swap. -->
+  <ItemGroup>
+    <PackageReference Include="TrBlazeUI.Components" Version="1.0.7" />
+    <PackageReference Include="TrBlazeUI.Icons.Lucide" Version="1.0.7" />
+    <!--
+      REQ-NFR-004 / NU1902: TrBlazeUI.Components 1.0.7 pulls HtmlSanitizer 9.0.892, which pins
+      AngleSharp [0.17.1] — carrying the moderate mXSS advisory GHSA-pgww-w46g-26qg. This direct
+      reference overrides that transitive pin.
+
+      2026-07-30 (REQ-NFR-004 / 004a): the stable 9.1.973 has shipped, so the pre-release escape
+      hatch is retired. The old pin was 9.1.949-beta, which was the first HtmlSanitizer to reach
+      AngleSharp >= 1.5.0 but dragged in AngleSharp.Css 1.0.0-beta.216 — meaning a distributable
+      product shipped TWO pre-release packages. 9.1.973 depends on AngleSharp 1.6.0 and
+      AngleSharp.Css 1.0.0, both STABLE, so the whole graph is now release-only. Do NOT downgrade
+      below 9.1.973: 9.0.967 is stable but reverts to the vulnerable AngleSharp [0.17.1] exact pin.
+      This keeps TR-009 worth fixing upstream (TrBlazeUI should raise its own floor) but the app is
+      no longer blocked on it.
+    -->
+    <PackageReference Include="HtmlSanitizer" Version="9.1.973" />
+  </ItemGroup>
+
+  <!-- Serilog (REQ-NFR-009): rolling-file logging, wired at scaffold time on every head. -->
+  <ItemGroup>
+    <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+    <!-- 6.1.1 is the latest stable Console sink; there is no 7.x line. -->
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>

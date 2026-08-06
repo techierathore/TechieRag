@@ -4,6 +4,7 @@ using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.Tokenizers;
 using TechieRag.Abstractions;
+using TechieRag.Models;
 
 namespace TechieRag.Embedded;
 
@@ -20,7 +21,35 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 {
     private const string EmbeddedModelName = "bge-m3";
     private const int EmbeddedModelDimensions = 1024;
-    private const string HuggingFaceBaseUrl = "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx";
+    private const string DefaultModelBaseUrl = "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx";
+
+    /// <summary>
+    /// Environment variable that redirects the one-time model download to an internal mirror.
+    /// </summary>
+    /// <remarks>
+    /// REQ-NFR-008 (data locality): the only outbound call this provider ever makes is the
+    /// first-run fetch of the BGE-M3 weights — no instance data is transmitted, and once the
+    /// model is cached the provider is fully offline. Air-gapped or policy-restricted
+    /// deployments can point this at an internal artifact store instead of huggingface.co, or
+    /// pre-seed the model directory so no download occurs at all.
+    /// </remarks>
+    public const string ModelBaseUrlEnvironmentVariable = "TECHIERAG_MODEL_BASE_URL";
+
+    /// <summary>
+    /// Gets the base URL the model weights are downloaded from — the configured mirror when
+    /// <see cref="ModelBaseUrlEnvironmentVariable"/> is set, otherwise the public Hugging Face
+    /// repository.
+    /// </summary>
+    public static string ModelBaseUrl
+    {
+        get
+        {
+            var configured = Environment.GetEnvironmentVariable(ModelBaseUrlEnvironmentVariable);
+            return string.IsNullOrWhiteSpace(configured)
+                ? DefaultModelBaseUrl
+                : configured.TrimEnd('/');
+        }
+    }
 
     private static readonly SemaphoreSlim DownloadSemaphore = new(1, 1);
     private static string? cachedModelDir;
@@ -44,6 +73,26 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
     /// <inheritdoc />
     public int Dimensions { get; private set; } = EmbeddedModelDimensions;
+
+    /// <summary>
+    /// The encoding revision of this provider (REQ-RAG-052).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>r1</b> — the original encoding: raw SentencePiece ids, no <c>&lt;s&gt;</c>/<c>&lt;/s&gt;</c>
+    /// wrapper. Wrong (TR-RAG-044), and every vector produced before 2026-08-04 carries it — except
+    /// that stamping did not exist then either, so in practice such a corpus is UNSTAMPED and is
+    /// reported as stale on that basis.</para>
+    /// <para><b>r2</b> — 2026-08-04 onwards: fairseq-shifted ids inside <c>&lt;s&gt;</c> …
+    /// <c>&lt;/s&gt;</c>. Neither the provider nor the model changed, which is precisely why a
+    /// revision is needed and why a provider/model pair alone would not have caught it.</para>
+    /// <para>Bump this for ANY change that alters the vector for identical input — encoding, pooling,
+    /// normalisation, or a different export of the same weights.</para>
+    /// </remarks>
+    private const int EncodingRevision = 2;
+
+    /// <inheritdoc />
+    public string EmbeddingSignature =>
+        EmbeddingStaleness.Signature(Name, ModelName, EncodingRevision);
 
     /// <inheritdoc />
     public event EventHandler<EmbeddingCompletedEventArgs>? OnEmbeddingCompleted;
@@ -255,7 +304,7 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
                 Console.WriteLine($"[TechieRag.Embedded] Downloading {filename} ({displaySize})...");
 
-                var url = $"{HuggingFaceBaseUrl}/{filename}";
+                var url = $"{ModelBaseUrl}/{filename}";
                 await DownloadFileWithProgressAsync(url, destPath, approxBytes, cancellationToken);
 
                 service.UpdateProgress(p => p.CompletedFiles = i + 1);
@@ -352,23 +401,64 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
         return results;
     }
 
+    // XLM-RoBERTa special token ids, and the shift between the SentencePiece vocabulary and the
+    // model's own (TR-RAG-044 / REQ-RAG-052).
+    private const long BosTokenId = 0;
+    private const long EosTokenId = 2;
+    private const long UnkTokenId = 3;
+    private const int FairseqOffset = 1;
+
+    /// <summary>
+    /// Converts one raw SentencePiece id into the id BGE-M3's XLM-RoBERTa embedding table expects.
+    /// </summary>
+    /// <param name="sentencePieceId">The id the SentencePiece model produced.</param>
+    /// <returns>The corresponding fairseq vocabulary id.</returns>
+    /// <remarks>
+    /// <para><b>The two vocabularies are not the same.</b> SentencePiece numbers <c>&lt;unk&gt;=0</c>,
+    /// <c>&lt;s&gt;=1</c>, <c>&lt;/s&gt;=2</c> then its pieces; XLM-RoBERTa's fairseq vocabulary is
+    /// <c>&lt;s&gt;=0</c>, <c>&lt;pad&gt;=1</c>, <c>&lt;/s&gt;=2</c>, <c>&lt;unk&gt;=3</c> then the
+    /// same pieces one slot later. Hugging Face's <c>XLMRobertaTokenizer</c> reconciles them exactly
+    /// this way, and this provider passed the ids through unshifted.</para>
+    /// <para><b>Why nobody noticed.</b> The shift is CONSISTENT, so a query and a passage sharing a
+    /// word still share its wrong id — lexical-overlap retrieval keeps working, and English results
+    /// look reasonable. Semantics do not survive: before this fix a Hindi query scored "Paris is the
+    /// capital city of France" at 0.3536 and "Bicycles should have their chains oiled regularly" at
+    /// 0.3642, both at noise level, with the wrong passage winning. Identical defect, and identical
+    /// disguise, to the one <c>OnnxCrossEncoderReranker</c> carried.</para>
+    /// <para>Mirrors <c>OnnxCrossEncoderReranker.ToModelId</c> deliberately: two copies of four lines
+    /// in two assemblies, rather than a shared helper that would put a public tokenizer detail on the
+    /// package's API surface.</para>
+    /// </remarks>
+    private static long ToModelId(int sentencePieceId) =>
+        sentencePieceId == 0 ? UnkTokenId : sentencePieceId + FairseqOffset;
+
     private float[] GenerateEmbedding(string text, out int tokenCount)
     {
         if (tokenizer == null || session == null)
             throw new InvalidOperationException("Provider not initialized. Call InitializeAsync() first.");
 
-        var encoded = tokenizer.EncodeToIds(text, maxSequenceLength, out _, out _);
-        tokenCount = encoded.Count;
+        // Two slots are reserved so the <s>/</s> wrapper cannot push a maximum-length input over the
+        // model's sequence limit.
+        var encoded = tokenizer.EncodeToIds(text, Math.Max(1, maxSequenceLength - 2), out _, out _);
 
-        var seqLength = Math.Min(encoded.Count, maxSequenceLength);
+        // XLM-RoBERTa encoding: <s> text </s>, with the piece ids shifted into the model's
+        // vocabulary (TR-RAG-044 / REQ-RAG-052). Both halves were missing: the ids went in raw, and
+        // the sequence carried no special tokens at all.
+        var seqLength = Math.Min(encoded.Count, maxSequenceLength - 2) + 2;
         var inputIds = new long[seqLength];
         var attentionMask = new long[seqLength];
 
-        for (var i = 0; i < seqLength; i++)
+        inputIds[0] = BosTokenId;
+        for (var i = 0; i < seqLength - 2; i++)
         {
-            inputIds[i] = encoded[i];
-            attentionMask[i] = 1;
+            inputIds[i + 1] = ToModelId(encoded[i]);
         }
+
+        inputIds[seqLength - 1] = EosTokenId;
+        Array.Fill(attentionMask, 1L);
+
+        // The count reported is what the model actually processed, wrapper included.
+        tokenCount = seqLength;
 
         var inputIdsTensor = new DenseTensor<long>(inputIds, [1, seqLength]);
         var attentionMaskTensor = new DenseTensor<long>(attentionMask, [1, seqLength]);

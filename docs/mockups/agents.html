@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechieDesk — Agents</title>
+<!-- TechieDesk mockup · route: /workspace/{slug}/agents (BRD-83…86, REQ-RAG-021/022/023 + REQ-UI-034) · TrBlazeUI controls: Tabs, Card, Switch, DataTable, Badge, Alert, Dialog, DropdownMenu, NumericInput -->
+<style>
+:root{--bg:#f6f7f9;--card:#ffffff;--fg:#1a1d23;--muted:#f1f2f5;--muted-fg:#6b7280;--border:#e6e8ec;--accent:#4f46e5;--accent-hover:#4338ca;--accent-soft:#eef2ff;--accent-border:#c7d2fe;--destructive:#dc2626;--success:#16a34a;--info:#2563eb;--warning:#d97706;--radius:10px;--sidebar:#fbfbfd;--shadow-sm:0 1px 2px rgba(16,24,40,.05);--shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.05);--shadow-lg:0 8px 24px rgba(16,24,40,.12)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 62px)}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:calc(100vh - 62px);overflow-y:auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;padding:6px 8px 14px;letter-spacing:-.01em}
+.logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:var(--shadow)}
+.ws-switch{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:9px;background:var(--card);padding:8px 10px;margin:2px 0 10px;font-weight:600;font-size:13px;cursor:pointer;box-shadow:var(--shadow-sm)}
+.ws-switch:hover{border-color:var(--accent-border)}
+.ws-switch .dot{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700}
+.ws-switch .chev{margin-left:auto;color:var(--muted-fg)}
+.navgroup{font-size:10.5px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.7px;padding:12px 10px 4px}
+.navitem{display:flex;align-items:center;gap:10px;padding:7.5px 10px;border-radius:8px;color:#3d4451;font-weight:500;font-size:13.5px;transition:all .12s}
+.navitem svg{width:16px;height:16px;stroke:#9aa1ad;flex-shrink:0;transition:stroke .12s}
+.navitem:hover{background:#f0f1f4;color:var(--fg)}
+.navitem:hover svg{stroke:var(--fg)}
+.navitem.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.navitem.active svg{stroke:var(--accent)}
+.sidebar .foot{margin-top:auto;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:center}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
+.crumb{color:var(--muted-fg);font-size:13px}
+.crumb b{color:var(--fg);font-weight:600}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.content{padding:24px;display:flex;flex-direction:column;gap:16px;max-width:1180px;width:100%}
+.pagehead{display:flex;align-items:center;gap:12px}
+.pagehead h1{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.pagehead .sub{color:var(--muted-fg);font-size:13px}
+.pagehead .actions{margin-left:auto;display:flex;gap:8px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm)}
+.card h3{font-size:15px;font-weight:650;margin-bottom:2px}
+.card .desc{color:var(--muted-fg);font-size:13px;margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;padding:8px 15px;font-size:13.5px;font-weight:600;border:1px solid transparent;cursor:pointer;background:var(--accent);color:#fff;box-shadow:var(--shadow-sm);transition:background .12s}
+.btn:hover{background:var(--accent-hover)}
+.btn.outline{background:var(--card);color:var(--fg);border-color:var(--border)}
+.btn.outline:hover{background:var(--muted)}
+.btn.ghost{background:transparent;color:var(--fg);box-shadow:none}
+.btn.ghost:hover{background:var(--muted)}
+.btn.destructive{background:var(--destructive)}
+.btn.destructive:hover{background:#b91c1c}
+.btn.sm{padding:4.5px 11px;font-size:12.5px}
+.btn svg{width:15px;height:15px;stroke:currentColor}
+.input,select.input,textarea.input{width:100%;border:1px solid var(--border);border-radius:8px;padding:8.5px 11px;font-size:13.5px;background:var(--card);color:var(--fg);font-family:inherit}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.hint{font-size:12px;color:var(--muted-fg)}
+.field{margin-bottom:14px}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2.5px 10px;font-size:11.5px;font-weight:600;background:var(--muted);color:#4b5563;border:1px solid var(--border)}
+.badge.green{background:#ecfdf3;color:#067647;border-color:#abefc6}
+.badge.blue{background:#eff4ff;color:#1d4ed8;border-color:#c7d7fe}
+.badge.amber{background:#fffaeb;color:#b54708;border-color:#fedf89}
+.badge.red{background:#fef3f2;color:#b42318;border-color:#fecdca}
+.badge.violet{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-border)}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.t th{color:var(--muted-fg);font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.4px;background:#fafbfc}
+table.t td{padding:11px 12px;border-bottom:1px solid #f0f1f4}
+table.t tr:hover td{background:#fafbff}
+.tabs{display:flex;gap:2px;background:var(--muted);border-radius:9px;padding:3px;width:max-content}
+.tab{padding:6px 16px;border-radius:7px;font-size:13px;font-weight:500;color:#5b6472;cursor:pointer}
+.tab.active{background:var(--card);font-weight:600;color:var(--fg);box-shadow:var(--shadow-sm)}
+.avatar{width:30px;height:30px;border-radius:999px;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4338ca;flex-shrink:0}
+.alert{display:flex;gap:10px;border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;background:var(--card);box-shadow:var(--shadow-sm)}
+.alert.green{background:#ecfdf3;border-color:#abefc6;color:#067647}
+.alert.red{background:#fef3f2;border-color:#fecdca;color:#b42318}
+.alert.amber{background:#fffaeb;border-color:#fedf89;color:#b54708}
+.alert.blue{background:#eff4ff;border-color:#c7d7fe;color:#1d4ed8}
+.switch{width:36px;height:20px;border-radius:999px;background:var(--accent);position:relative;display:inline-block;flex-shrink:0}
+.switch:after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:var(--shadow-sm)}
+.switch.off{background:#d1d5db}
+.switch.off:after{right:auto;left:2px}
+.progress{height:8px;border-radius:999px;background:var(--muted);overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#4f46e5);border-radius:999px}
+.auth{min-height:calc(100vh - 62px);background:linear-gradient(160deg,#eef2ff 0%,#f6f7f9 45%,#f6f7f9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth .box{width:410px;display:flex;flex-direction:column;gap:16px}
+.auth .card{box-shadow:var(--shadow-lg);border-radius:14px;padding:26px}
+.empty{text-align:center;color:var(--muted-fg);padding:36px;border:1.5px dashed var(--border);border-radius:12px;font-size:13px;background:#fafbfc}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer}
+/* screen-specific */
+.cardtag{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.dropzone{border:1.5px dashed var(--border);border-radius:10px;padding:18px;text-align:center;color:var(--muted-fg);font-size:12.5px;background:#fafbfc}
+.swatches{display:flex;align-items:center;gap:8px}
+.sw{width:20px;height:20px;border-radius:999px;display:inline-block;cursor:pointer}
+.sw.sel{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--accent)}
+.radios{display:flex;gap:16px;font-size:13.5px}
+.codeblock{background:#0f172a;color:#93c5fd;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;border-radius:8px;padding:12px;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.wpreview{height:260px;background:linear-gradient(160deg,#eef2ff 0%,#f1f2f5 100%);border:1px solid var(--border);border-radius:var(--radius);position:relative}
+.wbubble{position:absolute;right:14px;bottom:14px;width:40px;height:40px;border-radius:999px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-lg)}
+.wbubble svg{width:19px;height:19px;stroke:#fff}
+.wwin{position:absolute;right:14px;bottom:64px;width:180px;background:#fff;border-radius:10px;box-shadow:var(--shadow-lg);overflow:hidden}
+.wwin .whead{background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;font-size:12px;font-weight:600;padding:7px 10px}
+.wwin .wmsg{margin:10px;background:var(--muted);border-radius:8px;padding:7px 9px;font-size:12px}
+.keyaction{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.strike{text-decoration:line-through;color:var(--muted-fg)}
+
+/* ===== v3 overrides — dark sidebar + dark mode ===== */
+html[data-theme="dark"] .sidebar{background:linear-gradient(180deg,#161b2e,#10131f);border-right:1px solid #232941}
+html[data-theme="dark"] .sidebar .logo{color:#fff}
+html[data-theme="dark"] .navgroup{color:#5d6480}
+html[data-theme="dark"] .navitem{color:#a6adc5}
+html[data-theme="dark"] .navitem svg{stroke:#6f7691}
+html[data-theme="dark"] .navitem:hover{background:rgba(255,255,255,.06);color:#e6e9f4}
+html[data-theme="dark"] .navitem:hover svg{stroke:#c3c9dd}
+html[data-theme="dark"] .navitem.active{background:rgba(99,102,241,.22);color:#c7d2fe}
+html[data-theme="dark"] .navitem.active svg{stroke:#a5b4fc}
+html[data-theme="dark"] .ws-switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#e6e9f4;box-shadow:none}
+html[data-theme="dark"] .ws-switch:hover{border-color:#6366f1}
+html[data-theme="dark"] .ws-switch .chev{color:#8b92ad}
+html[data-theme="dark"] .sidebar .foot{border-top-color:rgba(255,255,255,.1);color:#e6e9f4}
+html[data-theme="dark"] .sidebar .foot .hint{color:#8b92ad}
+.theme-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted-fg);cursor:pointer;padding:0}
+.theme-btn:hover{color:var(--accent);border-color:var(--accent-border)}
+.theme-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+body > .theme-btn{position:fixed;top:14px;right:16px;z-index:50;box-shadow:var(--shadow)}
+html[data-theme="dark"]{--bg:#0d1017;--card:#151a26;--fg:#e2e5ee;--muted:#1c2231;--muted-fg:#8b93a8;--border:#242b3d;--accent:#818cf8;--accent-hover:#939bfa;--accent-soft:#232a4d;--accent-border:#414a83;--sidebar:#10131f;--shadow-sm:0 1px 2px rgba(0,0,0,.4);--shadow:0 1px 3px rgba(0,0,0,.5);--shadow-lg:0 8px 24px rgba(0,0,0,.55)}
+html[data-theme="dark"] .btn{color:#fff}
+html[data-theme="dark"] .btn.outline{color:var(--fg)}
+html[data-theme="dark"] .btn.ghost{color:var(--fg)}
+html[data-theme="dark"] table.t th{background:#181e2c;color:#8b93a8}
+html[data-theme="dark"] table.t td{border-bottom-color:#1e2434}
+html[data-theme="dark"] table.t tr:hover td{background:#181e2e}
+html[data-theme="dark"] .tab{color:#9aa2b6}
+html[data-theme="dark"] .tab.active{background:#232a3d;color:#e2e5ee}
+html[data-theme="dark"] .badge{background:#1c2231;color:#a8b0c4;border-color:#2b3348}
+html[data-theme="dark"] .badge.green{background:#0d2b1e;color:#4ade80;border-color:#1c4a34}
+html[data-theme="dark"] .badge.blue{background:#122142;color:#93b4fd;border-color:#25407a}
+html[data-theme="dark"] .badge.amber{background:#32230a;color:#fbbf24;border-color:#5c4514}
+html[data-theme="dark"] .badge.red{background:#331416;color:#f87171;border-color:#5f2120}
+html[data-theme="dark"] .badge.violet{background:#232a4d;color:#a5b4fc;border-color:#414a83}
+html[data-theme="dark"] .alert.green{background:#0d2b1e;border-color:#1c4a34;color:#6ee7a0}
+html[data-theme="dark"] .alert.red{background:#331416;border-color:#5f2120;color:#fca5a5}
+html[data-theme="dark"] .alert.amber{background:#32230a;border-color:#5c4514;color:#fcd34d}
+html[data-theme="dark"] .alert.blue{background:#122142;border-color:#25407a;color:#a9c4fe}
+html[data-theme="dark"] .auth{background:linear-gradient(160deg,#151a30 0%,#0d1017 50%)}
+html[data-theme="dark"] .empty{background:#131826}
+html[data-theme="dark"] .avatar{background:linear-gradient(135deg,#2b3157,#3a4180);color:#c7d2fe}
+html[data-theme="dark"] .switch.off{background:#3a4256}
+html[data-theme="dark"] .input,html[data-theme="dark"] select.input,html[data-theme="dark"] textarea.input{background:#11151f;border-color:#2a3145;color:var(--fg)}
+html[data-theme="dark"] [style*="#f5f7ff"]{background:#1b2140!important}
+html[data-theme="dark"] [style*="#fffbfa"]{background:#231518!important}
+html[data-theme="dark"] [style*="#fafbfc"]{background:#151a26!important}
+html[data-theme="dark"] [style*="#fafbff"]{background:#161c2a!important}
+/* dark-mode screen fixes */
+html[data-theme="dark"] .dropzone{background:#131826}
+html[data-theme="dark"] .wpreview{background:linear-gradient(160deg,#1b2140 0%,#10131f 100%)}
+html[data-theme="dark"] .wwin{background:var(--card)}
+/* --- desktop window chrome (2026-07-26: MAUI Blazor Hybrid window, not a browser tab) --- */
+.winbar{display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;background:linear-gradient(#f2f3f6,#e9ebef);border-bottom:1px solid var(--border);user-select:none;flex:0 0 auto}
+.traffic{display:flex;gap:7px}
+.traffic i{width:11px;height:11px;border-radius:50%;display:block}
+.traffic .r{background:#ff5f57}.traffic .y{background:#febc2e}.traffic .g{background:#28c840}
+.wintitle{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted-fg);margin-right:46px}
+.menubar{display:flex;align-items:center;gap:17px;height:28px;padding:0 14px;background:var(--card);border-bottom:1px solid var(--border);font-size:12.5px;color:#4b5563;user-select:none;flex:0 0 auto}
+.menubar b{font-weight:700;color:var(--fg)}
+html[data-theme="dark"] .winbar{background:linear-gradient(#20242e,#1a1e27);border-color:#2a3145}
+html[data-theme="dark"] .menubar{background:#151a26;border-color:#2a3145;color:#98a1b3}
+
+/* ===== prototype kit (owner review 2026-07-26) — menus, tabs, dialogs, popovers ===== */
+.menubar{position:relative;z-index:120}
+.mb{position:relative}
+.mb>button{background:none;border:0;font:inherit;color:inherit;cursor:pointer;padding:3px 9px;border-radius:6px;line-height:1.6}
+.mb>button:hover{background:var(--muted)}
+.mb.open>button{background:var(--accent);color:#fff}
+.menu{position:absolute;top:calc(100% + 3px);left:0;min-width:236px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;font-size:13px;color:var(--fg)}
+.mb.open>.menu{display:block}
+.menu a,.menu .mi{display:flex;align-items:center;gap:10px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.menu a:hover,.menu .mi:not(.disabled):hover{background:var(--muted)}
+.menu .mi.disabled{color:var(--muted-fg);cursor:default}
+.menu .sep{height:1px;background:var(--border);margin:4px 2px}
+.menu .k{margin-left:auto;color:var(--muted-fg);font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.menu .grouplbl{padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)}
+
+/* popovers — row overflow menus, workspace switcher, anything anchored */
+.popwrap{position:relative;display:inline-block}
+.pop{position:absolute;top:calc(100% + 5px);right:0;min-width:210px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;z-index:180;font-size:13px;text-align:left;font-weight:400}
+.pop.open{display:block}
+.pop.left{right:auto;left:0}
+.pop a,.pop .mi{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.pop a:hover,.pop .mi:not(.disabled):hover{background:var(--muted)}
+.pop .mi.danger{color:var(--destructive)}
+.pop .mi.disabled{color:var(--muted-fg);cursor:default}
+.pop .sep{height:1px;background:var(--border);margin:4px 2px}
+.dots{border:0;background:none;color:var(--muted-fg);cursor:pointer;font-size:16px;line-height:1;padding:3px 7px;border-radius:6px}
+.dots:hover{background:var(--muted);color:var(--fg)}
+
+/* modal dialogs */
+.modal{position:fixed;inset:0;background:rgba(12,15,23,.5);display:none;align-items:center;justify-content:center;z-index:400;padding:28px}
+.modal.open{display:flex}
+.modal .sheet{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);width:min(700px,100%);max-height:84vh;overflow:auto;padding:22px}
+.modal .sheet.wide{width:min(960px,100%)}
+.modal .mhead{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.modal .mhead h3{font-size:16px;font-weight:680}
+.modal .mhead .sub{color:var(--muted-fg);font-size:12.5px;margin-top:2px}
+.modal .x{margin-left:auto;border:0;background:none;font-size:20px;line-height:1;color:var(--muted-fg);cursor:pointer;padding:0 4px}
+.modal .x:hover{color:var(--fg)}
+.modal .mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+
+/* tab panels — the tab strips were decorative; now they switch */
+.tab{user-select:none}
+.tabpanel{display:none}
+.tabpanel.active{display:block}
+
+/* 3 — fill the window instead of stranding half of it */
+.content{max-width:none !important}
+.content>*{max-width:1560px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+</style>
+<script>(function(){try{if(localStorage.getItem('td-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}})();function tdTheme(){var r=document.documentElement,d=r.getAttribute('data-theme')==='dark';if(d)r.removeAttribute('data-theme');else r.setAttribute('data-theme','dark');try{localStorage.setItem('td-theme',d?'light':'dark')}catch(e){}}</script>
+</head>
+<body>
+<div class="winbar">
+  <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+  <div class="wintitle">TechieDesk</div>
+</div>
+<div class="menubar"><div class="mb"><button><b>TechieDesk</b></button><div class="menu"><div class="mi">About TechieDesk</div><div class="mi">Check for Updates&hellip;</div><div class="sep"></div><a href="admin-settings.html">Settings<span class="k">&#8984;,</span></a><a href="data-storage.html">Data &amp; Storage</a><a href="billing.html">Licence &amp; Account</a><div class="sep"></div><div class="mi">Quit TechieDesk<span class="k">&#8984;Q</span></div></div></div><div class="mb"><button>File</button><div class="menu"><div class="mi" onclick="tdOpen('dlgNewWs')">New Workspace&hellip;<span class="k">&#8984;N</span></div><div class="mi">New Thread<span class="k">&#8984;T</span></div><div class="sep"></div><a href="document-library.html">Import Documents&hellip;<span class="k">&#8984;O</span></a><a href="connectors.html">Add a Connector&hellip;</a><div class="sep"></div><div class="mi">Export Thread as Markdown&hellip;</div><div class="mi">Reveal Data Folder in Finder</div></div></div><div class="mb"><button>Edit</button><div class="menu"><div class="mi disabled">Undo<span class="k">&#8984;Z</span></div><div class="mi disabled">Redo<span class="k">&#8679;&#8984;Z</span></div><div class="sep"></div><div class="mi">Cut<span class="k">&#8984;X</span></div><div class="mi">Copy<span class="k">&#8984;C</span></div><div class="mi">Paste<span class="k">&#8984;V</span></div><div class="sep"></div><div class="mi">Find in Thread&hellip;<span class="k">&#8984;F</span></div></div></div><div class="mb"><button>View</button><div class="menu"><div class="mi">Toggle Sidebar<span class="k">&#8984;\</span></div><div class="sep"></div><div class="grouplbl">Appearance</div><div class="mi" onclick="tdSetTheme('light')">Light</div><div class="mi" onclick="tdSetTheme('dark')">Dark</div><div class="mi" onclick="tdSetTheme('system')">Match System</div><div class="sep"></div><div class="mi">Zoom In<span class="k">&#8984;+</span></div><div class="mi">Zoom Out<span class="k">&#8984;&minus;</span></div><div class="mi">Actual Size<span class="k">&#8984;0</span></div><div class="mi">Enter Full Screen<span class="k">&#8963;&#8984;F</span></div></div></div><div class="mb"><button>Workspace</button><div class="menu"><a href="workspace-chat.html">Chat</a><a href="document-library.html">Documents</a><a href="connectors.html">Connectors</a><a href="agents.html">Agents</a><a href="automations.html">Automations</a><div class="sep"></div><a href="workspace-settings.html">Workspace Settings&hellip;</a><div class="sep"></div><div class="grouplbl">Switch to</div><a href="workspace-chat.html">Contracts</a><a href="workspace-chat.html">HR Docs</a><a href="workspace-chat.html">Legal Archive</a></div></div><div class="mb"><button>Window</button><div class="menu"><div class="mi">Minimise<span class="k">&#8984;M</span></div><div class="mi">Zoom</div><div class="sep"></div><div class="mi">Bring All to Front</div></div></div><div class="mb"><button>Help</button><div class="menu"><div class="mi">TechieDesk Help<span class="k">&#8984;?</span></div><div class="mi">Keyboard Shortcuts</div><div class="sep"></div><a href="support.html">Support&hellip;</a><a href="admin-events.html">Event Log</a><div class="mi">Reveal Logs in Finder</div></div></div></div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="logo" href="workspace-chat.html"><span class="mark">TD</span> TechieDesk</a>
+    <div class="popwrap" style="display:block"><div class="ws-switch" data-pop="wsPop"><span class="dot">C</span> Contracts <span class="chev">&#9662;</span></div><div class="pop left" id="wsPop" style="min-width:236px"><div class="grouplbl" style="padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)">Workspaces</div><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">C</span> Contracts <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">1,043</span></a><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">H</span> HR Docs <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">412</span></a><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">L</span> Legal Archive <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">8,201</span></a><div class="sep"></div><div class="mi" onclick="tdOpen('dlgNewWs')">New workspace&hellip;</div><a href="workspace-settings.html">Workspace settings&hellip;</a></div></div>
+    <div class="navgroup">Workspace</div>
+    <a class="navitem" href="workspace-chat.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</a>
+    <a class="navitem" href="document-library.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Documents</a>
+    <a class="navitem" href="connectors.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Connectors</a>
+    <a class="navitem" href="agents.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg>Agents</a>
+    <a class="navitem" href="automations.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Automations</a>
+    <a class="navitem" href="workspace-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>Workspace Settings</a>
+    <div class="navgroup">Account</div>
+    <a class="navitem" href="profile.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</a>
+    <a class="navitem" href="pricing.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></svg>Pricing</a>
+    <a class="navitem" href="billing.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>Billing</a>
+    <a class="navitem" href="support.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/></svg>Support</a>
+    <div class="navgroup">Operator</div>
+    <a class="navitem" href="admin-events.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>Event Log</a>
+    <a class="navitem" href="admin-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4"/><path d="M12 19v4"/><path d="m4.22 4.22 2.83 2.83"/><path d="m16.95 16.95 2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="m4.22 19.78 2.83-2.83"/><path d="m16.95 7.05 2.83-2.83"/></svg>App Settings</a>
+    <a class="navitem" href="data-storage.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Data &amp; Storage</a>
+    <div class="navgroup">Console</div>
+    <a class="navitem" href="qdrant-admin.html" title="Qdrant Admin (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Qdrant Admin</a>
+    <a class="navitem" href="llm-settings.html" title="LLM Settings (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg>LLM Settings</a>
+    <a class="navitem" href="token-usage.html" title="Token Usage (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>Token Usage</a>
+    <div class="foot"><span class="avatar">RK</span><div style="font-size:13px;line-height:1.25"><div style="font-weight:650">Ravi Kumar</div><div class="hint">This Mac</div></div><span class="badge violet" style="margin-left:auto">Pro</span></div>
+  </aside>
+  <div class="main">
+    <div class="topbar"><span class="crumb">Workspace: Contracts / <b>Agents</b></span><div class="right"><button class="theme-btn" onclick="tdTheme()" title="Toggle dark mode"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></button><a class="badge green" href="billing.html">Professional</a><a class="avatar" href="profile.html">RK</a></div></div>
+    <div class="content">
+
+      <div class="pagehead">
+        <h1>Agents — Contracts</h1>
+        <div class="sub">Named agents, the skills they may use, and the tool servers behind them</div>
+        <div class="actions">
+          <button class="btn outline" onclick="tdOpen('dlgTrace')">View last run</button>
+          <button class="btn" onclick="tdOpen('dlgAgent')">New agent</button>
+        </div>
+      </div>
+
+      <div class="alert blue">Invoke the agent from any workspace chat with <b>@agent</b> (BRD-83). Every skill below is a library tool, reusable by any TechieRag consumer &mdash; the app only surfaces the toggles and the trace.</div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="agents">Agents</div>
+        <div class="tab" data-tab="skills">Skill catalogue</div>
+        <div class="tab" data-tab="mcp">MCP servers</div>
+        <div class="tab" data-tab="runs">Run history</div>
+      </div>
+
+      <div class="tabpanel active" data-panel="agents">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:18px 18px 0"><h3>Your agents</h3><div class="desc">A named agent is a saved set of instructions, a model, the skills it may use, and what it is allowed to read. Call one from chat with <b>@name</b>.</div></div>
+          <div style="overflow-x:auto"><table class="t">
+            <thead><tr><th>Agent</th><th>Model</th><th>Skills</th><th>Knowledge</th><th>Last used</th><th></th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>@analyst</b><div class="hint">Contract Analyst &mdash; answers with the clause it relied on</div></td>
+                <td>Ollama &middot; llama3.1:8b</td><td>RAG search, Chart</td><td>Contracts</td><td>11:02 today</td>
+                <td style="text-align:right"><button class="btn outline sm" onclick="tdOpen('dlgAgent')">Edit</button>
+                  <span class="popwrap"><button class="dots" data-pop="ag1">&#8943;</button>
+                  <span class="pop" id="ag1"><span class="mi">Run in chat</span><span class="mi">Duplicate</span><span class="mi">Export&hellip;</span><span class="sep"></span><span class="mi danger">Delete</span></span></span></td>
+              </tr>
+              <tr>
+                <td><b>@watcher</b><div class="hint">Renewal Watcher &mdash; flags contracts expiring within 90 days</div></td>
+                <td>LM Studio &middot; qwen2.5-14b</td><td>RAG search</td><td>Contracts, Legal Archive</td><td>Fri 08:00 (scheduled)</td>
+                <td style="text-align:right"><button class="btn outline sm" onclick="tdOpen('dlgAgent')">Edit</button>
+                  <span class="popwrap"><button class="dots" data-pop="ag2">&#8943;</button>
+                  <span class="pop" id="ag2"><span class="mi">Run in chat</span><span class="mi">Duplicate</span><span class="mi">Export&hellip;</span><span class="sep"></span><span class="mi danger">Delete</span></span></span></td>
+              </tr>
+              <tr>
+                <td><b>@agent</b><div class="hint">General assistant &mdash; the built-in default, always available</div></td>
+                <td>Follows workspace default</td><td>All enabled skills</td><td>Current workspace</td><td>10:41 today</td>
+                <td style="text-align:right"><button class="btn outline sm" onclick="tdOpen('dlgAgent')">Edit</button>
+                  <span class="popwrap"><button class="dots" data-pop="ag3">&#8943;</button>
+                  <span class="pop" id="ag3"><span class="mi">Run in chat</span><span class="mi">Reset to defaults</span><span class="sep"></span><span class="mi disabled">Built-in &mdash; cannot delete</span></span></span></td>
+              </tr>
+            </tbody>
+          </table></div>
+        </div>
+
+        <div class="card">
+          <div class="cardtag"><span class="badge violet">How agents relate to skills</span></div>
+          <div class="desc" style="margin-bottom:0">The <b>Skill catalogue</b> tab controls what is available and permitted <i>in this workspace</i> &mdash; the outer boundary. Each agent then selects from what that boundary allows. Turning a skill off in the catalogue turns it off for every agent, regardless of the agent&rsquo;s own setting.</div>
+        </div>
+      </div>
+
+      <div class="tabpanel" data-panel="skills">
+        <div class="card">
+          <div class="cardtag"><span class="badge violet">Skills</span><a href="pricing.html"><span class="badge amber">AGENTS — Professional</span></a></div>
+          <h3>Enabled in this workspace</h3>
+          <div class="desc">Per-workspace toggles (BRD-84). A disabled skill is never offered to the model, so it cannot be called by accident.</div>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border)"><span class="switch"></span><div style="flex:1"><b>RAG search</b><div class="hint">Search this workspace&rsquo;s documents and cite them</div></div><span class="badge green">Local</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border)"><span class="switch"></span><div style="flex:1"><b>Web search</b><div class="hint">Query a search provider for current information</div></div><span class="badge amber">Leaves the machine</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border)"><span class="switch off"></span><div style="flex:1"><b>Web scrape</b><div class="hint">Fetch and clean a specific URL on demand</div></div><span class="badge amber">Leaves the machine</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border)"><span class="switch off"></span><div style="flex:1"><b>SQL query</b><div class="hint">Read-only queries against a configured database</div></div><span class="badge red">Needs review</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--border)"><span class="switch"></span><div style="flex:1"><b>Chart generation</b><div class="hint">Render a chart from retrieved data</div></div><span class="badge green">Local</span></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:11px 2px"><span class="switch off"></span><div style="flex:1"><b>File operations</b><div class="hint">Read and write files inside the data directory only</div></div><span class="badge red">Needs review</span></div>
+          </div>
+          <div class="alert amber" style="margin-top:14px;margin-bottom:0">Skills marked <b>Needs review</b> let the agent reach beyond your documents. They stay off until you turn them on deliberately, and each run records what was touched in the trace.</div>
+        </div>
+
+        <div class="card">
+          <div class="cardtag"><span class="badge violet">Behaviour</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">
+            <div class="field"><label class="label">Max tool calls per turn</label><input class="input" type="number" value="8"></div>
+            <div class="field"><label class="label">Time limit per run</label><input class="input" value="90"> <span class="hint">seconds</span></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Show the execution trace in chat (BRD-85)</div>
+            <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Ask before any skill that leaves this machine</div>
+            <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Let the agent start follow-up runs on its own</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabpanel" data-panel="mcp">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:18px 18px 0;display:flex;align-items:center;gap:10px">
+            <div><h3>MCP tool servers</h3><div class="desc">Registered servers expose their tools to the agent loop (BRD-86).</div></div>
+            <button class="btn sm" style="margin-left:auto" onclick="tdOpen('dlgMcp')">Add server</button>
+          </div>
+          <div style="overflow-x:auto"><table class="t">
+            <thead><tr><th>Server</th><th>Transport</th><th>Tools</th><th>Status</th><th>Last handshake</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><b>filesystem</b><div class="hint">Bundled &middot; scoped to the data directory</div></td><td class="mono">stdio</td><td>4</td><td><span class="badge green">Connected</span></td><td>2 min ago</td><td style="text-align:right"><button class="dots" data-pop="mcp1">&#8943;</button><div class="popwrap"><div class="pop" id="mcp1"><div class="mi">Inspect tools</div><div class="mi">Reconnect</div><div class="sep"></div><div class="mi danger">Remove</div></div></div></td></tr>
+              <tr><td><b>jira-mcp</b><div class="hint">http://localhost:8931</div></td><td class="mono">http</td><td>11</td><td><span class="badge green">Connected</span></td><td>2 min ago</td><td style="text-align:right"><button class="dots" data-pop="mcp2">&#8943;</button><div class="popwrap"><div class="pop" id="mcp2"><div class="mi">Inspect tools</div><div class="mi">Reconnect</div><div class="sep"></div><div class="mi danger">Remove</div></div></div></td></tr>
+              <tr><td><b>postgres-mcp</b><div class="hint">tcp://db.lan:5432</div></td><td class="mono">http</td><td>&mdash;</td><td><span class="badge red">Handshake failed</span></td><td>18 min ago</td><td style="text-align:right"><button class="dots" data-pop="mcp3">&#8943;</button><div class="popwrap"><div class="pop" id="mcp3"><div class="mi">View error</div><div class="mi">Reconnect</div><div class="sep"></div><div class="mi danger">Remove</div></div></div></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <div class="tabpanel" data-panel="runs">
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:18px 18px 0"><h3>Recent agent runs</h3><div class="desc">Every run is replayable &mdash; open one to see exactly which tools were called and what came back.</div></div>
+          <div style="overflow-x:auto"><table class="t">
+            <thead><tr><th>Started</th><th>Prompt</th><th>Tools used</th><th>Duration</th><th>Outcome</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="mono">11:02:14</td><td>@agent compare the Acme and Globex liability caps</td><td>RAG search &times;3, Chart</td><td>14.2 s</td><td><span class="badge green">Completed</span></td><td style="text-align:right"><button class="btn outline sm" onclick="tdOpen('dlgTrace')">Trace</button></td></tr>
+              <tr><td class="mono">10:41:55</td><td>@agent summarise renewals due this quarter</td><td>RAG search &times;2</td><td>6.8 s</td><td><span class="badge green">Completed</span></td><td style="text-align:right"><button class="btn outline sm" onclick="tdOpen('dlgTrace')">Trace</button></td></tr>
+              <tr><td class="mono">09:58:02</td><td>@agent check the Jira ticket for SOW-Q3</td><td>jira-mcp</td><td>21.0 s</td><td><span class="badge amber">Stopped &mdash; time limit</span></td><td style="text-align:right"><button class="btn outline sm" onclick="tdOpen('dlgTrace')">Trace</button></td></tr>
+            </tbody>
+          </table></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script>
+/* prototype kit — menus, popovers, tabs, dialogs (owner review 2026-07-26) */
+(function(){
+  function closeAll(except){
+    document.querySelectorAll('.mb.open').forEach(function(m){ if(m!==except) m.classList.remove('open'); });
+    document.querySelectorAll('.pop.open').forEach(function(p){ if(p!==except) p.classList.remove('open'); });
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var trigger = t.closest('.mb>button');
+    if(trigger){ var mb = trigger.parentElement; var was = mb.classList.contains('open'); closeAll(); if(!was) mb.classList.add('open'); e.preventDefault(); return; }
+    var popBtn = t.closest('[data-pop]');
+    if(popBtn){ var p = document.getElementById(popBtn.getAttribute('data-pop')); var open = p && p.classList.contains('open'); closeAll(); if(p && !open) p.classList.add('open'); e.preventDefault(); return; }
+    if(t.closest('.menu') || t.closest('.pop')){ if(!t.closest('a')) { closeAll(); } return; }
+    closeAll();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeAll(); document.querySelectorAll('.modal.open').forEach(function(m){ m.classList.remove('open'); }); }
+  });
+  /* tabs: .tab[data-tab] switches the sibling [data-panel] of the same name */
+  document.addEventListener('click', function(e){
+    var tab = e.target.closest('.tab[data-tab]');
+    if(!tab) return;
+    var strip = tab.closest('.tabs');
+    var scope = strip.closest('.content') || document;
+    strip.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+    tab.classList.add('active');
+    var want = tab.getAttribute('data-tab');
+    scope.querySelectorAll('[data-panel]').forEach(function(p){
+      p.classList.toggle('active', p.getAttribute('data-panel') === want);
+    });
+  });
+})();
+function tdOpen(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
+function tdClose(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+function tdSetTheme(m){var r=document.documentElement;if(m==='system'){try{localStorage.removeItem('td-theme')}catch(e){}r.removeAttribute('data-theme');if(window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)r.setAttribute('data-theme','dark');return}if(m==='dark')r.setAttribute('data-theme','dark');else r.removeAttribute('data-theme');try{localStorage.setItem('td-theme',m)}catch(e){}}
+</script>
+
+<div class="modal" id="dlgTrace">
+  <div class="sheet wide">
+    <div class="mhead"><div><h3>Execution trace</h3>
+      <div class="sub">@agent compare the Acme and Globex liability caps &middot; 11:02:14 &middot; 14.2 s &middot; 4 tool calls</div></div>
+      <button class="x" onclick="tdClose('dlgTrace')">&times;</button></div>
+    <div style="display:flex;flex-direction:column;gap:9px;max-height:420px;overflow:auto">
+      <div style="border:1px solid var(--border);border-radius:9px;padding:11px 13px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:5px"><span class="badge violet">1</span><b>rag_search</b><span class="badge green" style="margin-left:auto">1.2 s</span></div><div class="hint" style="font-family:ui-monospace,Menlo,monospace">{ "query": "Acme liability cap", "workspace": "contracts", "topK": 5 }</div><div style="margin-top:6px">5 chunks &middot; top score 0.83 &middot; MSA-Acme-2026.pdf #17, #18</div></div>
+      <div style="border:1px solid var(--border);border-radius:9px;padding:11px 13px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:5px"><span class="badge violet">2</span><b>rag_search</b><span class="badge green" style="margin-left:auto">0.9 s</span></div><div class="hint" style="font-family:ui-monospace,Menlo,monospace">{ "query": "Globex liability cap", "workspace": "contracts", "topK": 5 }</div><div style="margin-top:6px">4 chunks &middot; top score 0.79 &middot; MSA-Globex-2025.pdf #22</div></div>
+      <div style="border:1px solid var(--border);border-radius:9px;padding:11px 13px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:5px"><span class="badge violet">3</span><b>rag_search</b><span class="badge amber" style="margin-left:auto">0.7 s &middot; empty</span></div><div class="hint" style="font-family:ui-monospace,Menlo,monospace">{ "query": "liability cap carve-outs", "topK": 5 }</div><div style="margin-top:6px">0 chunks above the 0.55 threshold &mdash; the agent moved on rather than inventing an answer</div></div>
+      <div style="border:1px solid var(--border);border-radius:9px;padding:11px 13px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:5px"><span class="badge violet">4</span><b>chart_generate</b><span class="badge green" style="margin-left:auto">0.3 s</span></div><div class="hint" style="font-family:ui-monospace,Menlo,monospace">{ "type": "bar", "series": [ "Acme: 12mo fees", "Globex: 6mo fees" ] }</div></div>
+    </div>
+    <div class="mfoot"><button class="btn ghost" onclick="tdClose('dlgTrace')">Copy trace</button><button class="btn outline" onclick="tdClose('dlgTrace')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal" id="dlgMcp">
+  <div class="sheet">
+    <div class="mhead"><div><h3>Add MCP tool server</h3><div class="sub">Its tools become available to the agent in every workspace where the matching skill is on</div></div>
+      <button class="x" onclick="tdClose('dlgMcp')">&times;</button></div>
+    <div class="field"><label class="label">Transport</label><select class="input"><option>stdio &mdash; launch a local command</option><option>http &mdash; connect to a running server</option></select></div>
+    <div class="field"><label class="label">Name</label><input class="input" placeholder="jira-mcp"></div>
+    <div class="field"><label class="label">Command or URL</label><input class="input" placeholder="npx -y @acme/jira-mcp" style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px"></div>
+    <div class="field"><label class="label">Environment / headers</label><textarea class="input" rows="3" placeholder="JIRA_TOKEN=&hellip;"></textarea><div class="hint" style="margin-top:5px">Secrets go to the macOS Keychain, not a settings file.</div></div>
+    <div class="alert amber">An MCP server runs with your permissions and can be given your credentials. Only add servers you trust.</div>
+    <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgMcp')">Cancel</button><button class="btn" onclick="tdClose('dlgMcp')">Add &amp; handshake</button></div>
+  </div>
+</div>
+
+<div class="modal" id="dlgNewWs"><div class="sheet">
+  <div class="mhead"><div><h3>New workspace</h3><div class="sub">A workspace is an isolated set of documents, threads and retrieval settings</div></div>
+    <button class="x" onclick="tdClose('dlgNewWs')">&times;</button></div>
+  <div class="field"><label class="label">Name</label><input class="input" placeholder="Vendor agreements"></div>
+  <div class="field"><label class="label">Description <span class="hint">optional</span></label><textarea class="input" rows="2" placeholder="What lives in here, and what it is for"></textarea></div>
+  <div class="field"><label class="label">Start from</label>
+    <select class="input"><option>Empty workspace</option><option>Copy settings from &ldquo;Contracts&rdquo;</option><option>Copy settings and documents from &ldquo;Contracts&rdquo;</option></select></div>
+  <div class="field"><label class="label">System prompt <span class="hint">optional &mdash; how the assistant should behave here</span></label>
+    <textarea class="input" rows="2" placeholder="You are a contracts analyst. Always cite the clause you relied on."></textarea></div>
+  <div class="hint">Retrieval settings (Top-K, threshold, reranking) can be tuned later in Workspace settings &rarr; Retrieval.</div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgNewWs')">Cancel</button>
+    <button class="btn" onclick="tdClose('dlgNewWs')">Create workspace</button></div>
+</div></div>
+
+<div class="modal" id="dlgAgent"><div class="sheet wide">
+  <div class="mhead"><div><h3>Agent &mdash; Contract Analyst</h3>
+    <div class="sub">Called as <b>@analyst</b> in any chat in the workspaces it can read</div></div>
+    <button class="x" onclick="tdClose('dlgAgent')">&times;</button></div>
+
+  <div class="tabs" style="margin-bottom:14px">
+    <div class="tab active" data-tab="ident">Identity</div>
+    <div class="tab" data-tab="askills">Skills</div>
+    <div class="tab" data-tab="know">Knowledge</div>
+    <div class="tab" data-tab="guard">Guardrails</div>
+  </div>
+
+  <div class="tabpanel active" data-panel="ident">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">
+      <div class="field"><label class="label">Display name</label><input class="input" value="Contract Analyst"></div>
+      <div class="field"><label class="label">Handle</label><input class="input" value="@analyst"><div class="hint" style="margin-top:5px">How it is called in chat.</div></div>
+    </div>
+    <div class="field"><label class="label">Description</label><input class="input" value="Answers with the clause it relied on"></div>
+    <div class="field"><label class="label">Instructions</label>
+      <textarea class="input" rows="5">You are a contracts analyst. Answer only from the retrieved clauses and always quote the clause you relied on, with its document and section. If the documents do not answer the question, say so plainly rather than reasoning from general knowledge.</textarea>
+      <div class="hint" style="margin-top:5px">Plain language &mdash; this is the agent&rsquo;s system prompt.</div></div>
+    <div class="field"><label class="label">Model</label>
+      <select class="input"><option>Follow the workspace default</option><option selected>Ollama &middot; llama3.1:8b</option><option>LM Studio &middot; qwen2.5-14b</option><option>Anthropic &middot; claude-sonnet-5</option></select></div>
+  </div>
+
+  <div class="tabpanel" data-panel="askills">
+    <div class="hint" style="margin-bottom:10px">Only skills permitted by the workspace catalogue can be enabled here. Two are greyed out because the catalogue has them off.</div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--border)"><span class="switch"></span><div style="flex:1"><b>RAG search</b><div class="hint">Search the knowledge below and cite it</div></div></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--border)"><span class="switch"></span><div style="flex:1"><b>Chart generation</b><div class="hint">Render a chart from retrieved data</div></div></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--border)"><span class="switch off"></span><div style="flex:1"><b>Web search</b><div class="hint">Query a search provider</div></div><span class="badge amber">Leaves the machine</span></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 2px;border-bottom:1px solid var(--border);opacity:.5"><span class="switch off"></span><div style="flex:1"><b>SQL query</b><div class="hint">Off in the workspace catalogue</div></div><span class="badge">Blocked</span></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 2px;opacity:.5"><span class="switch off"></span><div style="flex:1"><b>File operations</b><div class="hint">Off in the workspace catalogue</div></div><span class="badge">Blocked</span></div>
+    </div>
+  </div>
+
+  <div class="tabpanel" data-panel="know">
+    <div class="field"><label class="label">This agent can read</label>
+      <select class="input"><option selected>The workspace it is called from</option><option>Specific workspaces&hellip;</option><option>Specific documents&hellip;</option></select></div>
+    <div class="field"><label class="label">Workspaces</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="badge violet">Contracts &times;</span><span class="badge">+ Add workspace</span></div></div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+      <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Restrict to pinned documents only</div>
+      <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> May answer from general knowledge when nothing is retrieved</div>
+    </div>
+    <div class="alert blue" style="margin-top:12px">With that second switch off, an unanswerable question gets &ldquo;the documents do not cover this&rdquo; rather than a plausible guess.</div>
+  </div>
+
+  <div class="tabpanel" data-panel="guard">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 16px">
+      <div class="field"><label class="label">Max tool calls per turn</label><input class="input" type="number" value="8"></div>
+      <div class="field"><label class="label">Time limit per run</label><input class="input" value="90"> <span class="hint">seconds</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Show the execution trace in chat</div>
+      <div style="display:flex;align-items:center;gap:9px"><span class="switch"></span> Ask before any skill that leaves this machine</div>
+      <div style="display:flex;align-items:center;gap:9px"><span class="switch off"></span> Allow this agent to start follow-up runs on its own</div>
+    </div>
+  </div>
+
+  <div class="mfoot"><button class="btn ghost" onclick="tdClose('dlgAgent')">Test in chat</button>
+    <button class="btn outline" onclick="tdClose('dlgAgent')">Cancel</button>
+    <button class="btn" onclick="tdClose('dlgAgent')">Save agent</button></div>
+</div></div>
+</body>
+</html>

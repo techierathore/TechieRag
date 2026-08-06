@@ -1,0 +1,120 @@
+@* REQ-UI-038 (BRD-90) + REQ-UI-039 (BRD-91) — the appearance card: default theme, accent colour and
+   UI language.
+
+   SELF-CONTAINED: injects only ThemeCoordinator, takes no parameters, renders one Card. Drop it into
+   the Branding tab of the App settings screen, ABOVE <BrandingPanel />.
+
+   Why this is a separate card from BrandingPanel even though docs/mockups/admin-settings.html draws
+   "Accent color" and "Default theme" inside the one Branding card: that card carries a
+   "WHITE_LABEL — Enterprise" badge, and gating these two controls on a licence would put dark mode
+   behind a paywall. REQ-UI-038 is not a white-label feature — it is BRD-90, separate from BRD-89 —
+   so the licensed fields (logo, name, welcome, footer) stay gated in BrandingPanel and these do not.
+   Rendered one above the other in the same tab, the pair reads as the mockup's single panel.
+
+   The "default theme" radios and the topbar ThemeToggle are deliberately the SAME setting, not a
+   default plus an override. BRD-129 makes this a single-user desktop install, so a per-instance
+   default that differs from the current user's choice would be two names for one value — and two
+   controls that silently disagree is worse than one that does not. *@
+
+@implements IDisposable
+@inject ThemeCoordinator Theme
+@inject IStringLocalizer<AppStrings> Localizer
+
+<Card>
+    <CardHeader>
+        <CardTitle>@Localizer["AppearanceTitle"]</CardTitle>
+        <CardDescription>@Localizer["AppearanceDescription"]</CardDescription>
+    </CardHeader>
+    <CardContent Class="td-stack-6">
+
+        <!-- Theme -->
+        <div class="space-y-1.5">
+            <Label>@Localizer["ThemeLabel"]</Label>
+            @* td-radio-row, not `flex flex-wrap gap-4`: RadioGroup renders its own `grid gap-2`, and
+               a second display utility in the class list does not win — `.grid` and `.flex` have the
+               same specificity, so the one declared later in trblazeui.css decides, and it stacked.
+               Smoked: the options rendered as a column where the mockup shows a row. base.css loads
+               after the library bundle, so a scoped rule there wins without !important. *@
+            <RadioGroup TValue="string" Value="@ModeValue" ValueChanged="OnModeChangedAsync"
+                        AriaLabel="@Localizer["ThemeLabel"]" Class="td-radio-row">
+                @foreach (var option in ModeOptions)
+                {
+                    <div class="flex items-center gap-2">
+                        <RadioGroupItem TValue="string" Value="@option.Mode.ToString()"
+                                        Id="@($"td-theme-{option.Mode}")" />
+                        <Label For="@($"td-theme-{option.Mode}")">@Localizer[option.ResourceKey]</Label>
+                    </div>
+                }
+            </RadioGroup>
+        </div>
+
+        <!-- Accent -->
+        <div class="space-y-1.5">
+            <Label>@Localizer["AccentLabel"]</Label>
+            @* Real <button>s, not the mockup's decorative <span class="sw">: choosing a colour is an
+               action, and a keyboard user has to be able to reach and activate it (REQ-NFR-005).
+               aria-pressed carries the selected state, which a colour ring alone does not — the one
+               piece of information a swatch row is useless without if you cannot see colour. *@
+            <div class="flex flex-wrap items-center gap-3">
+                @foreach (var accent in AccentPalette.All)
+                {
+                    @* One line on purpose: split over two, the counter's tag-stripper leaves the
+                       first half standing in the text stream as a phantom English run. *@
+                    var selected = string.Equals(accent.Key, Theme.Current.AccentKey, StringComparison.OrdinalIgnoreCase);
+                    <button type="button"
+                            class="@(selected ? "td-accent-swatch td-accent-selected" : "td-accent-swatch")"
+                            style="@($"background:{accent.LightHex}")"
+                            aria-pressed="@(selected ? "true" : "false")"
+                            title="@Localizer[accent.DisplayNameKey]"
+                            @onclick="@(() => OnAccentChosenAsync(accent.Key))">
+                        <span class="sr-only">@Localizer[accent.DisplayNameKey]</span>
+                    </button>
+                }
+            </div>
+            <TypographyMuted Class="block text-xs">@Localizer["AccentDescription"]</TypographyMuted>
+        </div>
+
+        <!-- Language -->
+        <LanguagePicker />
+    </CardContent>
+</Card>
+
+@code {
+    private static readonly (ThemeMode Mode, string ResourceKey)[] ModeOptions =
+    [
+        (ThemeMode.Light, "ThemeLight"),
+        (ThemeMode.Dark, "ThemeDark"),
+        (ThemeMode.System, "ThemeSystem")
+    ];
+
+    // RadioGroup binds a string, so the enum travels by name. Round-tripped through Enum.TryParse
+    // below rather than by index, so reordering ModeOptions cannot silently change what a click does.
+    private string ModeValue => Theme.Current.Mode.ToString();
+
+    protected override void OnInitialized() => Theme.Changed += HandleThemeChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Idempotent: normally Routes.razor's ThemeInitializer has already done this, but the
+            // panel must show the stored state even if it is somehow rendered first.
+            await Theme.EnsureAppliedAsync();
+        }
+    }
+
+    private async Task OnModeChangedAsync(string? value)
+    {
+        if (Enum.TryParse<ThemeMode>(value, out var mode))
+        {
+            await Theme.SetModeAsync(mode);
+        }
+    }
+
+    private Task OnAccentChosenAsync(string accentKey) => Theme.SetAccentAsync(accentKey);
+
+    private void HandleThemeChanged() => _ = InvokeAsync(StateHasChanged);
+
+    /// <inheritdoc />
+    public void Dispose() => Theme.Changed -= HandleThemeChanged;
+}

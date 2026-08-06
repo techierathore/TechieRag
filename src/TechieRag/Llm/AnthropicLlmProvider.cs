@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
+using TechieRag.Diagnostics;
 using TechieRag.Models;
 
 namespace TechieRag.Llm;
@@ -20,7 +21,7 @@ namespace TechieRag.Llm;
 /// system message is a top-level field, not in the messages array.
 /// Tool use returns content blocks with type "tool_use" instead of "tool_calls".</para>
 /// </remarks>
-public class AnthropicLlmProvider : ILlmProvider
+public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
     private readonly HttpClient httpClient;
     private readonly int defaultMaxTokens;
@@ -37,6 +38,11 @@ public class AnthropicLlmProvider : ILlmProvider
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
+
+    /// <inheritdoc/>
+    /// <remarks>Images are encoded as native <c>image</c> content blocks, inline or by URL (REQ-RAG-039).</remarks>
+    public bool SupportsInput(ChatContentKind kind) =>
+        kind is ChatContentKind.Text or ChatContentKind.Image;
 
     /// <inheritdoc/>
     public event EventHandler<LlmCompletionEventArgs>? OnCompletionCompleted;
@@ -65,6 +71,23 @@ public class AnthropicLlmProvider : ILlmProvider
         };
         httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
         httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+    }
+
+    /// <summary>
+    /// Creates an Anthropic provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Model name.</param>
+    /// <param name="maxTokens">Default max output tokens.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal AnthropicLlmProvider(HttpClient httpClient, string model, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        ModelName = model;
+        defaultMaxTokens = maxTokens;
+        this.logger = logger ?? NullLogger<AnthropicLlmProvider>.Instance;
     }
 
     /// <inheritdoc/>
@@ -113,6 +136,8 @@ public class AnthropicLlmProvider : ILlmProvider
         var toolCalls = ExtractToolCalls(result.Content);
         var inputTokens = result.Usage?.InputTokens ?? 0;
         var outputTokens = result.Usage?.OutputTokens ?? 0;
+        var cacheReadTokens = result.Usage?.CacheReadInputTokens ?? 0;
+        var cacheWriteTokens = result.Usage?.CacheCreationInputTokens ?? 0;
 
         var llmResponse = new LlmResponse
         {
@@ -122,6 +147,8 @@ public class AnthropicLlmProvider : ILlmProvider
             {
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
+                CacheReadTokens = cacheReadTokens,
+                CacheWriteTokens = cacheWriteTokens,
                 ModelName = ModelName,
                 ProviderName = Name
             },
@@ -129,7 +156,7 @@ public class AnthropicLlmProvider : ILlmProvider
             ModelName = result.Model ?? ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls);
+        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens, cacheWriteTokens);
         return llmResponse;
     }
 
@@ -151,6 +178,7 @@ public class AnthropicLlmProvider : ILlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        var outputText = new StringBuilder();
 
         while (!reader.EndOfStream)
         {
@@ -187,6 +215,7 @@ public class AnthropicLlmProvider : ILlmProvider
                         var textValue = text.GetString();
                         if (!string.IsNullOrEmpty(textValue))
                         {
+                            outputText.Append(textValue);
                             yield return textValue;
                         }
                     }
@@ -202,6 +231,14 @@ public class AnthropicLlmProvider : ILlmProvider
         }
 
         sw.Stop();
+
+        // Fallback: estimate when the API sent no usage events
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
         RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
@@ -240,15 +277,32 @@ public class AnthropicLlmProvider : ILlmProvider
     {
         var request = new Dictionary<string, object>
         {
-            ["model"] = ModelName,
+            ["model"] = options?.Model ?? ModelName,
             ["max_tokens"] = options?.MaxTokens ?? defaultMaxTokens
         };
+
+        var cache = options?.PromptCache;
 
         // Anthropic: system message is a top-level field
         var systemMsg = messages.FirstOrDefault(m => m.Role == "system");
         if (systemMsg is not null)
         {
-            request["system"] = systemMsg.Content ?? string.Empty;
+            // The plain-string form has nowhere to hang cache_control, so caching the system prompt
+            // forces the block-array form (REQ-RAG-043). Uncached callers keep the simpler shape.
+            if (cache?.CacheSystemPrompt == true)
+            {
+                var systemBlock = new Dictionary<string, object>
+                {
+                    ["type"] = "text",
+                    ["text"] = systemMsg.Content ?? string.Empty,
+                    ["cache_control"] = BuildCacheControl(cache)
+                };
+                request["system"] = new List<object> { systemBlock };
+            }
+            else
+            {
+                request["system"] = systemMsg.Content ?? string.Empty;
+            }
         }
 
         // Map non-system messages
@@ -290,7 +344,19 @@ public class AnthropicLlmProvider : ILlmProvider
                             ["input"] = JsonSerializer.Deserialize<JsonElement>(tc.ArgumentsJson)
                         });
                     }
+                    ApplyCacheBoundary(contentBlocks, m, cache);
                     return new Dictionary<string, object> { ["role"] = "assistant", ["content"] = contentBlocks };
+                }
+
+                // Multimodal (REQ-RAG-039) and cache breakpoints (REQ-RAG-043) both need the block-array
+                // form. Everything else stays on the plain string, which is what the vast majority of
+                // messages are and what the API documents as the common case.
+                var needsBlocks = m.Parts is { Count: > 0 } || (cache is not null && m.CacheBoundary);
+                if (needsBlocks)
+                {
+                    var blocks = BuildContentBlocks(m);
+                    ApplyCacheBoundary(blocks, m, cache);
+                    return new Dictionary<string, object> { ["role"] = m.Role, ["content"] = blocks };
                 }
 
                 return new Dictionary<string, object>
@@ -309,12 +375,22 @@ public class AnthropicLlmProvider : ILlmProvider
         // Tool definitions
         if (options?.Tools is { Count: > 0 })
         {
-            request["tools"] = options.Tools.Select(t => new
+            var toolDefinitions = options.Tools.Select(t => new Dictionary<string, object>
             {
-                name = t.Name,
-                description = t.Description,
-                input_schema = JsonSerializer.Deserialize<JsonElement>(t.ParametersSchema)
+                ["name"] = t.Name,
+                ["description"] = t.Description,
+                ["input_schema"] = JsonSerializer.Deserialize<JsonElement>(t.ParametersSchema)
             }).ToList();
+
+            // Anthropic caches the prefix up to a breakpoint, so the marker goes on the LAST tool:
+            // that covers the whole tool block and the system prompt ahead of it in one entry
+            // (REQ-RAG-043). Marking the first tool would cache almost nothing.
+            if (cache?.CacheToolDefinitions == true && toolDefinitions.Count > 0)
+            {
+                toolDefinitions[^1]["cache_control"] = BuildCacheControl(cache);
+            }
+
+            request["tools"] = toolDefinitions;
 
             if (options.ToolChoice is not null)
             {
@@ -329,6 +405,82 @@ public class AnthropicLlmProvider : ILlmProvider
         }
 
         return request;
+    }
+
+    /// <summary>Builds Anthropic content blocks for one message, images included (REQ-RAG-039).</summary>
+    private static List<object> BuildContentBlocks(ChatMessage message)
+    {
+        var blocks = new List<object>();
+
+        if (message.Parts is { Count: > 0 })
+        {
+            foreach (var part in message.Parts)
+            {
+                if (part.Kind == ChatContentKind.Image && part.Image is not null)
+                {
+                    blocks.Add(new Dictionary<string, object>
+                    {
+                        ["type"] = "image",
+                        ["source"] = part.Image.IsInline
+                            ? new Dictionary<string, object>
+                            {
+                                ["type"] = "base64",
+                                ["media_type"] = part.Image.MediaType,
+                                ["data"] = part.Image.Base64Data!
+                            }
+                            : new Dictionary<string, object>
+                            {
+                                ["type"] = "url",
+                                ["url"] = part.Image.Url!.ToString()
+                            }
+                    });
+                }
+                else if (!string.IsNullOrEmpty(part.Text))
+                {
+                    blocks.Add(new Dictionary<string, object> { ["type"] = "text", ["text"] = part.Text });
+                }
+            }
+        }
+        else if (!string.IsNullOrEmpty(message.Content))
+        {
+            blocks.Add(new Dictionary<string, object> { ["type"] = "text", ["text"] = message.Content });
+        }
+
+        // The API rejects an empty content array. A message with neither text nor parts is a caller
+        // bug, but failing it here with an empty text block beats a 400 with no line number.
+        if (blocks.Count == 0)
+        {
+            blocks.Add(new Dictionary<string, object> { ["type"] = "text", ["text"] = string.Empty });
+        }
+
+        return blocks;
+    }
+
+    /// <summary>Marks the end of the cacheable prefix on the last block of a message (REQ-RAG-043).</summary>
+    private static void ApplyCacheBoundary(List<object> blocks, ChatMessage message, PromptCacheOptions? cache)
+    {
+        if (cache is null || !message.CacheBoundary || blocks.Count == 0) return;
+
+        if (blocks[^1] is Dictionary<string, object> lastBlock)
+        {
+            lastBlock["cache_control"] = BuildCacheControl(cache);
+        }
+    }
+
+    /// <summary>Builds the Anthropic <c>cache_control</c> value for the requested lifetime (REQ-RAG-043).</summary>
+    private static Dictionary<string, object> BuildCacheControl(PromptCacheOptions cache)
+    {
+        var control = new Dictionary<string, object> { ["type"] = "ephemeral" };
+
+        // Anthropic offers two tiers, not a free-form duration. Anything an hour or longer takes the
+        // 1h tier; everything shorter takes the default 5m tier, which is left unstated so that a
+        // caller asking for the default does not depend on the extended-TTL beta being enabled.
+        if (cache.Ttl is { } ttl && ttl >= TimeSpan.FromHours(1))
+        {
+            control["ttl"] = "1h";
+        }
+
+        return control;
     }
 
     private static string? ExtractText(List<AnthropicContentBlock>? contentBlocks)
@@ -355,8 +507,11 @@ public class AnthropicLlmProvider : ILlmProvider
         return toolUses.Count > 0 ? toolUses : null;
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
+    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0, int cacheWriteTokens = 0)
     {
+        TechieRagTelemetry.RecordLlmCompletion(
+            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens, cacheWriteTokens);
+
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
             InputTokens = inputTokens,
@@ -418,5 +573,13 @@ public class AnthropicLlmProvider : ILlmProvider
 
         [JsonPropertyName("output_tokens")]
         public int OutputTokens { get; set; }
+
+        /// <summary>Prompt tokens written into the cache on this call (REQ-RAG-043).</summary>
+        [JsonPropertyName("cache_creation_input_tokens")]
+        public int CacheCreationInputTokens { get; set; }
+
+        /// <summary>Prompt tokens served from the cache on this call (REQ-RAG-043).</summary>
+        [JsonPropertyName("cache_read_input_tokens")]
+        public int CacheReadInputTokens { get; set; }
     }
 }

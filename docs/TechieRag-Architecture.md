@@ -1,11 +1,7 @@
 # TechieRag — Architecture
 
 **Last updated:** 2026-06-25
-**Status:** Current (brownfield)
-
-> **Depth mandate:** this is a HUMAN document, read as rendered HTML. Module rows in §4 with non-trivial behavior get a prose paragraph beneath the table, and every significant runtime flow beyond §3's primary path (embedded-model load, agent/tool loop, resilience, NuGet autodistribution) gets its own diagram.
-
-> **Mermaid mandate.** Every diagram quotes all node/edge/subgraph labels and never uses `end` as a node id (see `.tfcore/templates/v4custom/html-render-shell.md §5.5`).
+**Status:** Current (brownfield) — amended 2026-07-17: TechieDesk repositioning (app renamed from TechieRagWeb, promoted from sample to product; ADR-007)
 
 ## Table of Contents
 
@@ -22,7 +18,7 @@
 
 ## 1. Tech stack
 
-TechieRag is a **configurable RAG (Retrieval-Augmented Generation) library for .NET**, shipped as two NuGet packages (`TechieRag`, `TechieRag.Embedded`) plus a Blazor Server sample (`TechieRagWeb`) and an xUnit test project. It is a class-library SDK, not a hosted application — consumers reference it and wire it into their own apps via a fluent builder or DI.
+TechieRag is a **configurable RAG (Retrieval-Augmented Generation) library for .NET**, shipped as two NuGet packages (`TechieRag`, `TechieRag.Embedded`) plus the **TechieDesk** Blazor Server application (formerly `TechieRagWeb`; folder `apps/TechieDesk`, renamed per BRD-82 / REQ-UI-014 on 2026-07-17) and an xUnit test project. The library is a class-library SDK, not a hosted application — consumers reference it and wire it into their own apps via a fluent builder or DI. TechieDesk is being productized as a self-hostable AnythingLLM alternative built on the library (BRD-81; roadmap in `docs/TechieRag-CompetitorAnalysis.md`).
 
 | Layer | Choice | Version | Notes |
 |-------|--------|---------|-------|
@@ -34,7 +30,7 @@ TechieRag is a **configurable RAG (Retrieval-Augmented Generation) library for .
 | Cloud embedding | Azure.AI.OpenAI | 2.1.0 | Azure OpenAI embedding provider |
 | Embedded embedding | Microsoft.ML.OnnxRuntime (+ Managed), Microsoft.ML.Tokenizers | 1.24.1 / 2.0.0 | `TechieRag.Embedded` only — BGE-M3 ONNX inference |
 | DI / config | Microsoft.Extensions.{DependencyInjection,Configuration,Logging,Options}.Abstractions | 10.0.3 | Abstractions only — no framework lock-in |
-| Sample UI | Blazor Server + TrBlazeUI.Components + TrBlazeUI.Icons.Lucide | 1.0.3 | `samples/TechieRagWeb` only (from GitHub Packages) |
+| TechieDesk UI | Blazor Server + TrBlazeUI.Components + TrBlazeUI.Icons.Lucide | 1.0.3 | `apps/TechieDesk` only (from GitHub Packages) |
 | Test | xUnit | — | `tests/TechieRag.Tests` |
 
 **LLM providers** are implemented with raw `HttpClient` + `System.Text.Json` (no heavy vendor SDKs) so the core package stays dependency-light: Ollama, LM Studio, OpenAI-compatible, Azure AI Foundry, Google Gemini, Anthropic Claude.
@@ -48,7 +44,7 @@ flowchart TB
     Embed["TechieRag.Embedded (ONNX BGE-M3)"]
   end
   subgraph Samples["samples"]
-    Web["TechieRagWeb (Blazor Server demo)"]
+    Web["TechieDesk (Blazor Server app, formerly TechieRagWeb)"]
   end
   subgraph Tests["tests"]
     UT["TechieRag.Tests (xUnit)"]
@@ -250,6 +246,7 @@ flowchart LR
 - **ADR-004 — Embedded model downloaded on first use, not packed.** The ~2.3GB BGE-M3 ONNX model is fetched from Hugging Face to a local cache instead of bloating the NuGet; offline after first run.
 - **ADR-005 — Additive v2 (LLM/RAG generation).** All v2 methods are additive; `LlmSource.None` preserves identical v1 (retrieval-only) behaviour — guaranteed backward compatibility.
 - **ADR-006 — MSBuild autodistribution of AI skills.** Skill files ship inside the package and self-install into consumer repos via `buildTransitive` targets.
+- **ADR-007 — TechieDesk repositioning (2026-07-17).** The companion app `TechieRagWeb` is renamed **TechieDesk** and promoted from demo sample to a first-class, self-hostable AnythingLLM-alternative product in the monorepo (folder `apps/TechieDesk` per the BRD-82 rename, completed 2026-07-17 / REQ-UI-014); the TechieRag library remains the reusable core powering it and any other consumer. Repo split into separate library/app repositories is deferred until post-MVP (rationale + phased roadmap: `docs/TechieRag-CompetitorAnalysis.md` §6–7).
 
 ## 8. Target architecture
 
@@ -265,7 +262,7 @@ These bolt onto existing seams (telemetry events, the test project) without chan
 - **Field-naming convention (resolved):** the codebase uses **bare camelCase, no prefix, no underscores** for instance fields/params/locals (~95%+ dominance — standard Microsoft style, e.g. `private readonly ILlmProvider llmProvider;`). Recorded as the project convention in Coding-Standards §"Fields, Parameters, Locals". The TechieFlow default `obj`/`a`/`v` prefixes are **not** adopted for this established library; new code follows the codebase's camelCase convention. No drift remediation required.
 - **Formal automated tests:** the `tests/TechieRag.Tests` project exists but the suite is minimal — v2 was validated by manual/integration testing (21 documented scenarios, all passed). Formal unit tests are deferred (v2 Phase 7). This is the single largest gap for long-term maintainability.
 - **Observability depth:** event-based telemetry exists; OpenTelemetry exporters are deferred (enterprise feature).
-- **Sample build dependency:** `samples/TechieRagWeb` pulls `TrBlazeUI.*` from GitHub Packages, which needs an authenticated `nuget.config` token. A clean restore of the **sample** requires that credential; the two shipped library packages have no such dependency and restore from nuget.org alone.
+- **TechieDesk build dependency:** the app (`apps/TechieDesk`) pulls `TrBlazeUI.*` from GitHub Packages, which needs an authenticated `nuget.config` token. A clean restore of the **app** requires that credential; the two shipped library packages have no such dependency and restore from nuget.org alone.
 - **SQLite concurrency:** documented limitation — multiple processes against one `.db` file can lock; single-instance or a server-backed store (PgVector/Qdrant) for multi-user.
 
 ## 10. Sources harvested
@@ -278,7 +275,7 @@ This architecture was reverse-documented from the codebase and the following sou
 - `docs/ai-agent-autodistribution-guide.md` — MSBuild skill-file distribution
 - `docs/SETUP-AND-TESTING-GUIDE.md`, `docs/integration-testing-guide.md`, `docs/NUGET-PUBLISHING-GUIDE.md`, `docs/EMBEDDED-PACKAGE-GUIDE.md` — runbook, test plan, packaging
 - `README.md`, `docs/brainstorming-session-results.md` — project intent
-- Code scan of `src/TechieRag`, `src/TechieRag.Embedded`, `samples/TechieRagWeb`, `tests/TechieRag.Tests`
+- Code scan of `src/TechieRag`, `src/TechieRag.Embedded`, `apps/TechieDesk`, `tests/TechieRag.Tests`
 
 ---
 Last updated: 2026-06-25

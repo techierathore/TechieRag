@@ -1,0 +1,34 @@
+@* REQ-UI-038 (BRD-90) — applies the stored theme to the document, once per window.
+
+   Renders nothing. It exists as a component only because applying the theme needs JS interop, and
+   interop is not available until after the first render — there is no earlier hook in a Blazor
+   Hybrid head that can reach <html>.
+
+   Mounted in Routes.razor rather than in a layout on purpose: the app has two layouts (MainLayout
+   for the shell, AuthLayout for /login, /register and the first-run wizard), and a theme that only
+   applied under one of them would leave the other rendering light on a dark install. Routes.razor
+   wraps both. *@
+
+@inject ThemeCoordinator Theme
+@inject ILogger<ThemeInitializer> Logger
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await Theme.EnsureAppliedAsync();
+        }
+        catch (Exception ex)
+        {
+            // The document already carries whatever the first-paint shim in index.html put there,
+            // so a failure here means "the theme may be stale", never "the app cannot render".
+            Logger.LogWarning(ex, "Could not initialize the theme");
+        }
+    }
+}

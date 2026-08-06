@@ -1,0 +1,279 @@
+@page "/workspace/{Slug}/settings"
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<WorkspaceSettings> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["WsSettingsPageTitle", workspace?.Name ?? Localizer["WsSettingsWorkspaceFallback"].Value]</PageTitle>
+
+@if (accessDenied)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["WsSettingsNotAllowed"]</AlertTitle>
+        <AlertDescription>@Localizer["WsSettingsNotAllowedBody"]</AlertDescription>
+    </Alert>
+}
+else if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["WsSettingsNotAvailable"]</AlertTitle>
+        <AlertDescription>@Localizer["WsSettingsNotAvailableBody"]</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["WsSettingsLoading"]</span>
+    </div>
+}
+else
+{
+    <div class="mb-4 flex items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["WsSettingsHeading", workspace.Name]</h1>
+            <TypographyMuted>@Localizer["WsSettingsSubtitle"]</TypographyMuted>
+        </div>
+        <div class="ml-auto">
+            <Button OnClick="SaveAsync" Disabled="@isSaving">@(isSaving ? Localizer["Saving"] : Localizer["SaveChanges"])</Button>
+        </div>
+    </div>
+
+    <Tabs DefaultValue="general">
+        <!-- REQ-FN-041: the Members tab is gone with user↔workspace assignment. One desktop
+             install serves one person, so a workspace has no membership to edit. -->
+        <TabsList Class="grid w-full grid-cols-3">
+            <TabsTrigger Value="general">@Localizer["WsSettingsTabGeneral"]</TabsTrigger>
+            <TabsTrigger Value="retrieval">@Localizer["WsSettingsTabRetrieval"]</TabsTrigger>
+            <TabsTrigger Value="danger">@Localizer["WsSettingsTabDanger"]</TabsTrigger>
+        </TabsList>
+
+        <!-- General (REQ-UI-015 / REQ-RAG-015) -->
+        <TabsContent Value="general" ForceMount="true">
+            <Card>
+                <CardContent Class="space-y-4 p-4">
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsDisplayName"]</FieldLabel>
+                        <FieldContent><Input @bind-Value="name" Placeholder="@Localizer["WsSettingsNamePlaceholder"]" /></FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsSlug"]</FieldLabel>
+                        <FieldContent>
+                            <Input AriaLabel="@Localizer["WsSettingsSlug"]" Value="@currentSlug" Disabled="true" />
+                            <FieldDescription>@Localizer["WsSettingsSlugHint"]</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsSystemPrompt"]</FieldLabel>
+                        <FieldContent><Textarea @bind-Value="systemPrompt" Class="min-h-[90px]" Placeholder="@Localizer["WsSettingsSystemPromptPlaceholder"]" /></FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsLlmOverride"]</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="llmModel" Placeholder="@Localizer["WsSettingsInstanceDefault"]" />
+                            <FieldDescription>@Localizer["WsSettingsLlmOverrideHint"]</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsMode"]</FieldLabel>
+                        <FieldContent>
+                            <RadioGroup @bind-Value="mode" TValue="string">
+                                <div class="flex items-center space-x-2">
+                                    <RadioGroupItem Value="@("chat")" Id="mode-chat" TValue="string" />
+                                    <Label For="mode-chat">@Localizer["WsSettingsModeChat"]</Label>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <RadioGroupItem Value="@("query")" Id="mode-query" TValue="string" />
+                                    <Label For="mode-query">@Localizer["WsSettingsModeQuery"]</Label>
+                                </div>
+                            </RadioGroup>
+                        </FieldContent>
+                    </Field>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Retrieval (REQ-RAG-014) -->
+        <TabsContent Value="retrieval" ForceMount="true">
+            <Card>
+                <CardContent Class="space-y-4 p-4">
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsThreshold", threshold.ToString("0.00")]</FieldLabel>
+                        <FieldContent>
+                            <input type="range" class="td-range" min="0" max="1" step="0.05"
+                                   value="@threshold.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                   @onchange="OnThresholdChanged" disabled="@(!Workspaces.CanTuneRetrieval)" />
+                            <FieldDescription>@Localizer["WsSettingsThresholdHint"]</FieldDescription>
+                        </FieldContent>
+                    </Field>
+                    <Field>
+                        <FieldLabel>@Localizer["WsSettingsTopK"]</FieldLabel>
+                        <FieldContent>
+                            <Input AriaLabel="@Localizer["WsSettingsTopK"]" @bind-Value="topKString" Disabled="@(!Workspaces.CanTuneRetrieval)" Class="max-w-[140px]" />
+                        </FieldContent>
+                    </Field>
+                    <div class="flex items-center gap-3">
+                        <Switch @bind-Checked="rerankEnabled" Id="rerank" Disabled="@(!Workspaces.CanTuneRetrieval)" />
+                        <Label For="rerank">@Localizer["WsSettingsRerank"]</Label>
+                    </div>
+                    <FieldDescription>@Localizer["WsSettingsRerankHint"]</FieldDescription>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <!-- Danger (REQ-UI-014 delete confirm) -->
+        <TabsContent Value="danger" ForceMount="true">
+            <Card Class="border-destructive/50">
+                <CardContent Class="space-y-3 p-4">
+                    <TypographyMuted>@Localizer["WsSettingsDeleteNote"]</TypographyMuted>
+                    <Button Variant="ButtonVariant.Destructive" OnClick="@(() => showDeleteDialog = true)">@Localizer["WsSettingsDeleteAction"]</Button>
+                </CardContent>
+            </Card>
+        </TabsContent>
+    </Tabs>
+}
+
+<Dialog @bind-Open="showDeleteDialog">
+    <DialogContent>
+        <DialogHeader>
+            <DialogTitle>@Localizer["WsSettingsDeleteTitle", workspace?.Name ?? string.Empty]</DialogTitle>
+            <DialogDescription>@Localizer["WsSettingsDeleteBody"]</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => showDeleteDialog = false)">@Localizer["Cancel"]</Button>
+            <Button Variant="ButtonVariant.Destructive" OnClick="ConfirmDeleteAsync">@Localizer["WsSettingsDeleteConfirm"]</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    private Workspace? workspace;
+    private bool notFound;
+    private bool accessDenied;
+    private bool isSaving;
+    private string? loadedSlug;
+    private string currentSlug = string.Empty;
+
+    private string name = string.Empty;
+    private string? systemPrompt;
+    private string? llmModel;
+    private string mode = "chat";
+    private double threshold;
+    private string topKString = "5";
+    private bool rerankEnabled;
+
+    private bool showDeleteDialog;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loadedSlug == Slug) return;
+        loadedSlug = Slug;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        accessDenied = false;
+        notFound = false;
+        workspace = null;
+
+        if (!Workspaces.CanManageWorkspaces)
+        {
+            accessDenied = true;
+            return;
+        }
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            currentSlug = Workspaces.SlugFor(workspace);
+            name = workspace.Name;
+            systemPrompt = workspace.SystemPrompt;
+            llmModel = workspace.LlmModel;
+            mode = workspace.ChatMode == WorkspaceChatMode.Query ? "query" : "chat";
+            threshold = workspace.SimilarityThreshold ?? 0;
+            topKString = (workspace.TopK ?? 5).ToString();
+            rerankEnabled = workspace.RerankEnabled;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load workspace settings for {Slug}", Slug);
+            notFound = true;
+        }
+    }
+
+    private void OnThresholdChanged(ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var v))
+        {
+            threshold = v;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (workspace is null) return;
+        isSaving = true;
+        try
+        {
+            workspace.Name = string.IsNullOrWhiteSpace(name) ? workspace.Name : name.Trim();
+            workspace.SystemPrompt = string.IsNullOrWhiteSpace(systemPrompt) ? null : systemPrompt.Trim();
+            workspace.LlmModel = string.IsNullOrWhiteSpace(llmModel) ? null : llmModel.Trim();
+            workspace.ChatMode = mode == "query" ? WorkspaceChatMode.Query : WorkspaceChatMode.Chat;
+            workspace.SimilarityThreshold = threshold <= 0 ? null : (float)threshold;
+            workspace.TopK = int.TryParse(topKString, out var k) && k > 0 ? k : 5;
+            workspace.RerankEnabled = rerankEnabled;
+
+            await Workspaces.UpdateWorkspaceAsync(workspace);
+            ToastService.Success(Localizer["WsSettingsSavedBody"], Localizer["Saved"]);
+
+            var newSlug = Workspaces.SlugFor(workspace);
+            if (!string.Equals(newSlug, currentSlug, StringComparison.OrdinalIgnoreCase))
+            {
+                Nav.NavigateTo($"/workspace/{newSlug}/settings", forceLoad: false);
+            }
+            else
+            {
+                currentSlug = newSlug;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save workspace settings");
+            ToastService.Error(ex.Message, Localizer["SaveFailed"]);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (workspace is null) return;
+        try
+        {
+            await Workspaces.DeleteWorkspaceAsync(workspace.WorkspaceId);
+            showDeleteDialog = false;
+            ToastService.Success(Localizer["WsSettingsDeletedBody"], Localizer["WsSettingsDeletedTitle"]);
+            Nav.NavigateTo("/", forceLoad: false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete workspace");
+            ToastService.Error(ex.Message, Localizer["WsSettingsDeleteFailed"]);
+        }
+    }
+}

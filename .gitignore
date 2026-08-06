@@ -29,6 +29,11 @@ src/TechieRag.Embedded/Models/
 # history — you must also untrack it (git rm --cached nuget.config) AND revoke/rotate the exposed PAT.
 nuget.config
 
+# Local dev secrets — real AppManager BaseUrl/ApiKey/ApiSecret/ApplicationId live here, never commit.
+# .NET auto-layers appsettings.Development.json over appsettings.json in the Development environment.
+appsettings.Development.json
+apps/TechieDesk/appsettings.Development.json
+
 # Claude/AI tooling
 .tfcore/
 .claude/
@@ -41,3 +46,18 @@ CLAUDE.md
 *.json
 /test-results/qdrant-crud-Qdrant-Admin-C-abb04--real-server-version-1-15-5
 /nuget.config
+
+# TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)
+/opencode.jsonc
+/.tf-scaffold-note.txt
+
+# TechieFlow agent artifacts — machine-generated test harness & logs, never commit (managed by scaffold/update-framework.sh)
+/package.json
+/package-lock.json
+node_modules/
+test-results/
+playwright-report/
+.verify/
+logs/
+.DS_Store
+/docs/.last-verify.json

@@ -1,0 +1,49 @@
+@inherits LayoutComponentBase
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* Centered-card layout for the public auth screens (login/register/password recovery),
+   matching docs/mockups/*.html — no sidebar, soft gradient backdrop. *@
+
+<div class="flex min-h-screen items-center justify-center bg-gradient-to-b from-primary/5 via-background to-background p-6">
+    <div class="flex w-full max-w-md flex-col gap-4">
+        @* REQ-NFR-005: the brand lockup and the strapline are the page banner; wrapping them in
+           <header> (and the legal note below in <footer>) puts every node on these screens inside
+           a landmark, which is what axe's `region` rule is asking for. Both are display:contents-
+           free plain wrappers, so the parent flex column still sees the same children. *@
+        <header class="flex flex-col gap-4">
+            @* REQ-FN-036: the lockup points back into the APP, not at /login. Nobody is ever sent
+               here by the app, so the way out must be a way forward — the workspace is usable with
+               or without an account. *@
+            @* REQ-UI-037 (BRD-89): the lockup is drawn from the white-label branding rather than
+               hardcoded, so a branded install shows its own mark and name on the screens an outside
+               user is most likely to see first. BrandLockup falls back to the shipped TechieDesk
+               identity, so an unbranded install is unchanged. *@
+            <a href="/" class="flex items-center justify-center gap-2.5 text-lg font-bold tracking-tight">
+                <BrandLockup NameClass="" />
+            </a>
+            <div class="-mt-2 text-center text-sm text-muted-foreground">@Localizer["AuthStrapline"]</div>
+        </header>
+
+        @* REQ-NFR-005: the auth screens had no landmark at all, so every element on them was
+           orphaned outside a region (axe landmark-one-main + region, 6-10 nodes per route).
+           A <main> wrapper gives assistive tech a single "skip to the form" target without
+           changing the visual layout: <main> repeats the parent's `flex flex-col gap-4` so a
+           body with several stacked cards (e.g. /setup) keeps the exact same rhythm, while the
+           wrapper itself is a single flex item in the parent's identical gap. Deliberately not
+           `class="contents"` — that utility is not present in the prebuilt TrBlazeUI bundle. *@
+        <main class="flex w-full flex-col gap-4">
+            @Body
+        </main>
+
+        @* REQ-FN-036 / BRD-129: was "Accounts managed by AppManager", which read as "you need one".
+           The escape hatch itself lives on the sign-in/registration screens rather than here,
+           because this layout is shared with the first-run wizard (/setup), where "continue without
+           an account" would be meaningless. *@
+        <footer class="text-center text-xs text-muted-foreground">
+            @Localizer["AuthFooterNote"]
+        </footer>
+    </div>
+</div>
+
+<ToastProvider Position="ToastPosition.BottomRight" />
+<PortalHost />

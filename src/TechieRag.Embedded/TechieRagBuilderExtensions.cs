@@ -106,6 +106,45 @@ public static class TechieRagBuilderExtensions
     }
 
     /// <summary>
+    /// Enables the rerank stage using the local BGE-Reranker-v2-M3 ONNX cross-encoder
+    /// (auto-downloaded on first use).
+    /// </summary>
+    /// <param name="builder">The TechieRag builder instance.</param>
+    /// <param name="modelDirectory">Optional pre-downloaded model directory; null downloads on first use.</param>
+    /// <param name="topN">How many results the reranker returns (0 = same as requested topK).</param>
+    /// <param name="candidateCount">How many vector search candidates are fetched for reranking.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    /// <remarks>
+    /// <para><b>Example:</b></para>
+    /// <code>
+    /// var rag = new TechieRagBuilder()
+    ///     .UseEmbedded()
+    ///     .UseSqliteVec()
+    ///     .UseEmbeddedReranker()
+    ///     .Build();
+    /// </code>
+    /// </remarks>
+    public static TechieRagBuilder UseEmbeddedReranker(
+        this TechieRagBuilder builder,
+        string? modelDirectory = null,
+        int topN = 0,
+        int candidateCount = 20)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        var config = builder.GetConfig();
+        config.Rerank.Source = RerankSource.LocalOnnx;
+        config.Rerank.ModelPath = modelDirectory;
+
+        return builder.WithReranker(
+            () => modelDirectory is null
+                ? new OnnxCrossEncoderReranker()
+                : OnnxCrossEncoderReranker.FromDirectory(modelDirectory),
+            topN,
+            candidateCount);
+    }
+
+    /// <summary>
     /// Creates an EmbeddedEmbeddingProvider instance from the specified model directory.
     /// </summary>
     /// <param name="modelDirectory">Directory containing the ONNX model and tokenizer files.</param>

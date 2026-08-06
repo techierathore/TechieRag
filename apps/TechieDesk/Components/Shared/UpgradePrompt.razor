@@ -1,0 +1,62 @@
+@* REQ-FN-014/BRD-50: the upgrade prompt shown in place of a gated feature. Links to /pricing.
+
+   REQ-UI-050: localized 2026-07-29. This panel is rendered INSIDE screens that were already
+   translated, so leaving it in English produced a visibly broken half-translated card — it was
+   observed sitting in English in the middle of an otherwise-translated Branding tab, which is why
+   a small shared component was prioritised over much larger unlocalized pages. *@
+
+@inject IStringLocalizer<AppStrings> Localizer
+
+<div class="rounded-lg border border-dashed bg-muted/40 p-5 text-center @Class">
+    <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <LucideIcon aria-hidden="true" Name="lock" Size="18" />
+    </div>
+    <TypographyH4>@Title</TypographyH4>
+    <p class="mt-1 text-sm text-muted-foreground">@Description</p>
+    @if (!string.IsNullOrWhiteSpace(RequiredLicense))
+    {
+        <div class="mt-3">
+            <Badge Variant="BadgeVariant.Secondary">@Localizer["UpgradeRequiresLicense", RequiredLicense!]</Badge>
+        </div>
+    }
+    <div class="mt-4">
+        <Button Href="/pricing" Variant="ButtonVariant.Default">
+            <Button.Icon><LucideIcon aria-hidden="true" Name="sparkles" Size="16" /></Button.Icon>
+            @Localizer["ViewPlans"]
+        </Button>
+    </div>
+</div>
+
+@code {
+    /// <summary>The gated feature code (used to build a default title/description).</summary>
+    [Parameter] public string? Feature { get; set; }
+
+    /// <summary>The license tier that unlocks the feature (shown as a badge).</summary>
+    [Parameter] public string? RequiredLicense { get; set; }
+
+    /// <summary>An explicit reason/description; falls back to a generated one.</summary>
+    [Parameter] public string? Reason { get; set; }
+
+    /// <summary>Extra CSS classes for the wrapper.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private string FeatureLabel => string.IsNullOrWhiteSpace(Feature)
+        ? Localizer["UpgradeThisFeature"]
+        : Humanize(Feature!);
+
+    private string Title => Localizer["UpgradeTitle", FeatureLabel];
+
+    // The lower-casing is English-only grammar: it exists so "Workspace Chat" reads as "unlock
+    // workspace chat" mid-sentence. Devanagari has no letter case, so ToLowerInvariant is a no-op
+    // there rather than something that needs a per-culture branch.
+    private string Description => string.IsNullOrWhiteSpace(Reason)
+        ? Localizer["UpgradeDescription", FeatureLabel.ToLowerInvariant()]
+        : Reason!;
+
+    private static string Humanize(string code)
+    {
+        var words = code.Replace('_', ' ').ToLowerInvariant()
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w => char.ToUpperInvariant(w[0]) + w[1..]));
+    }
+}

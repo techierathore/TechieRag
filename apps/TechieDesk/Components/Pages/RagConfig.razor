@@ -1,0 +1,443 @@
+@* REQ-UI-049 — renamed from "/settings" 2026-07-28 to end a genuine naming collision.
+
+   Three things were called "settings" and only one of them was this screen:
+     /settings         this page — "TechieRag Configuration" (embedding, vector store, processing)
+     /admin/settings   "App settings" — the sidebar's App Settings entry
+     /settings/data    "Data & Storage"   /settings/updates  "Updates"
+   So "/settings" was simultaneously a page AND the namespace prefix of two unrelated pages, while
+   the screen a user means by "settings" lived at /admin/settings. The route now says what the h1
+   has always said, and "/settings/*" is purely a namespace. *@
+@page "/rag-config"
+@inject TechieRagConfigService ConfigService
+@inject TechieRagManager RagManager
+@inject ToastService ToastService
+@inject ILogger<RagConfig> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["RagPageTitle"]</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["RagPageHeading"]</h1>
+        <TypographyMuted>@Localizer["RagPageSubtitle"]</TypographyMuted>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="flex items-center justify-center py-16">
+            <Spinner Size="SpinnerSize.Large" />
+        </div>
+    }
+    else
+    {
+        <div class="grid gap-6 lg:grid-cols-2">
+            <!-- Embedding Configuration -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>@Localizer["RagEmbeddingCardTitle"]</CardTitle>
+                    <CardDescription>@Localizer["RagEmbeddingCardDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <Field>
+                        <FieldLabel>@Localizer["RagEmbeddingSourceLabel"]</FieldLabel>
+                        <FieldContent>
+                            @* TR-024: the bound value is the invariant enum name, so the trigger paints "AzureOpenAI"
+                               without a DisplayTextSelector (REQ-UI-051). *@
+                            <Select @bind-Value="embeddingSourceString" TValue="string" DisplayTextSelector="EmbeddingSourceText">
+                                <SelectTrigger aria-label="@Localizer["RagEmbeddingSourceAriaLabel"]">
+                                    <SelectValue Placeholder="@Localizer["RagSelectEmbeddingSourcePlaceholder"]" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem Value="@("Embedded")" Text="@Localizer["RagSourceEmbeddedBge"]" TValue="string">@Localizer["RagSourceEmbeddedBge"]</SelectItem>
+                                    <SelectItem Value="@("Ollama")" Text="@Localizer["RagSourceOllama"]" TValue="string">@Localizer["RagSourceOllama"]</SelectItem>
+                                    <SelectItem Value="@("LmStudio")" Text="@Localizer["RagSourceLmStudio"]" TValue="string">@Localizer["RagSourceLmStudio"]</SelectItem>
+                                    <SelectItem Value="@("Onnx")" Text="@Localizer["RagSourceOnnx"]" TValue="string">@Localizer["RagSourceOnnx"]</SelectItem>
+                                    <SelectItem Value="@("Http")" Text="@Localizer["RagSourceHttp"]" TValue="string">@Localizer["RagSourceHttp"]</SelectItem>
+                                    <SelectItem Value="@("AzureOpenAI")" Text="@Localizer["RagSourceAzureOpenAI"]" TValue="string">@Localizer["RagSourceAzureOpenAI"]</SelectItem>
+                                    <SelectItem Value="@("OpenAI")" Text="@Localizer["RagSourceOpenAI"]" TValue="string">@Localizer["RagSourceOpenAI"]</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FieldDescription>@Localizer["RagEmbeddingSourceHelp"]</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    @if (config.Embedding.Source == EmbeddingSource.Embedded)
+                    {
+                        <Alert Variant="AlertVariant.Info">
+                            <AlertTitle>@Localizer["RagBgeAlertTitle"]</AlertTitle>
+                            <AlertDescription>@Localizer["RagBgeAlertBody"]</AlertDescription>
+                        </Alert>
+                    }
+                    else
+                    {
+                        <Field>
+                            <FieldLabel>@Localizer["RagModelNameLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="config.Embedding.Model" Placeholder="@GetModelPlaceholder()" />
+                                <FieldDescription>@GetModelHint()</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    }
+
+                    @if (config.Embedding.Source == EmbeddingSource.Onnx)
+                    {
+                        <Field>
+                            <FieldLabel>@Localizer["RagModelPathLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="config.Embedding.ModelPath" Placeholder="@Localizer["RagModelPathPlaceholder"]" />
+                                <FieldDescription>@Localizer["RagModelPathHelp"]</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    }
+                    else if (config.Embedding.Source != EmbeddingSource.Embedded)
+                    {
+                        <Field>
+                            <FieldLabel>@Localizer["RagEndpointUrlLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="config.Embedding.Endpoint" Placeholder="@GetEndpointPlaceholder()" />
+                                <FieldDescription>@GetEndpointHint()</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    }
+
+                    @if (RequiresApiKey())
+                    {
+                        <Field>
+                            <FieldLabel>@Localizer["RagApiKeyLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input Type="InputType.Password" @bind-Value="config.Embedding.ApiKey" Placeholder="@Localizer["RagApiKeyPlaceholder"]" />
+                                <FieldDescription>@Localizer["RagApiKeyHelp"]</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    }
+                </CardContent>
+            </Card>
+
+            <!-- Vector Store Configuration -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>@Localizer["RagVectorStoreCardTitle"]</CardTitle>
+                    <CardDescription>@Localizer["RagVectorStoreCardDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <Field>
+                        <FieldLabel>@Localizer["RagVectorStoreTypeLabel"]</FieldLabel>
+                        <FieldContent>
+                            <Select @bind-Value="vectorStoreTypeString" TValue="string" DisplayTextSelector="VectorStoreText">
+                                <SelectTrigger aria-label="@Localizer["RagVectorStoreTypeAriaLabel"]">
+                                    <SelectValue Placeholder="@Localizer["RagSelectVectorStorePlaceholder"]" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem Value="@("SqliteVec")" Text="@Localizer["RagVectorStoreSqliteVecShort"]" TValue="string">@Localizer["RagVectorStoreSqliteVec"]</SelectItem>
+                                    <SelectItem Value="@("PgVector")" Text="@Localizer["RagVectorStorePgVector"]" TValue="string">@Localizer["RagVectorStorePgVector"]</SelectItem>
+                                    <SelectItem Value="@("Qdrant")" Text="@Localizer["RagVectorStoreQdrant"]" TValue="string">@Localizer["RagVectorStoreQdrant"]</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <FieldDescription>@GetVectorStoreHint()</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    <Field>
+                        <FieldLabel>@GetConnectionStringLabel()</FieldLabel>
+                        <FieldContent>
+                            <Input @bind-Value="vectorStoreConnectionInput" Placeholder="@GetConnectionStringPlaceholder()" />
+                            <FieldDescription>@GetConnectionStringHint()</FieldDescription>
+                        </FieldContent>
+                    </Field>
+
+                    @if (config.VectorStore.Type == VectorStoreType.Qdrant)
+                    {
+                        <Field>
+                            <FieldLabel>@Localizer["RagQdrantApiKeyLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input Type="InputType.Password" @bind-Value="config.VectorStore.ApiKey" Placeholder="@Localizer["RagQdrantApiKeyPlaceholder"]" />
+                                <FieldDescription>@Localizer["RagQdrantApiKeyHelp"]</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    }
+                </CardContent>
+            </Card>
+
+            <!-- Processing Configuration -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>@Localizer["RagProcessingCardTitle"]</CardTitle>
+                    <CardDescription>@Localizer["RagProcessingCardDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent Class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <Field>
+                            <FieldLabel>@Localizer["RagChunkSizeLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input Type="InputType.Number" @bind-Value="chunkSizeString" Placeholder="500" />
+                                <FieldDescription>@Localizer["RagChunkSizeHelp"]</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["RagChunkOverlapLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input Type="InputType.Number" @bind-Value="chunkOverlapString" Placeholder="50" />
+                                <FieldDescription>@Localizer["RagChunkOverlapHelp"]</FieldDescription>
+                            </FieldContent>
+                        </Field>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <!-- Advanced Settings -->
+            <Card>
+                <CardHeader>
+                    <CardTitle>@Localizer["RagAdvancedCardTitle"]</CardTitle>
+                    <CardDescription>@Localizer["RagAdvancedCardDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div class="flex items-center space-x-2">
+                        <Switch @bind-Checked="config.EnableTelemetry" Id="telemetry" />
+                        <Label For="telemetry">@Localizer["RagEnableTelemetry"]</Label>
+                    </div>
+                    <TypographyMuted>@Localizer["RagTelemetryHelp"]</TypographyMuted>
+                </CardContent>
+            </Card>
+        </div>
+
+        <!-- Action Buttons -->
+        <Card>
+            <CardContent Class="flex items-center justify-between pt-6">
+                <Button Variant="ButtonVariant.Outline" OnClick="ResetToDefaults" Disabled="isSaving">
+                    @Localizer["RagResetToDefaults"]
+                </Button>
+                <Button OnClick="SaveConfigAsync" Disabled="isSaving">
+                    @if (isSaving)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["RagSaving"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["RagSaveConfiguration"]</span>
+                    }
+                </Button>
+            </CardContent>
+        </Card>
+    }
+</div>
+
+@code {
+    private TechieRagConfig config = new();
+    private bool isLoading = true;
+    private bool isSaving;
+    private string vectorStoreConnectionInput = "";
+
+    private string embeddingSourceString
+    {
+        get => config.Embedding.Source.ToString();
+        set { if (Enum.TryParse<EmbeddingSource>(value, out var src)) config.Embedding.Source = src; }
+    }
+
+    private string vectorStoreTypeString
+    {
+        get => config.VectorStore.Type.ToString();
+        set { if (Enum.TryParse<VectorStoreType>(value, out var t)) config.VectorStore.Type = t; }
+    }
+
+    private string? chunkSizeString
+    {
+        get => config.Processing.DefaultChunkSize.ToString();
+        set { if (int.TryParse(value, out var v)) config.Processing.DefaultChunkSize = v; }
+    }
+
+    private string? chunkOverlapString
+    {
+        get => config.Processing.DefaultChunkOverlap.ToString();
+        set { if (int.TryParse(value, out var v)) config.Processing.DefaultChunkOverlap = v; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            config = await ConfigService.LoadConfigAsync();
+            vectorStoreConnectionInput = ExtractConnectionInput(config.VectorStore.Type, config.VectorStore.ConnectionString);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load configuration");
+            ToastService.Error(Localizer["RagLoadFailedToast"], Localizer["RagErrorTitle"]);
+            config = new TechieRagConfig();
+            vectorStoreConnectionInput = "techierag.db";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private static string ExtractConnectionInput(VectorStoreType type, string connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+            return type == VectorStoreType.SqliteVec ? "techierag.db" : "";
+
+        if (type == VectorStoreType.SqliteVec)
+        {
+            var lower = connectionString.ToLowerInvariant();
+            if (lower.StartsWith("data source="))
+                return connectionString.Substring("data source=".Length).Trim().TrimEnd(';');
+            return connectionString;
+        }
+
+        return connectionString;
+    }
+
+    private static string BuildConnectionString(VectorStoreType type, string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return type switch
+            {
+                VectorStoreType.SqliteVec => "Data Source=techierag.db",
+                VectorStoreType.Qdrant => "http://localhost:6334",
+                _ => ""
+            };
+        }
+
+        if (type == VectorStoreType.SqliteVec)
+        {
+            var trimmed = input.Trim();
+            if (trimmed.ToLowerInvariant().StartsWith("data source="))
+                return trimmed;
+            return $"Data Source={trimmed}";
+        }
+
+        return input.Trim();
+    }
+
+    private async Task SaveConfigAsync()
+    {
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            config.VectorStore.ConnectionString = BuildConnectionString(config.VectorStore.Type, vectorStoreConnectionInput);
+            // REQ-NFR-004: embedding + vector store are shared with App Settings, and processing
+            // and telemetry are this screen's alone. Writing only these four leaves LLM Settings'
+            // sections untouched instead of reverting them.
+            await ConfigService.SaveConfigAsync(
+                config,
+                TechieRagConfigSections.Embedding
+                | TechieRagConfigSections.VectorStore
+                | TechieRagConfigSections.Processing
+                | TechieRagConfigSections.Telemetry);
+            await RagManager.ReconfigureAsync();
+            ToastService.Success(Localizer["RagConfigSavedToast"], Localizer["Saved"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save or apply configuration");
+            ToastService.Error(Localizer["RagSaveFailedToast", ex.Message], Localizer["RagErrorTitle"]);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ResetToDefaults()
+    {
+        ConfigService.ResetToDefaults();
+        config = await ConfigService.LoadConfigAsync();
+        ToastService.Success(Localizer["RagConfigResetToast"], Localizer["RagResetTitle"]);
+    }
+
+    private bool RequiresApiKey() => config.Embedding.Source is EmbeddingSource.AzureOpenAI or EmbeddingSource.OpenAI;
+
+    private string GetModelPlaceholder() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => "bge-m3",
+        EmbeddingSource.AzureOpenAI => "text-embedding-3-small",
+        EmbeddingSource.OpenAI => "text-embedding-3-small",
+        _ => "bge-m3"
+    };
+
+    private string GetModelHint() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => Localizer["RagModelHintOllama"],
+        EmbeddingSource.AzureOpenAI => Localizer["RagModelHintAzureOpenAI"],
+        EmbeddingSource.OpenAI => Localizer["RagModelHintOpenAI"],
+        _ => Localizer["RagModelHintDefault"]
+    };
+
+    private string GetEndpointPlaceholder() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => "http://localhost:11434",
+        EmbeddingSource.LmStudio => "http://localhost:1234",
+        EmbeddingSource.Http => "http://localhost:7997",
+        EmbeddingSource.AzureOpenAI => "https://your-resource.openai.azure.com",
+        EmbeddingSource.OpenAI => "https://api.openai.com",
+        _ => ""
+    };
+
+    private string GetEndpointHint() => config.Embedding.Source switch
+    {
+        EmbeddingSource.Ollama => Localizer["RagEndpointHintOllama"],
+        EmbeddingSource.LmStudio => Localizer["RagEndpointHintLmStudio"],
+        EmbeddingSource.Http => Localizer["RagEndpointHintHttp"],
+        EmbeddingSource.AzureOpenAI => Localizer["RagEndpointHintAzureOpenAI"],
+        EmbeddingSource.OpenAI => Localizer["RagEndpointHintOpenAI"],
+        _ => Localizer["RagEndpointHintDefault"]
+    };
+
+    private string GetVectorStoreHint() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => Localizer["RagVectorStoreHintSqliteVec"],
+        VectorStoreType.PgVector => Localizer["RagVectorStoreHintPgVector"],
+        VectorStoreType.Qdrant => Localizer["RagVectorStoreHintQdrant"],
+        _ => Localizer["RagVectorStoreHintDefault"]
+    };
+
+    private string GetConnectionStringLabel() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => Localizer["RagConnectionLabelDatabaseFilePath"],
+        VectorStoreType.PgVector => Localizer["RagConnectionLabelConnectionString"],
+        VectorStoreType.Qdrant => Localizer["RagConnectionLabelEndpointUrl"],
+        _ => Localizer["RagConnectionLabelConnectionString"]
+    };
+
+    private string GetConnectionStringPlaceholder() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => "techierag.db",
+        VectorStoreType.PgVector => "Host=localhost;Database=techierag;...",
+        VectorStoreType.Qdrant => "http://localhost:6334",
+        _ => ""
+    };
+
+    private string GetConnectionStringHint() => config.VectorStore.Type switch
+    {
+        VectorStoreType.SqliteVec => Localizer["RagConnectionHintSqliteVec"],
+        VectorStoreType.PgVector => Localizer["RagConnectionHintPgVector"],
+        VectorStoreType.Qdrant => Localizer["RagConnectionHintQdrant"],
+        _ => Localizer["RagConnectionHintDefault"]
+    };
+
+    /// <summary>REQ-UI-051 / TR-024: the localized display text for an embedding source.</summary>
+    /// <param name="value">The invariant enum name that is the bound value.</param>
+    /// <returns>The text painted on the Select trigger.</returns>
+    private string EmbeddingSourceText(string value) => value switch
+    {
+        "Ollama" => Localizer["RagSourceOllama"],
+        "LmStudio" => Localizer["RagSourceLmStudio"],
+        "Onnx" => Localizer["RagSourceOnnx"],
+        "Http" => Localizer["RagSourceHttp"],
+        "AzureOpenAI" => Localizer["RagSourceAzureOpenAI"],
+        "OpenAI" => Localizer["RagSourceOpenAI"],
+        _ => Localizer["RagSourceEmbeddedBge"]
+    };
+
+    /// <summary>REQ-UI-051 / TR-024: the localized display text for a vector store.</summary>
+    /// <param name="value">The invariant enum name that is the bound value.</param>
+    /// <returns>The text painted on the Select trigger.</returns>
+    private string VectorStoreText(string value) => value switch
+    {
+        "PgVector" => Localizer["RagVectorStorePgVector"],
+        "Qdrant" => Localizer["RagVectorStoreQdrant"],
+        _ => Localizer["RagVectorStoreSqliteVecShort"]
+    };
+}

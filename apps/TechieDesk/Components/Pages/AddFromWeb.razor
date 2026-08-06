@@ -1,0 +1,707 @@
+@page "/workspace/{Slug}/documents/web"
+@using TechieDesk.Services.Localization
+@using TechieDesk.Services.Web
+@using TechieRag.Web
+@implements IDisposable
+@inject IWebIngestionService Ingestion
+@inject IWorkspaceService Workspaces
+@inject ToastService ToastService
+@inject NavigationManager Nav
+@inject ILogger<AddFromWeb> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["WebPageTitle", workspace?.Name ?? Localizer["WebWorkspaceFallback"].Value]</PageTitle>
+
+@* REQ-NFR-010/BRD-101: a backend outage is not "this workspace does not exist". *@
+@if (loadError is not null)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["WebLoadErrorTitle"]</AlertTitle>
+        <AlertDescription>
+            @Localizer["WebLoadErrorBody", loadError]
+        </AlertDescription>
+    </Alert>
+}
+else if (notFound)
+{
+    <Alert Variant="AlertVariant.Danger">
+        <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+        <AlertTitle>@Localizer["WebNotFoundTitle"]</AlertTitle>
+        <AlertDescription>@Localizer["WebNotFoundBody"]</AlertDescription>
+    </Alert>
+}
+else if (workspace is null)
+{
+    <div class="flex items-center gap-2 text-muted-foreground">
+        <Spinner Size="SpinnerSize.Small" /> <span>@Localizer["WebLoadingWorkspace"]</span>
+    </div>
+}
+else
+{
+    <div class="mb-4">
+        @* REQ-RAG-016/017 — this screen is now the web half of the Connectors hub
+           (/workspace/{slug}/connectors), which is what the sidebar entry and the breadcrumb point
+           at, so "back" leads there rather than to the library. The library's own "Add from web"
+           button still jumps straight here, and /workspace/{slug}/documents/web is unchanged, so
+           neither that button nor an existing bookmark breaks. *@
+        <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small" OnClick="GoBackToConnectors">
+            <LucideIcon aria-hidden="true" Name="arrow-left" Size="15" Class="mr-2" />
+            <span>@Localizer["WebBackToConnectors"]</span>
+        </Button>
+        <h1 class="mt-2 scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight">@Localizer["WebTitle", workspace.Name]</h1>
+        <TypographyMuted>
+            @Localizer["WebIntro"]
+        </TypographyMuted>
+    </div>
+
+    @if (!canManage)
+    {
+        <Alert Variant="AlertVariant.Warning" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="lock" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["WebViewOnlyTitle"]</AlertTitle>
+            <AlertDescription>@Localizer["WebViewOnlyBody"]</AlertDescription>
+        </Alert>
+    }
+
+    @* REQ-RAG-016/017 — the WEB half of the source grid from docs/mockups/connectors.html
+       (".src-grid": an icon tile, a name, one line of description and a Configure button per
+       source). The full grid now lives on the Connectors hub, which shows these two tiles plus one
+       per installed connector type and links back here; this copy is kept because it is also the
+       switch between page and crawl for the screen the operator is already on.
+       Only sources that WORK are shown. Absent rather than disabled — a tile that cannot be
+       configured teaches the operator that this screen lies:
+         · YouTube (REQ-RAG-018) — postponed by owner decision 2026-07-27; the platform stopped
+           serving transcripts at all (TR-RAG-015), so every attempt would fail;
+         · GitHub/GitLab and Confluence are not web ingestion at all — they are connector jobs, and
+           the hub offers them from IConnectorJobService.AvailableTypes when a build ships them. *@
+    <div class="mb-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        @foreach (var source in WebSources)
+        {
+            <Card Class="@(source.Kind == sourceKind ? "border-primary" : null)">
+                <CardContent Class="flex h-full flex-col gap-1">
+                    <span class="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-primary">
+                        <LucideIcon aria-hidden="true" Name="@source.Icon" Size="18" />
+                    </span>
+                    <span class="font-semibold">@source.Name</span>
+                    <TypographyMuted Class="block text-xs">@source.Description</TypographyMuted>
+                    <div class="mt-auto pt-4">
+                        @* aria-pressed is what makes the grid a set of toggles rather than three
+                           unrelated buttons: without it a screen reader is never told which source
+                           the configuration panel below belongs to. *@
+                        <Button Variant="@(source.Kind == sourceKind ? ButtonVariant.Default : ButtonVariant.Outline)"
+                                Size="ButtonSize.Small"
+                                aria-pressed="@(source.Kind == sourceKind ? "true" : "false")"
+                                Disabled="isRunning"
+                                OnClick="@(() => SelectSource(source.Kind))">
+                            <span>@(source.Kind == sourceKind ? Localizer["WebSelected"].Value : Localizer["WebConfigure"].Value)</span>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        }
+    </div>
+
+    @* The mockup puts these fields in a modal per source. They are inline here on purpose: a crawl
+       runs for minutes and reports per-page progress, and a dialog that cannot be left without
+       abandoning the run is the wrong container for it (the same reasoning that made this a page
+       rather than a dialog on the Documents screen). The mockup's per-source titles are kept. *@
+    <Card Class="mb-4">
+        <CardHeader>
+            <CardTitle>@Localizer["WebConfigureFor", SelectedSource.Name]</CardTitle>
+            <CardDescription>@SelectedSource.ConfigureHint</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div class="space-y-2">
+                <Label For="web-url">@SelectedSource.UrlLabel</Label>
+                <Input Id="web-url" Type="InputType.Url" @bind-Value="url" Placeholder="@SelectedSource.UrlPlaceholder" Disabled="isRunning" />
+            </div>
+
+            @if (sourceKind == "site")
+            {
+                @* The mockup's two-column ".form-grid". Its Include/Exclude pattern fields and its
+                   "Respect robots.txt" switch are NOT here: TechieRag.Web's WebCrawlOptions has no
+                   such options, so the controls would collect input nothing reads. *@
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="space-y-2">
+                        <Label For="crawl-depth">@Localizer["WebLinkDepthLabel", WebIngestionRequest.MaxAllowedDepth]</Label>
+                        <Input Id="crawl-depth" Type="InputType.Number" @bind-Value="maxDepthText" Disabled="isRunning" />
+                        <TypographyMuted Class="block text-xs">@Localizer["WebLinkDepthHint"]</TypographyMuted>
+                    </div>
+                    <div class="space-y-2">
+                        <Label For="crawl-pages">@Localizer["WebMaxPagesLabel", WebIngestionRequest.MaxAllowedPages]</Label>
+                        <Input Id="crawl-pages" Type="InputType.Number" @bind-Value="maxPagesText" Disabled="isRunning" />
+                        <TypographyMuted Class="block text-xs">@Localizer["WebMaxPagesHint"]</TypographyMuted>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <Switch @bind-Checked="sameHostOnly" Id="same-host" Disabled="isRunning" />
+                    <Label For="same-host">@Localizer["WebStayOnHost", SeedHostLabel]</Label>
+                </div>
+            }
+            else if (sourceKind == "video")
+            {
+                @* UNREACHABLE while YouTube is off the source grid above (REQ-RAG-018 postponed
+                   2026-07-27, TR-RAG-015). Retained ON PURPOSE, not overlooked: with this panel kept,
+                   restoring the feature is re-adding the one WebSources entry, and deleting it would
+                   turn a one-line restore into a rebuild of the configuration UI. Delete both together
+                   if the owner withdraws video ingestion permanently rather than postponing it.
+                   The mockup offers a language SELECT and a playlist limit. The reader takes a BCP-47
+                   prefix and matches any track, so a fixed three-option list would be narrower than
+                   the feature; playlists are not supported at all, so no limit field is shown. *@
+                <div class="space-y-2 sm:max-w-xs">
+                    <Label For="caption-language">@Localizer["WebCaptionLanguageLabel"]</Label>
+                    <Input Id="caption-language" @bind-Value="preferredLanguage" Placeholder="@("en")" Disabled="isRunning" />
+                    <TypographyMuted Class="block text-xs">
+                        @Localizer["WebCaptionLanguageHintLead"] <b>@("en")</b> @Localizer["WebCaptionLanguageHintOr"] <b>@("de")</b>. @Localizer["WebCaptionLanguageHintTail"]
+                    </TypographyMuted>
+                </div>
+
+                <Alert Variant="AlertVariant.Warning">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="triangle-alert" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["WebNoCaptionsTitle"]</AlertTitle>
+                    <AlertDescription>
+                        @Localizer["WebNoCaptionsBody"]
+                    </AlertDescription>
+                </Alert>
+            }
+
+            <Separator />
+
+            <div class="flex items-center gap-2">
+                <Switch @bind-Checked="pinned" Id="pin-web" Disabled="isRunning" />
+                <Label For="pin-web">@Localizer["WebPinLabel"]</Label>
+            </div>
+
+            @* REQ-RAG-017: the SSRF guard is ON by default. Turning it off is an explicit act, and
+               the risk is stated where the switch is, not in a tooltip nobody opens. *@
+            @if (sourceKind != "video")
+            {
+                <div class="flex items-center gap-2">
+                    <Switch @bind-Checked="allowPrivateNetworkTargets" Id="allow-private" Disabled="isRunning" />
+                    <Label For="allow-private">@Localizer["WebAllowPrivateLabel"]</Label>
+                </div>
+
+                @if (allowPrivateNetworkTargets)
+                {
+                    <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                        <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-alert" Size="16" /></Alert.Icon>
+                        <AlertTitle>@Localizer["WebPrivateWarnTitle"]</AlertTitle>
+                        <AlertDescription>
+                            @Localizer["WebPrivateWarnLead"] <b>localhost</b>, @Localizer["WebPrivateWarnRest"]
+                        </AlertDescription>
+                    </Alert>
+                }
+            }
+
+            @if (validationError is not null)
+            {
+                <Alert Variant="AlertVariant.Danger">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["WebValidationTitle"]</AlertTitle>
+                    <AlertDescription>@validationError</AlertDescription>
+                </Alert>
+            }
+
+            <div class="flex flex-wrap items-center gap-2">
+                <Button OnClick="StartAsync" Disabled="@(isRunning || !canManage)">
+                    <LucideIcon aria-hidden="true" Name="@SelectedSource.Icon" Size="16" Class="mr-2" />
+                    <span>@SelectedSource.StartLabel</span>
+                </Button>
+                @if (isRunning)
+                {
+                    <Button Variant="ButtonVariant.Outline" OnClick="Cancel">
+                        <LucideIcon aria-hidden="true" Name="square" Size="16" Class="mr-2" />
+                        <span>@Localizer["WebStop"]</span>
+                    </Button>
+                }
+            </div>
+        </CardContent>
+    </Card>
+
+    @* REQ-RAG-017: a crawl takes minutes. Live progress is what separates "working" from "hung".
+       The mockup's Jobs table carries a status Badge beside its progress bar; this run gets the same
+       pairing. TR-027 — BadgeVariant has no success or warning tone, so "Completed" is Secondary
+       rather than green. *@
+    @if (isRunning || progressPercent > 0)
+    {
+        <Card Class="mb-4">
+            <CardHeader>
+                <CardTitle>@(isRunning ? Localizer["WebWorking"].Value : Localizer["WebFinished"].Value)</CardTitle>
+                <CardDescription>@progressMessage</CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-2">
+                <Progress aria-label="@Localizer["WebProgressLabel"]" Value="@Math.Round((double)progressPercent)" />
+                <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    @if (isRunning)
+                    {
+                        <Spinner Size="SpinnerSize.Small" />
+                    }
+                    <Badge Variant="@RunBadgeVariant">@RunBadgeLabel</Badge>
+                    <span>@progressPercent% — @progressStage</span>
+                </div>
+            </CardContent>
+        </Card>
+    }
+
+    @if (cancelled)
+    {
+        <Alert Variant="AlertVariant.Warning" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="octagon-alert" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["WebStoppedTitle"]</AlertTitle>
+            <AlertDescription>
+                @Localizer["WebStoppedBody"]
+            </AlertDescription>
+        </Alert>
+    }
+
+    @if (runError is not null)
+    {
+        <Alert Variant="AlertVariant.Danger" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="circle-alert" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["WebNothingIngestedTitle"]</AlertTitle>
+            <AlertDescription>@runError</AlertDescription>
+        </Alert>
+    }
+
+    @if (outcome is not null)
+    {
+        @* Honesty rule: a run with skips is NEVER shown as a plain success. *@
+        <Alert Variant="@OutcomeVariant" Class="mb-4">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="@OutcomeIcon" Size="16" /></Alert.Icon>
+            <AlertTitle>@OutcomeTitle</AlertTitle>
+            <AlertDescription>@outcome.SummaryText(Localize)</AlertDescription>
+        </Alert>
+
+        @* The mockup's Jobs table (Source · Target · Status · …), holding THIS run's items rather
+           than a job history — nothing persists ingestion runs, and a table titled "Jobs" that
+           empties on navigation would be a claim the product cannot keep. Ingested and skipped share
+           one table on purpose: two separate cards let an operator read the first and never scroll
+           to the second, which is how content goes missing unnoticed. *@
+        <Card Class="overflow-hidden">
+            <CardHeader>
+                <CardTitle>@Localizer["WebResultsTitle"]</CardTitle>
+                <CardDescription>
+                    @Localizer["WebResultsSummary", outcome.Ingested.Count, workspace.Name, outcome.Skipped.Count]
+                </CardDescription>
+            </CardHeader>
+            <div class="relative overflow-x-auto">
+                <DataTable TData="ResultRow" Data="@ResultRows" ShowToolbar="false" ShowPagination="false"
+                           AriaLabel="@Localizer["WebResultsTableLabel"]">
+                    <Columns>
+                        <DataTableColumn TData="ResultRow" TValue="string" Property="@(row => row.Status)" Header="@Localizer["WebColStatus"]">
+                            <CellTemplate Context="row">
+                                <span class="flex items-center gap-2">
+                                    <LucideIcon aria-hidden="true" Name="@(row.Ingested ? "circle-check" : "circle-slash")" Size="15"
+                                                Class="@(row.Ingested ? "shrink-0 text-muted-foreground" : "shrink-0 text-destructive")" />
+                                    <Badge Variant="@(row.Ingested ? BadgeVariant.Secondary : BadgeVariant.Destructive)">@row.Status</Badge>
+                                </span>
+                            </CellTemplate>
+                        </DataTableColumn>
+                        <DataTableColumn TData="ResultRow" TValue="string" Property="@(row => row.Source)" Header="@Localizer["WebColSource"]" />
+                        <DataTableColumn TData="ResultRow" TValue="string" Property="@(row => row.Target)" Header="@Localizer["WebColTarget"]">
+                            <CellTemplate Context="row">
+                                <span class="block max-w-md truncate font-medium">@row.Target</span>
+                            </CellTemplate>
+                        </DataTableColumn>
+                        <DataTableColumn TData="ResultRow" TValue="string" Property="@(row => row.Detail)" Header="@Localizer["WebColDetail"]">
+                            <CellTemplate Context="row">
+                                <span class="block max-w-md text-xs text-muted-foreground">@row.Detail</span>
+                            </CellTemplate>
+                        </DataTableColumn>
+                    </Columns>
+                    <EmptyTemplate>
+                        <div class="p-6 text-center text-sm text-muted-foreground">
+                            @Localizer["WebResultsEmpty"]
+                        </div>
+                    </EmptyTemplate>
+                </DataTable>
+            </div>
+        </Card>
+    }
+}
+
+@code {
+    /// <summary>The workspace URL slug from the route.</summary>
+    [Parameter] public string Slug { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Which web source the Connectors hub asked for — "page" or "site".
+    /// </summary>
+    /// <remarks>
+    /// The hub's grid has one tile per source, and both land on this screen, so the tile the
+    /// operator pressed has to survive the navigation or the second tile is indistinguishable from
+    /// the first. Anything unrecognised is ignored rather than reported: a hand-typed query string
+    /// is not an error the operator needs a dialog about, and the screen still opens on its default.
+    /// </remarks>
+    [SupplyParameterFromQuery(Name = "source")] public string? Source { get; set; }
+
+    private string? appliedSource;
+    private Workspace? workspace;
+    private bool notFound;
+    private string? loadError;
+    private string? loadedSlug;
+    private bool canManage;
+
+    private string sourceKind = "page";
+    private string url = string.Empty;
+    private string maxDepthText = "1";
+    private string maxPagesText = "25";
+    private bool sameHostOnly = true;
+    private bool pinned;
+    private bool allowPrivateNetworkTargets;
+    private string preferredLanguage = "en";
+
+    private string? validationError;
+    private string? runError;
+    private bool isRunning;
+    private bool cancelled;
+    private int progressPercent;
+    private string progressMessage = string.Empty;
+    private WebIngestionStage progressStage = WebIngestionStage.Starting;
+    private WebIngestionOutcome? outcome;
+    private CancellationTokenSource? cancellation;
+
+    /// <summary>
+    /// One tile in the source grid, carrying everything that changes with the chosen source.
+    /// </summary>
+    /// <param name="Kind">The stable key bound to <c>sourceKind</c>.</param>
+    /// <param name="Icon">Lucide icon name for the tile and the start button.</param>
+    /// <param name="Name">The tile's title, as the mockup names it.</param>
+    /// <param name="Description">The tile's one-line description.</param>
+    /// <param name="ConfigureHint">What the configuration card says it is about to do.</param>
+    /// <param name="UrlLabel">Label for the single address field.</param>
+    /// <param name="UrlPlaceholder">Example address for the field.</param>
+    /// <param name="StartLabel">Text on the button that starts the run.</param>
+    /// <remarks>
+    /// A table rather than three <c>switch</c> expressions over the same key: every per-source string
+    /// sits on one line, so a source can never end up with a crawl label and a video placeholder.
+    /// </remarks>
+    private sealed record WebSource(
+        string Kind,
+        string Icon,
+        string Name,
+        string Description,
+        string ConfigureHint,
+        string UrlLabel,
+        string UrlPlaceholder,
+        string StartLabel);
+
+    /// <summary>The web sources offered on this screen, in the mockup's order.</summary>
+    /// <remarks>
+    /// YouTube (REQ-RAG-018 / BRD-62) is deliberately ABSENT — postponed by owner decision
+    /// 2026-07-27. It is not a code defect: YouTube's timed-text endpoints now return HTTP 200 with a
+    /// zero-byte body for every video and every format, so the transcript cannot be downloaded at all
+    /// without an authenticated proof-of-origin token (TR-RAG-015). Offering the source anyway would
+    /// mean every attempt fails — a control that cannot succeed teaches the operator that this screen
+    /// lies, which is the same reasoning that keeps the unbuilt connectors off the grid above.
+    /// The reader, the service path and <c>WebIngestionSource.Video</c> are all left intact, and the
+    /// live canary test is deliberately RED, so restoring this is re-adding the one entry below.
+    /// </remarks>
+    /// <remarks>REQ-UI-051: an INSTANCE property, because every string in it but the kind, the
+    /// icon and the example URL is read by the user and has to come from the localizer.</remarks>
+    private WebSource[] WebSources =>
+    [
+        new(
+            "page",
+            "globe",
+            Localizer["WebSourcePageName"],
+            Localizer["WebSourcePageDescription"],
+            Localizer["WebSourcePageConfigureHint"],
+            Localizer["WebSourcePageUrlLabel"],
+            "https://example.com/article",
+            Localizer["WebSourcePageStartLabel"]),
+        new(
+            "site",
+            "network",
+            Localizer["WebSourceSiteName"],
+            Localizer["WebSourceSiteDescription"],
+            Localizer["WebSourceSiteConfigureHint"],
+            Localizer["WebSourceSiteUrlLabel"],
+            "https://docs.example.com/",
+            Localizer["WebSourceSiteStartLabel"]),
+    ];
+
+    /// <summary>One row of the results table (REQ-RAG-016/017/018).</summary>
+    /// <param name="Status">"Ingested" or "Not ingested" — the badge text.</param>
+    /// <param name="Ingested">Whether this item reached the workspace.</param>
+    /// <param name="Source">Which web source produced it, in the mockup's vocabulary.</param>
+    /// <param name="Target">The document name, or the URL when there is no document.</param>
+    /// <param name="Detail">The source URL, or the reason it was refused.</param>
+    private sealed record ResultRow(string Status, bool Ingested, string Source, string Target, string Detail);
+
+    /// <summary>Gets the source the configuration card and the start button are bound to.</summary>
+    private WebSource SelectedSource => WebSources.FirstOrDefault(source => source.Kind == sourceKind) ?? WebSources[0];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Applied only when the query VALUE changes, not on every parameter set: re-applying it
+        // would undo a source the operator had since picked from the grid on this screen.
+        if (Source != appliedSource)
+        {
+            appliedSource = Source;
+            if (WebSources.Any(source => source.Kind == Source))
+            {
+                sourceKind = Source!;
+            }
+        }
+
+        if (loadedSlug == Slug)
+        {
+            return;
+        }
+
+        loadedSlug = Slug;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        notFound = false;
+        loadError = null;
+        workspace = null;
+
+        try
+        {
+            workspace = await Workspaces.ResolveBySlugAsync(Slug);
+            if (workspace is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            canManage = Workspaces.CanManageWorkspaces;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load workspace {Slug} for web ingestion", Slug);
+            loadError = ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// REQ-UI-055: resolves a service-supplied resource key in the reader's language.
+    /// </summary>
+    /// <remarks>
+    /// The delegate <c>WebIngestionRequest.Validate</c> and <c>WebIngestionOutcome.SummaryText</c>
+    /// take. Both compose a sentence out of fragments and out of user data — a URL, a host, a
+    /// pluralized count — which is the case <see cref="LocalizeText"/> exists for: the composition
+    /// rule stays in the service that owns it, and only the resolution happens here.
+    /// </remarks>
+    private LocalizeText Localize => (key, arguments) => Localizer[key, arguments!].Value;
+
+    /// <summary>Returns to the Connectors hub, this screen's parent in the nav and the breadcrumb.</summary>
+    private void GoBackToConnectors() => Nav.NavigateTo($"/workspace/{Slug}/connectors");
+
+    /// <summary>
+    /// Selects a source from the grid, clearing the address-level validation message.
+    /// </summary>
+    /// <param name="kind">The <see cref="WebSource.Kind"/> that was chosen.</param>
+    /// <remarks>
+    /// The message is cleared because it was written about a DIFFERENT source's rules — "not a
+    /// YouTube URL" left standing over a crawl field is worse than no message at all. The address
+    /// itself is kept: switching from page to crawl on the same URL is a normal thing to do.
+    /// </remarks>
+    private void SelectSource(string kind)
+    {
+        if (isRunning || sourceKind == kind)
+        {
+            return;
+        }
+
+        sourceKind = kind;
+        validationError = null;
+    }
+
+    /// <summary>Names the host a crawl will be confined to, so the switch is not abstract.</summary>
+    private string SeedHostLabel =>
+        Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri) ? uri.Host : Localizer["WebSeedHostSameSite"];
+
+    /// <summary>
+    /// REQ-UI-051: the run's state as an invariant token, so the tone below branches on the STATE
+    /// rather than on a translated word.
+    /// </summary>
+    private string RunState => isRunning ? "running"
+        : cancelled ? "stopped"
+        : runError is not null || outcome is { Ingested.Count: 0 } ? "failed"
+        : "completed";
+
+    /// <summary>Gets the run's state as the mockup's Jobs-table status pill.</summary>
+    private string RunBadgeLabel => RunState switch
+    {
+        "running" => Localizer["WebRunRunning"],
+        "stopped" => Localizer["WebRunStopped"],
+        "failed" => Localizer["WebRunFailed"],
+        _ => Localizer["WebRunCompleted"],
+    };
+
+    /// <summary>Gets the tone for <see cref="RunBadgeLabel"/>.</summary>
+    private BadgeVariant RunBadgeVariant => RunState switch
+    {
+        "failed" => BadgeVariant.Destructive,
+        "running" => BadgeVariant.Default,
+        _ => BadgeVariant.Secondary,
+    };
+
+    private AlertVariant OutcomeVariant => outcome switch
+    {
+        null => AlertVariant.Default,
+        { Ingested.Count: 0 } => AlertVariant.Danger,
+        { Skipped.Count: > 0 } => AlertVariant.Warning,
+        _ => AlertVariant.Success,
+    };
+
+    private string OutcomeIcon => outcome switch
+    {
+        null => "info",
+        { Ingested.Count: 0 } => "circle-x",
+        { Skipped.Count: > 0 } => "triangle-alert",
+        _ => "circle-check",
+    };
+
+    private string OutcomeTitle => outcome switch
+    {
+        null => string.Empty,
+        { Ingested.Count: 0 } => Localizer["WebOutcomeNothingIngested"],
+        { Skipped.Count: > 0 } => Localizer["WebOutcomePartlyIngested"],
+        _ => Localizer["WebOutcomeIngested"],
+    };
+
+    /// <summary>
+    /// Gets the results table's rows: everything that was added, then everything that was not.
+    /// </summary>
+    /// <remarks>
+    /// Refusals come SECOND rather than being interleaved by arrival order, so the failures are a
+    /// block the operator reads to the end instead of lines to hunt for among successes.
+    /// </remarks>
+    private IReadOnlyList<ResultRow> ResultRows
+    {
+        get
+        {
+            if (outcome is null)
+            {
+                return [];
+            }
+
+            var label = SelectedSource.Name;
+            var rows = new List<ResultRow>(outcome.Ingested.Count + outcome.Skipped.Count);
+            rows.AddRange(outcome.Ingested.Select(document =>
+                new ResultRow(Localizer["WebOutcomeIngested"], true, label, document.Name, document.SourceUrl)));
+            rows.AddRange(outcome.Skipped.Select(failure =>
+                new ResultRow(Localizer["WebRowNotIngested"], false, label, failure.Url, failure.Reason)));
+            return rows;
+        }
+    }
+
+    private WebIngestionRequest BuildRequest() => new()
+    {
+        Source = sourceKind switch
+        {
+            "site" => WebIngestionSource.Site,
+            "video" => WebIngestionSource.Video,
+            _ => WebIngestionSource.Page,
+        },
+        WorkspaceId = workspace?.WorkspaceId ?? string.Empty,
+        Url = url,
+        Pinned = pinned,
+        // A field that will not parse becomes an out-of-range value on purpose, so it fails the
+        // SAME validation message as a number the user typed too large. Silently substituting a
+        // default would start a crawl with bounds nobody asked for.
+        MaxDepth = int.TryParse(maxDepthText, out var depth) ? depth : -1,
+        MaxPages = int.TryParse(maxPagesText, out var pages) ? pages : 0,
+        SameHostOnly = sameHostOnly,
+        AllowPrivateNetworkTargets = allowPrivateNetworkTargets,
+        PreferredLanguage = string.IsNullOrWhiteSpace(preferredLanguage) ? "en" : preferredLanguage.Trim(),
+    };
+
+    private async Task StartAsync()
+    {
+        if (workspace is null || isRunning || !canManage)
+        {
+            return;
+        }
+
+        var request = BuildRequest();
+        validationError = request.Validate(Localize);
+        if (validationError is not null)
+        {
+            return;
+        }
+
+        outcome = null;
+        runError = null;
+        cancelled = false;
+        isRunning = true;
+        progressPercent = 0;
+        progressStage = WebIngestionStage.Starting;
+        progressMessage = Localizer["WebProgressStarting"];
+        cancellation = new CancellationTokenSource();
+        StateHasChanged();
+
+        var reporter = new Progress<WebIngestionProgress>(OnProgress);
+        try
+        {
+            // Task.Run keeps the crawl off the WebView's UI thread. The network waits are already
+            // asynchronous, but HTML parsing and chunk building are not, and 25 pages of that on the
+            // render thread is a window that stops repainting — indistinguishable from a hang.
+            outcome = await Task.Run(
+                () => Ingestion.IngestAsync(request, reporter, cancellation.Token), cancellation.Token);
+
+            if (outcome.Succeeded && outcome.Skipped.Count == 0)
+            {
+                ToastService.Success(outcome.SummaryText(Localize), Localizer["WebToastAddedTitle"]);
+            }
+            else if (outcome.Succeeded)
+            {
+                // Partial success gets an ERROR toast, not a success one: the whole point is that
+                // the operator must look at the skipped list.
+                ToastService.Error(outcome.SummaryText(Localize), Localizer["WebToastPartlyIngestedTitle"]);
+            }
+            else
+            {
+                ToastService.Error(outcome.SummaryText(Localize), Localizer["WebNothingIngestedTitle"]);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            cancelled = true;
+        }
+        catch (WebFetchException ex)
+        {
+            runError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["WebToastFailedTitle"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Web ingestion of {Url} failed", url);
+            runError = ex.Message;
+            ToastService.Error(ex.Message, Localizer["WebToastFailedTitle"]);
+        }
+        finally
+        {
+            isRunning = false;
+            cancellation?.Dispose();
+            cancellation = null;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => cancellation?.Cancel();
+
+    private void OnProgress(WebIngestionProgress report)
+    {
+        progressPercent = report.Percent;
+        progressMessage = report.Message;
+        progressStage = report.Stage;
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>Stops an in-flight run when the user navigates away.</summary>
+    public void Dispose()
+    {
+        cancellation?.Cancel();
+        cancellation?.Dispose();
+        cancellation = null;
+    }
+}

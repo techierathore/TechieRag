@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
+using TechieRag.Diagnostics;
 using TechieRag.Models;
 
 namespace TechieRag.Llm;
@@ -18,7 +19,7 @@ namespace TechieRag.Llm;
 /// <para><b>Code Flow:</b> Created by TechieRagBuilder when LlmSource.OpenAICompatible is configured.
 /// Uses standard OpenAI chat completions API format.</para>
 /// </remarks>
-public class OpenAICompatibleLlmProvider : ILlmProvider
+public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
     private readonly HttpClient httpClient;
     private readonly string completionsPath;
@@ -35,6 +36,11 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
+
+    /// <inheritdoc/>
+    /// <remarks>Images are encoded as <c>image_url</c> content parts, inline as a data URI or by URL (REQ-RAG-039).</remarks>
+    public bool SupportsInput(ChatContentKind kind) =>
+        kind is ChatContentKind.Text or ChatContentKind.Image;
 
     /// <inheritdoc/>
     public event EventHandler<LlmCompletionEventArgs>? OnCompletionCompleted;
@@ -54,12 +60,19 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
         ModelName = model;
         this.logger = logger ?? NullLogger<OpenAICompatibleLlmProvider>.Instance;
 
+        // The request URI is composed as "{endpoint}/chat/completions", by keeping the whole endpoint
+        // as the base address and using a RELATIVE path. The earlier form split "/v1" off the
+        // endpoint and posted to the absolute path "/v1/chat/completions"; because an absolute path
+        // replaces the base address's path entirely, that silently discarded any base path and sent
+        // https://api.groq.com/openai/v1 to https://api.groq.com/v1/chat/completions. Endpoints with
+        // no base path (api.openai.com/v1, api.perplexity.ai) resolve identically either way, so
+        // this changes no existing behaviour — it only stops dropping base paths (REQ-RAG-034).
         var baseUri = endpoint.TrimEnd('/');
-        completionsPath = baseUri.EndsWith("/v1") ? "/v1/chat/completions" : "/chat/completions";
+        completionsPath = "chat/completions";
 
         httpClient = new HttpClient
         {
-            BaseAddress = new Uri(baseUri.EndsWith("/v1") ? baseUri[..^3] : baseUri),
+            BaseAddress = new Uri(baseUri + "/"),
             Timeout = TimeSpan.FromSeconds(120)
         };
 
@@ -68,6 +81,29 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
             httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
         }
     }
+
+    /// <summary>
+    /// Creates an OpenAI-compatible provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Model name.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal OpenAICompatibleLlmProvider(HttpClient httpClient, string model, ILogger<OpenAICompatibleLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        ModelName = model;
+        completionsPath = "/v1/chat/completions";
+        this.logger = logger ?? NullLogger<OpenAICompatibleLlmProvider>.Instance;
+    }
+
+    /// <summary>
+    /// The absolute URI chat completions are posted to, composed from the base address and the
+    /// relative completions path exactly as the request path is.
+    /// </summary>
+    /// <remarks>Test seam for REQ-RAG-034: lets endpoint composition be asserted without a network call.</remarks>
+    internal Uri EffectiveCompletionsUri => new(httpClient.BaseAddress!, completionsPath);
 
     /// <inheritdoc/>
     public async Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
@@ -114,6 +150,7 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
         var choice = result.Choices?.FirstOrDefault();
         var inputTokens = result.Usage?.PromptTokens ?? 0;
         var outputTokens = result.Usage?.CompletionTokens ?? 0;
+        var cacheReadTokens = result.Usage?.CachedTokens ?? 0;
         var toolCalls = ParseToolCalls(choice?.Message?.ToolCalls);
 
         var llmResponse = new LlmResponse
@@ -124,6 +161,7 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
             {
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
+                CacheReadTokens = cacheReadTokens,
                 ModelName = ModelName,
                 ProviderName = Name
             },
@@ -131,7 +169,7 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
             ModelName = result.Model ?? ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls);
+        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens);
         return llmResponse;
     }
 
@@ -150,6 +188,10 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
+        var totalInputTokens = 0;
+        var totalOutputTokens = 0;
+        var outputText = new StringBuilder();
+
         while (!reader.EndOfStream)
         {
             var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
@@ -159,15 +201,31 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
             if (data == "[DONE]") break;
 
             var chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (chunk?.Usage is not null)
+            {
+                totalInputTokens = chunk.Usage.PromptTokens;
+                totalOutputTokens = chunk.Usage.CompletionTokens;
+            }
+
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
             if (!string.IsNullOrEmpty(delta))
             {
+                outputText.Append(delta);
                 yield return delta;
             }
         }
 
         sw.Stop();
-        RaiseCompletionEvent(0, 0, sw.Elapsed, true, false);
+
+        // Fallback: estimate when the server sent no usage chunk
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
+        RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
     /// <inheritdoc/>
@@ -207,7 +265,10 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
         var apiMessages = messages.Select(m =>
         {
             var msg = new Dictionary<string, object> { ["role"] = m.Role };
-            if (m.Content is not null) msg["content"] = m.Content;
+            if (m.Content is not null || m.Parts is { Count: > 0 })
+            {
+                msg["content"] = OpenAIMessageMapper.BuildContent(m);
+            }
             if (m.ToolCallId is not null) msg["tool_call_id"] = m.ToolCallId;
             if (m.ToolCalls is { Count: > 0 })
             {
@@ -223,10 +284,20 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
 
         var request = new Dictionary<string, object>
         {
-            ["model"] = ModelName,
+            ["model"] = options?.Model ?? ModelName,
             ["messages"] = apiMessages,
             ["stream"] = stream
         };
+
+        if (stream)
+        {
+            // Ask the server to append a final usage chunk to the stream (TR-RAG-002)
+            request["stream_options"] = new Dictionary<string, object> { ["include_usage"] = true };
+        }
+
+        // REQ-RAG-043: prefix caching on these services is automatic; only the routing key is
+        // expressible on the wire. See PromptCacheOptions for what is intentionally not sent.
+        OpenAIMessageMapper.ApplyPromptCache(request, options?.PromptCache);
 
         if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
         if (options?.MaxTokens is not null) request["max_tokens"] = options.MaxTokens.Value;
@@ -271,8 +342,11 @@ public class OpenAICompatibleLlmProvider : ILlmProvider
         }).ToList();
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
+    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
     {
+        TechieRagTelemetry.RecordLlmCompletion(
+            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens);
+
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
             InputTokens = inputTokens,

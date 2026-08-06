@@ -1,0 +1,246 @@
+@* REQ-UI-037 (BRD-89) — the white-label branding card from the Branding tab of
+   docs/mockups/admin-settings.html: logo dropzone, display name, welcome message, footer links.
+
+   SELF-CONTAINED: injects only IBrandingStore and ToastService, takes no parameters, renders one
+   FeatureGate wrapping one Card. Drop it into the Branding tab of the App settings screen, BELOW
+   <AppearancePanel />.
+
+   Gated on WHITE_LABEL, which is what the mockup's amber "WHITE_LABEL — Enterprise" badge means. The
+   gate is FeatureGate, so an unlicensed install gets the standard upgrade prompt rather than a
+   disabled-looking form — the accent and theme controls live in AppearancePanel precisely so they
+   are not caught by this gate. *@
+
+@using TrBlazeUI.Components.FileUpload
+@inject IBrandingStore Branding
+@inject ToastService ToastService
+@inject IStringLocalizer<AppStrings> Localizer
+@inject ILogger<BrandingPanel> Logger
+
+<FeatureGate Feature="WHITE_LABEL">
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex flex-wrap items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["BrandingTitle"]</Badge>
+                <Badge Variant="BadgeVariant.Outline">WHITE_LABEL</Badge>
+            </div>
+            <CardTitle>@Localizer["BrandingTitle"]</CardTitle>
+            <CardDescription>@Localizer["BrandingDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="td-stack-6">
+
+            <!-- Logo -->
+            <div class="space-y-1.5">
+                <Label>@Localizer["BrandingLogoLabel"]</Label>
+                @if (logoDataUri is not null)
+                {
+                    <div class="flex items-center gap-3">
+                        @* The stored value is re-checked before it reaches an image source; see
+                           BrandingLogo.IsAcceptable for why the check is on the way out too. *@
+                        <img src="@logoDataUri" alt="" class="td-branding-logo" />
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                OnClick="RemoveLogo">
+                            @Localizer["BrandingLogoRemove"]
+                        </Button>
+                    </div>
+                }
+                <FileUpload Accept="@AcceptFilter"
+                            Multiple="false"
+                            MaxFileSize="@BrandingLogo.MaxBytes"
+                            Files="pickedFiles"
+                            FilesChanged="OnLogoPickedAsync"
+                            Disabled="isSaving" />
+                <TypographyMuted Class="block text-xs">@Localizer["BrandingLogoHint"]</TypographyMuted>
+            </div>
+
+            <!-- Display name -->
+            <div class="space-y-1.5">
+                <Label For="td-branding-name">@Localizer["BrandingDisplayNameLabel"]</Label>
+                <Input Id="td-branding-name" @bind-Value="productName"
+                       Placeholder="@BrandingSettings.DefaultProductName" />
+            </div>
+
+            <!-- Welcome message -->
+            <div class="space-y-1.5">
+                <Label For="td-branding-welcome">@Localizer["BrandingWelcomeLabel"]</Label>
+                @* REQ-UI-055: a placeholder is a hint, never persisted, so it reads in the operator's
+                   own language. The value BrandingSettings.DefaultWelcomeMessage still holds is the
+                   invariant one that is stored and that IsCustomised compares against. *@
+                <Textarea Id="td-branding-welcome" @bind-Value="welcomeMessage" MaxLength="280"
+                          Placeholder="@Localizer[BrandingSettings.DefaultWelcomeMessageKey]" />
+            </div>
+
+            <!-- Footer links -->
+            <div class="space-y-1.5">
+                <Label For="td-branding-footer">@Localizer["BrandingFooterLinksLabel"]</Label>
+                <Input Id="td-branding-footer" @bind-Value="footerLinks"
+                       Placeholder="@BrandingSettings.DefaultFooterLinks" />
+                <TypographyMuted Class="block text-xs">
+                    @Localizer["BrandingFooterLinksHint"]
+                </TypographyMuted>
+            </div>
+
+            <!-- Preview -->
+            @* The lockup as the shell will draw it. Without this the operator is typing into four
+               text boxes and finding out what they did by restarting. *@
+            <div class="space-y-1.5">
+                <Label>@Localizer["BrandingPreviewLabel"]</Label>
+                <div class="td-branding-preview">
+                    <div class="flex items-center gap-2">
+                        @if (logoDataUri is not null)
+                        {
+                            <img src="@logoDataUri" alt="" class="td-branding-mark" />
+                        }
+                        else
+                        {
+                            <span class="td-branding-mark td-branding-mark-fallback">
+                                @PreviewInitials
+                            </span>
+                        }
+                        <span class="font-semibold">@PreviewName</span>
+                    </div>
+                    <TypographyMuted Class="mt-2 block text-xs">@welcomeMessage</TypographyMuted>
+                    @if (PreviewFooterLabels.Count > 0)
+                    {
+                        <div class="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            @foreach (var label in PreviewFooterLabels)
+                            {
+                                <span>@label</span>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </CardContent>
+        <CardFooter Class="gap-2">
+            <Button OnClick="SaveAsync" Disabled="isSaving">@Localizer["SaveChanges"]</Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="RestoreDefaults" Disabled="isSaving">
+                @Localizer["RestoreDefaults"]
+            </Button>
+        </CardFooter>
+    </Card>
+</FeatureGate>
+
+@code {
+    private string productName = BrandingSettings.DefaultProductName;
+    private string welcomeMessage = BrandingSettings.DefaultWelcomeMessage;
+    private string footerLinks = BrandingSettings.DefaultFooterLinks;
+    private string? logoDataUri;
+    private bool isSaving;
+
+    private IReadOnlyList<FileUploadItem> pickedFiles = Array.Empty<FileUploadItem>();
+
+    private static string AcceptFilter => string.Join(',', BrandingLogo.AllowedExtensions);
+
+    private string PreviewName =>
+        string.IsNullOrWhiteSpace(productName) ? BrandingSettings.DefaultProductName : productName;
+
+    private IReadOnlyList<string> PreviewFooterLabels =>
+        new BrandingSettings(PreviewName, welcomeMessage, footerLinks, logoDataUri).FooterLinkLabels;
+
+    // The fallback mark mirrors the shell's lettermark so the preview is not lying about what an
+    // install with no logo looks like.
+    private string PreviewInitials
+    {
+        get
+        {
+            var words = PreviewName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return words.Length switch
+            {
+                0 => "?",
+                1 => words[0][..Math.Min(2, words[0].Length)].ToUpperInvariant(),
+                _ => $"{words[0][0]}{words[1][0]}".ToUpperInvariant()
+            };
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var stored = await Branding.LoadAsync();
+            productName = stored.ProductName;
+            welcomeMessage = stored.WelcomeMessage;
+            footerLinks = stored.FooterLinks;
+            logoDataUri = stored.LogoDataUri;
+        }
+        catch (Exception ex)
+        {
+            // The defaults are already in the fields, so the panel stays usable.
+            Logger.LogWarning(ex, "Could not load the branding settings");
+        }
+    }
+
+    private async Task OnLogoPickedAsync(IReadOnlyList<FileUploadItem> files)
+    {
+        pickedFiles = files;
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        var picked = files[0];
+        try
+        {
+            byte[] bytes;
+            await using (var readStream = picked.File.OpenReadStream(BrandingLogo.MaxBytes))
+            await using (var buffer = new MemoryStream())
+            {
+                await readStream.CopyToAsync(buffer);
+                bytes = buffer.ToArray();
+            }
+
+            if (BrandingLogo.TryEncode(picked.Name, picked.ContentType, bytes, out var encoded, out var error))
+            {
+                logoDataUri = encoded;
+            }
+            else
+            {
+                // REQ-UI-055: BrandingLogo returns a resource key and its values, never a sentence.
+                ToastService.Error(
+                    Localizer[error!.MessageKey, error.Arguments].Value,
+                    Localizer["BrandingLogoLabel"]);
+            }
+        }
+        catch (Exception ex)
+        {
+            // OpenReadStream throws when the file exceeds the cap, which is a user error rather than
+            // a fault — it is reported in the same place as every other refusal.
+            Logger.LogWarning(ex, "Could not read the picked logo {File}", picked.Name);
+            ToastService.Error(ex.Message, Localizer["BrandingLogoLabel"]);
+        }
+        finally
+        {
+            pickedFiles = Array.Empty<FileUploadItem>();
+        }
+    }
+
+    private void RemoveLogo() => logoDataUri = null;
+
+    private void RestoreDefaults()
+    {
+        productName = BrandingSettings.DefaultProductName;
+        welcomeMessage = BrandingSettings.DefaultWelcomeMessage;
+        footerLinks = BrandingSettings.DefaultFooterLinks;
+        logoDataUri = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            await Branding.SaveAsync(
+                new BrandingSettings(productName, welcomeMessage, footerLinks, logoDataUri));
+            ToastService.Success(Localizer["BrandingDescription"], Localizer["Saved"]);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Could not save the branding settings");
+            ToastService.Error(ex.Message, Localizer["SaveFailed"]);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

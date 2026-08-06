@@ -1,0 +1,407 @@
+@page "/llm-playground"
+@using System.Globalization
+@using TechieRag.Abstractions
+@using TechieRag.Models
+@inject TechieDesk.Services.TechieRagManager TechieRag
+@inject ToastService ToastService
+@inject IStringLocalizer<AppStrings> Localizer
+
+<PageTitle>@Localizer["PlaygroundPageTitle"]</PageTitle>
+
+<div class="space-y-6">
+    <div>
+        <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["PlaygroundHeading"]</h1>
+        <TypographyMuted>@Localizer["PlaygroundSubtitle"]</TypographyMuted>
+    </div>
+
+    <Tabs DefaultValue="completion">
+        <TabsList Class="grid w-full grid-cols-3">
+            <TabsTrigger Value="completion">@Localizer["PlaygroundTabCompletion"]</TabsTrigger>
+            <TabsTrigger Value="structured">@Localizer["PlaygroundTabStructured"]</TabsTrigger>
+            <TabsTrigger Value="chat">@Localizer["PlaygroundTabChat"]</TabsTrigger>
+        </TabsList>
+
+        <!-- Completion Tab -->
+        <TabsContent Value="completion" ForceMount="true">
+            <div class="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>@Localizer["PlaygroundPromptTitle"]</CardTitle>
+                    </CardHeader>
+                    <CardContent Class="space-y-4">
+                        <Field>
+                            <FieldLabel>@Localizer["PlaygroundSystemPrompt"]</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="systemPrompt" Placeholder="@Localizer["PlaygroundSystemPromptPlaceholder"]" Class="min-h-[60px]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["PlaygroundUserPrompt"]</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="userPrompt" Placeholder="@Localizer["PlaygroundUserPromptPlaceholder"]" Class="min-h-[80px]" />
+                            </FieldContent>
+                        </Field>
+                        <div class="grid grid-cols-3 gap-4">
+                            <Field>
+                                <FieldLabel>@Localizer["PlaygroundTemperature"]</FieldLabel>
+                                <FieldContent>
+                                    <Input Type="InputType.Number" @bind-Value="temperatureString" Placeholder="0.7" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>@Localizer["PlaygroundMaxTokens"]</FieldLabel>
+                                <FieldContent>
+                                    <Input Type="InputType.Number" @bind-Value="maxTokensString" Placeholder="2048" />
+                                </FieldContent>
+                            </Field>
+                            <Field>
+                                <FieldLabel>@Localizer["PlaygroundStreaming"]</FieldLabel>
+                                <FieldContent>
+                                    <div class="flex items-center space-x-2 pt-2">
+                                        <Switch @bind-Checked="useStreaming" Id="pg-streaming" />
+                                        <Label For="pg-streaming">@(useStreaming ? Localizer["PlaygroundOn"] : Localizer["PlaygroundOff"])</Label>
+                                    </div>
+                                </FieldContent>
+                            </Field>
+                        </div>
+                        <Button OnClick="GenerateCompletion" Disabled="isGenerating">
+                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["PlaygroundGenerating"]</span> }
+                            else { <span>@Localizer["PlaygroundGenerate"]</span> }
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                @if (!string.IsNullOrEmpty(completionResponse))
+                {
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>@Localizer["PlaygroundResponse"]</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4">@completionResponse</div>
+                            @if (!string.IsNullOrEmpty(completionStats))
+                            {
+                                <TypographyMuted Class="mt-2">@completionStats</TypographyMuted>
+                            }
+                        </CardContent>
+                    </Card>
+                }
+            </div>
+        </TabsContent>
+
+        <!-- Structured Output Tab -->
+        <TabsContent Value="structured" ForceMount="true">
+            <div class="space-y-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>@Localizer["PlaygroundTypedTitle"]</CardTitle>
+                    </CardHeader>
+                    <CardContent Class="space-y-4">
+                        <Field>
+                            <FieldLabel>@Localizer["PlaygroundPromptTitle"]</FieldLabel>
+                            <FieldContent>
+                                <Textarea @bind-Value="structuredPrompt" Placeholder="@Localizer["PlaygroundStructuredPlaceholder"]" Class="min-h-[80px]" />
+                            </FieldContent>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@Localizer["PlaygroundResponseType"]</FieldLabel>
+                            <FieldContent>
+                                <Select @bind-Value="structuredType" TValue="string" DisplayTextSelector="StructuredTypeTextFor">
+                                    <SelectTrigger aria-label="@Localizer["PlaygroundResponseType"]">
+                                        <SelectValue Placeholder="@Localizer["PlaygroundSelectType"]" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem Value="@("sentiment")" Text="@Localizer["PlaygroundTypeSentiment"]" TValue="string">@Localizer["PlaygroundTypeSentiment"]</SelectItem>
+                                        <SelectItem Value="@("weather")" Text="@Localizer["PlaygroundTypeWeather"]" TValue="string">@Localizer["PlaygroundTypeWeather"]</SelectItem>
+                                        <SelectItem Value="@("book")" Text="@Localizer["PlaygroundTypeBook"]" TValue="string">@Localizer["PlaygroundTypeBook"]</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </FieldContent>
+                        </Field>
+                        <Button OnClick="GenerateStructured" Disabled="isGenerating">
+                            @if (isGenerating) { <Spinner Size="SpinnerSize.Small" Class="mr-2" /> <span>@Localizer["PlaygroundGenerating"]</span> }
+                            else { <span>@Localizer["PlaygroundGenerateTyped"]</span> }
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                @if (!string.IsNullOrEmpty(structuredResponse))
+                {
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>@Localizer["PlaygroundParsedResult"]</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div class="whitespace-pre-wrap text-sm bg-muted rounded-md p-4 font-mono">@structuredResponse</div>
+                        </CardContent>
+                    </Card>
+                }
+            </div>
+        </TabsContent>
+
+        <!-- Chat Tab -->
+        <TabsContent Value="chat" ForceMount="true">
+            <Card Class="h-[500px] flex flex-col">
+                <CardHeader>
+                    <div class="flex items-center justify-between">
+                        <CardTitle>@Localizer["PlaygroundDirectChat"]</CardTitle>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small" OnClick="ClearDirectChat">@Localizer["PlaygroundClear"]</Button>
+                    </div>
+                </CardHeader>
+                <CardContent Class="flex-1 overflow-y-auto space-y-3">
+                    @foreach (var msg in directChatMessages)
+                    {
+                        <div class="@(msg.Role == "user" ? "flex justify-end" : "flex justify-start")">
+                            <div class="@(msg.Role == "user" ? "bg-primary text-primary-foreground" : "bg-muted") rounded-lg px-3 py-2 max-w-[80%]">
+                                <div class="whitespace-pre-wrap text-sm">@msg.Content</div>
+                            </div>
+                        </div>
+                    }
+                    @if (isGenerating && !string.IsNullOrEmpty(streamContent))
+                    {
+                        <div class="flex justify-start">
+                            <div class="bg-muted rounded-lg px-3 py-2">
+                                <div class="whitespace-pre-wrap text-sm">@streamContent<span class="animate-pulse">|</span></div>
+                            </div>
+                        </div>
+                    }
+                </CardContent>
+                <CardFooter Class="gap-2">
+                    <Textarea @bind-Value="directChatInput" Placeholder="@Localizer["PlaygroundTypeMessage"]" Class="flex-1 min-h-[44px]" />
+                    <Button OnClick="SendDirectChat" Disabled="@(isGenerating || string.IsNullOrWhiteSpace(directChatInput))">
+                        <LucideIcon aria-hidden="true" Name="send" Size="16" />
+                        <span class="sr-only">@Localizer["PlaygroundSendPrompt"]</span>
+                    </Button>
+                </CardFooter>
+            </Card>
+        </TabsContent>
+    </Tabs>
+</div>
+
+@code {
+    private string? systemPrompt = "You are a helpful assistant.";
+    private string? userPrompt;
+    private string? structuredPrompt;
+    private string structuredType = "sentiment";
+    private string? directChatInput;
+    private bool useStreaming = true;
+    private bool isGenerating;
+    private string completionResponse = "";
+    private string? completionStats;
+    private string? structuredResponse;
+    private string streamContent = "";
+    private List<ChatMsg> directChatMessages = new();
+
+    private string? temperatureString = "0.7";
+    private string? maxTokensString = "2048";
+
+    /// <summary>
+    /// Paints the response type's TRANSLATED label on the closed Select trigger (TR-024).
+    /// </summary>
+    /// <param name="value">The bound, culture-invariant type key.</param>
+    /// <returns>The label to draw.</returns>
+    private string StructuredTypeTextFor(string? value) => value switch
+    {
+        "weather" => Localizer["PlaygroundTypeWeather"].Value,
+        "book" => Localizer["PlaygroundTypeBook"].Value,
+        _ => Localizer["PlaygroundTypeSentiment"].Value
+    };
+
+    private async Task<ILlmProvider?> GetProviderAsync()
+    {
+        var provider = await TechieRag.GetLlmProviderAsync();
+        if (provider is null)
+            ToastService.Error(Localizer["PlaygroundNoProvider"], Localizer["PlaygroundErrorToast"]);
+        return provider;
+    }
+
+    private async Task GenerateCompletion()
+    {
+        var provider = await GetProviderAsync();
+        if (provider is null || string.IsNullOrWhiteSpace(userPrompt)) return;
+
+        isGenerating = true;
+        completionResponse = "";
+        completionStats = null;
+        StateHasChanged();
+
+        try
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var options = BuildCompletionOptions();
+
+            if (useStreaming)
+            {
+                var prompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
+                await foreach (var token in provider.CompleteStreamAsync(prompt, options))
+                {
+                    completionResponse += token;
+                    StateHasChanged();
+                }
+                sw.Stop();
+                completionStats = $"{sw.ElapsedMilliseconds}ms";
+            }
+            else
+            {
+                var prompt = string.IsNullOrWhiteSpace(systemPrompt) ? userPrompt : $"{systemPrompt}\n\n{userPrompt}";
+                var response = await provider.CompleteAsync(prompt, options);
+                sw.Stop();
+                completionResponse = response.Content ?? "";
+                completionStats = Localizer["PlaygroundStats", sw.ElapsedMilliseconds, response.Usage.InputTokens, response.Usage.OutputTokens];
+            }
+        }
+        catch (Exception ex)
+        {
+            completionResponse = Localizer["PlaygroundError", ex.Message];
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task GenerateStructured()
+    {
+        var provider = await GetProviderAsync();
+        if (provider is null || string.IsNullOrWhiteSpace(structuredPrompt)) return;
+
+        isGenerating = true;
+        structuredResponse = null;
+        StateHasChanged();
+
+        var options = new LlmCompletionOptions { JsonMode = true };
+
+        try
+        {
+            switch (structuredType)
+            {
+                case "sentiment":
+                    {
+                        var prompt = $"Analyze the sentiment and respond with JSON: {{\"sentiment\": \"positive|negative|neutral\", \"confidence\": 0.0-1.0, \"explanation\": \"...\"}}\n\n{structuredPrompt}";
+                        var result = await provider.CompleteAsync<SentimentAnalysis>(prompt, options);
+                        structuredResponse = Localizer[
+                            "PlaygroundTypedSentiment",
+                            result.Sentiment,
+                            result.Confidence.ToString("0.00", CultureInfo.InvariantCulture),
+                            result.Explanation];
+                        break;
+                    }
+                case "weather":
+                    {
+                        var prompt = $"Create a weather forecast and respond with JSON: {{\"city\": \"...\", \"temperature\": 0, \"condition\": \"...\", \"humidity\": 0}}\n\n{structuredPrompt}";
+                        var result = await provider.CompleteAsync<WeatherForecast>(prompt, options);
+                        structuredResponse = Localizer[
+                            "PlaygroundTypedWeather",
+                            result.City,
+                            result.Temperature,
+                            result.Condition,
+                            result.Humidity];
+                        break;
+                    }
+                case "book":
+                    {
+                        var prompt = $"Summarize the book and respond with JSON: {{\"title\": \"...\", \"author\": \"...\", \"summary\": \"...\", \"rating\": 0.0-5.0}}\n\n{structuredPrompt}";
+                        var result = await provider.CompleteAsync<BookSummary>(prompt, options);
+                        structuredResponse = Localizer[
+                            "PlaygroundTypedBook",
+                            result.Title,
+                            result.Author,
+                            result.Rating.ToString("0.0", CultureInfo.InvariantCulture),
+                            result.Summary];
+                        break;
+                    }
+                default:
+                    {
+                        var response = await provider.CompleteAsync(structuredPrompt!, options);
+                        structuredResponse = response.Content;
+                        break;
+                    }
+            }
+        }
+        catch (Exception ex)
+        {
+            structuredResponse = Localizer["PlaygroundParseError", ex.Message];
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task SendDirectChat()
+    {
+        var provider = await GetProviderAsync();
+        if (provider is null || string.IsNullOrWhiteSpace(directChatInput)) return;
+
+        var input = directChatInput!.Trim();
+        directChatInput = "";
+        directChatMessages.Add(new ChatMsg("user", input));
+        isGenerating = true;
+        streamContent = "";
+        StateHasChanged();
+
+        try
+        {
+            var chatMessages = directChatMessages
+                .Select(m => new ChatMessage { Role = m.Role, Content = m.Content })
+                .ToList()
+                .AsReadOnly();
+
+            if (useStreaming)
+            {
+                await foreach (var token in provider.ChatStreamAsync(chatMessages))
+                {
+                    streamContent += token;
+                    StateHasChanged();
+                }
+                directChatMessages.Add(new ChatMsg("assistant", streamContent));
+            }
+            else
+            {
+                var response = await provider.ChatAsync(chatMessages);
+                directChatMessages.Add(new ChatMsg("assistant", response.Content ?? ""));
+            }
+        }
+        catch (Exception ex)
+        {
+            directChatMessages.Add(new ChatMsg("assistant", Localizer["PlaygroundError", ex.Message]));
+        }
+        finally
+        {
+            isGenerating = false;
+            streamContent = "";
+        }
+    }
+
+    private void ClearDirectChat()
+    {
+        directChatMessages.Clear();
+    }
+
+    private LlmCompletionOptions? BuildCompletionOptions()
+    {
+        var options = new LlmCompletionOptions();
+        var hasValue = false;
+
+        if (float.TryParse(temperatureString, NumberStyles.Float, CultureInfo.InvariantCulture, out var temperature))
+        {
+            options.Temperature = temperature;
+            hasValue = true;
+        }
+
+        if (int.TryParse(maxTokensString, NumberStyles.Integer, CultureInfo.InvariantCulture, out var maxTokens))
+        {
+            options.MaxTokens = maxTokens;
+            hasValue = true;
+        }
+
+        return hasValue ? options : null;
+    }
+
+    private record ChatMsg(string Role, string Content);
+
+    private record SentimentAnalysis(string Sentiment, double Confidence, string Explanation);
+
+    private record WeatherForecast(string City, int Temperature, string Condition, int Humidity);
+
+    private record BookSummary(string Title, string Author, string Summary, double Rating);
+}

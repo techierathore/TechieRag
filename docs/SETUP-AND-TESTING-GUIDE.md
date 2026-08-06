@@ -59,7 +59,7 @@ dotnet build
 
 ```powershell
 # Run TechieRagWeb
-dotnet run --project samples/TechieRagWeb/TechieRagWeb.csproj
+dotnet run --project apps/TechieDesk/TechieDesk.csproj
 
 # Open browser to: https://localhost:5001 or http://localhost:5000
 ```
@@ -269,7 +269,7 @@ ollama serve
 
 ```powershell
 cd C:\3AIGenCode\TechieRag
-dotnet run --project samples/TechieRagWeb/TechieRagWeb.csproj
+dotnet run --project apps/TechieDesk/TechieDesk.csproj
 ```
 
 ### Step 3: Open in Browser
@@ -304,6 +304,71 @@ Navigate to: `https://localhost:5001` or `http://localhost:5000`
 3. Select Top-K results (5, 10, or 20)
 4. Click **Search** or press Enter
 5. View results with relevance scores and source attribution
+
+---
+
+## Live-network tests (opt-in)
+
+The web-ingestion requirements (REQ-RAG-016 single page, REQ-RAG-017 site crawl, REQ-RAG-018 YouTube
+transcript) have a second test suite that talks to the **real internet** and runs the **real embedded
+embedding model**. It lives in `tests/TechieRag.Tests/Web/Live/` and
+`tests/TechieDesk.Tests/Web/Live/`.
+
+**It is excluded from the default run and must stay that way.** These tests depend on third-party
+hosts that can be slow, rate-limited, unreachable from a build agent, or simply free to change their
+markup — none of which is a defect in this repository. They are skipped unless the
+`TechieRagLiveNetworkTests` environment variable is set, and they additionally carry
+`[Trait("Category", "LiveNetwork")]` so they can be selected by filter.
+
+```bash
+# Default: hermetic, no network, live tests reported as Skipped.
+dotnet test
+
+# Live network suite only.
+TechieRagLiveNetworkTests=1 dotnet test --filter "Category=LiveNetwork"
+
+# One project at a time.
+TechieRagLiveNetworkTests=1 dotnet test tests/TechieRag.Tests --filter "Category=LiveNetwork"
+TechieRagLiveNetworkTests=1 dotnet test tests/TechieDesk.Tests --filter "Category=LiveNetwork"
+```
+
+On Windows PowerShell, set the variable first: `$env:TechieRagLiveNetworkTests = "1"`.
+
+### What they need
+
+| Need | Detail |
+|------|--------|
+| Outbound HTTPS and HTTP | `example.com`, `en.wikipedia.org`, `quotes.toscrape.com`, `registry.npmjs.org`, `postman-echo.com`, `nip.io`, `www.youtube.com` |
+| Loopback listeners | The SSRF tests bind an `HttpListener` on a free 127.0.0.1 port |
+| The BGE-M3 ONNX model | ~2.3 GB, downloaded automatically on first use into `<test output>/models/bge-m3` |
+
+To avoid re-downloading the model per output directory, cache it once and symlink it in:
+
+```bash
+# One-time, per machine.
+mkdir -p ~/.cache/techierag-models/bge-m3
+cd ~/.cache/techierag-models/bge-m3
+for f in model.onnx model.onnx_data tokenizer.json sentencepiece.bpe.model config.json; do
+  curl -sSL -C - -O "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx/$f"
+done
+
+# Per output directory.
+mkdir -p tests/TechieDesk.Tests/bin/Debug/net10.0/models
+ln -sfn ~/.cache/techierag-models/bge-m3 tests/TechieDesk.Tests/bin/Debug/net10.0/models/bge-m3
+```
+
+### Reading a failure
+
+A red live test is **not automatically a bug in this repository** — that is the whole reason it is
+kept out of the default run. Check in this order: is the target host up; has the page's copy changed
+(the assertions are pinned to structure, not wording, but wording is asserted where nothing else
+identifies the content); and only then, is the code wrong.
+
+One test is **knowingly red**: `TranscriptIsReadFromARealVideoWithCaptions`. YouTube serves every
+caption URL derived from a watch page as HTTP 200 with an empty body, so no transcript can be read
+(TR-RAG-015 in `docs/TechieDesk-TechieRag-Feedback.md`). It is deliberately left asserting the
+requirement rather than relaxed to match the outage, because it is the only instrument that will
+report the day transcript ingestion starts working again.
 
 ---
 

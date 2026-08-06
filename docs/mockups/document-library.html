@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TechieDesk — Documents</title>
+<!-- TechieDesk mockup · route: /workspace/{slug}/documents · TrBlazeUI controls: Card, Button, FileUpload, Progress, Table, Badge, Tooltip -->
+<style>
+:root{--bg:#f6f7f9;--card:#ffffff;--fg:#1a1d23;--muted:#f1f2f5;--muted-fg:#6b7280;--border:#e6e8ec;--accent:#4f46e5;--accent-hover:#4338ca;--accent-soft:#eef2ff;--accent-border:#c7d2fe;--destructive:#dc2626;--success:#16a34a;--info:#2563eb;--warning:#d97706;--radius:10px;--sidebar:#fbfbfd;--shadow-sm:0 1px 2px rgba(16,24,40,.05);--shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.05);--shadow-lg:0 8px 24px rgba(16,24,40,.12)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.shell{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 62px)}
+.sidebar{background:var(--sidebar);border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:calc(100vh - 62px);overflow-y:auto}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15.5px;padding:6px 8px 14px;letter-spacing:-.01em}
+.logo .mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366f1,#4338ca);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:var(--shadow)}
+.ws-switch{display:flex;align-items:center;gap:8px;border:1px solid var(--border);border-radius:9px;background:var(--card);padding:8px 10px;margin:2px 0 10px;font-weight:600;font-size:13px;cursor:pointer;box-shadow:var(--shadow-sm)}
+.ws-switch:hover{border-color:var(--accent-border)}
+.ws-switch .dot{width:22px;height:22px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700}
+.ws-switch .chev{margin-left:auto;color:var(--muted-fg)}
+.navgroup{font-size:10.5px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:.7px;padding:12px 10px 4px}
+.navitem{display:flex;align-items:center;gap:10px;padding:7.5px 10px;border-radius:8px;color:#3d4451;font-weight:500;font-size:13.5px;transition:all .12s}
+.navitem svg{width:16px;height:16px;stroke:#9aa1ad;flex-shrink:0;transition:stroke .12s}
+.navitem:hover{background:#f0f1f4;color:var(--fg)}
+.navitem:hover svg{stroke:var(--fg)}
+.navitem.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.navitem.active svg{stroke:var(--accent)}
+.sidebar .foot{margin-top:auto;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:center}
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:5}
+.crumb{color:var(--muted-fg);font-size:13px}
+.crumb b{color:var(--fg);font-weight:600}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.content{padding:24px;display:flex;flex-direction:column;gap:16px;max-width:1180px;width:100%}
+.pagehead{display:flex;align-items:center;gap:12px}
+.pagehead h1{font-size:20px;font-weight:700;letter-spacing:-.01em}
+.pagehead .sub{color:var(--muted-fg);font-size:13px}
+.pagehead .actions{margin-left:auto;display:flex;gap:8px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm)}
+.card h3{font-size:15px;font-weight:650;margin-bottom:2px}
+.card .desc{color:var(--muted-fg);font-size:13px;margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:8px;padding:8px 15px;font-size:13.5px;font-weight:600;border:1px solid transparent;cursor:pointer;background:var(--accent);color:#fff;box-shadow:var(--shadow-sm);transition:background .12s}
+.btn:hover{background:var(--accent-hover)}
+.btn.outline{background:var(--card);color:var(--fg);border-color:var(--border)}
+.btn.outline:hover{background:var(--muted)}
+.btn.ghost{background:transparent;color:var(--fg);box-shadow:none}
+.btn.ghost:hover{background:var(--muted)}
+.btn.destructive{background:var(--destructive)}
+.btn.destructive:hover{background:#b91c1c}
+.btn.sm{padding:4.5px 11px;font-size:12.5px}
+.btn svg{width:15px;height:15px;stroke:currentColor}
+.input,select.input,textarea.input{width:100%;border:1px solid var(--border);border-radius:8px;padding:8.5px 11px;font-size:13.5px;background:var(--card);color:var(--fg);font-family:inherit}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.hint{font-size:12px;color:var(--muted-fg)}
+.field{margin-bottom:14px}
+.badge{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2.5px 10px;font-size:11.5px;font-weight:600;background:var(--muted);color:#4b5563;border:1px solid var(--border)}
+.badge.green{background:#ecfdf3;color:#067647;border-color:#abefc6}
+.badge.blue{background:#eff4ff;color:#1d4ed8;border-color:#c7d7fe}
+.badge.amber{background:#fffaeb;color:#b54708;border-color:#fedf89}
+.badge.red{background:#fef3f2;color:#b42318;border-color:#fecdca}
+.badge.violet{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-border)}
+table.t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.t th{color:var(--muted-fg);font-weight:600;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.4px;background:#fafbfc}
+table.t td{padding:11px 12px;border-bottom:1px solid #f0f1f4}
+table.t tr:hover td{background:#fafbff}
+.tabs{display:flex;gap:2px;background:var(--muted);border-radius:9px;padding:3px;width:max-content}
+.tab{padding:6px 16px;border-radius:7px;font-size:13px;font-weight:500;color:#5b6472;cursor:pointer}
+.tab.active{background:var(--card);font-weight:600;color:var(--fg);box-shadow:var(--shadow-sm)}
+.avatar{width:30px;height:30px;border-radius:999px;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#4338ca;flex-shrink:0}
+.alert{display:flex;gap:10px;border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:13px;background:var(--card);box-shadow:var(--shadow-sm)}
+.alert.green{background:#ecfdf3;border-color:#abefc6;color:#067647}
+.alert.red{background:#fef3f2;border-color:#fecdca;color:#b42318}
+.alert.amber{background:#fffaeb;border-color:#fedf89;color:#b54708}
+.alert.blue{background:#eff4ff;border-color:#c7d7fe;color:#1d4ed8}
+.switch{width:36px;height:20px;border-radius:999px;background:var(--accent);position:relative;display:inline-block;flex-shrink:0}
+.switch:after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:999px;background:#fff;box-shadow:var(--shadow-sm)}
+.switch.off{background:#d1d5db}
+.switch.off:after{right:auto;left:2px}
+.progress{height:8px;border-radius:999px;background:var(--muted);overflow:hidden}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#6366f1,#4f46e5);border-radius:999px}
+.auth{min-height:calc(100vh - 62px);background:linear-gradient(160deg,#eef2ff 0%,#f6f7f9 45%,#f6f7f9 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+.auth .box{width:410px;display:flex;flex-direction:column;gap:16px}
+.auth .card{box-shadow:var(--shadow-lg);border-radius:14px;padding:26px}
+.empty{text-align:center;color:var(--muted-fg);padding:36px;border:1.5px dashed var(--border);border-radius:12px;font-size:13px;background:#fafbfc}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent-border);background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer}
+
+/* --- Document Library screen styles --- */
+.dropzone{border:2px dashed var(--accent-border);background:#f5f7ff;border-radius:12px;text-align:center;padding:30px}
+.dropzone .dz-icon{width:24px;height:24px;stroke:var(--accent);margin-bottom:8px}
+.dropzone .dz-title{font-weight:700;font-size:14.5px}
+.dropzone .dz-sub{color:var(--muted-fg);font-size:13px;margin-top:4px}
+.uprow{display:flex;align-items:center;gap:12px;padding:8px 0}
+.uprow + .uprow{border-top:1px solid var(--border)}
+.uprow .fname{width:220px;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.uprow .progress{flex:1}
+.uprow .ustat{width:130px;text-align:right;color:var(--muted-fg);font-size:12.5px}
+td .actions{display:flex;gap:4px;justify-content:flex-end}
+.pin-col{width:28px;text-align:center}
+.pin-col svg{width:15px;height:15px;stroke:var(--accent);vertical-align:middle}
+
+/* ===== v3 overrides — dark sidebar + dark mode ===== */
+html[data-theme="dark"] .sidebar{background:linear-gradient(180deg,#161b2e,#10131f);border-right:1px solid #232941}
+html[data-theme="dark"] .sidebar .logo{color:#fff}
+html[data-theme="dark"] .navgroup{color:#5d6480}
+html[data-theme="dark"] .navitem{color:#a6adc5}
+html[data-theme="dark"] .navitem svg{stroke:#6f7691}
+html[data-theme="dark"] .navitem:hover{background:rgba(255,255,255,.06);color:#e6e9f4}
+html[data-theme="dark"] .navitem:hover svg{stroke:#c3c9dd}
+html[data-theme="dark"] .navitem.active{background:rgba(99,102,241,.22);color:#c7d2fe}
+html[data-theme="dark"] .navitem.active svg{stroke:#a5b4fc}
+html[data-theme="dark"] .ws-switch{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.1);color:#e6e9f4;box-shadow:none}
+html[data-theme="dark"] .ws-switch:hover{border-color:#6366f1}
+html[data-theme="dark"] .ws-switch .chev{color:#8b92ad}
+html[data-theme="dark"] .sidebar .foot{border-top-color:rgba(255,255,255,.1);color:#e6e9f4}
+html[data-theme="dark"] .sidebar .foot .hint{color:#8b92ad}
+.theme-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--muted-fg);cursor:pointer;padding:0}
+.theme-btn:hover{color:var(--accent);border-color:var(--accent-border)}
+.theme-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+body > .theme-btn{position:fixed;top:14px;right:16px;z-index:50;box-shadow:var(--shadow)}
+html[data-theme="dark"]{--bg:#0d1017;--card:#151a26;--fg:#e2e5ee;--muted:#1c2231;--muted-fg:#8b93a8;--border:#242b3d;--accent:#818cf8;--accent-hover:#939bfa;--accent-soft:#232a4d;--accent-border:#414a83;--sidebar:#10131f;--shadow-sm:0 1px 2px rgba(0,0,0,.4);--shadow:0 1px 3px rgba(0,0,0,.5);--shadow-lg:0 8px 24px rgba(0,0,0,.55)}
+html[data-theme="dark"] .btn{color:#fff}
+html[data-theme="dark"] .btn.outline{color:var(--fg)}
+html[data-theme="dark"] .btn.ghost{color:var(--fg)}
+html[data-theme="dark"] table.t th{background:#181e2c;color:#8b93a8}
+html[data-theme="dark"] table.t td{border-bottom-color:#1e2434}
+html[data-theme="dark"] table.t tr:hover td{background:#181e2e}
+html[data-theme="dark"] .tab{color:#9aa2b6}
+html[data-theme="dark"] .tab.active{background:#232a3d;color:#e2e5ee}
+html[data-theme="dark"] .badge{background:#1c2231;color:#a8b0c4;border-color:#2b3348}
+html[data-theme="dark"] .badge.green{background:#0d2b1e;color:#4ade80;border-color:#1c4a34}
+html[data-theme="dark"] .badge.blue{background:#122142;color:#93b4fd;border-color:#25407a}
+html[data-theme="dark"] .badge.amber{background:#32230a;color:#fbbf24;border-color:#5c4514}
+html[data-theme="dark"] .badge.red{background:#331416;color:#f87171;border-color:#5f2120}
+html[data-theme="dark"] .badge.violet{background:#232a4d;color:#a5b4fc;border-color:#414a83}
+html[data-theme="dark"] .alert.green{background:#0d2b1e;border-color:#1c4a34;color:#6ee7a0}
+html[data-theme="dark"] .alert.red{background:#331416;border-color:#5f2120;color:#fca5a5}
+html[data-theme="dark"] .alert.amber{background:#32230a;border-color:#5c4514;color:#fcd34d}
+html[data-theme="dark"] .alert.blue{background:#122142;border-color:#25407a;color:#a9c4fe}
+html[data-theme="dark"] .auth{background:linear-gradient(160deg,#151a30 0%,#0d1017 50%)}
+html[data-theme="dark"] .empty{background:#131826}
+html[data-theme="dark"] .avatar{background:linear-gradient(135deg,#2b3157,#3a4180);color:#c7d2fe}
+html[data-theme="dark"] .switch.off{background:#3a4256}
+html[data-theme="dark"] .input,html[data-theme="dark"] select.input,html[data-theme="dark"] textarea.input{background:#11151f;border-color:#2a3145;color:var(--fg)}
+html[data-theme="dark"] [style*="#f5f7ff"]{background:#1b2140!important}
+html[data-theme="dark"] [style*="#fffbfa"]{background:#231518!important}
+html[data-theme="dark"] [style*="#fafbfc"]{background:#151a26!important}
+html[data-theme="dark"] [style*="#fafbff"]{background:#161c2a!important}
+/* dark-mode screen fixes */
+html[data-theme="dark"] .dropzone{background:#1b2140}
+/* --- desktop window chrome (2026-07-26: MAUI Blazor Hybrid window, not a browser tab) --- */
+.winbar{display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;background:linear-gradient(#f2f3f6,#e9ebef);border-bottom:1px solid var(--border);user-select:none;flex:0 0 auto}
+.traffic{display:flex;gap:7px}
+.traffic i{width:11px;height:11px;border-radius:50%;display:block}
+.traffic .r{background:#ff5f57}.traffic .y{background:#febc2e}.traffic .g{background:#28c840}
+.wintitle{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted-fg);margin-right:46px}
+.menubar{display:flex;align-items:center;gap:17px;height:28px;padding:0 14px;background:var(--card);border-bottom:1px solid var(--border);font-size:12.5px;color:#4b5563;user-select:none;flex:0 0 auto}
+.menubar b{font-weight:700;color:var(--fg)}
+html[data-theme="dark"] .winbar{background:linear-gradient(#20242e,#1a1e27);border-color:#2a3145}
+html[data-theme="dark"] .menubar{background:#151a26;border-color:#2a3145;color:#98a1b3}
+
+/* ===== prototype kit (owner review 2026-07-26) — menus, tabs, dialogs, popovers ===== */
+.menubar{position:relative;z-index:120}
+.mb{position:relative}
+.mb>button{background:none;border:0;font:inherit;color:inherit;cursor:pointer;padding:3px 9px;border-radius:6px;line-height:1.6}
+.mb>button:hover{background:var(--muted)}
+.mb.open>button{background:var(--accent);color:#fff}
+.menu{position:absolute;top:calc(100% + 3px);left:0;min-width:236px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;font-size:13px;color:var(--fg)}
+.mb.open>.menu{display:block}
+.menu a,.menu .mi{display:flex;align-items:center;gap:10px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.menu a:hover,.menu .mi:not(.disabled):hover{background:var(--muted)}
+.menu .mi.disabled{color:var(--muted-fg);cursor:default}
+.menu .sep{height:1px;background:var(--border);margin:4px 2px}
+.menu .k{margin-left:auto;color:var(--muted-fg);font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.menu .grouplbl{padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)}
+
+/* popovers — row overflow menus, workspace switcher, anything anchored */
+.popwrap{position:relative;display:inline-block}
+.pop{position:absolute;top:calc(100% + 5px);right:0;min-width:210px;background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);padding:5px;display:none;z-index:180;font-size:13px;text-align:left;font-weight:400}
+.pop.open{display:block}
+.pop.left{right:auto;left:0}
+.pop a,.pop .mi{display:flex;align-items:center;gap:9px;padding:6px 9px;border-radius:6px;color:var(--fg);cursor:pointer;white-space:nowrap}
+.pop a:hover,.pop .mi:not(.disabled):hover{background:var(--muted)}
+.pop .mi.danger{color:var(--destructive)}
+.pop .mi.disabled{color:var(--muted-fg);cursor:default}
+.pop .sep{height:1px;background:var(--border);margin:4px 2px}
+.dots{border:0;background:none;color:var(--muted-fg);cursor:pointer;font-size:16px;line-height:1;padding:3px 7px;border-radius:6px}
+.dots:hover{background:var(--muted);color:var(--fg)}
+
+/* modal dialogs */
+.modal{position:fixed;inset:0;background:rgba(12,15,23,.5);display:none;align-items:center;justify-content:center;z-index:400;padding:28px}
+.modal.open{display:flex}
+.modal .sheet{background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lg);width:min(700px,100%);max-height:84vh;overflow:auto;padding:22px}
+.modal .sheet.wide{width:min(960px,100%)}
+.modal .mhead{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}
+.modal .mhead h3{font-size:16px;font-weight:680}
+.modal .mhead .sub{color:var(--muted-fg);font-size:12.5px;margin-top:2px}
+.modal .x{margin-left:auto;border:0;background:none;font-size:20px;line-height:1;color:var(--muted-fg);cursor:pointer;padding:0 4px}
+.modal .x:hover{color:var(--fg)}
+.modal .mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+
+/* tab panels — the tab strips were decorative; now they switch */
+.tab{user-select:none}
+.tabpanel{display:none}
+.tabpanel.active{display:block}
+
+/* 3 — fill the window instead of stranding half of it */
+.content{max-width:none !important}
+.content>*{max-width:1560px}
+</style>
+<script>(function(){try{if(localStorage.getItem('td-theme')==='dark')document.documentElement.setAttribute('data-theme','dark')}catch(e){}})();function tdTheme(){var r=document.documentElement,d=r.getAttribute('data-theme')==='dark';if(d)r.removeAttribute('data-theme');else r.setAttribute('data-theme','dark');try{localStorage.setItem('td-theme',d?'light':'dark')}catch(e){}}</script>
+</head>
+<body>
+<div class="winbar">
+  <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+  <div class="wintitle">TechieDesk</div>
+</div>
+<div class="menubar"><div class="mb"><button><b>TechieDesk</b></button><div class="menu"><div class="mi">About TechieDesk</div><div class="mi">Check for Updates&hellip;</div><div class="sep"></div><a href="admin-settings.html">Settings<span class="k">&#8984;,</span></a><a href="data-storage.html">Data &amp; Storage</a><a href="billing.html">Licence &amp; Account</a><div class="sep"></div><div class="mi">Quit TechieDesk<span class="k">&#8984;Q</span></div></div></div><div class="mb"><button>File</button><div class="menu"><div class="mi" onclick="tdOpen('dlgNewWs')">New Workspace&hellip;<span class="k">&#8984;N</span></div><div class="mi">New Thread<span class="k">&#8984;T</span></div><div class="sep"></div><a href="document-library.html">Import Documents&hellip;<span class="k">&#8984;O</span></a><a href="connectors.html">Add a Connector&hellip;</a><div class="sep"></div><div class="mi">Export Thread as Markdown&hellip;</div><div class="mi">Reveal Data Folder in Finder</div></div></div><div class="mb"><button>Edit</button><div class="menu"><div class="mi disabled">Undo<span class="k">&#8984;Z</span></div><div class="mi disabled">Redo<span class="k">&#8679;&#8984;Z</span></div><div class="sep"></div><div class="mi">Cut<span class="k">&#8984;X</span></div><div class="mi">Copy<span class="k">&#8984;C</span></div><div class="mi">Paste<span class="k">&#8984;V</span></div><div class="sep"></div><div class="mi">Find in Thread&hellip;<span class="k">&#8984;F</span></div></div></div><div class="mb"><button>View</button><div class="menu"><div class="mi">Toggle Sidebar<span class="k">&#8984;\</span></div><div class="sep"></div><div class="grouplbl">Appearance</div><div class="mi" onclick="tdSetTheme('light')">Light</div><div class="mi" onclick="tdSetTheme('dark')">Dark</div><div class="mi" onclick="tdSetTheme('system')">Match System</div><div class="sep"></div><div class="mi">Zoom In<span class="k">&#8984;+</span></div><div class="mi">Zoom Out<span class="k">&#8984;&minus;</span></div><div class="mi">Actual Size<span class="k">&#8984;0</span></div><div class="mi">Enter Full Screen<span class="k">&#8963;&#8984;F</span></div></div></div><div class="mb"><button>Workspace</button><div class="menu"><a href="workspace-chat.html">Chat</a><a href="document-library.html">Documents</a><a href="connectors.html">Connectors</a><a href="agents.html">Agents</a><a href="automations.html">Automations</a><div class="sep"></div><a href="workspace-settings.html">Workspace Settings&hellip;</a><div class="sep"></div><div class="grouplbl">Switch to</div><a href="workspace-chat.html">Contracts</a><a href="workspace-chat.html">HR Docs</a><a href="workspace-chat.html">Legal Archive</a></div></div><div class="mb"><button>Window</button><div class="menu"><div class="mi">Minimise<span class="k">&#8984;M</span></div><div class="mi">Zoom</div><div class="sep"></div><div class="mi">Bring All to Front</div></div></div><div class="mb"><button>Help</button><div class="menu"><div class="mi">TechieDesk Help<span class="k">&#8984;?</span></div><div class="mi">Keyboard Shortcuts</div><div class="sep"></div><a href="support.html">Support&hellip;</a><a href="admin-events.html">Event Log</a><div class="mi">Reveal Logs in Finder</div></div></div></div>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="logo" href="workspace-chat.html"><span class="mark">TD</span> TechieDesk</a>
+    <div class="popwrap" style="display:block"><div class="ws-switch" data-pop="wsPop"><span class="dot">C</span> Contracts <span class="chev">&#9662;</span></div><div class="pop left" id="wsPop" style="min-width:236px"><div class="grouplbl" style="padding:6px 9px 2px;font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted-fg)">Workspaces</div><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--accent-soft);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">C</span> Contracts <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">1,043</span></a><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">H</span> HR Docs <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">412</span></a><a href="workspace-chat.html"><span class="dot" style="width:20px;height:20px;border-radius:6px;background:var(--muted);color:var(--muted-fg);display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">L</span> Legal Archive <span class="k" style="margin-left:auto;color:var(--muted-fg);font-size:11.5px">8,201</span></a><div class="sep"></div><div class="mi" onclick="tdOpen('dlgNewWs')">New workspace&hellip;</div><a href="workspace-settings.html">Workspace settings&hellip;</a></div></div>
+    <div class="navgroup">Workspace</div>
+    <a class="navitem" href="workspace-chat.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Chat</a>
+    <a class="navitem active" href="document-library.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>Documents</a>
+    <a class="navitem" href="connectors.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Connectors</a>
+    <a class="navitem" href="agents.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><path d="M8 16h.01"/><path d="M16 16h.01"/></svg>Agents</a>
+    <a class="navitem" href="automations.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Automations</a>
+    <a class="navitem" href="workspace-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>Workspace Settings</a>
+    <div class="navgroup">Account</div>
+    <a class="navitem" href="profile.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Profile</a>
+    <a class="navitem" href="pricing.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><path d="M7 7h.01"/></svg>Pricing</a>
+    <a class="navitem" href="billing.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>Billing</a>
+    <a class="navitem" href="support.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/></svg>Support</a>
+    <div class="navgroup">Operator</div>
+    <a class="navitem" href="admin-events.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>Event Log</a>
+    <a class="navitem" href="admin-settings.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4"/><path d="M12 19v4"/><path d="m4.22 4.22 2.83 2.83"/><path d="m16.95 16.95 2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="m4.22 19.78 2.83-2.83"/><path d="m16.95 7.05 2.83-2.83"/></svg>App Settings</a>
+    <a class="navitem" href="data-storage.html"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Data &amp; Storage</a>
+    <div class="navgroup">Console</div>
+    <a class="navitem" href="qdrant-admin.html" title="Qdrant Admin (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>Qdrant Admin</a>
+    <a class="navitem" href="llm-settings.html" title="LLM Settings (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/><path d="M20 9h3"/><path d="M20 14h3"/><path d="M1 9h3"/><path d="M1 14h3"/></svg>LLM Settings</a>
+    <a class="navitem" href="token-usage.html" title="Token Usage (console)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/></svg>Token Usage</a>
+    <div class="foot"><span class="avatar">RK</span><div style="font-size:13px;line-height:1.25"><div style="font-weight:650">Ravi Kumar</div><div class="hint">This Mac</div></div><span class="badge violet" style="margin-left:auto">Pro</span></div>
+  </aside>
+  <div class="main">
+    <div class="topbar"><span class="crumb">Workspace: Contracts / <b>Documents</b></span><div class="right"><button class="theme-btn" onclick="tdTheme()" title="Toggle dark mode"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></button><a class="badge green" href="billing.html">Professional</a><a class="avatar" href="profile.html">RK</a></div></div>
+    <div class="content">
+
+      <div class="pagehead">
+        <h1>Documents — Contracts</h1>
+        <div class="actions">
+          <a class="btn outline" href="#">Ingest from folder…</a>
+          <button class="btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>
+            Upload files
+          </button>
+        </div>
+      </div>
+
+      <!-- Dropzone (FileUpload) -->
+      <div class="dropzone">
+        <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <div class="dz-title">Drag &amp; drop files here</div>
+        <div class="dz-sub">or click to browse — PDF, DOCX, MD, TXT, HTML, XLSX, PPTX, CSV + 70 code types</div>
+      </div>
+
+      <!-- Uploading -->
+      <div class="card">
+        <h3>Uploading (2)</h3>
+        <div class="desc">Files are chunked, embedded, and indexed in Qdrant.</div>
+        <div class="uprow">
+          <div class="fname">pricing-model.xlsx</div>
+          <div class="progress"><i style="width:68%"></i></div>
+          <div class="ustat">embedding… 68%</div>
+        </div>
+        <div class="uprow">
+          <div class="fname">vendor-quotes-2026.csv</div>
+          <div class="progress"><i style="width:23%"></i></div>
+          <div class="ustat">queued</div>
+        </div>
+      </div>
+
+      <!-- Library -->
+      <div class="card">
+        <h3>Library (5 documents)</h3>
+        <div class="desc">All documents linked to this workspace.</div>
+        <div style="overflow-x:auto">
+          <table class="t">
+            <thead>
+              <tr>
+                <th class="pin-col"></th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Chunks</th>
+                <th>Uploaded</th>
+                <th>Workspaces</th>
+                <th>Status</th>
+                <th style="text-align:right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="pin-col"><span title="Pinned — always in context"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></span></td>
+                <td>MSA-Acme-2026.pdf</td>
+                <td><span class="badge">PDF</span></td>
+                <td>1.2 MB</td>
+                <td>148</td>
+                <td>2026-07-16</td>
+                <td>Contracts</td>
+                <td><span class="badge green">Embedded</span></td>
+                <td><div class="actions"><button class="btn outline sm" onclick="tdOpen('dlgView')">View</button><button class="btn ghost sm">Unembed</button><button class="btn ghost sm">Delete</button></div></td>
+              </tr>
+              <tr>
+                <td class="pin-col"></td>
+                <td>SOW-Q3-2026.docx</td>
+                <td><span class="badge">DOCX</span></td>
+                <td>380 KB</td>
+                <td>52</td>
+                <td>2026-07-16</td>
+                <td>Contracts, Legal-Archive</td>
+                <td><span class="badge green">Embedded</span></td>
+                <td><div class="actions"><button class="btn outline sm" onclick="tdOpen('dlgView')">View</button><button class="btn ghost sm">Unembed</button><button class="btn ghost sm">Delete</button></div></td>
+              </tr>
+              <tr>
+                <td class="pin-col"></td>
+                <td>pricing-model.xlsx</td>
+                <td><span class="badge">XLSX</span></td>
+                <td>88 KB</td>
+                <td>—</td>
+                <td>2026-07-17</td>
+                <td>Contracts</td>
+                <td><span class="badge blue">Embedding 64%</span></td>
+                <td><div class="actions"><button class="btn outline sm" onclick="tdOpen('dlgView')">View</button><button class="btn ghost sm">Cancel</button></div></td>
+              </tr>
+              <tr>
+                <td class="pin-col"></td>
+                <td>standard-msa-template.md</td>
+                <td><span class="badge">MD</span></td>
+                <td>22 KB</td>
+                <td>31</td>
+                <td>2026-07-12</td>
+                <td>Contracts</td>
+                <td><span class="badge green">Embedded</span></td>
+                <td><div class="actions"><button class="btn outline sm" onclick="tdOpen('dlgView')">View</button><button class="btn ghost sm">Unembed</button><button class="btn ghost sm">Delete</button></div></td>
+              </tr>
+              <tr>
+                <td class="pin-col"></td>
+                <td>scanned-fax-1994.tiff<div class="hint">Unsupported type — no processor for .tiff</div></td>
+                <td><span class="badge">TIFF</span></td>
+                <td>4.1 MB</td>
+                <td>—</td>
+                <td>2026-07-17</td>
+                <td>—</td>
+                <td><span class="badge red">Failed</span></td>
+                <td><div class="actions"><button class="btn outline sm" onclick="tdOpen('dlgViewMissing')">View</button><button class="btn ghost sm">Remove</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty state spec -->
+      <div class="card">
+        <h3>Empty state (spec)</h3>
+        <div class="desc">Shown when the workspace has no documents.</div>
+        <div class="empty">No documents yet. Drag files above to give this workspace knowledge.</div>
+      </div>
+
+      <div class="hint">A document embedded once is reused across workspaces (content-hash dedupe) — deleting removes vectors everywhere.</div>
+
+    </div>
+  </div>
+</div>
+<script>
+/* prototype kit — menus, popovers, tabs, dialogs (owner review 2026-07-26) */
+(function(){
+  function closeAll(except){
+    document.querySelectorAll('.mb.open').forEach(function(m){ if(m!==except) m.classList.remove('open'); });
+    document.querySelectorAll('.pop.open').forEach(function(p){ if(p!==except) p.classList.remove('open'); });
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    var trigger = t.closest('.mb>button');
+    if(trigger){ var mb = trigger.parentElement; var was = mb.classList.contains('open'); closeAll(); if(!was) mb.classList.add('open'); e.preventDefault(); return; }
+    var popBtn = t.closest('[data-pop]');
+    if(popBtn){ var p = document.getElementById(popBtn.getAttribute('data-pop')); var open = p && p.classList.contains('open'); closeAll(); if(p && !open) p.classList.add('open'); e.preventDefault(); return; }
+    if(t.closest('.menu') || t.closest('.pop')){ if(!t.closest('a')) { closeAll(); } return; }
+    closeAll();
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape'){ closeAll(); document.querySelectorAll('.modal.open').forEach(function(m){ m.classList.remove('open'); }); }
+  });
+  /* tabs: .tab[data-tab] switches the sibling [data-panel] of the same name */
+  document.addEventListener('click', function(e){
+    var tab = e.target.closest('.tab[data-tab]');
+    if(!tab) return;
+    var strip = tab.closest('.tabs');
+    var scope = strip.closest('.content') || document;
+    strip.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+    tab.classList.add('active');
+    var want = tab.getAttribute('data-tab');
+    scope.querySelectorAll('[data-panel]').forEach(function(p){
+      p.classList.toggle('active', p.getAttribute('data-panel') === want);
+    });
+  });
+})();
+function tdOpen(id){ var m=document.getElementById(id); if(m) m.classList.add('open'); }
+function tdClose(id){ var m=document.getElementById(id); if(m) m.classList.remove('open'); }
+function tdSetTheme(m){var r=document.documentElement;if(m==='system'){try{localStorage.removeItem('td-theme')}catch(e){}r.removeAttribute('data-theme');if(window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches)r.setAttribute('data-theme','dark');return}if(m==='dark')r.setAttribute('data-theme','dark');else r.removeAttribute('data-theme');try{localStorage.setItem('td-theme',m)}catch(e){}}
+</script>
+
+<!-- 6 — document preview; the source file is still on disk -->
+<div class="modal" id="dlgView">
+  <div class="sheet wide">
+    <div class="mhead">
+      <div>
+        <h3>MSA-Acme-2026.pdf</h3>
+        <div class="sub">1.2 MB &middot; 148 chunks &middot; ingested 2026-07-16 &middot; workspace: Contracts</div>
+      </div>
+      <button class="x" onclick="tdClose('dlgView')">&times;</button>
+    </div>
+
+    <div class="tabs" style="margin-bottom:14px">
+      <div class="tab active" data-tab="preview">Preview</div>
+      <div class="tab" data-tab="chunks">Extracted chunks</div>
+      <div class="tab" data-tab="meta">Details</div>
+    </div>
+
+    <div class="tabpanel active" data-panel="preview">
+      <div style="border:1px solid var(--border);border-radius:10px;background:var(--muted);height:360px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--muted-fg)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="width:44px;height:44px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        <div style="font-size:13px">Rendered page 1 of 148 &middot; embedded PDF view</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+        <button class="btn outline sm">&larr; Prev</button><span class="hint">Page 1 / 42</span><button class="btn outline sm">Next &rarr;</button>
+        <button class="btn ghost sm" style="margin-left:auto">Open in default app</button>
+        <button class="btn ghost sm">Reveal in Finder</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" data-panel="chunks">
+      <div class="hint" style="margin-bottom:8px">What the retriever actually stored &mdash; this is what citations point at.</div>
+      <div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto">
+        <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div class="hint" style="margin-bottom:4px">chunk 17 / 148 &middot; 214 tokens</div>&ldquo;&hellip;the aggregate liability of either party shall not exceed the fees paid in the twelve (12) months preceding the claim&hellip;&rdquo;</div>
+        <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div class="hint" style="margin-bottom:4px">chunk 18 / 148 &middot; 198 tokens</div>&ldquo;&hellip;this cap shall not apply to breaches of confidentiality or indemnity obligations&hellip;&rdquo;</div>
+        <div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px"><div class="hint" style="margin-bottom:4px">chunk 19 / 148 &middot; 176 tokens</div>&ldquo;&hellip;notice of any claim must be delivered in writing within thirty (30) days&hellip;&rdquo;</div>
+      </div>
+    </div>
+
+    <div class="tabpanel" data-panel="meta">
+      <div style="overflow-x:auto"><table class="t">
+        <tbody>
+          <tr><td style="width:200px;color:var(--muted-fg)">Source path</td><td style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px">~/Documents/Contracts/MSA-Acme-2026.pdf</td></tr>
+          <tr><td style="color:var(--muted-fg)">Copy kept by TechieDesk</td><td style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px">&hellip;/Application Support/TechieDesk/uploads/a91f&hellip;c2.pdf</td></tr>
+          <tr><td style="color:var(--muted-fg)">Content hash</td><td style="font-family:ui-monospace,Menlo,monospace;font-size:12.5px">sha256:9f2c&hellip;7b41</td></tr>
+          <tr><td style="color:var(--muted-fg)">Embedding model</td><td>BGE-M3 (offline) &middot; 1024-dim</td></tr>
+          <tr><td style="color:var(--muted-fg)">Workspaces</td><td>Contracts</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgView')">Close</button></div>
+  </div>
+</div>
+
+<!-- 6 — the same View action when the user has since deleted the source file -->
+<div class="modal" id="dlgViewMissing">
+  <div class="sheet" style="width:min(560px,100%)">
+    <div class="mhead">
+      <div><h3>handbook-2025.md</h3><div class="sub">Ingested 2026-07-10 &middot; 96 chunks &middot; still fully searchable</div></div>
+      <button class="x" onclick="tdClose('dlgViewMissing')">&times;</button>
+    </div>
+    <div class="alert amber" style="margin-bottom:14px">
+      <div><b>The original file is no longer where it was ingested from.</b>
+      It looks like it was moved or deleted after ingestion, so there is nothing to preview.
+      <div class="hint" style="margin-top:8px;font-family:ui-monospace,Menlo,monospace">Last known location:<br>~/Documents/HR/handbook-2025.md</div></div>
+    </div>
+    <div class="hint" style="margin-bottom:6px">This does <b>not</b> affect retrieval &mdash; the extracted text and embeddings live in TechieDesk's own store, so the document still answers questions and can still be cited. You can:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      <button class="btn outline">Locate file&hellip;</button>
+      <button class="btn outline" onclick="tdClose('dlgViewMissing')">View extracted text</button>
+      <button class="btn ghost">Copy last known path</button>
+    </div>
+    <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgViewMissing')">Close</button></div>
+  </div>
+</div>
+
+<div class="modal" id="dlgNewWs"><div class="sheet">
+  <div class="mhead"><div><h3>New workspace</h3><div class="sub">A workspace is an isolated set of documents, threads and retrieval settings</div></div>
+    <button class="x" onclick="tdClose('dlgNewWs')">&times;</button></div>
+  <div class="field"><label class="label">Name</label><input class="input" placeholder="Vendor agreements"></div>
+  <div class="field"><label class="label">Description <span class="hint">optional</span></label><textarea class="input" rows="2" placeholder="What lives in here, and what it is for"></textarea></div>
+  <div class="field"><label class="label">Start from</label>
+    <select class="input"><option>Empty workspace</option><option>Copy settings from &ldquo;Contracts&rdquo;</option><option>Copy settings and documents from &ldquo;Contracts&rdquo;</option></select></div>
+  <div class="field"><label class="label">System prompt <span class="hint">optional &mdash; how the assistant should behave here</span></label>
+    <textarea class="input" rows="2" placeholder="You are a contracts analyst. Always cite the clause you relied on."></textarea></div>
+  <div class="hint">Retrieval settings (Top-K, threshold, reranking) can be tuned later in Workspace settings &rarr; Retrieval.</div>
+  <div class="mfoot"><button class="btn outline" onclick="tdClose('dlgNewWs')">Cancel</button>
+    <button class="btn" onclick="tdClose('dlgNewWs')">Create workspace</button></div>
+</div></div>
+</body>
+</html>

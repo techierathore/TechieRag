@@ -85,7 +85,13 @@ public class QdrantStore : IVectorStore
         this.initialized = false;
 
         var uri = new Uri(endpoint);
-        this.client = new QdrantClient(uri.Host, uri.Port, https: false, apiKey: apiKey);
+
+        // REQ-NFR-004: honour the endpoint's scheme instead of forcing cleartext. An
+        // https:// endpoint now negotiates TLS, so a remote Qdrant's API key is no longer
+        // transmitted in the clear. http:// endpoints (the local-container default) are
+        // unchanged.
+        this.client = new QdrantClient(
+            uri.Host, uri.Port, https: uri.Scheme == Uri.UriSchemeHttps, apiKey: apiKey);
     }
 
     /// <summary>
@@ -657,7 +663,17 @@ public class QdrantStore : IVectorStore
                 ["Name"] = new Value { StringValue = firstChunk.Metadata.TryGetValue("FileName", out var fileName) ? fileName?.ToString() ?? documentId : documentId },
                 ["SourcePath"] = new Value { StringValue = firstChunk.Metadata.TryGetValue("SourcePath", out var sourcePath) ? sourcePath?.ToString() ?? string.Empty : string.Empty },
                 ["ChunkCount"] = new Value { IntegerValue = chunkCount },
-                ["IngestedAt"] = new Value { StringValue = DateTime.UtcNow.ToString("O") }
+                ["IngestedAt"] = new Value { StringValue = DateTime.UtcNow.ToString("O") },
+
+                // Document-scoped metadata (byte size, source URL, …) as one JSON string rather
+                // than one payload field per key: the set is open, and a payload schema that has to
+                // grow every time an ingestion route records something new is how this ended up
+                // dropped entirely on the round trip.
+                ["Metadata"] = new Value
+                {
+                    StringValue = JsonSerializer.Serialize(
+                        DocumentMetadataKeys.ExtractDocumentScoped(firstChunk.Metadata))
+                }
             };
 
             var pointId = CreatePointId(documentId);
@@ -699,13 +715,18 @@ public class QdrantStore : IVectorStore
             ingestedAt = parsedDate;
         }
 
+        var metadata = payload.TryGetValue("Metadata", out var metadataValue)
+            ? DocumentMetadataKeys.FromJson(metadataValue.StringValue)
+            : new Dictionary<string, object>();
+
         return new Document
         {
             Id = id,
             Name = name,
             SourcePath = sourcePath,
             ChunkCount = chunkCount,
-            IngestedAt = ingestedAt
+            IngestedAt = ingestedAt,
+            Metadata = metadata
         };
     }
 }

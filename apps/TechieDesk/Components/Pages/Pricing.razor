@@ -1,0 +1,394 @@
+@page "/pricing"
+@inject ILicenseService LicenseService
+@inject ITechieDeskAuthModeProvider AuthMode
+@inject IAppManagerClient AppManager
+@inject ILogger<Pricing> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-UI-029 / BRD-76 and REQ-FN-026 / BRD-79 — built to docs/mockups/pricing.html.
+   The tier matrix below is TechieDesk's published plan catalogue (the owner-approved contract in
+   the mockup), NOT account data. Live prices and currencies are overlaid from
+   GET /LicenseSvc/types when a licence server is configured; when none is, the page says so
+   rather than passing list prices off as a live quote. *@
+
+<PageTitle>@Localizer["PricingPageTitle"]</PageTitle>
+
+<div class="td-stack">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["PricingHeading"]</h1>
+        </div>
+        <div class="ml-auto">
+            <Select TValue="string" Value="@currency" ValueChanged="OnCurrencyChangedAsync" Class="td-currency-select">
+                <SelectTrigger aria-label="@Localizer["PricingCurrency"]">
+                    <SelectValue Placeholder="@Localizer["PricingCurrency"]" />
+                </SelectTrigger>
+                <SelectContent>
+                    @foreach (var option in currencies)
+                    {
+                        <SelectItem TValue="string" Value="@option" Text="@option">@option</SelectItem>
+                    }
+                </SelectContent>
+            </Select>
+        </div>
+    </div>
+
+    @* An empty pricing grid would read as "there is nothing to buy"; the honest statement is that
+       this instance has no licence server, so nothing here is a live quote. *@
+    @if (!IsAppManagerConfigured)
+    {
+        <Alert Variant="AlertVariant.Info">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="info" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["PricingOfflineTitle"]</AlertTitle>
+            <AlertDescription>@Localizer["PricingOfflineBody"]</AlertDescription>
+        </Alert>
+    }
+    else if (catalogueError is not null)
+    {
+        <Alert Variant="AlertVariant.Warning" AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="wifi-off" Size="16" /></Alert.Icon>
+            <AlertTitle>@Localizer["PricingLiveUnavailable"]</AlertTitle>
+            <AlertDescription>@catalogueError @Localizer["PricingListPricesShown"]</AlertDescription>
+        </Alert>
+    }
+
+    <div class="td-tier-grid">
+        @foreach (var tier in Tiers)
+        {
+            <Card Class="@TierClass(tier)">
+                <CardHeader Class="relative">
+                    @if (tier.Popular)
+                    {
+                        <span class="td-tier-badge-popular">
+                            <Badge Variant="BadgeVariant.Secondary">@Localizer["PricingMostPopular"]</Badge>
+                        </span>
+                    }
+                    @if (IsCurrent(tier))
+                    {
+                        <span class="td-tier-badge-current">
+                            <Badge Variant="BadgeVariant.Default">@Localizer["PricingCurrentPlan"]</Badge>
+                        </span>
+                    }
+                    <div class="td-tier-name">@tier.DisplayName</div>
+                    <div class="td-tier-price">
+                        @PriceFor(tier)
+                        @if (SuffixFor(tier) is { Length: > 0 } suffix)
+                        {
+                            <span class="td-tier-price-suffix">@suffix</span>
+                        }
+                    </div>
+                </CardHeader>
+                <CardContent Class="flex-1">
+                    <ul class="td-tier-features">
+                        @foreach (var feature in tier.Included)
+                        {
+                            <li>
+                                <LucideIcon aria-hidden="true" Name="check" Size="15" Class="td-tier-tick" />
+                                <span>@feature</span>
+                            </li>
+                        }
+                        @foreach (var feature in tier.Excluded)
+                        {
+                            <li class="td-tier-excluded">
+                                <span aria-hidden="true" class="td-tier-nomark">&mdash;</span>
+                                <span>@feature</span>
+                            </li>
+                        }
+                    </ul>
+                </CardContent>
+                <CardFooter>
+                    <Button Href="@tier.CallToActionHref"
+                            Variant="@(tier.CallToActionPrimary ? ButtonVariant.Default : ButtonVariant.Outline)"
+                            Class="w-full">
+                        @tier.CallToAction
+                    </Button>
+                </CardFooter>
+            </Card>
+        }
+    </div>
+
+    <!-- REQ-FN-026 / BRD-79: promo-code validation -->
+    <Card>
+        <CardHeader>
+            <CardTitle>@Localizer["PricingPromoTitle"]</CardTitle>
+            <CardDescription>@Localizer["PricingPromoDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div class="td-promo-row">
+                <div class="td-promo-input">
+                    <Input @bind-Value="promoCode" Placeholder="@Localizer["PricingPromoPlaceholder"]" AriaLabel="@Localizer["PricingPromoTitle"]"
+                           AriaInvalid="@(promoError is not null)" Disabled="isValidatingPromo" />
+                </div>
+                <Button Variant="ButtonVariant.Outline" OnClick="ApplyPromoCodeAsync" Disabled="isValidatingPromo">
+                    @if (isValidatingPromo)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["PricingPromoChecking"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["PricingPromoApply"]</span>
+                    }
+                </Button>
+                <div class="td-promo-status">
+                    @if (promoSuccess is not null)
+                    {
+                        <Alert Variant="AlertVariant.Success">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="check-circle" Size="16" /></Alert.Icon>
+                            <AlertDescription>@promoSuccess</AlertDescription>
+                        </Alert>
+                    }
+                    else if (promoError is not null)
+                    {
+                        <Alert Variant="AlertVariant.Danger">
+                            <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                            <AlertDescription>@promoError</AlertDescription>
+                        </Alert>
+                    }
+                </div>
+            </div>
+        </CardContent>
+    </Card>
+
+    <TypographyMuted>@Localizer["PricingFooterNote"]</TypographyMuted>
+</div>
+
+@code {
+    /// <summary>The currency shown when the server offers no catalogue to choose from.</summary>
+    private const string DefaultCurrency = "USD";
+
+    /// <summary>One published plan.</summary>
+    /// <param name="Name">
+    /// The CULTURE-INVARIANT tier name. It is what <see cref="CatalogueEntryFor"/> matches against
+    /// the licence server's <c>TypeName</c> and what <see cref="IsCurrent"/> matches against the
+    /// licence this instance holds, so it must never become a translated string (TR-024's rule,
+    /// applied to a value that travels rather than to a Select). <c>DisplayName</c> is what is drawn.
+    /// </param>
+    private sealed record Tier(
+        string Name,
+        string DisplayName,
+        string ListPrice,
+        string ListPriceSuffix,
+        bool Popular,
+        string CallToAction,
+        string CallToActionHref,
+        bool CallToActionPrimary,
+        string[] Included,
+        string[] Excluded);
+
+    // The frozen plan matrix from docs/mockups/pricing.html — TechieDesk's own published
+    // catalogue. Live amounts replace ListPrice when AppManager answers.
+    //
+    // REQ-UI-050 tranche 4: an instance property rather than a static array, because every string
+    // in it except Name is read by a person and therefore resolves through AppStrings.
+    private Tier[] Tiers =>
+    [
+        new("Free", Localizer["PricingTierFree"], "$0", Localizer["PricingSuffixForever"], false,
+            Localizer["PricingCtaCurrentDefault"], "/settings/data", false,
+            [Localizer["PricingFreeWorkspaces"], Localizer["PricingFreeSeats"], Localizer["PricingFreeOfflineRag"]],
+            [Localizer["PricingFeatureApiAccess"], Localizer["PricingFeatureEmbedWidget"], Localizer["PricingFeatureAgents"], Localizer["PricingFeatureConnectors"]]),
+        new("Professional", Localizer["PricingTierProfessional"], "$99.99", Localizer["PricingSuffixYear"], true,
+            Localizer["PricingCtaManageSubscription"], "/billing", true,
+            [Localizer["PricingProWorkspaces"], Localizer["PricingProSeats"], Localizer["PricingProApiRequests"], Localizer["PricingFeatureEmbedWidget"], Localizer["PricingFeatureAgents"], Localizer["PricingFeatureConnectors"]],
+            [Localizer["PricingFeatureWhiteLabel"]]),
+        new("Enterprise", Localizer["PricingTierEnterprise"], Localizer["PricingPriceCustom"], "", false,
+            Localizer["PricingCtaContactSales"], "/support", false,
+            [Localizer["PricingEnterpriseWorkspaces"], Localizer["PricingEnterpriseApi"], Localizer["PricingEnterpriseEverythingInPro"], Localizer["PricingFeatureWhiteLabel"]],
+            [])
+    ];
+
+    private LicenseStatus? status;
+    private string currency = DefaultCurrency;
+    private List<string> currencies = new() { DefaultCurrency };
+    private IReadOnlyList<LicenseTypeData> catalogue = Array.Empty<LicenseTypeData>();
+    private string? catalogueError;
+
+    private string promoCode = string.Empty;
+    private string? promoSuccess;
+    private string? promoError;
+    private bool isValidatingPromo;
+
+    private bool IsAppManagerConfigured => AuthMode.IsAppManagerEnabled;
+
+    protected override async Task OnInitializedAsync()
+    {
+        status = await LicenseService.EnsureFreshAsync();
+
+        if (IsAppManagerConfigured)
+        {
+            await LoadCatalogueAsync();
+        }
+    }
+
+    private async Task LoadCatalogueAsync()
+    {
+        catalogueError = null;
+        try
+        {
+            catalogue = await AppManager.GetLicenseTypesAsync(currency);
+
+            var offered = catalogue
+                .SelectMany(type => type.Pricing)
+                .Select(price => price.CurrencyCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Select(code => code.ToUpperInvariant())
+                .Distinct()
+                .OrderBy(code => code, StringComparer.Ordinal)
+                .ToList();
+
+            if (offered.Count > 0)
+            {
+                currencies = offered;
+                if (!currencies.Contains(currency, StringComparer.OrdinalIgnoreCase))
+                {
+                    currency = currencies[0];
+                }
+            }
+        }
+        catch (AppManagerException exception)
+        {
+            Logger.LogWarning("License catalogue unavailable ({ErrorCode})", exception.ErrorCode);
+            catalogue = Array.Empty<LicenseTypeData>();
+            catalogueError = Localizer["PricingCatalogueNoList"];
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "License catalogue request failed");
+            catalogue = Array.Empty<LicenseTypeData>();
+            catalogueError = Localizer["PricingCatalogueUnreachable"];
+        }
+    }
+
+    private async Task OnCurrencyChangedAsync(string? selected)
+    {
+        currency = string.IsNullOrWhiteSpace(selected) ? DefaultCurrency : selected;
+        if (IsAppManagerConfigured)
+        {
+            await LoadCatalogueAsync();
+        }
+    }
+
+    private LicenseTypeData? CatalogueEntryFor(Tier tier) =>
+        catalogue.FirstOrDefault(type =>
+            string.Equals(type.TypeName, tier.Name, StringComparison.OrdinalIgnoreCase));
+
+    private string PriceFor(Tier tier)
+    {
+        var price = CatalogueEntryFor(tier)?.Pricing
+            .FirstOrDefault(entry => string.Equals(entry.CurrencyCode, currency, StringComparison.OrdinalIgnoreCase));
+
+        if (price is null)
+        {
+            return tier.ListPrice;
+        }
+
+        return string.IsNullOrWhiteSpace(price.FormattedPrice)
+            ? $"{price.Amount:0.##} {price.CurrencyCode}"
+            : price.FormattedPrice;
+    }
+
+    private string SuffixFor(Tier tier)
+    {
+        var days = CatalogueEntryFor(tier)?.DurationDays;
+        return days switch
+        {
+            null => tier.ListPriceSuffix,
+            >= 365 => Localizer["PricingSuffixYear"].Value,
+            >= 28 => Localizer["PricingSuffixMonth"].Value,
+            _ => Localizer["PricingSuffixDays", days].Value
+        };
+    }
+
+    private string TierClass(Tier tier) =>
+        IsCurrent(tier)
+            ? "td-tier-card border-2 border-primary shadow-lg"
+            : "td-tier-card";
+
+    /// <summary>
+    /// True when the licence this instance actually holds names this tier. Offline instances hold
+    /// the Free tier, so Free is the honest highlight here — never Professional.
+    /// </summary>
+    private bool IsCurrent(Tier tier)
+    {
+        var name = status?.LicenseName;
+        return !string.IsNullOrWhiteSpace(name)
+            && name.StartsWith(tier.Name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task ApplyPromoCodeAsync()
+    {
+        promoSuccess = null;
+        promoError = null;
+
+        // Local shape check first: an obvious typo gets a specific answer without a round-trip.
+        var format = PromoCodeValidator.Normalize(promoCode, out var normalized);
+        if (format != PromoCodeFormat.Valid)
+        {
+            // REQ-UI-055: the validator returns a resource key plus its length bounds.
+            var failure = PromoCodeValidator.DescribeFailure(format);
+            promoError = failure is null
+                ? null
+                : Localizer[failure.MessageKey, failure.Arguments].Value;
+            return;
+        }
+
+        promoCode = normalized;
+
+        if (!IsAppManagerConfigured)
+        {
+            promoError = Localizer["PricingPromoNoServer"];
+            return;
+        }
+
+        isValidatingPromo = true;
+        try
+        {
+            var promo = await AppManager.ValidatePromoCodeAsync(normalized);
+            promoSuccess = Localizer["PricingPromoValid", promo.Code, DescribeDiscount(promo)];
+            Logger.LogInformation("Promo code {PromoCode} validated", promo.Code);
+        }
+        catch (AppManagerException exception)
+        {
+            Logger.LogWarning("Promo code {PromoCode} rejected ({ErrorCode})", normalized, exception.ErrorCode);
+            promoError = DescribeRejection(exception);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Promo code validation failed");
+            promoError = Localizer["PricingPromoUnreachable"];
+        }
+        finally
+        {
+            isValidatingPromo = false;
+        }
+    }
+
+    private string DescribeDiscount(PromoCodeData promo)
+    {
+        if (!string.IsNullOrWhiteSpace(promo.Description))
+        {
+            return promo.Description;
+        }
+
+        return string.Equals(promo.DiscountType, "Percentage", StringComparison.OrdinalIgnoreCase)
+            ? Localizer["PricingDiscountPercent", promo.DiscountValue.ToString("0.##")].Value
+            : Localizer["PricingDiscountAmount", promo.DiscountValue.ToString("0.##"), currency].Value;
+    }
+
+    /// <summary>
+    /// Every documented promo-code rejection gets its own message — "invalid code" for all five
+    /// leaves the user guessing which of expiry, exhaustion or scope actually applied.
+    /// </summary>
+    private string DescribeRejection(AppManagerException exception) => exception.Error switch
+    {
+        AppManagerError.PromoCodeNotFound => Localizer["PricingPromoNotFound"].Value,
+        AppManagerError.PromoCodeInactive => Localizer["PricingPromoInactive"].Value,
+        AppManagerError.PromoCodeExpired => Localizer["PricingPromoExpired"].Value,
+        AppManagerError.PromoCodeExhausted => Localizer["PricingPromoExhausted"].Value,
+        AppManagerError.PromoCodeNotValidForApplication => Localizer["PricingPromoWrongApp"].Value,
+        AppManagerError.ApplicationIdRequired => Localizer["PricingPromoNotRegistered"].Value,
+        AppManagerError.ValidationError => Localizer["PricingPromoEmpty"].Value,
+        AppManagerError.NotConfigured => Localizer["PricingPromoNoServer"].Value,
+        _ => Localizer["PricingPromoUncheckable"].Value
+    };
+}

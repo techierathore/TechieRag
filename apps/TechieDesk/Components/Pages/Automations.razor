@@ -1,0 +1,1126 @@
+@page "/automations"
+@using TechieDesk.Services.Scheduling
+@using TechieDesk.Services.Scheduling.Authoring
+@inject IScheduleService Schedules
+@inject IScheduleInterpreter Interpreter
+@inject IBackgroundJobService BackgroundJobs
+@inject IJobRunner JobRunner
+@inject ISchedulerHelper SchedulerHelper
+@inject ISchedulerPreferencesStore PreferencesStore
+@inject ToastService ToastService
+@inject ILogger<Automations> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+@implements IDisposable
+
+@* REQ-FN-042 / REQ-FN-028 / REQ-FN-020 / REQ-UI-046 — built to docs/mockups/automations.html.
+
+   Two rules from BRD-140 govern everything visible here:
+     1. A cron expression never appears in a grid, a list or a notification. Every schedule reads as
+        the sentence its owner confirmed. Cron exists on this page in exactly one place: inside the
+        Advanced disclosure of the New schedule dialog.
+     2. Nothing saves without an explicit confirm showing the FULL understood result — trigger, every
+        step, and the delivery action. The confirm panel below is that, and IScheduleService refuses
+        a save whose confirmation does not echo what was displayed.
+
+   The Flows tab is REQ-UI-040 and is NOT built by this work; it says so rather than showing an
+   illustrative card grid that would read as a working feature. *@
+
+<PageTitle>@Localizer["AutoPageTitle"]</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["AutoTitle"]</h1>
+            <TypographyMuted>
+                @Localizer["AutoSubtitle"]
+            </TypographyMuted>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <Button OnClick="OpenNewScheduleDialog">
+                <Button.Icon><LucideIcon aria-hidden="true" Name="plus" Size="16" /></Button.Icon>
+                @Localizer["AutoNewSchedule"]
+            </Button>
+            <Button Variant="ButtonVariant.Outline" OnClick="@(() => isHelperDialogOpen = true)">
+                @Localizer["AutoBackgroundService"]
+            </Button>
+        </div>
+    </div>
+
+    @* The banner states the ACTUAL state read from the OS, never the user's saved intent. "You asked
+       for it" and "it is running" differ exactly when it matters. *@
+    @if (helperState is not null)
+    {
+        <Alert Variant="@(helperState.RunsWithWindowClosed ? AlertVariant.Info : AlertVariant.Warning)"
+               AccentBorder="true">
+            <Alert.Icon><LucideIcon aria-hidden="true" Name="clock" Size="16" /></Alert.Icon>
+            <AlertTitle>@HelperHeadline</AlertTitle>
+            <AlertDescription>
+                @HelperExplanation
+                <Button Variant="ButtonVariant.Link" Size="ButtonSize.Small"
+                        OnClick="@(() => isHelperDialogOpen = true)">@Localizer["AutoConfigure"]</Button>
+            </AlertDescription>
+        </Alert>
+    }
+
+    @* REQ-FN-020: a running job is visible while it runs, with per-item counts. *@
+    @if (activeJobs.Count > 0)
+    {
+        <Card>
+            <CardHeader>
+                <CardTitle>@Localizer["AutoRunningNow"]</CardTitle>
+                <CardDescription>@Localizer["AutoRunningNowDescription"]</CardDescription>
+            </CardHeader>
+            <CardContent Class="space-y-4">
+                @foreach (var job in activeJobs)
+                {
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2 text-sm">
+                            <Spinner Size="SpinnerSize.Small" />
+                            <span class="font-medium">@job.JobName</span>
+                            <span class="text-muted-foreground">@(job.Message?.Resolve(Localize) ?? Localizer["AutoWorking"].Value)</span>
+                            <span class="ml-auto text-muted-foreground">@DescribeCounts(job)</span>
+                            <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small"
+                                    OnClick="@(() => CancelJob(job.ScheduleRunId))">@Localizer["AutoStop"]</Button>
+                        </div>
+                        @if (job.PercentComplete is { } percent)
+                        {
+                            <Progress aria-label="@Localizer["AutoJobProgressAria"]" Value="@Math.Round(percent)" Class="h-2" />
+                        }
+                        else
+                        {
+                            @* No total yet: a bar that invented a percentage would jump backwards. *@
+                            <TypographyMuted Class="block text-xs">
+                                @Localizer["AutoCountingItems"]
+                            </TypographyMuted>
+                        }
+                    </div>
+                }
+            </CardContent>
+        </Card>
+    }
+
+    <Tabs DefaultValue="schedules">
+        <TabsList>
+            <TabsTrigger Value="schedules">@Localizer["AutoTabSchedules"]</TabsTrigger>
+            <TabsTrigger Value="flows">@Localizer["AutoFlows"]</TabsTrigger>
+            <TabsTrigger Value="history">@Localizer["AutoRunHistory"]</TabsTrigger>
+        </TabsList>
+
+        <TabsContent Value="schedules" ForceMount="true">
+            <Card Class="mt-4">
+                <CardHeader>
+                    <CardTitle>@Localizer["AutoScheduledJobs"]</CardTitle>
+                    <CardDescription>@Localizer["AutoScheduledJobsDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    @if (isLoading)
+                    {
+                        <Skeleton Class="h-24 w-full" />
+                    }
+                    else if (schedules.Count == 0)
+                    {
+                        @* ⚠ Written as explicit markup, NOT with TrBlazeUI's <Empty>. In 1.0.7 that
+                           control gives its title and description no styling of their own, so they
+                           render as one undifferentiated run of text — which a screenshot shows and a
+                           clean build does not. *@
+                        <div class="flex flex-col items-center gap-2 rounded-lg border border-dashed p-9 text-center">
+                            <LucideIcon aria-hidden="true" Name="calendar-clock" Size="40"
+                                        Class="text-muted-foreground" />
+                            <span class="text-base font-semibold">@Localizer["AutoNothingScheduledYet"]</span>
+                            <span class="max-w-md text-sm text-muted-foreground">
+                                @Localizer["AutoNothingScheduledHelp"]
+                            </span>
+                            <Button OnClick="OpenNewScheduleDialog" Class="mt-2">@Localizer["AutoNewSchedule"]</Button>
+                        </div>
+                    }
+                    else
+                    {
+                        <DataTable TData="Schedule" Data="@schedules" ShowToolbar="false" InitialPageSize="10">
+                            <Columns>
+                                <DataTableColumn TData="Schedule" TValue="bool"
+                                                 Property="@(row => row.IsEnabled)" Header="@Localizer["AutoColOn"]">
+                                    <CellTemplate Context="row">
+                                        @* REQ-NFR-005 / WCAG 4.1.2: role="switch" is nameFrom:author and this
+                                           one sits in a table cell with no visible label of its own, so the
+                                           row's job name is what makes it distinguishable from the other
+                                           rows' toggles. *@
+                                        <Switch Checked="row.IsEnabled"
+                                                CheckedChanged="@(value => ToggleAsync(row, value))"
+                                                AriaLabel="@Localizer["AutoEnableScheduleAria", row.Name]"
+                                                Id="@($"schedule-enabled-{row.ScheduleId}")" />
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="Schedule" TValue="string"
+                                                 Property="@(row => row.Name)" Header="@Localizer["AutoColJob"]" Sortable />
+                                @* REQ-UI-056: DESCRIBED LIVE from JobPayload, not bound to the stored
+                                   ActionSummary. Same reasoning as the schedule column below. *@
+                                <DataTableColumn TData="Schedule" TValue="string"
+                                                 Property="@(row => row.ActionSummary)" Header="@Localizer["AutoColWhatItDoes"]">
+                                    <CellTemplate Context="row">
+                                        @DescribeAction(row)
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                @* ⚠ BRD-140: this column shows the schedule as a SENTENCE. It must never
+                                   be bound to CronExpression.
+
+                                   REQ-UI-056: it is now DESCRIBED LIVE — CronDescriber.Describe over the
+                                   stored CronExpression — rather than bound to Schedule.ScheduleText.
+                                   ScheduleText stays exactly what BRD-140 says it is: the record of the
+                                   words the owner CONFIRMED, kept for the audit trail and echoed back by
+                                   IScheduleService on save. But it is English, it was written once at
+                                   save time, and painting it here made a Hindi install show an English
+                                   schedule forever. Describing live costs one parse per row, cannot
+                                   produce cron (CronDescriber has no raw-expression fallback, on
+                                   purpose), and falls back to the confirmed text if the stored
+                                   expression will not parse. *@
+                                <DataTableColumn TData="Schedule" TValue="string"
+                                                 Property="@(row => row.ScheduleText)" Header="@Localizer["AutoColRuns"]">
+                                    <CellTemplate Context="row">
+                                        @DescribeSchedule(row)
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="Schedule" TValue="string"
+                                                 Property="@(row => row.Name)" Header="@Localizer["AutoColLastRun"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-muted-foreground">@DescribeLastRun(row)</span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="Schedule" TValue="string"
+                                                 Property="@(row => row.Name)" Header="@Localizer["AutoColNextRun"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-muted-foreground">@DescribeNextRun(row)</span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="Schedule" TValue="string"
+                                                 Property="@(row => row.Name)" Header="@Localizer["AutoColScheduleActions"]" HeaderClass="td-th-label-hidden">
+                                    <CellTemplate Context="row">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger AsChild>
+                                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.IconSmall"
+                                                        AriaLabel="@Localizer["AutoActionsForAria", row.Name]">
+                                                    <LucideIcon aria-hidden="true" Name="more-horizontal" Size="16" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent Class="w-52">
+                                                <DropdownMenuItem OnClick="@(() => RunNowAsync(row))">
+                                                    @Localizer["AutoRunNow"]
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem OnClick="@(() => ConfirmDelete(row))">
+                                                    @Localizer["AutoDelete"]
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                            </Columns>
+                        </DataTable>
+                    }
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <TabsContent Value="flows" ForceMount="true">
+            <Card Class="mt-4">
+                <CardHeader>
+                    <div class="mb-1 flex items-center gap-2">
+                        <Badge Variant="BadgeVariant.Secondary">@Localizer["AutoFlows"]</Badge>
+                        <Badge Variant="BadgeVariant.Outline">@Localizer["AutoNotBuiltYet"]</Badge>
+                    </div>
+                    <CardTitle>@Localizer["AutoSavedAgentFlows"]</CardTitle>
+                    <CardDescription>@Localizer["AutoSavedAgentFlowsDescription"]</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    @* Stated plainly rather than mocked up. An illustrative card grid here would read
+                       as a working feature; flows are REQ-UI-040 and no code behind them exists. *@
+                    <div class="flex flex-col items-center gap-2 rounded-lg border border-dashed p-9 text-center">
+                        <LucideIcon aria-hidden="true" Name="workflow" Size="40" Class="text-muted-foreground" />
+                        <span class="text-base font-semibold">@Localizer["AutoFlowsNotInBuild"]</span>
+                        <span class="max-w-md text-sm text-muted-foreground">
+                            @Localizer["AutoFlowsNotInBuildHelp"]
+                        </span>
+                    </div>
+                </CardContent>
+            </Card>
+        </TabsContent>
+
+        <TabsContent Value="history" ForceMount="true">
+            <Card Class="mt-4">
+                <CardHeader>
+                    <CardTitle>@Localizer["AutoRunHistory"]</CardTitle>
+                    <CardDescription>
+                        @Localizer["AutoRunHistoryDescription"]
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    @if (runs.Count == 0)
+                    {
+                        <div class="flex flex-col items-center gap-2 rounded-lg border border-dashed p-9 text-center">
+                            <LucideIcon aria-hidden="true" Name="history" Size="40" Class="text-muted-foreground" />
+                            <span class="text-base font-semibold">@Localizer["AutoNothingHasRunYet"]</span>
+                            <span class="max-w-md text-sm text-muted-foreground">
+                                @Localizer["AutoNothingHasRunYetHelp"]
+                            </span>
+                        </div>
+                    }
+                    else
+                    {
+                        <DataTable TData="ScheduleRun" Data="@runs" ShowToolbar="false" InitialPageSize="10">
+                            <Columns>
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColStarted"]">
+                                    <CellTemplate Context="row">
+                                        <span class="font-mono text-xs">
+                                            @row.StartedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                                        </span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColJob"]" Sortable />
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColTrigger"]">
+                                    <CellTemplate Context="row">
+                                        <Badge Variant="BadgeVariant.Outline">@DescribeTrigger(row.TriggerKind)</Badge>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColItems"]">
+                                    <CellTemplate Context="row">@DescribeItems(row)</CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColDuration"]">
+                                    <CellTemplate Context="row">
+                                        <span class="text-muted-foreground">@DescribeDuration(row)</span>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColOutcome"]">
+                                    <CellTemplate Context="row">
+                                        <Badge Variant="@OutcomeVariant(row.Outcome)">@row.Outcome</Badge>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                                <DataTableColumn TData="ScheduleRun" TValue="string"
+                                                 Property="@(row => row.JobName)" Header="@Localizer["AutoColRunActions"]" HeaderClass="td-th-label-hidden">
+                                    <CellTemplate Context="row">
+                                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                                OnClick="@(() => OpenRunDetailsAsync(row))">@Localizer["AutoDetails"]</Button>
+                                    </CellTemplate>
+                                </DataTableColumn>
+                            </Columns>
+                        </DataTable>
+                    }
+                </CardContent>
+            </Card>
+        </TabsContent>
+    </Tabs>
+</div>
+
+@* ── New schedule ─────────────────────────────────────────────────────────────────────────── *@
+<Dialog @bind-Open="isScheduleDialogOpen">
+    <DialogContent Class="max-w-3xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer["AutoNewSchedule"]</DialogTitle>
+            <DialogDescription>@Localizer["AutoNewScheduleDescription"]</DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-4 py-2">
+            <Field>
+                <FieldLabel>@Localizer["AutoWhatAndWhenLabel"]</FieldLabel>
+                <FieldContent>
+                    <Textarea @bind-Value="instruction"
+                              Placeholder="@Localizer["AutoInstructionPlaceholder"]"
+                              Class="min-h-24" />
+                </FieldContent>
+            </Field>
+            <TypographyMuted Class="block text-xs">
+                @Localizer["AutoPlainEnglishHint"]
+            </TypographyMuted>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                        OnClick="InterpretAsync" Disabled="isInterpreting">
+                    @if (isInterpreting)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["AutoInterpreting"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["AutoInterpret"]</span>
+                    }
+                </Button>
+                <TypographyMuted Class="text-xs">@InterpreterAvailability</TypographyMuted>
+            </div>
+
+            @if (interpretError is not null)
+            {
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <AlertTitle>@Localizer["AutoInterpretFailedTitle"]</AlertTitle>
+                    <AlertDescription>@interpretError</AlertDescription>
+                </Alert>
+            }
+
+            @* The confirm panel. It shows the FULL understood result — never a one-line summary,
+               because a summary hides exactly the misreading this step exists to catch. *@
+            @if (draft is not null)
+            {
+                <Card>
+                    <CardHeader>
+                        <div class="mb-1 flex flex-wrap items-center gap-2">
+                            <Badge Variant="BadgeVariant.Secondary">@Localizer["AutoWhatUnderstood"]</Badge>
+                            <Badge Variant="@ConfidenceVariant(draft.Confidence)">@ConfidenceLabel(draft.Confidence)</Badge>
+                        </div>
+                        <CardTitle>@draft.Name</CardTitle>
+                        <CardDescription>@Localizer["AutoConfirmBeforeSaving"]</CardDescription>
+                    </CardHeader>
+                    <CardContent Class="space-y-3">
+                        @foreach (var step in draft.Steps)
+                        {
+                            <div class="flex flex-wrap items-center gap-2 text-sm">
+                                <Badge Variant="BadgeVariant.Outline">@step.Label</Badge>
+                                <span class="font-medium">@step.Text</span>
+                            </div>
+                        }
+
+                        @foreach (var warning in draft.Warnings)
+                        {
+                            <Alert Variant="AlertVariant.Warning">
+                                <AlertTitle>@Localizer["AutoCheckThis"]</AlertTitle>
+                                <AlertDescription>@warning</AlertDescription>
+                            </Alert>
+                        }
+
+                        <TypographyMuted Class="block text-xs">@Localizer["AutoNextThreeRuns"] @NextRunsPreview</TypographyMuted>
+
+                        <div class="space-y-2 pt-2">
+                            <div class="flex items-center gap-2">
+                                <Switch Checked="catchUpMissedRuns" CheckedChanged="OnCatchUpChanged"
+                                        Id="schedule-catch-up" />
+                                <Label For="schedule-catch-up">
+                                    @Localizer["AutoCatchUpLabel"]
+                                </Label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <Switch Checked="notifyOnFailure" CheckedChanged="OnNotifyChanged"
+                                        Id="schedule-notify" />
+                                <Label For="schedule-notify">@Localizer["AutoNotifyOnFailureLabel"]</Label>
+                            </div>
+                        </div>
+
+                        @* The ONE place on this page a cron expression is allowed to appear. *@
+                        <Collapsible @bind-Open="isAdvancedOpen">
+                            <CollapsibleTrigger AsChild>
+                                <Button Variant="ButtonVariant.Ghost" Size="ButtonSize.Small">
+                                    @Localizer["AutoAdvancedRawSchedule"]
+                                </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <div class="space-y-2 pt-2">
+                                    <Field>
+                                        <FieldLabel>@Localizer["AutoCronExpressionLabel"]</FieldLabel>
+                                        <FieldContent>
+                                            <Input @bind-Value="cronExpression" Class="font-mono" />
+                                        </FieldContent>
+                                    </Field>
+                                    <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                            OnClick="ApplyCron">@Localizer["AutoApply"]</Button>
+                                    <TypographyMuted Class="block text-xs">
+                                        @Localizer["AutoAdvancedHint"]
+                                    </TypographyMuted>
+                                </div>
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </CardContent>
+                </Card>
+            }
+        </div>
+
+        <DialogFooter>
+            <DialogClose AsChild>
+                <Button Variant="ButtonVariant.Outline">@Localizer["Cancel"]</Button>
+            </DialogClose>
+            <Button OnClick="SaveAsync" Disabled="@(draft is null || !draft.IsSavable || isSaving)">
+                @Localizer["AutoCreateSchedule"]
+            </Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* ── Background service ───────────────────────────────────────────────────────────────────── *@
+<Dialog @bind-Open="isHelperDialogOpen">
+    <DialogContent Class="max-w-2xl">
+        <DialogHeader>
+            <DialogTitle>@Localizer["AutoBackgroundService"]</DialogTitle>
+            <DialogDescription>@Localizer["AutoBackgroundServiceDescription"]</DialogDescription>
+        </DialogHeader>
+
+        @if (helperState is not null)
+        {
+            <div class="space-y-4 py-2">
+                <div class="flex items-start gap-3 border-b pb-3">
+                    <Switch Checked="@helperState.RunsWithWindowClosed"
+                            CheckedChanged="OnBackgroundServiceToggledAsync"
+                            Disabled="@(helperState.Status == SchedulerHelperStatus.Unavailable || isHelperBusy)"
+                            Id="background-service" />
+                    <div class="flex-1">
+                        <Label For="background-service">@Localizer["AutoRunInBackgroundLabel"]</Label>
+                        <TypographyMuted Class="mt-1 block text-xs">@helperState.Reason</TypographyMuted>
+                    </div>
+                    <Badge Variant="@HelperBadgeVariant">@HelperBadgeText</Badge>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <TypographyMuted Class="block text-xs">@Localizer["AutoMechanismLabel"]</TypographyMuted>
+                        <div class="text-sm font-medium">@helperState.MechanismName</div>
+                        <div class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                            @helperState.MechanismLocation
+                        </div>
+                    </div>
+                    <div>
+                        <TypographyMuted Class="block text-xs">@Localizer["AutoHelperItStarts"]</TypographyMuted>
+                        <div class="mt-1 break-all font-mono text-xs text-muted-foreground">
+                            @(helperState.HelperExecutablePath ?? Localizer["AutoHelperNotPresent"].Value)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div class="flex items-center gap-2">
+                        <Switch Checked="preferences.MainsPowerOnly"
+                                CheckedChanged="@(value => UpdatePreferencesAsync(preferences with { MainsPowerOnly = value }))"
+                                Id="condition-mains" />
+                        <Label For="condition-mains">@Localizer["AutoMainsPowerOnly"]</Label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Switch Checked="preferences.NamedNetworksOnly"
+                                CheckedChanged="@(value => UpdatePreferencesAsync(preferences with { NamedNetworksOnly = value }))"
+                                Id="condition-networks" />
+                        <Label For="condition-networks">@Localizer["AutoNamedNetworksOnly"]</Label>
+                    </div>
+                    @if (preferences.NamedNetworksOnly)
+                    {
+                        <Field>
+                            <FieldLabel>@Localizer["AutoAllowedNetworksLabel"]</FieldLabel>
+                            <FieldContent>
+                                <Input @bind-Value="allowedNetworksText" Placeholder="@Localizer["AutoNetworksPlaceholder"]" />
+                            </FieldContent>
+                        </Field>
+                        <Button Variant="ButtonVariant.Outline" Size="ButtonSize.Small"
+                                OnClick="SaveAllowedNetworksAsync">@Localizer["AutoSaveNetworks"]</Button>
+                    }
+
+                    @* Rendered disabled with its reason rather than omitted or left to look broken:
+                       waking a sleeping Mac needs a pmset schedule, which is an administrator action
+                       this build does not request. *@
+                    <div class="flex items-center gap-2">
+                        <Switch Checked="false" Disabled="true" Id="condition-wake" />
+                        <Label For="condition-wake">@Localizer["AutoWakeMachineLabel"]</Label>
+                    </div>
+                    <TypographyMuted Class="block text-xs">
+                        @Localizer["AutoWakeUnavailableHint"]
+                    </TypographyMuted>
+
+                    <div class="flex items-center gap-2">
+                        <Switch Checked="false" Disabled="true" Id="condition-menubar" />
+                        <Label For="condition-menubar">@Localizer["AutoMenuBarItemLabel"]</Label>
+                    </div>
+                    <TypographyMuted Class="block text-xs">
+                        @Localizer["AutoMenuBarUnavailableHint"]
+                    </TypographyMuted>
+                </div>
+
+                <Alert Variant="AlertVariant.Warning">
+                    <AlertTitle>@Localizer["AutoOneSchedulerTitle"]</AlertTitle>
+                    <AlertDescription>
+                        @Localizer["AutoOneSchedulerBody"]
+                    </AlertDescription>
+                </Alert>
+            </div>
+        }
+
+        <DialogFooter>
+            <DialogClose AsChild>
+                <Button Variant="ButtonVariant.Outline">@Localizer["AutoClose"]</Button>
+            </DialogClose>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* ── Run details ──────────────────────────────────────────────────────────────────────────── *@
+<Dialog @bind-Open="isRunDetailsOpen">
+    <DialogContent Class="max-w-2xl">
+        <DialogHeader>
+            <DialogTitle>@(selectedRun?.JobName ?? Localizer["AutoRunFallbackTitle"].Value)</DialogTitle>
+            <DialogDescription>@(DescribeDetail(selectedRun) ?? Localizer["AutoNoSummaryRecorded"].Value)</DialogDescription>
+        </DialogHeader>
+
+        <div class="space-y-3 py-2">
+            @if (DescribeFailure(selectedRun) is { Length: > 0 } reason)
+            {
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <AlertTitle>@Localizer["AutoWhyItDidNotFinish"]</AlertTitle>
+                    <AlertDescription>@reason</AlertDescription>
+                </Alert>
+            }
+
+            @if (runItems.Count == 0)
+            {
+                <TypographyMuted>@Localizer["AutoNoRunItems"]</TypographyMuted>
+            }
+            else
+            {
+                <div class="max-h-80 space-y-2 overflow-y-auto">
+                    @foreach (var item in runItems)
+                    {
+                        <div class="flex items-start gap-2 rounded-md border p-2 text-sm">
+                            <Badge Variant="@ItemVariant(item.Status)">@item.Status</Badge>
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate font-medium">@item.ItemName</div>
+                                @{
+                                    var itemReason = JobMessage.Render(item.Reason, item.ReasonJson, Localize);
+                                }
+                                @if (!string.IsNullOrWhiteSpace(itemReason))
+                                {
+                                    <div class="text-xs text-muted-foreground">@itemReason</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <DialogFooter>
+            <DialogClose AsChild><Button Variant="ButtonVariant.Outline">@Localizer["AutoClose"]</Button></DialogClose>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
+
+@* ── Delete confirmation ──────────────────────────────────────────────────────────────────── *@
+<AlertDialog @bind-Open="isDeleteOpen">
+    <AlertDialogContent>
+        <AlertDialogHeader>
+            <AlertDialogTitle>@Localizer["AutoDeleteScheduleConfirmTitle", pendingDelete?.Name ?? string.Empty]</AlertDialogTitle>
+            <AlertDialogDescription>
+                @Localizer["AutoDeleteScheduleConfirmBody"]
+            </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+            <AlertDialogCancel>@Localizer["Cancel"]</AlertDialogCancel>
+            <AlertDialogAction OnClick="DeleteConfirmedAsync">@Localizer["AutoDelete"]</AlertDialogAction>
+        </AlertDialogFooter>
+    </AlertDialogContent>
+</AlertDialog>
+
+@code {
+    private IReadOnlyList<Schedule> schedules = [];
+    private IReadOnlyList<ScheduleRun> runs = [];
+    private IReadOnlyList<JobProgressSnapshot> activeJobs = [];
+    private IReadOnlyList<ScheduleRunItem> runItems = [];
+
+    private SchedulerHelperState? helperState;
+    private SchedulerPreferences preferences = SchedulerPreferences.Default;
+    private ScheduleDraft? draft;
+    private ScheduleRun? selectedRun;
+    private Schedule? pendingDelete;
+
+    private string instruction = string.Empty;
+    private string cronExpression = string.Empty;
+    private string allowedNetworksText = string.Empty;
+    private string? interpretError;
+
+    private bool isLoading = true;
+    private bool isInterpreting;
+    private bool isSaving;
+    private bool isHelperBusy;
+    private bool isScheduleDialogOpen;
+    private bool isHelperDialogOpen;
+    private bool isRunDetailsOpen;
+    private bool isDeleteOpen;
+    private bool isAdvancedOpen;
+    private bool catchUpMissedRuns = true;
+    private bool notifyOnFailure = true;
+
+    private string HelperHeadline => helperState?.Status switch
+    {
+        SchedulerHelperStatus.Installed => Localizer["AutoHelperOnHeadline"].Value,
+        SchedulerHelperStatus.Unavailable => Localizer["AutoHelperWindowOnlyHeadline"].Value,
+        _ => Localizer["AutoHelperOffHeadline"].Value
+    };
+
+    // The trailing space stays in code rather than in the resource: a "Configure…" button follows
+    // this text inline, and a trailing space does not survive a round trip through a .resx.
+    private string HelperExplanation => helperState?.Status switch
+    {
+        SchedulerHelperStatus.Installed =>
+            Localizer["AutoHelperOnExplanation", helperState.MechanismName].Value + " ",
+        SchedulerHelperStatus.Unavailable =>
+            Localizer["AutoHelperUnavailableExplanation"].Value + " ",
+        _ =>
+            Localizer["AutoHelperOffExplanation"].Value + " "
+    };
+
+    private BadgeVariant HelperBadgeVariant => helperState?.Status switch
+    {
+        SchedulerHelperStatus.Installed => BadgeVariant.Default,
+        SchedulerHelperStatus.Unavailable => BadgeVariant.Destructive,
+        _ => BadgeVariant.Secondary
+    };
+
+    private string HelperBadgeText => helperState?.Status switch
+    {
+        SchedulerHelperStatus.Installed => Localizer["AutoHelperInstalled"].Value,
+        SchedulerHelperStatus.Unavailable => Localizer["AutoHelperUnavailableInBuild"].Value,
+        _ => Localizer["AutoHelperNotInstalled"].Value
+    };
+
+    private string InterpreterAvailability => Interpreter.IsModelAvailable
+        ? Localizer["AutoInterpreterLocal"].Value
+        : Localizer["AutoInterpreterNoModel"].Value;
+
+    /// <summary>
+    /// Resolves a resource key for the service layer, which returns KEYS and never sentences.
+    /// </summary>
+    /// <remarks>
+    /// The one adapter REQ-UI-051 sanctions: <c>(key, args) =&gt; Localizer[key, args]</c>. Everything
+    /// on this page that renders a <see cref="JobMessage"/> — a stored run detail, a per-item reason,
+    /// a live progress line, a described schedule — goes through it, so there is exactly one place
+    /// the reader's language enters.
+    /// </remarks>
+    private LocalizeText Localize => (key, arguments) =>
+        arguments.Length == 0 ? Localizer[key].Value : Localizer[key, arguments].Value;
+
+    /// <summary>
+    /// Renders a schedule's timing as a sentence in the reader's language (REQ-UI-056 / BRD-140).
+    /// </summary>
+    /// <remarks>
+    /// The stored <see cref="Schedule.ScheduleText"/> is the CONFIRMATION record and is the fallback,
+    /// not the source: an expression that will not parse — hand-edited, or written by a newer build —
+    /// must still show the owner the words they agreed to rather than a blank cell. CronDescriber
+    /// itself never emits cron syntax, so BRD-140 holds on both branches.
+    /// </remarks>
+    private string DescribeSchedule(Schedule schedule) =>
+        CronDescriber.TryDescribe(schedule.CronExpression, Localize) ?? schedule.ScheduleText;
+
+    /// <summary>
+    /// Renders what a schedule does, in the reader's language, by asking its handler to describe the
+    /// stored payload again (REQ-UI-056).
+    /// </summary>
+    /// <remarks>
+    /// Falls back to the stored <see cref="Schedule.ActionSummary"/> when this build has no handler
+    /// for the schedule's kind — a connector removed from the build, or a schedule written by a
+    /// newer one. That row's action genuinely cannot be re-described, and the confirmed English is a
+    /// better answer than an empty cell.
+    /// </remarks>
+    private string DescribeAction(Schedule schedule) =>
+        JobRunner.FindHandler(schedule.JobKind)?.DescribeAction(schedule.JobPayload).Resolve(Localize)
+        ?? schedule.ActionSummary;
+
+    /// <summary>Renders a run's stored summary line (REQ-UI-056).</summary>
+    /// <remarks>
+    /// <see cref="JobMessage.Render"/> is the whole persisted-English policy: coded rows render in the
+    /// reader's language, and a row with no codes prints its stored text exactly as written. The
+    /// second branch is permanent — it is what keeps a history written before this release readable
+    /// instead of blank.
+    /// </remarks>
+    private string? DescribeDetail(ScheduleRun? run) =>
+        run is null ? null : JobMessage.Render(run.Detail, run.DetailJson, Localize);
+
+    /// <summary>Renders why a run failed, coded when it can be and stored text when it cannot.</summary>
+    private string? DescribeFailure(ScheduleRun? run) =>
+        run is null ? null : JobMessage.Render(run.FailureReason, run.FailureReasonJson, Localize);
+
+    private string NextRunsPreview => draft is { NextRunsUtc.Count: > 0 }
+        ? string.Join(", ", draft.NextRunsUtc.Select(run => run.ToLocalTime().ToString("ddd dd MMM HH:mm")))
+        : Localizer["AutoNoRunsInYears"].Value;
+
+    protected override async Task OnInitializedAsync()
+    {
+        BackgroundJobs.Changed += OnJobsChanged;
+        await RefreshAsync();
+    }
+
+    public void Dispose() => BackgroundJobs.Changed -= OnJobsChanged;
+
+    private void OnJobsChanged() => InvokeAsync(() =>
+    {
+        activeJobs = BackgroundJobs.ActiveJobs;
+        StateHasChanged();
+    });
+
+    private async Task RefreshAsync()
+    {
+        isLoading = true;
+        try
+        {
+            schedules = await Schedules.ListAsync();
+            runs = await Schedules.ListRecentRunsAsync();
+            preferences = await PreferencesStore.LoadAsync();
+            allowedNetworksText = string.Join(", ", preferences.AllowedNetworks ?? []);
+            helperState = SchedulerHelper.GetState();
+            activeJobs = BackgroundJobs.ActiveJobs;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not load automations");
+            ToastService.Error(exception.Message, Localizer["AutoLoadFailedTitle"]);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenNewScheduleDialog()
+    {
+        draft = null;
+        interpretError = null;
+        instruction = string.Empty;
+        cronExpression = string.Empty;
+        isAdvancedOpen = false;
+        catchUpMissedRuns = true;
+        notifyOnFailure = true;
+        isScheduleDialogOpen = true;
+    }
+
+    private async Task InterpretAsync()
+    {
+        isInterpreting = true;
+        interpretError = null;
+        draft = null;
+        try
+        {
+            var result = await Interpreter.InterpretAsync(instruction);
+            if (!result.Succeeded)
+            {
+                interpretError = result.Error;
+                return;
+            }
+
+            draft = result.Draft! with
+            {
+                CatchUpMissedRuns = catchUpMissedRuns,
+                NotifyOnFailure = notifyOnFailure
+            };
+            cronExpression = draft.CronExpression;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Schedule interpretation failed");
+            interpretError = exception.Message;
+        }
+        finally
+        {
+            isInterpreting = false;
+        }
+    }
+
+    private void ApplyCron()
+    {
+        if (draft is null)
+        {
+            return;
+        }
+
+        var result = Interpreter.Rebuild(draft, cronExpression);
+        if (!result.Succeeded)
+        {
+            interpretError = result.Error;
+            return;
+        }
+
+        interpretError = null;
+        draft = result.Draft;
+    }
+
+    private void OnCatchUpChanged(bool value)
+    {
+        catchUpMissedRuns = value;
+        if (draft is not null)
+        {
+            draft = draft with { CatchUpMissedRuns = value };
+        }
+    }
+
+    private void OnNotifyChanged(bool value)
+    {
+        notifyOnFailure = value;
+        if (draft is not null)
+        {
+            draft = draft with { NotifyOnFailure = value };
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (draft is null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            // The confirmation echoes the two lines the panel above rendered. If the draft changed
+            // after they were shown, the service refuses the save rather than trusting this page.
+            var confirmation = new ScheduleConfirmation(draft.ScheduleText, draft.ActionSummary);
+            var saved = await Schedules.CreateAsync(draft, confirmation);
+            ToastService.Success(
+                Localizer["AutoScheduleCreatedBody", saved.Name, saved.ScheduleText],
+                Localizer["AutoScheduleCreatedTitle"]);
+            isScheduleDialogOpen = false;
+            draft = null;
+            await RefreshAsync();
+        }
+        catch (ScheduleNotConfirmedException exception)
+        {
+            interpretError = exception.Message;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not save the schedule");
+            ToastService.Error(exception.Message, Localizer["AutoScheduleNotSavedTitle"]);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ToggleAsync(Schedule schedule, bool isEnabled)
+    {
+        try
+        {
+            await Schedules.SetEnabledAsync(schedule.ScheduleId, isEnabled);
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not change the schedule state");
+            ToastService.Error(exception.Message, Localizer["AutoScheduleNotChangedTitle"]);
+        }
+    }
+
+    private async Task RunNowAsync(Schedule schedule)
+    {
+        try
+        {
+            var run = await Schedules.RunNowAsync(schedule.ScheduleId);
+            if (run is null)
+            {
+                ToastService.Show(Localizer["AutoAlreadyRunning", schedule.Name].Value);
+            }
+            else
+            {
+                ToastService.Success(
+                    DescribeDetail(run) ?? run.Outcome.ToString(),
+                    Localizer["AutoRunOutcomeToastTitle", schedule.Name, run.Outcome]);
+            }
+
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not run the schedule");
+            ToastService.Error(exception.Message, Localizer["AutoRunFailedToStartTitle"]);
+        }
+    }
+
+    private void CancelJob(long scheduleRunId)
+    {
+        if (BackgroundJobs.Cancel(scheduleRunId))
+        {
+            ToastService.Show(Localizer["AutoAskedJobToStop"].Value);
+        }
+    }
+
+    private void ConfirmDelete(Schedule schedule)
+    {
+        pendingDelete = schedule;
+        isDeleteOpen = true;
+    }
+
+    private async Task DeleteConfirmedAsync()
+    {
+        if (pendingDelete is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Schedules.DeleteAsync(pendingDelete.ScheduleId);
+            ToastService.Success(
+                Localizer["AutoScheduleDeletedBody", pendingDelete.Name],
+                Localizer["AutoScheduleDeletedTitle"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not delete the schedule");
+            ToastService.Error(exception.Message, Localizer["AutoScheduleNotDeletedTitle"]);
+        }
+        finally
+        {
+            pendingDelete = null;
+            isDeleteOpen = false;
+            await RefreshAsync();
+        }
+    }
+
+    private async Task OpenRunDetailsAsync(ScheduleRun run)
+    {
+        selectedRun = run;
+        runItems = await Schedules.ListRunItemsAsync(run.ScheduleRunId);
+        isRunDetailsOpen = true;
+    }
+
+    private async Task OnBackgroundServiceToggledAsync(bool value)
+    {
+        isHelperBusy = true;
+        try
+        {
+            var result = value
+                ? await SchedulerHelper.InstallAsync(preferences)
+                : await SchedulerHelper.UninstallAsync();
+
+            if (result.Succeeded)
+            {
+                ToastService.Success(
+                    result.Message,
+                    value
+                        ? Localizer["AutoBackgroundServiceOnTitle"].Value
+                        : Localizer["AutoBackgroundServiceOffTitle"].Value);
+            }
+            else
+            {
+                ToastService.Error(result.Message, Localizer["AutoNothingChangedTitle"]);
+            }
+
+            await UpdatePreferencesAsync(preferences with { BackgroundServiceEnabled = value });
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not change the background service");
+            ToastService.Error(exception.Message, Localizer["AutoNothingChangedTitle"]);
+        }
+        finally
+        {
+            isHelperBusy = false;
+            helperState = SchedulerHelper.GetState();
+        }
+    }
+
+    private async Task UpdatePreferencesAsync(SchedulerPreferences updated)
+    {
+        preferences = updated;
+        await PreferencesStore.SaveAsync(updated);
+    }
+
+    private Task SaveAllowedNetworksAsync()
+    {
+        var networks = allowedNetworksText
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        return UpdatePreferencesAsync(preferences with { AllowedNetworks = networks });
+    }
+
+    private string DescribeCounts(JobProgressSnapshot job)
+    {
+        var parts = new List<string> { Localizer["AutoCountDone", job.Processed].Value };
+        if (job.Failed > 0)
+        {
+            parts.Add(Localizer["AutoCountFailed", job.Failed].Value);
+        }
+
+        if (job.Total is { } total)
+        {
+            parts.Add(Localizer["AutoCountOfTotal", total].Value);
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private string DescribeLastRun(Schedule schedule) =>
+        schedule.LastRunUtc is { } last
+            ? last.ToLocalTime().ToString("ddd dd MMM HH:mm")
+            : Localizer["AutoNeverRun"].Value;
+
+    private string DescribeNextRun(Schedule schedule)
+    {
+        if (!schedule.IsEnabled)
+        {
+            return Localizer["AutoPaused"].Value;
+        }
+
+        return schedule.NextRunUtc is { } next
+            ? next.ToLocalTime().ToString("ddd dd MMM HH:mm")
+            : Localizer["AutoNotScheduled"].Value;
+    }
+
+    private string DescribeTrigger(RunTrigger trigger) => trigger switch
+    {
+        RunTrigger.Manual => Localizer["AutoRunNow"].Value,
+        RunTrigger.CatchUp => Localizer["AutoTriggerCatchUp"].Value,
+        RunTrigger.Background => Localizer["AutoTriggerBackground"].Value,
+        _ => Localizer["AutoTriggerScheduled"].Value
+    };
+
+    private string DescribeItems(ScheduleRun run)
+    {
+        var parts = new List<string>();
+        if (run.ItemsProcessed > 0 || run.ItemsFailed == 0)
+        {
+            parts.Add(Localizer["AutoCountDone", run.ItemsProcessed].Value);
+        }
+
+        if (run.ItemsFailed > 0)
+        {
+            parts.Add(Localizer["AutoCountFailed", run.ItemsFailed].Value);
+        }
+
+        if (run.ItemsSkipped > 0)
+        {
+            parts.Add(Localizer["AutoCountSkipped", run.ItemsSkipped].Value);
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    private string DescribeDuration(ScheduleRun run) => run.Duration switch
+    {
+        null => "—",
+        { TotalSeconds: < 1 } duration => Localizer["AutoDurationMilliseconds", duration.TotalMilliseconds.ToString("0")],
+        { TotalMinutes: < 1 } duration => Localizer["AutoDurationSeconds", duration.TotalSeconds.ToString("0.#")],
+        { } duration => Localizer["AutoDurationMinutesSeconds", duration.Minutes, duration.Seconds]
+    };
+
+    private static BadgeVariant OutcomeVariant(RunOutcome outcome) => outcome switch
+    {
+        RunOutcome.Succeeded => BadgeVariant.Default,
+        RunOutcome.Partial => BadgeVariant.Secondary,
+        RunOutcome.Failed => BadgeVariant.Destructive,
+        _ => BadgeVariant.Outline
+    };
+
+    private static BadgeVariant ItemVariant(RunItemStatus status) => status switch
+    {
+        RunItemStatus.Failed => BadgeVariant.Destructive,
+        RunItemStatus.Skipped => BadgeVariant.Outline,
+        _ => BadgeVariant.Secondary
+    };
+
+    private static BadgeVariant ConfidenceVariant(DraftConfidence confidence) => confidence switch
+    {
+        DraftConfidence.High => BadgeVariant.Default,
+        DraftConfidence.Medium => BadgeVariant.Secondary,
+        _ => BadgeVariant.Destructive
+    };
+
+    private string ConfidenceLabel(DraftConfidence confidence) => confidence switch
+    {
+        DraftConfidence.High => Localizer["AutoConfidenceHigh"].Value,
+        DraftConfidence.Medium => Localizer["AutoConfidenceMedium"].Value,
+        _ => Localizer["AutoConfidenceLow"].Value
+    };
+}

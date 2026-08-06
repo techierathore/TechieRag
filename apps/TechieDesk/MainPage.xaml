@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:b="clr-namespace:Microsoft.AspNetCore.Components.WebView.Maui;assembly=Microsoft.AspNetCore.Components.WebView.Maui"
+             xmlns:components="clr-namespace:TechieDesk.Components"
+             x:Class="TechieDesk.MainPage"
+             BackgroundColor="{DynamicResource PageBackgroundColor}">
+
+    <!--
+      REQ-FN-035: the BlazorWebView hosting the existing Razor components. Routes is the same router
+      component the Blazor Server head used — it is mounted directly as the root component here
+      instead of being wrapped by Components/App.razor, which existed only to declare the
+      InteractiveServer render mode and emit the SignalR bootstrap script.
+    -->
+    <b:BlazorWebView x:Name="blazorWebView" HostPage="wwwroot/index.html">
+        <b:BlazorWebView.RootComponents>
+            <b:RootComponent Selector="#app" ComponentType="{x:Type components:Routes}" />
+        </b:BlazorWebView.RootComponents>
+    </b:BlazorWebView>
+
+</ContentPage>

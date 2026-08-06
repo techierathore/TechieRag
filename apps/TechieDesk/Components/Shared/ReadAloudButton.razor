@@ -1,0 +1,125 @@
+@* REQ-UI-036 / BRD-88: play an assistant response back as speech.
+
+   Self-contained by design: give it the message text and it does the rest. Mount it in the
+   assistant message bubble's action row, one instance per message.
+
+   BRD-88 says "browser speech synthesis". This is a Mac Catalyst app hosting a WKWebView, not a
+   browser, and the requirement was amended on 2026-07-26 accordingly: synthesis goes through
+   IReadAloudService (MAUI Essentials -> AVSpeechSynthesizer on macOS, SAPI on Windows), which uses
+   the OS voices the user already has. No Web Speech API is touched. *@
+
+@* Declared here rather than in _Imports so the component stays droppable into any page. *@
+@using System.Globalization
+@using TechieDesk.Services.Speech
+@implements IAsyncDisposable
+@inject IReadAloudService ReadAloud
+@inject ILogger<ReadAloudButton> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+<Button Variant="ButtonVariant.Ghost"
+        Size="@Size"
+        OnClick="ToggleAsync"
+        Disabled="@IsDisabled"
+        AriaLabel="@ButtonLabel"
+        Class="@Class">
+    <LucideIcon aria-hidden="true" Name="@(isSpeaking ? "square" : "volume-2")" Size="14" />
+    <span class="sr-only">@ButtonLabel</span>
+</Button>
+
+@code {
+    /// <summary>The message to read aloud, as rendered on screen.</summary>
+    /// <remarks>
+    /// Markdown is expected and handled: <see cref="SpeechText.ForSpeech"/> strips the syntax that
+    /// would otherwise be spoken as punctuation before a word of it reaches the synthesiser.
+    /// </remarks>
+    [Parameter] public string? Text { get; set; }
+
+    /// <summary>Disables the button regardless of playback state.</summary>
+    [Parameter] public bool Disabled { get; set; }
+
+    /// <summary>The button size; defaults to the message row's small icon size.</summary>
+    [Parameter] public ButtonSize Size { get; set; } = ButtonSize.IconSmall;
+
+    /// <summary>Extra CSS classes for the button.</summary>
+    [Parameter] public string? Class { get; set; }
+
+    private bool isSpeaking;
+
+    private bool IsDisabled =>
+        Disabled || !ReadAloud.IsSupported || string.IsNullOrWhiteSpace(Text);
+
+    private string ButtonLabel => !ReadAloud.IsSupported
+        ? Localizer["ReadAloudUnavailable"].Value
+        : isSpeaking ? Localizer["ReadAloudStop"].Value : Localizer["ReadAloudStart"].Value;
+
+    /// <summary>Starts playback, or stops it when this message is already playing.</summary>
+    private async Task ToggleAsync()
+    {
+        if (isSpeaking)
+        {
+            await StopAsync();
+            return;
+        }
+
+        // REQ-UI-055 / BRD-91. The two interjections SpeechText adds — the code-block stand-in and
+        // the truncation notice — are spoken, not read, so they are only translated when this
+        // machine owns a voice that can pronounce the language. On a Hindi TechieDesk running on an
+        // en-US macOS with no Devanagari voice installed, AVSpeechSynthesizer skips Hindi text
+        // rather than speaking it, and the listener would get silence where a sentence belongs.
+        // English that is audible is the better failure.
+        var culture = CultureInfo.CurrentUICulture.Name;
+        var speakable = await ReadAloud.CanSpeakAsync(culture);
+        var spoken = speakable
+            ? SpeechText.ForSpeech(Text, (key, args) => Localizer[key, args].Value)
+            : SpeechText.ForSpeech(Text);
+
+        if (spoken.Length == 0)
+        {
+            return;
+        }
+
+        isSpeaking = true;
+
+        try
+        {
+            // SpeakAsync returns when the utterance finishes OR when a later click cancels it, so
+            // awaiting it here is what keeps the icon in step with what is actually being said.
+            // The culture goes with the text so the synthesiser picks a voice for the SCRIPT: the
+            // answer itself is already in the reader's language whatever this component does.
+            await ReadAloud.SpeakAsync(spoken, speakable ? culture : null);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Read-aloud failed (REQ-UI-036)");
+        }
+        finally
+        {
+            isSpeaking = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Stops playback immediately.</summary>
+    private async Task StopAsync()
+    {
+        try
+        {
+            await ReadAloud.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Read-aloud failed to stop (REQ-UI-036)");
+        }
+
+        isSpeaking = false;
+    }
+
+    /// <summary>Stops playback if the page is left mid-utterance.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (isSpeaking)
+        {
+            await StopAsync();
+        }
+    }
+}

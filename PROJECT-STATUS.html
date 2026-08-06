@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TechieRag — Status — TechieRag Project Status</title>
+<title>TechieDesk — Project Status</title>
 <script>
 /* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
    pick by time of day — light 07:00–19:00 local, softened dark at night. */
@@ -99,85 +99,269 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 .diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
 
 @media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+
+/* frontmatter definition list */
+dl.meta{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:14px 0 4px;font-size:13.5px}
+dl.meta dt{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.5px;align-self:center}
+dl.meta dd{margin:0}
 </style>
 </head>
 <body>
 <button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
 <div class="layout">
   <nav class="side">
-    <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-07-02</div>
+    <h1>TechieDesk — Project Status</h1>
+    <div class="sub">Last rendered: 2026-08-04</div>
     <div class="group">Contents</div>
     <ol>
       <li><a href="#where-i-am">Where I am</a></li>
-      <li><a href="#next-command">Next command</a></li>
+      <li><a href="#next-command-to-run">Next command to run</a></li>
       <li><a href="#open-requirements">Open requirements</a></li>
       <li><a href="#known-blockers">Known blockers</a></li>
-      <li><a href="#library-feedback">Library feedback</a></li>
+      <li><a href="#library-feedback-summary">Library feedback summary</a></li>
       <li><a href="#standards-compliance">Standards compliance</a></li>
       <li><a href="#verification-log">Verification log</a></li>
       <li><a href="#deferred-future">Deferred / future</a></li>
     </ol>
   </nav>
   <main>
-    <h1>TechieRag — Status</h1>
-    <div class="subtitle">Project status snapshot</div>
-<p>Configurable .NET 10 RAG library (NuGet), ~96% complete. All v1.1 + v2 features shipped and migrated into the single checklist as <code>Done (pre-existing)</code>. <strong>This file is the dashboard only</strong> — per-REQ evidence lives in <code>docs/TechieRag-Checklist.md</code> (Requirements Status table); library defects in the per-library feedback files.</p>
-<div class="toc-inline">
-  <div>Contents</div>
-  <ol>
-    <li><a href="#where-i-am">Where I am</a></li>
-    <li><a href="#next-command">Next command</a></li>
-    <li><a href="#open-requirements">Open requirements</a></li>
-    <li><a href="#known-blockers">Known blockers</a></li>
-    <li><a href="#library-feedback">Library feedback</a></li>
-    <li><a href="#standards-compliance">Standards compliance</a></li>
-    <li><a href="#verification-log">Verification log</a></li>
-    <li><a href="#deferred-future">Deferred / future</a></li>
-  </ol>
-</div>
-<h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p><strong>Handoff — all 36 REQs <code>Verified</code> / <code>Done (pre-existing)</code>; awaiting manual UAT per the Usage Guide.</strong> The last 3 open rows were closed in the 2026-07-02 <code>*build-phase</code> (REQ-UI-011 mobile layout, REQ-RAG-012 Retry-After, REQ-FN-003 CI gates — see the Verification log + <code>docs/TechieRag-Checklist.md</code>). Handoff artifacts are finalized: Usage Guide (test plan + runbook + smoke checklist), DevGuide, BRD §4 rollup (F-RESIL / F-PKG / F-QDRANT now Done), and both per-library feedback files consolidated.</p>
-<h2 id="next-command">Next command<a class="anchor-link" href="#next-command">#</a></h2>
-<pre><code class="language-none">Manual UAT per docs/TechieRag-UsageGuide.md smoke checklist.</code></pre>
-<p>Then hand each per-library feedback file to its team, and after UAT set <code>current_phase: Released</code>.</p>
-<h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
-<ul>
-<li><strong>None.</strong> All 36 REQs are <code>Verified</code> / <code>Done (pre-existing)</code> (terminal). See <code>docs/TechieRag-Checklist.md#requirements-status</code>.</li>
-<li>Deferred (not BRD REQs): broader xUnit coverage beyond the resilience/provider suite; OpenTelemetry exporters.</li>
-</ul>
-<h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
-<ul>
-<li>None open. RAG retrieval no longer depends on the external <code>localhost:7997</code> embedding server — the bundled BGE-M3 model in the sample's bin output serves the Embedded source offline.</li>
-<li>⚠ <strong>Security:</strong> the TrBlazeUI PAT is committed in plaintext in <code>nuget.config</code> (now gitignored but still tracked and in history) — untrack + revoke recommended.</li>
-</ul>
-<h2 id="library-feedback">Library feedback<a class="anchor-link" href="#library-feedback">#</a></h2>
-<ul>
-<li><strong>TrBlazeUI:</strong> 0 major, 2 open minor (TR-003 SidebarInset min-width; TR-004 DataTable scroll wrapper — now known to be <em>inert</em> because <code>.overflow-x-auto</code> is purged from the shipped CSS, fixed app-side with inline style), 1 nice-to-have (TR-002 css 404) — <code>docs/TechieRag-TrBlazeUI-Feedback.md</code></li>
-<li><strong>TechieRag:</strong> 1 major open (TR-RAG-001 streaming RAG sources); TR-RAG-005 + TR-RAG-006 fixed; 3 minor — <code>docs/TechieRag-TechieRag-Feedback.md</code></li>
-</ul>
-<h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
-<p>0 new underscore-field violations (new code is bare camelCase). Pre-existing <code>_lock</code>/<code>_currentInstance</code> in <code>TechieRagManager</code> left as-is (out of scope for this fix).</p>
-<h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
-<table>
-<thead>
-<tr><th>Date</th><th>Phase</th><th>Result</th></tr>
-</thead>
-<tbody>
-<tr><td>2026-06-25</td><td>Discovery (day-1 brownfield)</td><td>Docs generated; roadmap+spec migrated; build PASS</td></tr>
-<tr><td>2026-07-01</td><td>Build+Verify (<code>*build-phase</code> + follow-ups)</td><td>PAT unblocked → sample builds + boots; 6 UI fixes; overlay/SQLite/logging fixes; <code>*verify ui</code> → 12/13 UI Verified; REQ-UI-007 open (TR-RAG-005/006 logged)</td></tr>
-<tr><td>2026-07-01</td><td>Build (<code>*build-phase</code>, TR-RAG-005/006)</td><td>LmStudio tool calling + async accessors fixed; core + test + sample build PASS; 3 new xUnit tests pass; <strong>live agent-loop smoke PASS</strong> (real <code>get_weather</code> tool call, AgentSteps fired). REQ-UI-007 → Implemented, pending verifier UI render</td></tr>
-<tr><td>2026-07-02</td><td>Verify + fix (<code>*verify REQ-UI-007</code> → mobile-overflow fix → re-verify)</td><td><strong>Execution Trace VERIFIED LIVE in the UI</strong> (real tool steps, bundled BGE-M3, no download); 390px overflow found on /tool-demo + /ingestion, root-caused (TR-003 SidebarInset min-width + TR-004 DataTable sr-only escape) and FIXED same day; all routes <code>scrollWidth==390</code> @390; <strong>REQ-UI-007 + REQ-UI-004 → Verified 100%</strong> — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
-<tr><td>2026-07-02</td><td>Full verify (<code>*verify all</code>, 36 REQs, live LM Studio + live Qdrant 1.15.5)</td><td>Builds 0-err ×3, xUnit 3/3, Playwright 37/37 after gate/selector fixes. LIVE-proven: ingest write cycle, Auto-RAG streaming + sources, token dashboard non-zero, LLM connection test 912ms, Qdrant collection create/delete + 1,043-pt browse/detail. Opened: <strong>REQ-UI-011 ⚠ visual @390</strong> (container row off-canvas), <strong>REQ-RAG-012 PARTIAL</strong> (Retry-After never parsed), <strong>REQ-FN-003 PARTIAL</strong> (NuGet.org job commented out; CI tests non-blocking) — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
-<tr><td>2026-07-02</td><td>Build+fix (<code>*build-phase</code> FIX, last 3 rows)</td><td>Builds 0-err ×3 (+ sample), <strong>xUnit 11/11</strong>. <strong>REQ-RAG-012 → Verified</strong> (Retry-After parsed via new <code>LlmHttpGuard</code>+<code>LlmRateLimitException</code> in all 6 providers; 4 Retry-After unit tests). <strong>REQ-UI-011 → Verified</strong> (mobile @390 off-canvas fixed — root cause: <code>.overflow-x-auto</code> purged/inert + <code>MapStaticAssets</code> 0-byte CSS to br clients; real fix = inline style on QdrantAdmin DataTable wrappers; live <code>scrollWidth</code> 496→390 with running container). <strong>REQ-FN-003 → Verified (static)</strong> (publish-nuget.yml: test-gate now blocking, NuGet.org job un-commented + secret-gated). <strong>All 36 REQs Verified/terminal → Handoff</strong> — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
-<tr><td>2026-07-02</td><td>Handoff (<code>*handoff-phase</code>)</td><td><strong>Ship-ready for UAT.</strong> All 36 REQs Verified/terminal; build PASS ×3 + sample; xUnit 11/11. Finalized: Usage Guide (test plan + runbook + smoke), DevGuide, BRD §4 rollup (F-RESIL/F-PKG/F-QDRANT → Done; test-suite → Partial 40%), both feedback files consolidated (open: TR-RAG-001; TR-002/003/004 minor). HTMLs re-rendered. Open for library teams: TrBlazeUI TR-003/TR-004, TechieRag TR-RAG-001 — <a href="docs/TechieRag-Checklist.md#requirements-status">details</a></td></tr>
-</tbody>
-</table>
-<h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
-<ul>
-<li>Formal automated xUnit suite (now partial — LmStudio provider tool tests added this session).</li>
-<li>OpenTelemetry metrics + distributed tracing exporters.</li>
-</ul>
+    <h1>TechieDesk — Project Status</h1>
+    <div class="subtitle">Last rendered: 2026-08-04</div>
+
+    <div style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
+      <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
+      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *build-phase TechieDesk</div>
+    </div>
+
+    <dl class="meta">
+      <dt>Project</dt><dd>TechieRag</dd>
+      <dt>Stack</dt><dd>.NET 10 class library (NuGet) + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieDesk desktop app (MAUI Blazor Hybrid — macOS + Windows, TrBlazeUI, <code>apps/TechieDesk</code>)</dd>
+      <dt>Current phase</dt><dd>Build — 106 open; stale-vector banner FIXED and seen live — <strong>RE-INGEST REQUIRED</strong></dd>
+      <dt>Last verified build</dt><dd>PASS</dd>
+      <dt>Last verified date</dt><dd>2026-08-05</dd>
+      <dt>Last updated</dt><dd>2026-08-05</dd>
+    </dl>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#where-i-am">Where I am</a></li>
+        <li><a href="#next-command-to-run">Next command to run</a></li>
+        <li><a href="#open-requirements">Open requirements</a></li>
+        <li><a href="#known-blockers">Known blockers</a></li>
+        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
+        <li><a href="#standards-compliance">Standards compliance</a></li>
+        <li><a href="#verification-log">Verification log</a></li>
+        <li><a href="#deferred-future">Deferred / future</a></li>
+      </ol>
+    </div>
+
+    <p>Configurable .NET 10 RAG library (NuGet) + TechieDesk product app. <strong>This file is the dashboard only</strong> — per-REQ evidence lives in <code>docs/TechieDesk-Checklist.md</code> (Requirements Status table); library defects in the per-library feedback files.</p>
+
+    <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
+
+    <p>A <code>*build-phase</code> scoped by you to the <strong>open TechieRag (<code>REQ-RAG-*</code>) cluster</strong>, plus <code>REQ-FN-053</code>, then extended on your approval to <strong>download the reranker model and finish BRD-106</strong>. Build <strong>0 errors</strong>, <strong>2,308 tests pass</strong> (was 2,225) — <strong>+83 new, 0 failed</strong>.</p>
+
+    <p><strong>BRD-106 is complete: the local ONNX cross-encoder ranks, live, for the first time</strong> — 7/7 scoring tests, including cross-lingual.</p>
+
+    <p>Getting there was the story. That component had <strong>never executed</strong>, and running it uncovered <strong>two defects that made it impossible to run at all</strong> — and then a <strong>third, in the BGE-M3 embedder</strong>, which you approved fixing. Cross-lingual retrieval went from <strong>0.3536 (losing to 0.3642)</strong> to <strong>0.7182</strong>.</p>
+
+    <p>🔶 <strong>That fix means your stored vectors are stale. Re-ingest everything — do not top up.</strong></p>
+
+    <p>Your environment answer became work in its own right: <strong>verification endpoints are now declared in config, not discovered by probing localhost.</strong></p>
+
+    <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
+
+<pre><code>/TechieFlow:agents:flow-master *build-phase TechieDesk</code></pre>
+
+    <p><strong>You granted the consent, it immediately found a defect, and the defect is now fixed and seen.</strong> The stale-vector banner renders live in Hindi — <em>"5 of 5 documents here were indexed with a different embedding model"</em>. Root cause was mine: <code>EmbeddingSignature</code> has an <code>unknown</code> default and I had given the override to the embedded provider <strong>alone</strong>, while this install runs <strong>Ollama</strong> — so the feature looked finished and did nothing. All 8 remaining providers now publish one, guarded reflectively.</p>
+
+    <p>Two things still need <strong>you</strong>, not a build:</p>
+
+    <ol>
+      <li>🔶 <strong>Re-ingest.</strong> Clear each workspace's documents and add them again — everything, not a top-up. Note the banner meant to track this for you is the thing that is currently broken.</li>
+      <li><strong>The endpoints.</strong> <code>.tfcore/core-config.yaml → runtimeVerification.services</code> is still entirely unset. Filling it in unblocks <code>REQ-RAG-044</code>, <code>REQ-RAG-049</code> and the 44 <code>Needs re-verify</code> rows — <code>docs/VERIFICATION-ENDPOINTS.md</code> says where and how.</li>
+    </ol>
+
+    <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
+
+    <ul>
+      <li><strong>TechieDesk: 106 open</strong> of 179 — <strong>73 terminal</strong> (55 <code>Verified</code> + 18 <code>N/A</code>). <strong>0 <code>FAIL</code>.</strong> Open: 44 <code>Implemented</code>, 44 <code>Needs re-verify</code>, 9 <code>Blocked</code>, 4 <code>PARTIAL</code>, 2 <code>Planned</code>, 2 <code>Not Started</code>, 1 <code>In Progress</code>.</li>
+      <li><strong>Graded on a LIVE SCREEN 2026-08-04 (second verify run)</strong> — 0 promoted, 1 downgraded, 5 held:
+        <ul>
+          <li><code>REQ-RAG-052</code> <strong>95% → <code>Needs re-verify</code> 80%</strong> 🔴. The banner is not on screen. Library half untouched and still passing; the consumer is the failure.</li>
+          <li><code>REQ-UI-059</code> held 95%, but <strong>clause 2 is now proven on screen</strong> — legacy English rows render verbatim amid Devanagari, each confirmed <code>ContentJson NULL</code> in the live store.</li>
+          <li><code>REQ-UI-058</code> and <code>REQ-RAG-051</code> held — both need a live <strong>blocked tool call</strong>, which <code>REQ-FN-053</code> still prevents. The screen was available; the event was not.</li>
+          <li><code>REQ-RAG-044</code> and <code>REQ-RAG-049</code> held — Postgres and IMAP still undeclared.</li>
+        </ul>
+      </li>
+      <li><strong>Built after the first verify run</strong> — the localization loop the library has been waiting on:
+        <ul>
+          <li><code>REQ-UI-058</code> <code>Planned 0%</code> → <strong><code>Implemented 90%</code></strong>. The library's 24 flow codes finally have a reader; the mapping is <strong>exhaustive by reflection</strong>, so a future code cannot ship as English.</li>
+          <li><code>REQ-UI-059</code> <code>Planned 0%</code> → <strong><code>Implemented 95%</code></strong>. <strong>Both halves.</strong> The chat transcript stores codes, not frozen sentences, and legacy rows render verbatim <strong>permanently</strong>; then the "model-facing" argument was settled by splitting the audience — <code>SkillOutcome</code> carries invariant English for the model and a code for the person, across all six refusal sites.</li>
+        </ul>
+      </li>
+      <li><strong>Graded by the verifier 2026-08-04</strong> — 1 promoted, 4 held, 0 failed:
+        <ul>
+          <li><code>REQ-RAG-025</code> → <strong><code>Verified 100%</code></strong>. 29/29 tests, <strong>0 skipped</strong>, including 9 live scoring runs against the staged 2.28 GB model. Owns no screen, so §4a/§4b are exempt by shape.</li>
+          <li><code>REQ-RAG-051</code> 90% → <strong>95%</strong> (held). 2 of 3 acceptance clauses proven; the third says the trace row <em>renders</em> blocked, and no screen could be driven.</li>
+          <li><code>REQ-RAG-052</code> 100% → <strong>95%</strong> (LOWERED). Library half proven live (0.7182 cross-lingual, 6 tests through a real store); the banner a person actually reads has never been seen.</li>
+          <li><code>REQ-RAG-044</code> (85%) and <code>REQ-RAG-049</code> (90%) held — their own acceptance names a real Postgres and a real IMAP mailbox, and neither is declared.</li>
+        </ul>
+      </li>
+      <li><strong>Built earlier the same day</strong> (all to <code>Implemented</code> — the verifier's grades above supersede):
+        <ul>
+          <li><code>REQ-RAG-051</code> <code>Planned 0%</code> → <strong><code>Implemented 90%</code></strong>. <code>ForFlow</code> returned a bare string, so a blocked sub-flow got <code>IsSuccess</code> defaulting to <code>true</code> and the trace painted it green. The delegate now carries the failure. <strong>The old test named this defect without asserting the flag</strong> — that is how it survived a release; it does now.</li>
+          <li><code>REQ-RAG-049</code> <code>Blocked 75%</code> → <strong><code>Implemented 90%</code></strong>. TR-RAG-037 fixed: mbox item identity no longer embeds the archive's file name, so renaming it stops re-ingesting everything. IMAP is untouched.</li>
+          <li><code>REQ-RAG-044</code> <code>PARTIAL 70%</code> → <strong><code>Implemented 85%</code></strong>. Its remark was <strong>stale</strong> — written 2026-07-29 against the Chroma/Milvus/Pinecone/Weaviate list you WITHDREW on 2026-07-31. Corrected, and <code>PgVectorStore</code> went from <strong>zero tests to 7</strong>.</li>
+          <li><code>REQ-RAG-025</code> <code>Needs re-verify 75%</code> → <strong><code>Implemented 95%</code></strong> — <strong>BRD-106 complete.</strong> Zero tests → 14 hermetic + 7 live scoring + 4 URL guards. Two blocking defects fixed on the way (<strong>TR-RAG-045</strong>: the download 404'd, omitted the 2.27 GB weights file, and had a completeness check that was false by construction; <strong>TR-RAG-044</strong>: the tokenizer offset). Model staged at <code>~/.cache/techierag-models/bge-reranker-v2-m3</code> (2.28 GB, byte-exact).</li>
+          <li><code>REQ-RAG-052</code> raised and closed in the same pass → <strong><code>Implemented 100%</code></strong>. The embedder tokenizer fix, plus the <code>{provider}/{model}/r{revision}</code> stamp that detects a stale corpus, surfaced in the document library.</li>
+          <li><code>REQ-FN-053</code> <code>Planned 0%</code> → <strong><code>In Progress 40%</code></strong>. Read the blocker; this one is not what it looked like.</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
+
+    <ul>
+      <li>🟢 <strong><code>REQ-RAG-052</code> — BANNER FIXED AND SEEN (2026-08-05).</strong> Was: not rendering at all. <code>/workspace/Default/documents</code> lists 5 documents embedded by the old tokenizer and now says so, in Hindi, live.
+        <ul>
+          <li><strong>Root cause was mine.</strong> <code>EmbeddingSignature</code> carries an <code>unknown</code> DEFAULT (so external implementers keep compiling) and I had overridden it on <code>EmbeddedEmbeddingProvider</code> <strong>alone</strong>. This install runs <strong>Ollama</strong> (<code>EmbeddingSource</code> ordinal 2), so the signature was <code>unknown</code>, <code>IsDeterminable</code> false, banner suppressed <strong>silently</strong>. All 8 remaining providers now publish one.</li>
+          <li>⚠ <strong>Three hypotheses were disproven first, and one of my own fixes was INERT</strong> — it passed its mutation test unchanged, proving it fixed nothing, and was reverted rather than shipped. The answer came from instrumenting the running page: <code>matched=5 signature=unknown</code>.</li>
+          <li><strong>Guarded</strong>: a reflective sweep fails when any provider inherits the default — mutation-tested.</li>
+        </ul>
+      </li>
+      <li>🟢 <strong><code>REQ-UI-059</code> — BOTH HALVES BUILT; clause 2 now proven ON SCREEN.</strong> Product-authored messages now persist a <strong>code + arguments</strong> and render per reader; rows written before codes existed print verbatim <strong>permanently</strong> (deleting that branch would blank out real conversations). A source-level guard, <strong>mutation-tested RED then GREEN</strong>, stops a future write localizing at write time again.
+        <ul>
+          <li>✅ <strong>Half two done too.</strong> The reasoning that kept those sentences English was right — do not translate what the model reads — but the premise was wrong: the UI renders that text <strong>verbatim to a person</strong>. <code>SkillOutcome</code> now carries both audiences, and the English is rendered from the same resource entry the code names, so they cannot drift. <strong>The library was not changed</strong>: the app owns its tool handler now, because <code>ToolRegistry</code>'s delegate had nowhere to put a code.</li>
+          <li>⚠ Neither half has been <strong>seen</strong> — same Catalyst consent blocker.</li>
+        </ul>
+      </li>
+
+      <li>🔶 <strong><code>REQ-RAG-052</code> — FIXED, and it leaves you one job: RE-INGEST THE WHOLE CORPUS.</strong> <code>EmbeddedEmbeddingProvider</code> was feeding <strong>raw SentencePiece ids</strong> to an XLM-RoBERTa graph — no fairseq <code>+1</code> shift, and no <code>&lt;s&gt;</code>/<code>&lt;/s&gt;</code> wrapper at all. Now both. Cross-lingual similarity went from <strong>0.3536, losing to an irrelevant passage at 0.3642</strong>, to <strong>0.7182</strong>. English always looked fine, which is exactly how it hid: a <em>consistent</em> id shift preserves lexical-overlap signal and destroys semantics.
+        <ul>
+          <li><strong>Vectors embedded before 2026-08-04 are in a different space from ones embedded after.</strong> Cosine similarity between the two is meaningless. <strong>Do not top up</strong> — a partial re-ingest mixes both and degrades retrieval with nothing in the logs.</li>
+          <li>✅ <strong>A stale corpus is now DETECTED, not trusted.</strong> Vectors carry a <code>{provider}/{model}/r{revision}</code> stamp; the document library shows a localized warning naming how many documents are affected, and a louder one if the corpus is MIXED. <strong>The revision is what matters</strong> — this defect changed neither provider nor model. An unstamped document counts as stale, and a provider with no signature reports "cannot determine" rather than a clean result. 18 tests, 6 of them end-to-end against a real store.</li>
+          <li>⚠ It retroactively qualifies <code>REQ-RAG-003</code> / <code>REQ-RAG-004</code>'s "runtime-confirmed" remarks — the embedder ran, but not correctly, until today. Full write-up: <strong>TR-RAG-044</strong>.</li>
+        </ul>
+      </li>
+
+      <li>🔴 <strong><code>REQ-FN-053</code> — I could NOT reproduce it, and the negative result is the finding.</strong> Driven through the real <code>FlowRunner</code> with a prompt answered LATE from another thread — what a dialog actually does — a Tool-node run <strong>completes on both answers</strong>, trace past <code>NodeStarted</code>. So <code>EgressGate</code> + <code>FlowRunner</code> + <code>GuardedToolHandler</code> are <strong>not</strong> the fault, and the suspect list moves up: the Razor/BlazorWebView dispatcher, or the tool itself — <strong>both reported tool names (<code>web_fetch</code>, <code>sql-query</code>) are skills <code>REQ-RAG-022</code> records as shipping no provider.</strong> Needs the running Catalyst head; I cannot drive it from here.
+        <ul>
+          <li>⚠ <strong>Why the suite never caught it:</strong> every existing test on this REQ answered the prompt <strong>synchronously</strong>, so the <code>TaskCompletionSource</code> was already complete and the resume path never ran. A deferred-answer double now covers it. Worth remembering as a pattern, not a one-off.</li>
+          <li>✅ <strong>A real defect did fall out of the hunt:</strong> the flows screen called <code>RunAsync</code> with <strong>no cancellation token at all</strong>, while a chat turn runs under the agent's time limit — so any stall hung forever with no exception and a button stuck on "running". The service now derives the same limit and renders a timeout reason. <strong>That bounds the hang; it does not close the row.</strong></li>
+        </ul>
+      </li>
+
+      <li>🔴 <strong><code>REQ-RAG-051</code> is the FOURTH lying-surface defect</strong> (<code>ConfirmEgress</code>, Save &amp; apply, thread export, now <code>ForFlow</code> returning <code>IsSuccess = true</code> for a blocked run so the trace renders green). Four instances makes it a systemic pattern, not incidental.</li>
+
+      <li>🔴 <strong>THE ENVIRONMENT IS STILL THE CEILING — but it is now a CONFIGURATION question, not a search.</strong> Per your direction this pass, the gates no longer probe <code>:11434</code> / <code>:1234</code> / the default Docker socket and then write <em>"no LLM provider is reachable on this host"</em> into a REQ. Endpoints are <strong>declared</strong> in <code>.tfcore/core-config.yaml → runtimeVerification.services</code>; the rule is in <code>_smoke-test-policy.md</code> (unset = honest <code>⚠ STATIC-ONLY</code>, set-but-down = a REAL failure, secrets by env-var name only since that file is committed). <strong>Every key ships commented out</strong> — I did not enable the historical <code>192.168.1.13:1234</code> / <code>192.168.1.14:5101</code> values, because an endpoint nobody confirmed is a guess with extra steps. <strong>Filling that block in is the single highest-leverage thing you can do</strong>: it is what unblocks the 44 <code>Needs re-verify</code> rows. How: <code>docs/VERIFICATION-ENDPOINTS.md</code>.
+        <ul>
+          <li>The first consumer is already wired: <code>LivePgVectorStoreTests</code> (5 tests) runs the moment <code>TechieRagTestPostgres</code> is set, and <strong>skips visibly</strong> until then.</li>
+        </ul>
+      </li>
+
+      <li>⚠ <strong><code>REQ-UI-053</code> now has a measured answer, and it is worse than "open question":</strong> <strong>0 of 23</strong> sidebar identifiers reach the macOS AX tree. The sweep runs <em>entirely</em> on the resource-key label fallback, which makes <code>REQ-NFR-014</code>'s no-English-selector guard load-bearing today.</li>
+
+      <li>⚠ <strong><code>REQ-NFR-015</code>: <code>/register</code> and <code>/setup</code> have never been swept by anything</strong> — arrival markers exist and look deliberate, but the driver loop iterates <code>SIDEBAR</code> and neither screen has a row.</li>
+
+      <li>⚠ <strong>The licence banner has still never been seen on screen</strong>; <strong>read-aloud in Hindi is still unverified on a real Mac</strong>; <strong>~2,900 Hindi keys remain agent-produced</strong>.</li>
+
+      <li>🔴 <strong><code>REQ-FN-043</code></strong> Apple signing identity; <strong><code>REQ-FN-035</code></strong> Windows platform sources; <strong><code>REQ-NFR-001</code></strong> PAT still untracked-and-unrotated. All owner-only.</li>
+    </ul>
+
+    <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
+
+    <ul>
+      <li><strong>TrBlazeUI — 28 entries.</strong> TR-024 closed-with-workaround; TR-039, TR-038 open; TR-008 corrected.</li>
+      <li><strong>TechieRag — 45 entries.</strong> TR-RAG-042/043 open. <strong>Closed this pass: TR-RAG-037</strong> (mbox identity embedded the archive's file name), <strong>TR-RAG-044</strong> (raw SentencePiece ids into an XLM-RoBERTa graph — fixed in BOTH the reranker and the embedder, plus the version stamp that now detects a stale corpus) and <strong>TR-RAG-045</strong> (the reranker's first-run download could never succeed: 404 URL, missing external-data file, and a completeness check that was false by construction).</li>
+      <li><code>Models.AgentStep</code> / <code>ToolResult</code> <strong>now carry a code slot</strong> — <code>FailureMessage</code> was lifted from <code>FlowStep</code> to the base step, closing the gap this summary previously listed as open.</li>
+    </ul>
+
+    <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
+
+    <ul>
+      <li>Build <strong>0 errors</strong>; <strong>2,282 tests pass</strong> (1,552 app + 730 lib), 36 skipped.</li>
+      <li>Of the 36 skipped, <strong>5 are the new <code>LivePgVectorStoreTests</code></strong> and they skip with a reason naming the env var that turns them on — a visible gap, not a silent one.</li>
+      <li>Service-layer English ratchet <strong>330 → 189</strong>, and the derivation is recorded in the constant itself: <strong>118 real conversions</strong>, plus <strong>23 that were never debt</strong> — the counter matched <code>logger.Log…</code> but not <code>logger?.Log…</code>, so log templates were being counted as prose. The instrument was fixed, not the code. Nobody should later read 141 as 141 conversions.</li>
+      <li>Harness guards 8/8; markup localization 100%; greps clean (no <code>a</code>/<code>v</code>/<code>obj</code> prefixes, no underscore fields, no underscored test names).</li>
+      <li>⚠ Pre-existing: <code>MauiProgram.cs</code> <code>SCREAMING_SNAKE_CASE</code> env var; ~14 CS1591 in <code>TechieRagManager.cs</code>.</li>
+    </ul>
+
+    <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
+
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>2026-08-05</td>
+          <td><strong><code>*build-phase</code> — REQ-RAG-052 banner (owner-scoped), NO verify-phase run</strong></td>
+          <td>✅ <strong>2,308 pass / 0 fail.</strong> 🟢 <strong>The verifier's RENDER-FAIL is closed and PROVEN ON SCREEN</strong>: the stale-corpus banner renders live in Hindi — <em>"5 of 5 documents here were indexed with a different embedding model"</em> (content nodes 148 → 151, 0 render defects, both widths). 🔴 <strong>Root cause was MINE, and it silently disabled the feature for most installs</strong>: <code>EmbeddingSignature</code> carries an <code>unknown</code> DEFAULT so external implementers keep compiling (REQ-NFR-007), and I had given the override to <code>EmbeddedEmbeddingProvider</code> <strong>alone</strong> — while this install runs <strong>Ollama</strong> (<code>EmbeddingSource</code> ordinal 2). Signature <code>unknown</code> → <code>IsDeterminable</code> false → banner suppressed with no error anywhere. All 8 remaining built-in providers now publish <code>Signature(Name, ModelName)</code>. ⚠ <strong>Three hypotheses were disproven before the right one, and one of my own fixes was INERT</strong> — it passed its mutation test <em>unchanged</em>, proving it fixed nothing; reverted rather than shipped as a fake fix. The answer came from <strong>instrumenting the running page</strong>: <code>wsDocs=5 catalog=14 matched=5 signature=unknown</code>. <strong>Guard</strong>: <code>ProviderSignatureCoverageTests</code> reflects over every <code>IEmbeddingProvider</code> and fails when one inherits the default — mutation-tested. ⚠ <strong><code>REQ-FN-053</code> was in the confirmed scope and was NOT started</strong> — said plainly rather than quietly dropped</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-04</td>
+          <td><strong><code>*verify</code> ×6 (owner-invoked, SECOND run — consent granted)</strong></td>
+          <td>✅ <strong>2,306 pass / 0 fail</strong>, harness guards 8/8. 🟢 <strong>THE CONSENT GRANT PAID FOR ITSELF IMMEDIATELY.</strong> <code>WebDriverAgentMac</code> came up on :10100 and screens were driven for the first time this session — 3 swept in <strong>Hindi</strong> at 1600 and the 1024 floor, 0 render defects. 🔴 <strong>And the first screen graded produced a defect no test could have</strong>: <code>REQ-RAG-052</code>'s stale-vector banner <strong>is not on screen</strong>, on a library of 5 documents provably embedded by the OLD tokenizer (<code>Metadata '{}'</code>, unstamped ⇒ stale). Confirmed NOT a stale build — bundle assemblies 20:09, process started 21:54, <code>DocsStaleEmbeddingsTitle</code> present in the shipped assembly, checked by symbol presence rather than the <code>.app</code> directory mtime that misled me earlier today. <strong>Downgraded 95% → <code>Needs re-verify</code> 80%</strong>; the library half is untouched and still passes. ✅ <strong><code>REQ-UI-059</code> clause 2 PROVEN ON SCREEN</strong> — five legacy English rows render verbatim amid complete Devanagari, each verified in the live store as <code>ContentJson NULL</code> dated 2026-07-30, so that English is the policy working rather than the defect returning; and the <code>ContentJson</code> column now exists in the owner's real database, proving the additive <code>ALTER</code> outside its fixture. ⚠ <strong>0 promoted.</strong> <code>REQ-UI-058</code> and <code>REQ-RAG-051</code> need a live <strong>blocked tool call</strong> that <code>REQ-FN-053</code> still prevents — the screen was finally available, the event was not; <code>REQ-RAG-044</code>/<code>-049</code> still have no declared Postgres or IMAP; <code>REQ-UI-059</code> has 14 transcript rows and <strong>0 coded</strong>. ⚠ The one overlap was matched to the <strong>documented phantom</strong>, not re-filed. ⚠ <strong>Not done</strong>: <code>TechieDesk-DevGuide-Workspace.html</code> was not re-rendered (§6b) — it had already been stale since 2026-07-29, and the <code>.md</code> carries this run's observations</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-04</td>
+          <td><strong><code>*build-phase</code> — REQ-UI-058 + REQ-UI-059 (owner-scoped), NO verify-phase run</strong></td>
+          <td>✅ <strong>2,306 pass / 0 fail</strong> (+24). <strong>The library's localization codes finally have a reader</strong>: <code>FlowMessageText</code> maps all <strong>24</strong> <code>FlowMessageCodes</code> to <code>AppStrings</code>, <code>AgentTrace</code> prefers <code>AgentStep.FailureMessage</code> over raw English in all four failure arms, and <code>WorkspaceFlows</code> resolves <code>BlockMessage</code>/<code>FailureMessage</code>. Required widening the trace entry with <code>DetailArguments</code> — the detail line resolved with <strong>no arguments</strong>, so a coded refusal had nowhere to put its guardrail id and fell back to English regardless. <strong>Nested substitution included</strong>: the guardrail's own reason is localized too, not just the framing. <strong>Exhaustive by reflection</strong> — a library upgrade that adds a code fails the build rather than shipping English. 🔴 <strong><code>REQ-UI-059</code> half one built</strong>: the chat transcript persists <strong>code + arguments</strong>, legacy rows render verbatim <strong>permanently</strong> (that IS the migration stance — nothing deleted or rewritten), and <code>TrMessage</code> gained a <code>ContentJson</code> column with an additive <code>ALTER</code> proven against an older-database fixture, because <code>CREATE TABLE IF NOT EXISTS</code> does nothing to a table that already exists. The clause-4 guard was <strong>mutation-tested</strong>: reintroducing the original defect turns it RED, restoring turns it GREEN. ✅ <strong>Half two built on a follow-up instruction</strong>: the "model-facing, out of scope" judgement was settled by splitting the audience rather than arguing it — <code>SkillOutcome</code> carries invariant English for the model and a code for the person, with the English rendered from the SAME resource entry the code names so the two cannot drift. 10 reasons coded across six sites, 20 resx entries. <strong>The library was not changed</strong>: <code>ToolRegistry</code>'s delegate returns a bare string, so the app now owns its tool handler. ⚠ <strong>Nothing observed on screen</strong> — Catalyst consent still ungranted, so both rows are capped at <code>Implemented</code></td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-04</td>
+          <td><strong><code>*verify REQ-RAG-025,044,049,051,052</code> (owner-invoked)</strong></td>
+          <td>✅ <strong>2,282 pass / 0 fail</strong>, harness guards 8/8. <strong>1 promoted: <code>REQ-RAG-025</code> → <code>Verified</code></strong> — BRD-106's local ONNX cross-encoder ranked <strong>live</strong> for the first time, 9 live tests <strong>explicitly confirmed as executed, not skipped</strong> (a gated suite that skips is indistinguishable from a pass in a summary line, which is how this row's earlier <code>Verified</code> was overstated and demoted on 2026-07-29). 🔴 <strong>NO SCREEN WAS DRIVEN</strong>: <code>WebDriverAgentMac</code> failed with <em>"Timed out while enabling automation mode"</em> — the macOS UI-testing consent gate, an OS privacy grant only the owner can give. §3b escalation was exhausted first (Appium up, WDA launched, bundle <code>lsregister</code>-ed, project harness used rather than hand-rolled — <code>drv.py</code> correctly surfaced the crash instead of inventing verdicts). ⚠ <strong>4 rows held, none failed, and each for a stated reason</strong>: <code>REQ-RAG-051</code> and <code>REQ-RAG-052</code> make <strong>on-screen</strong> claims nobody could observe; <code>REQ-RAG-044</code> and <code>REQ-RAG-049</code> name a real Postgres and a real IMAP mailbox that are not declared (5 Postgres tests skipped visibly). 🔻 <strong><code>REQ-RAG-052</code> LOWERED 100% → 95%</strong> — its library half is proven live (0.7182 cross-lingual, 6 tests through a real <code>SqliteVecStore</code>) but the banner a person actually reads has never been seen; 100% asserted nothing was left, and something is. ⚠ <strong>My own error</strong>: I reported the Catalyst bundle STALE and rebuilt it on that basis — the <em>instrument</em> was wrong, not the bundle (<code>grep -a</code> cannot read a compiled <code>.resources</code> stream; it also called <code>DocsLoadErrorTitle</code> absent, which certainly exists). Caught by validating the check against keys known to pre-date the change; the bundle had been current all along and the claim was withdrawn</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-04</td>
+          <td><strong><code>*build-phase</code> — RAG cluster (owner-scoped), NO verify-phase run</strong></td>
+          <td>✅ <strong>2,282 tests pass, 0 errors</strong> (+57 new). <strong>BRD-106 complete — the local ONNX cross-encoder ranked for the first time</strong>, 7/7 live scoring tests. 🔴 <strong>It had never been able to run</strong>: the download URL 404'd (BAAI ships no ONNX export), the 2.27 GB external-weights file was missing from the download list, and <code>IsModelDownloaded()</code> gated on a size that an external-data export can never reach — three faults, none visible to a hermetic test (<strong>TR-RAG-045</strong>). 🔴 <strong>Then it ranked English correctly and put the WORST passage first for a Hindi query</strong> — raw SentencePiece ids into an XLM-RoBERTa graph (<strong>TR-RAG-044</strong>). A <em>consistent</em> off-by-one preserves lexical overlap and destroys semantics, which is why every same-language test had always passed. 🔴 <strong>The same defect was in the BGE-M3 EMBEDDER</strong> — 0.3536 vs 0.3642 with the wrong passage winning, now 0.7182 — so <strong>every stored vector is stale and the corpus must be re-ingested</strong> (<code>REQ-RAG-052</code>), and a <code>{provider}/{model}/r{revision}</code> stamp now DETECTS it, surfaced in the document library. 🔴 <strong><code>REQ-RAG-044</code>'s row was measured against an acceptance the owner had already WITHDRAWN</strong> on 2026-07-31 and is corrected. ⚠ <strong><code>REQ-FN-053</code> did NOT reproduce</strong>: driven with a late, off-thread answer the Tool-node run completes both ways — the fault is above the service layer. Every prior test on it answered synchronously, so the resume path had never run. A real defect fell out anyway: the flows screen ran with <strong>no cancellation token at all</strong>. ⚠ <strong>My own errors</strong>: I never re-rendered this file's HTML, so the owner saw a two-day-old dashboard; and I left three figures in it stale until they asked</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-02</td>
+          <td><strong><code>*build-phase</code> (5 parallel clusters) → <code>*verify all</code> inline</strong></td>
+          <td>✅ <strong>2,225 tests pass, 0 errors, 23/23 screens clean in Hindi at both widths, menu bar MENU-OK in BOTH languages.</strong> 🔴 <strong>The headline find came from the §4b screenshot gate, not a test</strong>: the primary chat screen renders English amid complete Devanagari because the strings were persisted into <code>TrMessage</code> at write time — the same class <code>REQ-UI-056</code> had just fixed elsewhere, but on real user history (<code>REQ-UI-059</code>). 🔴 <strong>Two clusters' "model-facing, out of scope" judgment was disproven</strong> by the running app rendering that text verbatim. 🔴 <strong><code>REQ-UI-057</code>'s recorded hypothesis was wrong</strong>: not a fixed port and not class concurrency, but <code>Stop()</code>-then-<code>Close()</code> double prefix-unregistration re-binding the port on Unix — proven by stack trace, a deterministic harness, and errno forensics that also disproved the shared-collection fix this repo had proposed. 🔴 <strong><code>REQ-UI-056</code> unblocked on measured evidence</strong>: the DB held 22 synthetic rows and <strong>zero</strong> <code>FailureReason</code> rows, and the proposed bare-key fix would have destroyed the numbers in <code>"2 ingested of 2 listed"</code> — so it ships as code+args. 🔴 <strong><code>REQ-UI-053</code> measured at 0/23.</strong> ⚠ <strong>My own errors</strong>: I fanned five clusters at a single-session harness and it cost two clusters their live evidence; my first sweep analysis read non-existent top-level keys and reported a <strong>vacuous</strong> "0 findings" before I checked the schema</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-02</td>
+          <td><strong><code>*build-phase</code> (6 parallel clusters) → <code>*verify all</code> inline</strong></td>
+          <td>✅ <strong>2,180 tests pass, 0 errors, 23/23 screens clean in Hindi.</strong> 🔴 Service-layer English 569 → 330 and the ratchet lowered to match. <code>CronDescriber</code> solved properly — Hindi reverses three joins, so it composes from whole localizable patterns with deliberately no English default overload. 🔴 <strong>A live pre-existing defect found</strong>: read-aloud spoke with no locale, so Hindi answers were <strong>silently skipped by an English voice</strong>. ⚠ <strong>Three mutations came back GREEN and were reported</strong> — including a <code>.resx</code> heredoc that silently never applied</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-02</td>
+          <td><strong><code>*build-phase</code> (2 clusters) → <code>*verify all</code> inline</strong></td>
+          <td>✅ <strong>2,073 tests pass.</strong> 🔴 <code>REQ-UI-054</code> root cause proven and it was <strong>not</strong> the title collision hypothesised — <code>UIMenuBuilder</code> discards an entire menu that re-declares a system-owned key. 🔴 <code>REQ-UI-051</code> services now return invariant keys. ⚠ <strong>Three recorded claims were wrong and were corrected</strong></td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+        <tr>
+          <td>2026-08-01</td>
+          <td><strong><code>*build-phase</code> (4 clusters) → <code>*verify all</code> inline</strong></td>
+          <td>✅ <strong>2,055 tests pass, 23/23 screens clean in English AND Hindi.</strong> 🔴 Markup localization <strong>100%</strong>, counter widened on purpose. 🔴 <strong><code>REQ-UI-053</code> DISPROVEN by probe.</strong> ⚠ <code>/settings/backup</code> had shipped for days and had never been graded</td>
+          <td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
+
+    <ul>
+      <li><strong><code>REQ-RAG-045/046</code></strong> (BRD-deferred by owner decision); <strong><code>REQ-RAG-044</code></strong>'s live <code>PgVectorStore</code> round trip — 5 tests are written and skip until a Postgres is declared in <code>runtimeVerification.services</code>.</li>
+      <li>The <code>AgentToolHandler</code> / <code>EgressGate</code> audience split at the render seam (now <code>REQ-UI-059</code>).</li>
+      <li>An app-side consumer for the library's <code>FlowMessageCodes</code> — now <strong>24 codes</strong> with zero readers (<code>REQ-UI-058</code>).</li>
+      <li>A <code>drv.py</code> revive-and-retry wrapper — three clusters independently rediscovered that WDA drops the session between nearly every command on this host.</li>
+      <li><code>run_sweep</code> sidebar selectors only work at <code>nav.DESK</code> (1600×1240); at 1440×980 the rail collapses and every selector misses with a confusing "link NOT FOUND".</li>
+    </ul>
+
   </main>
 </div>
 

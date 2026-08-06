@@ -1,0 +1,357 @@
+@page "/settings/updates"
+@using TechieDesk.Services.Updates
+@using TechieDesk.Services.Storage
+@using TechieDeskDb
+@inject IUpdateService UpdateService
+@inject IUpdatePreferencesStore Preferences
+@inject ToastService ToastService
+@inject ILogger<AppUpdates> Logger
+@inject IStringLocalizer<AppStrings> Localizer
+
+@* REQ-FN-038b / BRD-131 — the Updates surface from docs/TechieDesk-UIDesign.md (Card + Switch x3 +
+   Button x2 + Alert). It is BOTH a route of its own and the Updates tab of the App settings screen
+   (REQ-UI-028, /admin/settings), which is what the design asks for — "lifts into this tab unchanged".
+
+   Hosting one routable page inside another duplicates its page chrome: two <PageTitle> elements
+   (last one wins, silently) and two <h1> on the same document, which breaks the single-main-heading
+   expectation screen readers rely on (REQ-NFR-005 / WCAG 1.3.1). `Embedded` suppresses the chrome
+   only — the surface itself is identical in both places, so there is no second copy to drift. *@
+
+@if (!Embedded)
+{
+    <PageTitle>@Localizer["UpdatesPageTitle"]</PageTitle>
+}
+
+<div class="space-y-6">
+    @if (!Embedded)
+    {
+        <div>
+            <h1 class="scroll-m-20 border-b pb-2 text-3xl font-semibold tracking-tight first:mt-0">@Localizer["UpdatesHeading"]</h1>
+            <TypographyMuted>@Localizer["UpdatesSubtitle"]</TypographyMuted>
+        </div>
+    }
+
+    <!-- Version + check -->
+    <Card>
+        <CardHeader>
+            <div class="mb-1 flex items-center gap-2">
+                <Badge Variant="BadgeVariant.Secondary">@Localizer["UpdatesBadgeInstalled"]</Badge>
+                @if (result?.Status == UpdateCheckStatus.UpToDate)
+                {
+                    <Badge Variant="BadgeVariant.Outline">@Localizer["UpdatesBadgeUpToDate"]</Badge>
+                }
+                else if (result?.Status == UpdateCheckStatus.UpdateAvailable)
+                {
+                    <Badge Variant="BadgeVariant.Default">@Localizer["UpdatesBadgeAvailable"]</Badge>
+                }
+            </div>
+            <CardTitle>@Localizer["UpdatesVersion", UpdateService.CurrentVersionDisplay]</CardTitle>
+            <CardDescription>@LastCheckedDescription</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+
+            @* REQ-NFR-010: a check that could not run says so. It must never be shown as
+               "up to date", which is the same thing a successful check says. *@
+            @if (result?.Status == UpdateCheckStatus.Failed)
+            {
+                <Alert Variant="AlertVariant.Danger" AccentBorder="true">
+                    <Alert.Icon><LucideIcon aria-hidden="true" Name="alert-circle" Size="16" /></Alert.Icon>
+                    <AlertTitle>@Localizer["UpdatesCheckFailedTitle"]</AlertTitle>
+                    <AlertDescription>@result.Error @Localizer["UpdatesCheckFailedBody"]</AlertDescription>
+                </Alert>
+            }
+            else if (result?.Status == UpdateCheckStatus.UpToDate)
+            {
+                <Alert Variant="AlertVariant.Success">
+                    <AlertTitle>@Localizer["UpdatesNewestTitle"]</AlertTitle>
+                    <AlertDescription>@Localizer["UpdatesNothingToInstall", ChannelDescription]</AlertDescription>
+                </Alert>
+            }
+            else if (result is { Status: UpdateCheckStatus.UpdateAvailable, Release: not null })
+            {
+                <Alert Variant="AlertVariant.Info" AccentBorder="true">
+                    <AlertTitle>@Localizer["UpdatesVersionAvailable", result.Release.Version]</AlertTitle>
+                    <AlertDescription>
+                        @if (result.UpdateHasNoDownloadForThisPlatform)
+                        {
+                            <span>@Localizer["UpdatesNoDownloadForPlatform", PlatformName]</span>
+                        }
+                        else
+                        {
+                            <span>@Localizer["UpdatesReleasedOn", PublishedDescription, AssetSizeDescription]</span>
+                        }
+                    </AlertDescription>
+                </Alert>
+
+                @if (!string.IsNullOrWhiteSpace(result.Release.ReleaseNotes))
+                {
+                    <div>
+                        <span class="text-sm font-medium">@Localizer["UpdatesReleaseNotes"]</span>
+                        @* Rendered as plain text on purpose. The notes are remote content, and the
+                           release body is Markdown that would otherwise be an HTML injection point
+                           into a WebView that hosts the whole application. *@
+                        <pre class="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded-md border bg-muted p-3 text-xs">@result.Release.ReleaseNotes</pre>
+                    </div>
+                }
+
+                @if (downloadedPath is not null)
+                {
+                    <Alert Variant="AlertVariant.Success">
+                        <AlertTitle>@Localizer["UpdatesDownloadedTitle"]</AlertTitle>
+                        <AlertDescription>
+                            <span class="font-mono text-xs">@downloadedPath</span>
+                            <br />
+                            @Localizer["UpdatesDownloadedBody"]
+                        </AlertDescription>
+                    </Alert>
+                }
+            }
+
+            <div class="flex flex-wrap items-center gap-2">
+                <Button OnClick="CheckAsync" Disabled="isBusy">
+                    @if (isChecking)
+                    {
+                        <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                        <span>@Localizer["UpdatesChecking"]</span>
+                    }
+                    else
+                    {
+                        <span>@Localizer["UpdatesCheckAction"]</span>
+                    }
+                </Button>
+
+                @if (result is { Status: UpdateCheckStatus.UpdateAvailable, Asset: not null })
+                {
+                    <Button Variant="ButtonVariant.Outline"
+                            OnClick="DownloadAsync"
+                            Disabled="isBusy">
+                        @if (isDownloading)
+                        {
+                            <Spinner Size="SpinnerSize.Small" Class="mr-2" />
+                            <span>@Localizer["UpdatesDownloading"]</span>
+                        }
+                        else if (downloadedPath is not null)
+                        {
+                            <span>@Localizer["UpdatesShowIn", RevealTarget]</span>
+                        }
+                        else
+                        {
+                            <span>@Localizer["UpdatesDownloadAsset", result.Asset.Name]</span>
+                        }
+                    </Button>
+                }
+            </div>
+        </CardContent>
+    </Card>
+
+    <!-- Preferences -->
+    <Card>
+        <CardHeader>
+            <CardTitle>@Localizer["UpdatesPreferencesTitle"]</CardTitle>
+            <CardDescription>@Localizer["UpdatesPreferencesDescription"]</CardDescription>
+        </CardHeader>
+        <CardContent Class="space-y-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <Switch Checked="autoCheck" CheckedChanged="OnAutoCheckChanged" Id="updates-auto-check" />
+                    <Label For="updates-auto-check">@Localizer["UpdatesAutoCheckLabel"]</Label>
+                </div>
+                <TypographyMuted Class="mt-1 block text-xs">@Localizer["UpdatesAutoCheckHint"]</TypographyMuted>
+            </div>
+
+            <div>
+                <div class="flex items-center gap-2">
+                    <Switch Checked="includePrerelease" CheckedChanged="OnPrereleaseChanged" Id="updates-prerelease" />
+                    <Label For="updates-prerelease">@Localizer["UpdatesPrereleaseLabel"]</Label>
+                </div>
+                <TypographyMuted Class="mt-1 block text-xs">@Localizer["UpdatesPrereleaseHint"]</TypographyMuted>
+            </div>
+
+            @* The third switch the UI design calls for. It is rendered DISABLED rather than omitted,
+               because the honest state of this feature is "specified, deliberately not enabled yet"
+               — and rather than left to look broken, it says why. See IUpdateService for the full
+               reasoning: installing an unsigned download without verifying a signature would be an
+               unauthenticated code-execution path, so it waits for REQ-FN-038c. *@
+            <div>
+                <div class="flex items-center gap-2">
+                    <Switch Checked="false" Disabled="true" Id="updates-background-install" />
+                    <Label For="updates-background-install">@Localizer["UpdatesBackgroundLabel"]</Label>
+                </div>
+                <TypographyMuted Class="mt-1 block text-xs">@Localizer["UpdatesBackgroundHint"]</TypographyMuted>
+            </div>
+
+            <Alert Variant="AlertVariant.Info">
+                <Alert.Icon><LucideIcon aria-hidden="true" Name="shield-check" Size="16" /></Alert.Icon>
+                <AlertTitle>@Localizer["UpdatesDataSafeTitle"]</AlertTitle>
+                <AlertDescription>
+                    @Localizer["UpdatesDataSafeBefore"]
+                    <span class="font-mono text-xs">@DataLocationName</span>@Localizer["UpdatesDataSafeAfter"]
+                </AlertDescription>
+            </Alert>
+        </CardContent>
+    </Card>
+</div>
+
+@code {
+    /// <summary>
+    /// Gets or sets a value indicating whether this surface is hosted inside another page.
+    /// </summary>
+    /// <remarks>
+    /// True suppresses the page title and heading, which the host already provides. Defaults to
+    /// false so the standalone route at <c>/settings/updates</c> is unaffected.
+    /// </remarks>
+    [Parameter]
+    public bool Embedded { get; set; }
+
+    private UpdateCheckResult? result;
+    private UpdatePreferences? stored;
+    private string? downloadedPath;
+    private bool autoCheck;
+    private bool includePrerelease;
+    private bool isChecking;
+    private bool isDownloading;
+
+    private bool isBusy => isChecking || isDownloading;
+
+    private static string PlatformName =>
+        DataDirectory.CurrentPlatform == DataDirectoryPlatform.Windows ? "Windows" : "macOS";
+
+    private string RevealTarget =>
+        DataDirectory.CurrentPlatform == DataDirectoryPlatform.Windows
+            ? Localizer["UpdatesFileExplorer"].Value
+            : Localizer["UpdatesFinder"].Value;
+
+    private static string DataLocationName =>
+        DataDirectory.CurrentPlatform == DataDirectoryPlatform.Windows
+            ? @"%LOCALAPPDATA%\TechieDesk"
+            : "~/Library/Application Support/TechieDesk";
+
+    private string ChannelDescription =>
+        includePrerelease ? Localizer["UpdatesChannelPrerelease"].Value : Localizer["UpdatesChannelStable"].Value;
+
+    private string LastCheckedDescription =>
+        stored?.LastCheckedUtc is { } checkedAt
+            ? Localizer["UpdatesLastChecked", checkedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm")].Value
+            : Localizer["UpdatesNotCheckedYet"].Value;
+
+    private string PublishedDescription =>
+        result?.Release?.PublishedAtUtc is { } published
+            ? published.ToLocalTime().ToString("yyyy-MM-dd")
+            : Localizer["UpdatesPublishedRecently"].Value;
+
+    private string AssetSizeDescription =>
+        result?.Asset is { SizeBytes: > 0 } asset
+            ? Localizer["UpdatesDownloadSize", (asset.SizeBytes / 1024d / 1024d).ToString("0.#")].Value
+            : Localizer["UpdatesDownloadSizeUnknown"].Value;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stored = await Preferences.LoadAsync();
+        autoCheck = stored.AutoCheckOnLaunch;
+        includePrerelease = stored.IncludePrerelease;
+    }
+
+    private async Task CheckAsync()
+    {
+        isChecking = true;
+        downloadedPath = null;
+        StateHasChanged();
+
+        try
+        {
+            result = await UpdateService.CheckAsync();
+            stored = await Preferences.LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Update check failed unexpectedly");
+            ToastService.Error(exception.Message, Localizer["UpdatesCheckFailedToast"]);
+        }
+        finally
+        {
+            isChecking = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DownloadAsync()
+    {
+        // Already downloaded: the button becomes a reveal, so a second click cannot silently
+        // re-download hundreds of megabytes.
+        if (downloadedPath is not null)
+        {
+            Reveal(downloadedPath);
+            return;
+        }
+
+        if (result?.Asset is not { } asset)
+        {
+            return;
+        }
+
+        isDownloading = true;
+        StateHasChanged();
+
+        try
+        {
+            downloadedPath = await UpdateService.DownloadAsync(asset);
+            ToastService.Success(Localizer["UpdatesSavedTo", downloadedPath], Localizer["UpdatesDownloadedToast"]);
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Update download failed");
+            ToastService.Error(exception.Message, Localizer["UpdatesDownloadFailedToast"]);
+        }
+        finally
+        {
+            isDownloading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Reveal(string path)
+    {
+        var outcome = FileManagerReveal.Reveal(path);
+        // REQ-UI-055: the outcome carries a resource key and its values, not a sentence.
+        var message = Localizer[outcome.MessageKey, outcome.Arguments].Value;
+        if (outcome.Launched)
+        {
+            ToastService.Success(message, Localizer["UpdatesShowIn", RevealTarget]);
+            return;
+        }
+
+        Logger.LogWarning("Reveal failed for {Path}: {MessageKey}", path, outcome.MessageKey);
+        ToastService.Error(message, Localizer["UpdatesRevealFailedToast"]);
+    }
+
+    private async Task OnAutoCheckChanged(bool value)
+    {
+        autoCheck = value;
+        await SavePreferencesAsync();
+    }
+
+    private async Task OnPrereleaseChanged(bool value)
+    {
+        includePrerelease = value;
+        // The stale result was computed on the OTHER channel, so leaving it on screen would show a
+        // stable user an available beta they can no longer be offered.
+        result = null;
+        downloadedPath = null;
+        await SavePreferencesAsync();
+    }
+
+    private async Task SavePreferencesAsync()
+    {
+        try
+        {
+            var updated = new UpdatePreferences(autoCheck, includePrerelease, stored?.LastCheckedUtc);
+            await Preferences.SaveAsync(updated);
+            stored = updated;
+        }
+        catch (Exception exception)
+        {
+            Logger.LogError(exception, "Could not save update preferences");
+            ToastService.Error(exception.Message, Localizer["UpdatesPreferenceNotSaved"]);
+        }
+    }
+}

@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk DevGuide — Operator</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieDesk DevGuide — Operator</h1>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#admin-events-adminevents"><code>/admin/events</code> — AdminEvents</a>
+          <ul>
+            <li><a href="#controls">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#admin-settings-adminsettings"><code>/admin/settings</code> — AdminSettings</a>
+          <ul>
+            <li><a href="#controls-2">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-2">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#automations-automations"><code>/automations</code> — Automations</a>
+          <ul>
+            <li><a href="#controls-3">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-3">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#settings-data-datastorage"><code>/settings/data</code> — DataStorage</a>
+          <ul>
+            <li><a href="#controls-4">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-4">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+        <li><a href="#settings-updates-appupdates"><code>/settings/updates</code> — AppUpdates</a>
+          <ul>
+            <li><a href="#controls-5">Controls</a></li>
+            <li><a href="#data-lineage-razor-injected-service-5">Data lineage — Razor → injected service</a></li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <p><em>Generated 2026-07-28 · reflects code as built.</em> <a href="./TechieDesk-DevGuide.md">← index</a></p>
+    <blockquote>
+      <p>✅ <strong>Runtime-verified 2026-07-29</strong> — re-swept on the live <strong>Mac Catalyst</strong> head over Appium (<code>mac2</code>), bound by <code>appPath</code> to the universal Release bundle, driving <strong>28 of the 30 screens</strong> at <strong>1600×1240</strong> and <strong>1024×720</strong> (the REQ-UI-041 floor). Every <code>Observed</code> line below is what the running app did; <code>Visual (§4b)</code> is the overlap / zero-size / off-viewport geometry check plus a human look at the screenshot. Screens that could not be reached say so and are <strong>not</strong> claimed as verified. Screenshots: <code>test-results/ui-verify/</code>.</p>
+    </blockquote>
+    <p>5 screen(s) in this area.</p>
+    <h2 id="admin-events-adminevents"><code>/admin/events</code> — AdminEvents<a class="anchor-link" href="#admin-events-adminevents">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/AdminEvents.razor</code> (487 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → OPERATOR → Event Log</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <strong>proven with real data.</strong> The screen was empty on arrival (the <code>EventLog</code> table held 0 rows), so a real config change was made on <code>/admin/settings</code> and saved; the row then rendered with every column populated (Time / Category <code>Configuration</code> / Actor <code>you</code> / Event / Source <code>admin:settings</code>), the header count <code>1 events · configuration</code> matched <code>Showing 1–1 of 1</code>, and the <strong>Details Dialog</strong> rendered its Summary / Raw record / Related events tabs with the correlation id.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size, dialog centred.</li>
+      <li><strong>Known issues (2026-07-29):</strong> ⚠ <strong>Coverage gap (not a render defect).</strong> <code>IEventLogRepository</code> has exactly <strong>one</strong> producer — <code>AppSettingsChangeLog</code>, driven only by the <code>/admin/settings</code> save. The screen's own subtitle and REQ-UI-026 both promise “auth, ingestion and configuration changes”, yet 12 ingested documents and 5 connector runs on this install produced <strong>zero</strong> events. Auth and ingestion have no writer at all.</li>
+    </ul>
+    <p><img alt="AdminEvents" src="../screenshots/TechieDesk/event-log.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls">Controls<a class="anchor-link" href="#controls">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>6</td><td>61, 93, 163, 167…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>3</td><td>81, 144, 225</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>34, 35</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>2</td><td>35, 105</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>2</td><td>42, 66</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>2</td><td>68, 214</td></tr>
+        <tr><td><code>&lt;Select&gt;</code></td><td>1</td><td>46</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>1</td><td>59</td></tr>
+        <tr><td><code>&lt;Dialog&gt;</code></td><td>1</td><td>125</td></tr>
+        <tr><td><code>&lt;Tabs&gt;</code></td><td>1</td><td>134</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>EventLogs.CountAsync()</code></td><td><code>IEventLogRepository</code></td><td>337</td></tr>
+        <tr><td><code>EventLogs.ListCategoriesAsync()</code></td><td><code>IEventLogRepository</code></td><td>352</td></tr>
+        <tr><td><code>EventLogs.QueryAsync()</code></td><td><code>IEventLogRepository</code></td><td>351</td></tr>
+        <tr><td><code>EventLogs.QueryByCorrelationAsync()</code></td><td><code>IEventLogRepository</code></td><td>390</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;AdminEvents&gt;</code></td><td>356</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;AdminEvents&gt;</code></td><td>394, 465, 483</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>395, 466, 484</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>461, 479</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IEventLogRepository</code>, <code>IConfiguration</code>, <code>ToastService</code>, <code>ILogger&lt;AdminEvents&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 5 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (loadError is not null)</code> (line 32)</li>
+      <li><code>@if (selected is not null)</code> (line 132)</li>
+      <li><code>@if (!string.IsNullOrWhiteSpace(selected.CorrelationId))</code> (line 165)</li>
+    </ul>
+    <h2 id="admin-settings-adminsettings"><code>/admin/settings</code> — AdminSettings<a class="anchor-link" href="#admin-settings-adminsettings">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/AdminSettings.razor</code> (347 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → OPERATOR → App Settings (MainLayout.razor:226)</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <strong>all three tabs driven.</strong> <em>Defaults</em>: Default LLM, Default embeddings, Vector store Selects and the Max-upload NumericInput all show live values; Save works and is audited. <em>Branding</em>: AppearancePanel (Theme radios, 5 accent swatches, Language picker) <strong>plus</strong> the <code>WHITE_LABEL</code> FeatureGate rendering its upgrade prompt — the correct render for a Free install, not a missing form. <em>Updates</em>: the hosted <code>AppUpdates Embedded="true"</code> surface.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size on every tab.</li>
+      <li><strong>Known issues (2026-07-29):</strong> ✅ <strong><code>ForceMount="true"</code> on all three <code>&lt;TabsContent&gt;</code> (the 2026-07-29 <code>aria-controls</code> fix) causes no visual regression and no duplicate heading.</strong> Verified directly: inactive panels mount hidden and contribute <strong>nothing</strong> to the accessibility tree (the Defaults fields disappear from the element dump the moment Branding is active), exactly one <code>App settings</code> <code>&lt;h1&gt;</code> is present on every tab, and the embedded <code>AppUpdates</code> emits no second <code>&lt;h1&gt;</code>/<code>&lt;PageTitle&gt;</code> — its standalone <code>/settings/updates</code> copy does show its own <code>Updates</code> heading, confirming the <code>Embedded</code> switch works.</li>
+    </ul>
+    <p><img alt="AdminSettings" src="../screenshots/TechieDesk/app-settings.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-2">Controls<a class="anchor-link" href="#controls-2">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Select&gt;</code></td><td>3</td><td>85, 103, 121</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>37, 69</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>2</td><td>50, 51</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>1</td><td>34</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>51</td></tr>
+        <tr><td><code>&lt;Tabs&gt;</code></td><td>1</td><td>57</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>1</td><td>75</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>1</td><td>78</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-2">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-2">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>ChangeLog.RecordAsync()</code></td><td><code>IAppSettingsChangeLog</code></td><td>288</td></tr>
+        <tr><td><code>ConfigService.LoadConfigAsync()</code></td><td><code>TechieRagConfigService</code></td><td>243</td></tr>
+        <tr><td><code>ConfigService.SaveConfigAsync()</code></td><td><code>TechieRagConfigService</code></td><td>282</td></tr>
+        <tr><td><code>DefaultsStore.GetMaxUploadSizeMbAsync()</code></td><td><code>IAppDefaultsStore</code></td><td>244</td></tr>
+        <tr><td><code>DefaultsStore.SetMaxUploadSizeMbAsync()</code></td><td><code>IAppDefaultsStore</code></td><td>284</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;AdminSettings&gt;</code></td><td>249, 299</td></tr>
+        <tr><td><code>RagManager.ReconfigureAsync()</code></td><td><code>TechieRagManager</code></td><td>283</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>269, 300</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>291</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>TechieRagConfigService</code>, <code>TechieRagManager</code>, <code>IAppDefaultsStore</code>, <code>IAppSettingsChangeLog</code>, <code>ToastService</code>, <code>ILogger&lt;AdminSettings&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 4 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isSaving)</code> (line 35)</li>
+      <li><code>@if (loadError is not null)</code> (line 48)</li>
+      <li><code>@if (isLoading)</code> (line 66)</li>
+    </ul>
+    <h2 id="automations-automations"><code>/automations</code> — Automations<a class="anchor-link" href="#automations-automations">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/Automations.razor</code> (1046 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → OPERATOR → Automations</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <em>Schedules</em> tab shows a real scheduled job (plain-language “Every 5 minutes”, last run, paused state) with working pagination; <em>Run history</em> shows 5 populated runs (Outcome/Items/Started/Duration/Trigger); the <code>New schedule</code> Dialog renders the natural-language authoring surface (free-text description + <code>Interpret</code>).</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size on every tab.</li>
+      <li><strong>Known issues (2026-07-29):</strong> The <em>Flows</em> tab renders an honest “<strong>Flows are not part of this build</strong>” panel — consistent with REQ-UI-040 <code>Not Started</code>. NL interpretation is <strong>unexercised</strong>: the dialog itself reports “No local model is configured”.</li>
+    </ul>
+    <p><img alt="Automations" src="../screenshots/TechieDesk/automations.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-3">Controls<a class="anchor-link" href="#controls-3">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>16</td><td>37, 38, 41, 57…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>9</td><td>200, 201, 258, 274…</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>8</td><td>142, 372, 379, 438…</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>7</td><td>374, 381, 443, 470…</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>6</td><td>38, 53, 125, 174…</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>6</td><td>51, 53, 332, 362…</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>5</td><td>66, 108, 197, 223…</td></tr>
+        <tr><td><code>&lt;Dialog&gt;</code></td><td>3</td><td>294, 427, 533</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>76, 319</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>2</td><td>137, 243</td></tr>
+        <tr><td><code>&lt;Input&gt;</code></td><td>2</td><td>397, 483</td></tr>
+        <tr><td><code>&lt;Progress&gt;</code></td><td>1</td><td>85</td></tr>
+        <tr><td><code>&lt;Tabs&gt;</code></td><td>1</td><td>100</td></tr>
+        <tr><td><code>&lt;DropdownMenu&gt;</code></td><td>1</td><td>170</td></tr>
+        <tr><td><code>&lt;Textarea&gt;</code></td><td>1</td><td>305</td></tr>
+        <tr><td><code>&lt;AlertDialog&gt;</code></td><td>1</td><td>580</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-3">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-3">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>BackgroundJobs.Cancel()</code></td><td><code>IBackgroundJobService</code></td><td>857</td></tr>
+        <tr><td><code>Interpreter.InterpretAsync()</code></td><td><code>IScheduleInterpreter</code></td><td>723</td></tr>
+        <tr><td><code>Interpreter.Rebuild()</code></td><td><code>IScheduleInterpreter</code></td><td>755</td></tr>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;Automations&gt;</code></td><td>695, 739, 809…</td></tr>
+        <tr><td><code>PreferencesStore.LoadAsync()</code></td><td><code>ISchedulerPreferencesStore</code></td><td>688</td></tr>
+        <tr><td><code>PreferencesStore.SaveAsync()</code></td><td><code>ISchedulerPreferencesStore</code></td><td>936</td></tr>
+        <tr><td><code>SchedulerHelper.GetState()</code></td><td><code>ISchedulerHelper</code></td><td>690, 929</td></tr>
+        <tr><td><code>SchedulerHelper.InstallAsync()</code></td><td><code>ISchedulerHelper</code></td><td>907</td></tr>
+        <tr><td><code>SchedulerHelper.UninstallAsync()</code></td><td><code>ISchedulerHelper</code></td><td>908</td></tr>
+        <tr><td><code>Schedules.CreateAsync()</code></td><td><code>IScheduleService</code></td><td>797</td></tr>
+        <tr><td><code>Schedules.DeleteAsync()</code></td><td><code>IScheduleService</code></td><td>878</td></tr>
+        <tr><td><code>Schedules.ListAsync()</code></td><td><code>IScheduleService</code></td><td>686</td></tr>
+        <tr><td><code>Schedules.ListRecentRunsAsync()</code></td><td><code>IScheduleService</code></td><td>687</td></tr>
+        <tr><td><code>Schedules.ListRunItemsAsync()</code></td><td><code>IScheduleService</code></td><td>897</td></tr>
+        <tr><td><code>Schedules.RunNowAsync()</code></td><td><code>IScheduleService</code></td><td>836</td></tr>
+        <tr><td><code>Schedules.SetEnabledAsync()</code></td><td><code>IScheduleService</code></td><td>822</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>696, 810, 828…</td></tr>
+        <tr><td><code>ToastService.Show()</code></td><td><code>ToastService</code></td><td>839, 859</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>798, 843, 879…</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IScheduleService</code>, <code>IScheduleInterpreter</code>, <code>IBackgroundJobService</code>, <code>ISchedulerHelper</code>, <code>ISchedulerPreferencesStore</code>, <code>ToastService</code>, <code>ILogger&lt;Automations&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 13 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (helperState is not null)</code> (line 49)</li>
+      <li><code>@if (activeJobs.Count &gt; 0)</code> (line 64)</li>
+      <li><code>@if (job.PercentComplete is { } percent)</code> (line 83)</li>
+    </ul>
+    <h2 id="settings-data-datastorage"><code>/settings/data</code> — DataStorage<a class="anchor-link" href="#settings-data-datastorage">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/DataStorage.razor</code> (276 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → OPERATOR → Data &amp; Storage</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — data-directory path with Copy, <code>Healthy</code> badge, disk-usage summary, and a 9-row artefact table with real sizes and timestamps plus per-row <code>Reveal</code>.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps; the table compresses without horizontal overflow at 1024.</li>
+      <li><strong>Known issues (2026-07-29):</strong> The <code>uploads</code> artefact reads <code>not created yet</code> — original source documents are not retained, which is the same root cause as the blank <code>Size</code> column on <code>/workspace/{Slug}/documents</code>.</li>
+    </ul>
+    <p><img alt="DataStorage" src="../screenshots/TechieDesk/data-and-storage.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-4">Controls<a class="anchor-link" href="#controls-4">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Button&gt;</code></td><td>6</td><td>21, 22, 69, 114…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>5</td><td>51, 54, 58, 84…</td></tr>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>3</td><td>40, 41, 144</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>3</td><td>48, 81, 131</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>1</td><td>25</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>1</td><td>41</td></tr>
+        <tr><td><code>&lt;Progress&gt;</code></td><td>1</td><td>90</td></tr>
+        <tr><td><code>&lt;DataTable&gt;</code></td><td>1</td><td>92</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-4">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-4">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;DataStorage&gt;</code></td><td>222</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;DataStorage&gt;</code></td><td>258, 271</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>259, 272</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>254, 267</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IConfiguration</code>, <code>ToastService</code>, <code>ILogger&lt;DataStorage&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 4 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (isMeasuring)</code> (line 23)</li>
+      <li><code>@if (measureError is not null)</code> (line 38)</li>
+      <li><code>@if (snapshot is { DirectoryExists: true })</code> (line 52)</li>
+    </ul>
+    <h2 id="settings-updates-appupdates"><code>/settings/updates</code> — AppUpdates<a class="anchor-link" href="#settings-updates-appupdates">#</a></h2>
+    <ul>
+      <li><strong>File:</strong> <code>apps/TechieDesk/Components/Pages/AppUpdates.razor</code> (367 lines)</li>
+      <li><strong>Reached via:</strong> Sidebar → OPERATOR → Updates</li>
+      <li><strong>Observed:</strong> renders ✓ (runtime-confirmed 2026-07-29) — <code>Installed</code> badge, <code>Version 1.0</code>, <code>Not checked yet</code>, <code>Check for updates</code>, and three preference Switches with their explanations.</li>
+      <li><strong>Visual (§4b):</strong> looks-right ✓ (runtime-confirmed 2026-07-29) — 1600 and 1024: 0 overlaps, 0 zero-size.</li>
+      <li><strong>Known issues (2026-07-29):</strong> Standalone it emits its own <code>Updates</code> <code>&lt;h1&gt;</code>; hosted on <code>/admin/settings</code> with <code>Embedded="true"</code> it emits none. Both were observed this run.</li>
+    </ul>
+    <p><img alt="AppUpdates" src="../screenshots/TechieDesk/updates.png" style="max-width:100%;border:1px solid var(--border,#ccc);border-radius:6px" /></p>
+    <h3 id="controls-5">Controls<a class="anchor-link" href="#controls-5">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Component</th><th>Uses</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>&lt;Alert&gt;</code></td><td>7</td><td>56, 57, 64, 73…</td></tr>
+        <tr><td><code>&lt;Badge&gt;</code></td><td>3</td><td>37, 40, 44</td></tr>
+        <tr><td><code>&lt;Switch&gt;</code></td><td>3</td><td>160, 170, 185</td></tr>
+        <tr><td><code>&lt;Label&gt;</code></td><td>3</td><td>161, 171, 186</td></tr>
+        <tr><td><code>&lt;Card&gt;</code></td><td>2</td><td>34, 152</td></tr>
+        <tr><td><code>&lt;LucideIcon&gt;</code></td><td>2</td><td>57, 196</td></tr>
+        <tr><td><code>&lt;Button&gt;</code></td><td>2</td><td>115, 129</td></tr>
+        <tr><td><code>&lt;Spinner&gt;</code></td><td>2</td><td>118, 134</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3 id="data-lineage-razor-injected-service-5">Data lineage — Razor → injected service<a class="anchor-link" href="#data-lineage-razor-injected-service-5">#</a></h3>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Call</th><th>Service (as injected)</th><th>Razor line(s)</th></tr></thead>
+      <tbody>
+        <tr><td><code>Logger.LogError()</code></td><td><code>ILogger&lt;AppUpdates&gt;</code></td><td>278, 313, 362</td></tr>
+        <tr><td><code>Logger.LogWarning()</code></td><td><code>ILogger&lt;AppUpdates&gt;</code></td><td>332</td></tr>
+        <tr><td><code>Preferences.LoadAsync()</code></td><td><code>IUpdatePreferencesStore</code></td><td>260, 274</td></tr>
+        <tr><td><code>Preferences.SaveAsync()</code></td><td><code>IUpdatePreferencesStore</code></td><td>357</td></tr>
+        <tr><td><code>ToastService.Error()</code></td><td><code>ToastService</code></td><td>279, 314, 333…</td></tr>
+        <tr><td><code>ToastService.Success()</code></td><td><code>ToastService</code></td><td>309, 328</td></tr>
+        <tr><td><code>UpdateService.CheckAsync()</code></td><td><code>IUpdateService</code></td><td>273</td></tr>
+        <tr><td><code>UpdateService.DownloadAsync()</code></td><td><code>IUpdateService</code></td><td>308</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p><strong>Injected services:</strong> <code>IUpdateService</code>, <code>IUpdatePreferencesStore</code>, <code>ToastService</code>, <code>ILogger&lt;AppUpdates&gt;</code></p>
+    <p><strong>Conditional render guards:</strong> 10 <code>@if</code> blocks — the render-truth risk on this screen. First few:</p>
+    <ul>
+      <li><code>@if (!Embedded)</code> (line 19)</li>
+      <li><code>@if (!Embedded)</code> (line 25)</li>
+      <li><code>@if (result?.Status == UpdateCheckStatus.UpToDate)</code> (line 38)</li>
+    </ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

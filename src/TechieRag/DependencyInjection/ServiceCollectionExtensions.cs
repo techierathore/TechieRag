@@ -163,9 +163,35 @@ public static class ServiceCollectionExtensions
             builder.WithChunkSize(
                 config.Processing.DefaultChunkSize,
                 config.Processing.DefaultChunkOverlap);
+            builder.WithChunking(config.Processing.ChunkingStrategy);
 
             // Configure telemetry
             builder.WithTelemetry(config.EnableTelemetry);
+
+            // Configure reranking (if specified). The reranker is registered whenever credentials
+            // exist, even with Rerank.Enabled false, so a workspace with RerankEnabled = true can
+            // still opt in per call (REQ-RAG-047); Enabled is then restored as the global default.
+            if (config.Rerank.Source is RerankSource.Cohere or RerankSource.Jina
+                && !string.IsNullOrEmpty(config.Rerank.ApiKey))
+            {
+                builder.WithReranker(
+                    config.Rerank.Source,
+                    config.Rerank.ApiKey,
+                    config.Rerank.Model,
+                    config.Rerank.Endpoint,
+                    config.Rerank.TopN,
+                    config.Rerank.CandidateCount);
+                builder.WithRerankEnabledByDefault(config.Rerank.Enabled);
+            }
+
+            // Configure persistence (if specified)
+            if (config.Persistence.Provider != StoreProvider.None && config.Persistence.ConnectionString is not null)
+            {
+                builder.WithPersistence(
+                    config.Persistence.Provider,
+                    config.Persistence.ConnectionString,
+                    config.Persistence.DefaultUserId);
+            }
 
             // Configure LLM (if specified)
             if (config.Llm.Source != LlmSource.None)
@@ -202,6 +228,7 @@ public static class ServiceCollectionExtensions
                     tracking.MaxCostUsd = config.UsageTracking.MaxCostUsd;
                     tracking.AlertThreshold = config.UsageTracking.AlertThreshold;
                     tracking.BlockOnExceeded = config.UsageTracking.BlockOnExceeded;
+                    tracking.Pricing = config.UsageTracking.Pricing;
                 });
             }
 

@@ -1,0 +1,77 @@
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.JSInterop
+@* REQ-FN-035: supplied implicitly by Microsoft.NET.Sdk.Web; the MAUI head's SDK does not. *@
+@using Microsoft.Extensions.Logging
+@using TechieDesk
+@using TechieDesk.Services.Hosting
+@using TechieDesk.Components
+@using TechieDesk.Components.Layout
+@using TechieDesk.Services
+@using TechieDesk.Services.AppManager
+@using TechieDesk.Services.AppManager.Models
+@using TechieDesk.Services.Appearance
+@using TechieDesk.Services.Auth
+@using TechieDesk.Services.Branding
+@using TechieDesk.Services.Localization
+@* REQ-UI-039: .resx lookups. Aliased rather than `@using TechieDesk.Resources` because MAUI treats
+   a `Resources` folder as its own asset root, and an unqualified `Resources` in a MAUI head is
+   ambiguous enough to be worth not writing. *@
+@using Microsoft.Extensions.Localization
+@using AppStrings = TechieDesk.Resources.AppStrings
+@using TechieDesk.Services.Licensing
+@using TechieDesk.Services.Workspaces
+@using TechieDesk.Components.Shared
+@using TechieRag
+@using TechieRag.Abstractions
+@using TechieRag.Models
+@using TechieRag.Services
+@using TrBlazeUI.Components
+@using TrBlazeUI.Primitives
+@using TrBlazeUI.Components.Button
+@using TrBlazeUI.Components.Card
+@using TrBlazeUI.Components.Checkbox
+@using TrBlazeUI.Components.RadioGroup
+@using TrBlazeUI.Components.Select
+@using TrBlazeUI.Components.Switch
+@using TrBlazeUI.Components.Separator
+@using TrBlazeUI.Components.Badge
+@using TrBlazeUI.Components.Sidebar
+@using TrBlazeUI.Components.Dialog
+@using TrBlazeUI.Components.DropdownMenu
+@using TrBlazeUI.Components.Toast
+@using TrBlazeUI.Components.Tabs
+@using TrBlazeUI.Components.Alert
+@using TrBlazeUI.Components.Avatar
+@using TrBlazeUI.Components.Input
+@using TrBlazeUI.Components.Textarea
+@using TrBlazeUI.Components.Label
+@using TrBlazeUI.Components.Field
+@using TrBlazeUI.Components.Combobox
+@using TrBlazeUI.Components.Sheet
+@using TrBlazeUI.Components.Tooltip
+@using TrBlazeUI.Components.Progress
+@using TrBlazeUI.Components.Skeleton
+@using TrBlazeUI.Components.Spinner
+@using TrBlazeUI.Components.DataTable
+@using TrBlazeUI.Components.Breadcrumb
+@using TrBlazeUI.Components.Collapsible
+@using TrBlazeUI.Components.Drawer
+@using TrBlazeUI.Components.Slider
+@using TrBlazeUI.Components.Carousel
+@using TrBlazeUI.Components.Command
+@using TrBlazeUI.Components.ContextMenu
+@using TrBlazeUI.Components.Popover
+@using TrBlazeUI.Components.HoverCard
+@using TrBlazeUI.Components.AlertDialog
+@using TrBlazeUI.Components.Typography
+@using TrBlazeUI.Icons.Lucide.Components
+@using TrBlazeUI.Icons.Lucide.Data
+@using TrBlazeUI.Primitives.Services

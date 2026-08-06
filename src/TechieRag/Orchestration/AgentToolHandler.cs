@@ -1,0 +1,372 @@
+using System.Globalization;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using TechieRag.Abstractions;
+using TechieRag.Models;
+using TechieRag.Services;
+
+namespace TechieRag.Orchestration;
+
+/// <summary>
+/// Exposes an agent — or a whole flow — to another agent as one callable tool (REQ-RAG-042).
+/// </summary>
+/// <remarks>
+/// <para><b>It is an ordinary <see cref="IToolHandler"/>, and that is the whole design.</b> A
+/// calling agent cannot tell the difference between this and a delegate on <c>ToolRegistry</c> or a
+/// tool from an MCP server. So it composes with <see cref="CompositeToolHandler"/> like anything
+/// else — <c>new CompositeToolHandler(localTools, AgentToolHandler.ForAgent(...))</c> — the agent
+/// loop needed no change, <see cref="IToolHandler"/> was not widened, and every existing behaviour
+/// that applies to tools applies to this: the guardrail stage in <see cref="GuardedToolHandler"/>
+/// sees it, a host's egress wrapping sees it, and a failure comes back as an unsuccessful
+/// <see cref="ToolResult"/> the caller can read rather than an exception that ends its turn.</para>
+/// <para><b>Recursion is bounded three ways.</b> <see cref="MaxInvocations"/> caps how many times
+/// one handler may run within its lifetime — the lifetime being one turn, since a host builds these
+/// per turn. A nested flow is additionally bounded by its own
+/// <see cref="FlowDefinition.MaxSteps"/>, and a nested agent by the agent loop's iteration ceiling.
+/// Two agents exposed to each other as tools therefore terminate; they do not have to be prevented
+/// from being wired that way.</para>
+/// <para><b>One string in, one string out.</b> The schema is deliberately a single <c>input</c>
+/// property. A sub-agent that took a structured object would need its caller to know its internals,
+/// which is the coupling agent-as-tool exists to avoid.</para>
+/// <para><b>Its English is model-facing, and stays English (REQ-RAG-050).</b> Every sentence this
+/// type produces — the <c>unavailable: …</c> outcomes, the invocation-limit refusal, the schema's
+/// <c>input</c> description — is written FOR THE LLM, either as a tool result it must read and adapt
+/// to or as prompt text it is conditioned on. Translating those would change what the model is told,
+/// per user, which is a correctness problem dressed as a localization one; TechieDesk's
+/// <c>FlowGuardrailCatalog</c> documents the same split. Only text that reaches a
+/// <see cref="FlowStep"/> or a <see cref="FlowRunResult"/> — what a PERSON reads — carries a
+/// <see cref="FlowMessage"/> code, and a nested run's own steps already do, because
+/// <see cref="FlowRunner"/> emits them.</para>
+/// </remarks>
+public sealed class AgentToolHandler : IToolHandler
+{
+    /// <summary>The default ceiling on how many times one handler may be invoked.</summary>
+    public const int DefaultMaxInvocations = 8;
+
+    private readonly Func<string, IProgress<AgentStep>?, CancellationToken, Task<Invocation>> invoke;
+    private readonly ToolDefinition definition;
+    private int invocations;
+
+    private AgentToolHandler(
+        ToolDefinition definition,
+        int maxInvocations,
+        Func<string, IProgress<AgentStep>?, CancellationToken, Task<Invocation>> invoke)
+    {
+        this.definition = definition;
+        this.invoke = invoke;
+        MaxInvocations = maxInvocations;
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<ToolDefinition> ToolDefinitions => [definition];
+
+    /// <summary>Gets the ceiling on how many times this handler may run.</summary>
+    public int MaxInvocations { get; }
+
+    /// <summary>Gets how many times it has run.</summary>
+    public int Invocations => Volatile.Read(ref invocations);
+
+    /// <summary>
+    /// Gets or sets a live sink for the sub-agent's own steps, so a caller can render what the
+    /// nested agent did as part of one trace. Null discards the inner steps.
+    /// </summary>
+    public IProgress<AgentStep>? InnerProgress { get; set; }
+
+    /// <summary>
+    /// Builds the JSON Schema this handler advertises.
+    /// </summary>
+    /// <param name="inputDescription">What the calling model should put in the <c>input</c> property.</param>
+    /// <returns>A one-property object schema.</returns>
+    public static string BuildSchema(string inputDescription) =>
+        JsonSerializer.Serialize(new
+        {
+            type = "object",
+            properties = new
+            {
+                input = new
+                {
+                    type = "string",
+                    description = string.IsNullOrWhiteSpace(inputDescription)
+                        ? "The request to hand to this agent."
+                        : inputDescription
+                }
+            },
+            required = new[] { "input" }
+        });
+
+    /// <summary>
+    /// Exposes a single agent as a tool.
+    /// </summary>
+    /// <param name="toolName">The name the calling model sees. Must match the providers' <c>[A-Za-z0-9_-]{1,64}</c> shape.</param>
+    /// <param name="description">What this agent is for — the calling model's only basis for choosing it.</param>
+    /// <param name="agent">The agent to run.</param>
+    /// <param name="inputDescription">What to put in the tool's <c>input</c> property.</param>
+    /// <param name="maxInvocations">The ceiling on invocations; defaults to <see cref="DefaultMaxInvocations"/>.</param>
+    /// <param name="loggerFactory">Optional logger factory for the inner agent loop.</param>
+    /// <returns>A handler exposing exactly one tool.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="toolName"/> or <paramref name="description"/> is blank.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="agent"/> is null.</exception>
+    /// <remarks>
+    /// The sub-agent runs the same <see cref="AgentLoopRunner"/> a top-level turn runs, with its own
+    /// system prompt and its own tools. It does not inherit the caller's conversation: a sub-agent
+    /// that could see everything its caller had said would be a handoff wearing a tool's clothes,
+    /// and the token cost would be invisible at the call site.
+    /// </remarks>
+    public static AgentToolHandler ForAgent(
+        string toolName,
+        string description,
+        FlowAgent agent,
+        string? inputDescription = null,
+        int maxInvocations = DefaultMaxInvocations,
+        ILoggerFactory? loggerFactory = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        ArgumentNullException.ThrowIfNull(agent);
+
+        var definition = new ToolDefinition
+        {
+            Name = toolName,
+            Description = description,
+            ParametersSchema = BuildSchema(inputDescription ?? $"The request to hand to {agent.DisplayName}.")
+        };
+
+        return new AgentToolHandler(definition, maxInvocations, async (input, progress, cancellationToken) =>
+        {
+            var messages = new List<ChatMessage>();
+            if (!string.IsNullOrWhiteSpace(agent.SystemPrompt))
+            {
+                messages.Add(ChatMessage.System(agent.SystemPrompt));
+            }
+
+            messages.Add(ChatMessage.User(input));
+
+            var loop = new AgentLoopRunner(
+                agent.LlmProvider,
+                agent.Tools,
+                loggerFactory?.CreateLogger<AgentLoopRunner>(),
+                agent.MaxToolCalls);
+
+            var response = await loop.RunAsync(
+                messages,
+                new LlmCompletionOptions { Temperature = agent.Temperature, MaxTokens = agent.MaxTokens },
+                progress,
+                cancellationToken).ConfigureAwait(false);
+
+            return Invocation.Answer(response.Content ?? string.Empty);
+        });
+    }
+
+    /// <summary>
+    /// Exposes a whole flow as a tool, so an agent can delegate to a multi-step graph.
+    /// </summary>
+    /// <param name="toolName">The name the calling model sees.</param>
+    /// <param name="description">What the flow does.</param>
+    /// <param name="flow">The flow to run.</param>
+    /// <param name="runtime">The bindings the flow runs on.</param>
+    /// <param name="inputDescription">What to put in the tool's <c>input</c> property.</param>
+    /// <param name="maxInvocations">The ceiling on invocations; defaults to <see cref="DefaultMaxInvocations"/>.</param>
+    /// <param name="depth">The nesting depth stamped on the inner flow's steps.</param>
+    /// <param name="loggerFactory">Optional logger factory for the inner runner.</param>
+    /// <returns>A handler exposing exactly one tool.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="toolName"/> or <paramref name="description"/> is blank.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when a required argument is null.</exception>
+    /// <remarks>
+    /// A blocked or budget-exhausted inner run comes back as an UNSUCCESSFUL tool result naming what
+    /// happened, not as a plausible-looking answer. A calling agent that cannot tell "the sub-flow
+    /// was refused" from "the sub-flow replied" will confidently report the refusal as a finding.
+    /// </remarks>
+    public static AgentToolHandler ForFlow(
+        string toolName,
+        string description,
+        FlowDefinition flow,
+        FlowRuntime runtime,
+        string? inputDescription = null,
+        int maxInvocations = DefaultMaxInvocations,
+        int depth = 1,
+        ILoggerFactory? loggerFactory = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(toolName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        ArgumentNullException.ThrowIfNull(flow);
+        ArgumentNullException.ThrowIfNull(runtime);
+
+        var definition = new ToolDefinition
+        {
+            Name = toolName,
+            Description = description,
+            ParametersSchema = BuildSchema(inputDescription ?? $"The request to hand to the '{flow.Name}' flow.")
+        };
+
+        return new AgentToolHandler(definition, maxInvocations, async (input, progress, cancellationToken) =>
+        {
+            var runner = new FlowRunner(flow, runtime, loggerFactory?.CreateLogger<FlowRunner>(), depth);
+            var result = await runner.RunAsync(input, null, progress, cancellationToken).ConfigureAwait(false);
+
+            // Content stays model-facing English so the calling agent can adapt and finish its turn.
+            // The FlowMessage is the same outcome for the PERSON reading the trace — and carrying it
+            // is what makes the row render as blocked rather than green (REQ-RAG-051).
+            return result.Outcome switch
+            {
+                FlowRunOutcome.Completed => Invocation.Answer(result.Output ?? string.Empty),
+
+                FlowRunOutcome.Blocked => Invocation.Unavailable(
+                    $"unavailable: the '{flow.Name}' flow was stopped by guardrail '{result.BlockedByGuardrailId}'. {result.BlockReason}",
+                    FlowMessage.Create(
+                        FlowMessageCodes.SubFlowBlocked,
+                        "The '{0}' flow was stopped by guardrail '{1}': {2}",
+                        flow.Name,
+                        result.BlockedByGuardrailId ?? string.Empty,
+                        result.BlockReason ?? string.Empty)),
+
+                FlowRunOutcome.StepBudgetExhausted => Invocation.Unavailable(
+                    $"unavailable: the '{flow.Name}' flow reached its {flow.MaxSteps}-step budget without finishing.",
+                    FlowMessage.Create(
+                        FlowMessageCodes.SubFlowStepBudgetExhausted,
+                        "The '{0}' flow reached its {1}-step budget without finishing.",
+                        flow.Name,
+                        flow.MaxSteps.ToString(CultureInfo.InvariantCulture))),
+
+                _ => Invocation.Unavailable(
+                    $"unavailable: the '{flow.Name}' flow did not complete. {result.FailureReason}",
+                    FlowMessage.Create(
+                        FlowMessageCodes.SubFlowFailed,
+                        "The '{0}' flow did not complete: {1}",
+                        flow.Name,
+                        result.FailureReason ?? string.Empty))
+            };
+        });
+    }
+
+    /// <inheritdoc/>
+    public async Task<ToolResult> ExecuteToolAsync(ToolCall toolCall, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(toolCall);
+
+        if (!string.Equals(toolCall.Name, definition.Name, StringComparison.OrdinalIgnoreCase))
+        {
+            return new ToolResult
+            {
+                ToolCallId = toolCall.Id,
+                Content = $"Error: Unknown tool '{toolCall.Name}'",
+                IsSuccess = false,
+                ErrorMessage = $"This handler exposes only '{definition.Name}'"
+            };
+        }
+
+        if (Interlocked.Increment(ref invocations) > MaxInvocations)
+        {
+            // The recursion bound. Reported to the model rather than thrown so the calling agent can
+            // say it ran out of delegations and answer with what it has.
+            return new ToolResult
+            {
+                ToolCallId = toolCall.Id,
+                Content = $"unavailable: '{definition.Name}' has already been called {MaxInvocations} times this turn and will not run again.",
+                IsSuccess = false,
+                ErrorMessage = $"Invocation limit of {MaxInvocations} reached for '{definition.Name}'",
+                Message = FlowMessage.Create(
+                    FlowMessageCodes.SubFlowInvocationLimitReached,
+                    "'{0}' reached its limit of {1} calls for this turn and did not run again.",
+                    definition.Name,
+                    MaxInvocations.ToString(CultureInfo.InvariantCulture))
+            };
+        }
+
+        var input = ReadInput(toolCall.ArgumentsJson);
+        if (input is null)
+        {
+            return new ToolResult
+            {
+                ToolCallId = toolCall.Id,
+                Content = "Error: the call must supply a string 'input' property.",
+                IsSuccess = false,
+                ErrorMessage = "Missing or non-string 'input' argument"
+            };
+        }
+
+        try
+        {
+            var outcome = await invoke(input, InnerProgress, cancellationToken).ConfigureAwait(false);
+            return new ToolResult
+            {
+                ToolCallId = toolCall.Id,
+                Content = outcome.Content,
+                // Not defaulted to true any more. An inner run that a guardrail refused, or that ran
+                // out of steps, is NOT a successful tool call, and a trace that renders it green
+                // reports success the run did not achieve (REQ-RAG-051).
+                IsSuccess = outcome.IsSuccess,
+                ErrorMessage = outcome.ErrorMessage,
+                Message = outcome.Message
+            };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Same contract as every other tool handler: a failure is a message the model can read.
+            return new ToolResult
+            {
+                ToolCallId = toolCall.Id,
+                Content = $"Error executing tool: {ex.Message}",
+                IsSuccess = false,
+                ErrorMessage = ex.Message
+            };
+        }
+    }
+
+    /// <summary>
+    /// What one invocation produced: the sentence the MODEL reads, plus — when the run did not
+    /// succeed — the failure a PERSON reads (REQ-RAG-051).
+    /// </summary>
+    /// <param name="Content">The tool result content, always model-facing English.</param>
+    /// <param name="ErrorMessage">The English failure, or null when the run genuinely succeeded.</param>
+    /// <param name="Message">The localizable form of <paramref name="ErrorMessage"/>.</param>
+    /// <remarks>
+    /// <b>This type exists because a string could not say "this did not work".</b> The delegate used
+    /// to return only the content, so every outcome — including a guardrail refusal and an exhausted
+    /// step budget — was wrapped in a <see cref="ToolResult"/> whose <see cref="ToolResult.IsSuccess"/>
+    /// defaulted to true. The sentence said "unavailable"; the flag said "fine". A trace renders the
+    /// flag, so a refused run painted green, and this type's whole job is to make the two agree.
+    /// </remarks>
+    private readonly record struct Invocation(string Content, string? ErrorMessage, FlowMessage? Message)
+    {
+        /// <summary>Gets whether the inner run reached a normal end.</summary>
+        public bool IsSuccess => ErrorMessage is null;
+
+        /// <summary>An inner run that completed, carrying its answer.</summary>
+        /// <param name="content">The answer.</param>
+        /// <returns>A successful invocation.</returns>
+        public static Invocation Answer(string content) => new(content, null, null);
+
+        /// <summary>An inner run that did not complete, carrying what stopped it.</summary>
+        /// <param name="content">The model-facing <c>unavailable: …</c> sentence.</param>
+        /// <param name="message">The coded, translatable form of the failure.</param>
+        /// <returns>An unsuccessful invocation.</returns>
+        public static Invocation Unavailable(string content, FlowMessage message) =>
+            new(content, message.Text, message);
+    }
+
+    /// <summary>Reads the <c>input</c> property out of a call's arguments.</summary>
+    /// <param name="argumentsJson">The arguments the model produced.</param>
+    /// <returns>The input text, or null when the arguments do not carry a string <c>input</c>.</returns>
+    private static string? ReadInput(string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(argumentsJson);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return null;
+
+            return document.RootElement.TryGetProperty("input", out var input) && input.ValueKind == JsonValueKind.String
+                ? input.GetString()
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+}

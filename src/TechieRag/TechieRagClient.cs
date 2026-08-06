@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using TechieRag.Abstractions;
+using TechieRag.Diagnostics;
 using TechieRag.Models;
 using TechieRag.Processors;
 using TechieRag.Services;
@@ -32,6 +34,10 @@ public class TechieRagClient : ITechieRag
     private readonly ITokenTracker tokenTracker;
     private readonly IConversationMemory? conversationMemory;
     private readonly IPromptTemplate promptTemplate;
+    private readonly IReranker? reranker;
+    private readonly IChunker chunker;
+    private readonly IConversationStore? conversationStore;
+    private readonly WorkspaceManager? workspaceManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TechieRagClient"/> class.
@@ -55,7 +61,11 @@ public class TechieRagClient : ITechieRag
         ILlmProvider? llmProvider = null,
         ITokenTracker? tokenTracker = null,
         IConversationMemory? conversationMemory = null,
-        IPromptTemplate? promptTemplate = null)
+        IPromptTemplate? promptTemplate = null,
+        IReranker? reranker = null,
+        IChunker? chunker = null,
+        IConversationStore? conversationStore = null,
+        IWorkspaceStore? workspaceStore = null)
     {
         ArgumentNullException.ThrowIfNull(vectorStore);
         ArgumentNullException.ThrowIfNull(embeddingProvider);
@@ -72,6 +82,12 @@ public class TechieRagClient : ITechieRag
         this.tokenTracker = tokenTracker ?? new TokenUsageTracker();
         this.conversationMemory = conversationMemory;
         this.promptTemplate = promptTemplate ?? new PromptTemplateEngine(config.Prompt);
+        this.reranker = reranker;
+        this.chunker = chunker ?? Processors.Chunking.RecursiveChunker.Instance;
+        this.conversationStore = conversationStore;
+        workspaceManager = workspaceStore is not null
+            ? new WorkspaceManager(this, workspaceStore, this.promptTemplate, config.Prompt, logger)
+            : null;
     }
 
     /// <inheritdoc/>
@@ -82,7 +98,25 @@ public class TechieRagClient : ITechieRag
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Initializing TechieRag client");
-        await vectorStore.InitializeAsync(cancellationToken);
+
+        // REQ-FN-049: ConfigureAwait(false) here is not cosmetic. This is the first await on the
+        // initialization chain a desktop host calls at launch, and without it the continuation is
+        // posted back to whatever SynchronizationContext the caller was on — the exact shape that
+        // deadlocked the MAUI launch delegate when a saved config made the awaited work genuinely
+        // asynchronous. The two awaits below already had it; this one was the odd one out. Library
+        // code never needs the caller's context (coding standards §Best Practices).
+        await vectorStore.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        if (conversationStore is not null)
+        {
+            await conversationStore.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (workspaceManager is not null)
+        {
+            await workspaceManager.GetStore().InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         logger.LogInformation("TechieRag client initialized successfully");
     }
 
@@ -130,11 +164,18 @@ public class TechieRagClient : ITechieRag
         var fileName = Path.GetFileName(filePath);
 
         using var stream = File.OpenRead(filePath);
+
+        // Read before the processor consumes the stream. This is the one number the source artefact
+        // itself carries, and it is the only place in the pipeline where it is still available:
+        // downstream only chunks exist, and their combined length is inflated by chunk overlap.
+        var fileSizeBytes = stream.Length;
+
         var chunks = await processor.ProcessAsync(stream, fileName,
             new DocumentProcessingOptions
             {
                 MaxChunkSize = config.Processing.DefaultChunkSize,
-                ChunkOverlap = config.Processing.DefaultChunkOverlap
+                ChunkOverlap = config.Processing.DefaultChunkOverlap,
+                Chunker = chunker
             }, cancellationToken);
 
         if (chunks.Count == 0)
@@ -151,18 +192,13 @@ public class TechieRagClient : ITechieRag
             chunk.Metadata["DocumentName"] = fileName;
             chunk.Metadata["SourcePath"] = filePath;
             chunk.Metadata["FileName"] = fileName;
+            chunk.Metadata[DocumentMetadataKeys.FileSize] = fileSizeBytes;
             chunkList.Add(chunk);
         }
 
         // Embed all chunks
         logger.LogDebug("Embedding {ChunkCount} chunks for document {DocumentId}", chunkList.Count, documentId);
-        var texts = chunkList.Select(c => c.Text).ToList();
-        var vectors = await embeddingProvider.EmbedBatchAsync(texts, cancellationToken);
-
-        for (int i = 0; i < chunkList.Count; i++)
-        {
-            chunkList[i].Vector = vectors[i];
-        }
+        await EmbedAndStampAsync(chunkList, cancellationToken);
 
         // Ensure document record exists
         await EnsureDocumentExistsAsync(documentId, fileName, filePath, cancellationToken);
@@ -172,6 +208,7 @@ public class TechieRagClient : ITechieRag
         await vectorStore.UpsertBatchAsync(chunkList, cancellationToken);
 
         logger.LogInformation("Successfully ingested document {DocumentId} with {ChunkCount} chunks", documentId, chunkList.Count);
+        TechieRagTelemetry.RecordIngestion(chunkList.Count, "file");
         return documentId;
     }
 
@@ -199,11 +236,18 @@ public class TechieRagClient : ITechieRag
 
         var documentId = Guid.NewGuid().ToString();
 
-        // Chunk the text
+        // For text ingestion the text IS the artefact — pasted input, a page's readable content, a
+        // transcript — so its UTF-8 byte count is the document's size. A caller that knows a truer
+        // number (the original file it read the text out of) overrides it through the metadata
+        // argument below, which is applied after this default.
+        var textSizeBytes = (long)Encoding.UTF8.GetByteCount(text);
+
+        // Chunk the text using the configured chunking strategy
         var textChunks = TextChunker.ChunkText(
             text,
             config.Processing.DefaultChunkSize,
-            config.Processing.DefaultChunkOverlap);
+            config.Processing.DefaultChunkOverlap,
+            chunker);
 
         var chunkList = new List<TextChunk>();
         var chunkIndex = 0;
@@ -221,7 +265,8 @@ public class TechieRagClient : ITechieRag
                 {
                     ["DocumentName"] = documentName,
                     ["SourcePath"] = "text-input",
-                    ["FileName"] = documentName
+                    ["FileName"] = documentName,
+                    [DocumentMetadataKeys.FileSize] = textSizeBytes
                 }
             };
 
@@ -245,13 +290,7 @@ public class TechieRagClient : ITechieRag
 
         // Embed all chunks
         logger.LogDebug("Embedding {ChunkCount} chunks for text document {DocumentId}", chunkList.Count, documentId);
-        var texts = chunkList.Select(c => c.Text).ToList();
-        var vectors = await embeddingProvider.EmbedBatchAsync(texts, cancellationToken);
-
-        for (int i = 0; i < chunkList.Count; i++)
-        {
-            chunkList[i].Vector = vectors[i];
-        }
+        await EmbedAndStampAsync(chunkList, cancellationToken);
 
         // Ensure document record exists
         await EnsureDocumentExistsAsync(documentId, documentName, "text-input", cancellationToken);
@@ -261,6 +300,7 @@ public class TechieRagClient : ITechieRag
         await vectorStore.UpsertBatchAsync(chunkList, cancellationToken);
 
         logger.LogInformation("Successfully ingested text document {DocumentId} with {ChunkCount} chunks", documentId, chunkList.Count);
+        TechieRagTelemetry.RecordIngestion(chunkList.Count, "text");
         return documentId;
     }
 
@@ -327,25 +367,105 @@ public class TechieRagClient : ITechieRag
     /// <item><description>Return ranked results with similarity scores</description></item>
     /// </list>
     /// </remarks>
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+    public Task<IReadOnlyList<SearchResult>> SearchAsync(
         string query,
         int topK = 5,
         string? documentFilter = null,
+        CancellationToken cancellationToken = default) =>
+        SearchAsync(
+            query,
+            new SearchOptions { TopK = topK, DocumentFilter = documentFilter },
+            cancellationToken);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para><b>Algorithm:</b></para>
+    /// <list type="number">
+    /// <item><description>Resolve the effective rerank decision: <see cref="SearchOptions.Rerank"/>
+    /// when set, otherwise the library-wide <c>Rerank.Enabled</c> configuration</description></item>
+    /// <item><description>Generate the embedding vector for the query text</description></item>
+    /// <item><description>Fetch candidates from the vector store (oversampled when reranking)</description></item>
+    /// <item><description>Apply the reranker when it is both configured and enabled for this call</description></item>
+    /// </list>
+    /// </remarks>
+    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+        string query,
+        SearchOptions? options,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(query);
+
+        options ??= new SearchOptions();
+        var topK = options.TopK;
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(topK);
 
-        logger.LogDebug("Searching for query with topK={TopK}, documentFilter={Filter}", topK, documentFilter ?? "(none)");
+        var useReranker = ResolveRerank(options);
+        logger.LogDebug("Searching for query with topK={TopK}, documentFilter={Filter}, rerank={Rerank}",
+            topK, options.DocumentFilter ?? "(none)", useReranker);
 
-        // Embed the query
-        var queryVector = await embeddingProvider.EmbedAsync(query, cancellationToken);
+        // REQ-RAG-036: the span and the histogram cover embedding, retrieval and rerank together,
+        // because that whole sequence is what a caller experiences as "the search took N ms".
+        // Both are inert unless the host opted in - see TechieRagTelemetry.
+        var searchActivity = TechieRagTelemetry.StartActivity("TechieRag.Search");
+        var searchTimer = Stopwatch.StartNew();
+        searchActivity?.SetTag("techierag.search.top.k", topK);
+        searchActivity?.SetTag("techierag.reranked", useReranker);
 
-        // Search the vector store
-        var results = await vectorStore.SearchAsync(queryVector, topK, documentFilter, cancellationToken);
+        using var activityScope = searchActivity;
+
+        var queryVector = await embeddingProvider.EmbedAsync(query, cancellationToken).ConfigureAwait(false);
+        var fetchCount = useReranker ? Math.Max(topK, config.Rerank.CandidateCount) : topK;
+        var results = await vectorStore
+            .SearchAsync(queryVector, fetchCount, options.DocumentFilter, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (useReranker && results.Count > 0)
+        {
+            results = await ApplyRerankAsync(query, results, topK, cancellationToken).ConfigureAwait(false);
+        }
+
+        searchTimer.Stop();
+        searchActivity?.SetTag("techierag.search.result.count", results.Count);
+        TechieRagTelemetry.RecordSearch(searchTimer.Elapsed, results.Count, useReranker);
 
         logger.LogDebug("Search returned {ResultCount} results", results.Count);
         return results;
+    }
+
+    /// <summary>
+    /// Decides whether the rerank stage runs for a single search call.
+    /// </summary>
+    /// <param name="options">The per-call search options.</param>
+    /// <returns>True when a reranker is configured and reranking is enabled for this call.</returns>
+    /// <remarks>
+    /// <para>A null <see cref="SearchOptions.Rerank"/> falls back to <c>config.Rerank.Enabled</c>,
+    /// which is exactly the behaviour of the legacy overload (REQ-RAG-047 back-compat).</para>
+    /// </remarks>
+    private bool ResolveRerank(SearchOptions options)
+    {
+        var requested = options.Rerank ?? config.Rerank.Enabled;
+        if (!requested) return false;
+
+        if (reranker is null)
+        {
+            logger.LogWarning("Rerank was requested for this search but no IReranker is configured; " +
+                              "returning vector-similarity order. Configure one via WithReranker or TechieRag:Rerank.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task<IReadOnlyList<SearchResult>> ApplyRerankAsync(
+        string query,
+        IReadOnlyList<SearchResult> candidates,
+        int topK,
+        CancellationToken cancellationToken)
+    {
+        var topN = config.Rerank.TopN > 0 ? Math.Min(config.Rerank.TopN, topK) : topK;
+        logger.LogDebug("Reranking {CandidateCount} candidates to top {TopN} with {Reranker}",
+            candidates.Count, topN, reranker!.Name);
+        return await reranker.RerankAsync(query, candidates, topN, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -367,6 +487,23 @@ public class TechieRagClient : ITechieRag
     /// <para><b>Flow:</b> Delegates to the vector store's ListDocumentsAsync method
     /// to retrieve all document metadata.</para>
     /// </remarks>
+    /// <inheritdoc />
+    /// <remarks>Taken from the configured provider, so it always describes what THIS client writes.</remarks>
+    public string EmbeddingSignature => embeddingProvider.EmbeddingSignature;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Implemented here as well as on the interface. The interface carries a default so existing
+    /// implementations keep compiling, but a default member is reachable only through the interface —
+    /// a caller holding a concrete <see cref="TechieRagClient"/> could not call it at all, which is
+    /// how most consumers and every test hold it.
+    /// </remarks>
+    public async Task<EmbeddingStalenessReport> DetectStaleEmbeddingsAsync(
+        CancellationToken cancellationToken = default) =>
+        EmbeddingStaleness.Analyze(
+            await ListDocumentsAsync(cancellationToken).ConfigureAwait(false), EmbeddingSignature);
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<Document>> ListDocumentsAsync(CancellationToken cancellationToken = default)
     {
         logger.LogDebug("Listing all documents");
@@ -537,6 +674,71 @@ public class TechieRagClient : ITechieRag
     }
 
     /// <inheritdoc/>
+    public async IAsyncEnumerable<RagStreamEvent> AskStreamWithSourcesAsync(
+        string question,
+        int topK = 5,
+        string? systemPrompt = null,
+        string? documentFilter = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(question);
+
+        var searchResults = await SearchAsync(question, topK, documentFilter, cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(searchResults);
+
+        var messages = promptTemplate.BuildRagPrompt(question, searchResults, systemPrompt);
+        var fullAnswer = new StringBuilder();
+
+        await foreach (var token in llmProvider!.ChatStreamAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            fullAnswer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        yield return RagStreamEvent.FromCompleted(fullAnswer.ToString());
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<RagStreamEvent> ChatWithRagStreamWithSourcesAsync(
+        string userMessage,
+        IReadOnlyList<ChatMessage>? conversationHistory = null,
+        int topK = 5,
+        string? systemPrompt = null,
+        LlmCompletionOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureLlmConfigured();
+        ArgumentException.ThrowIfNullOrEmpty(userMessage);
+
+        if (conversationHistory is null && conversationMemory is not null)
+        {
+            conversationHistory = await conversationMemory.GetHistoryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        var searchResults = await SearchAsync(userMessage, topK, cancellationToken: cancellationToken).ConfigureAwait(false);
+        yield return RagStreamEvent.FromSources(searchResults);
+
+        var messages = promptTemplate.BuildRagChatPrompt(userMessage, searchResults, conversationHistory, systemPrompt);
+        var fullAnswer = new StringBuilder();
+
+        await foreach (var token in llmProvider!.ChatStreamAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            fullAnswer.Append(token);
+            yield return RagStreamEvent.FromToken(token);
+        }
+
+        if (conversationMemory is not null)
+        {
+            await conversationMemory.AddMessageAsync(ChatMessage.User(userMessage), cancellationToken).ConfigureAwait(false);
+            await conversationMemory.AddMessageAsync(ChatMessage.Assistant(fullAnswer.ToString()), cancellationToken).ConfigureAwait(false);
+        }
+
+        yield return RagStreamEvent.FromCompleted(fullAnswer.ToString());
+    }
+
+    /// <inheritdoc/>
     public ILlmProvider? GetLlmProvider() => llmProvider;
 
     /// <inheritdoc/>
@@ -544,6 +746,15 @@ public class TechieRagClient : ITechieRag
 
     /// <inheritdoc/>
     public IConversationMemory? GetConversationMemory() => conversationMemory;
+
+    /// <inheritdoc/>
+    public IReranker? GetReranker() => reranker;
+
+    /// <inheritdoc/>
+    public IConversationStore? GetConversationStore() => conversationStore;
+
+    /// <inheritdoc/>
+    public WorkspaceManager? GetWorkspaceManager() => workspaceManager;
 
     private void EnsureLlmConfigured()
     {
@@ -619,6 +830,31 @@ public class TechieRagClient : ITechieRag
     /// automatically during chunk upsert. This method ensures the record exists for
     /// stores that may not do so automatically.</para>
     /// </remarks>
+    /// <summary>
+    /// Embeds a document's chunks and stamps each one with what produced its vector (REQ-RAG-052).
+    /// </summary>
+    /// <param name="chunkList">The chunks to embed, mutated in place.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A task that completes when every chunk carries a vector and a signature.</returns>
+    /// <remarks>
+    /// <b>The two steps are together on purpose.</b> Every ingestion route embeds and then stores, so
+    /// a route that embedded here and stamped somewhere else would eventually gain a path that forgot
+    /// the stamp — and an unstamped document is indistinguishable from a pre-2026-08-04 one. Binding
+    /// the stamp to the embedding call makes "vector present, signature absent" unreachable.
+    /// </remarks>
+    private async Task EmbedAndStampAsync(List<TextChunk> chunkList, CancellationToken cancellationToken)
+    {
+        var texts = chunkList.Select(chunk => chunk.Text).ToList();
+        var vectors = await embeddingProvider.EmbedBatchAsync(texts, cancellationToken);
+        var signature = embeddingProvider.EmbeddingSignature;
+
+        for (var i = 0; i < chunkList.Count; i++)
+        {
+            chunkList[i].Vector = vectors[i];
+            chunkList[i].Metadata[DocumentMetadataKeys.EmbeddingSignature] = signature;
+        }
+    }
+
     private async Task EnsureDocumentExistsAsync(
         string documentId,
         string name,

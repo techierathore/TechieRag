@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
+using TechieRag.Diagnostics;
 using TechieRag.Models;
 
 namespace TechieRag.Llm;
@@ -19,7 +20,7 @@ namespace TechieRag.Llm;
 /// <para><b>Code Flow:</b> Created by TechieRagBuilder when LlmSource.Ollama is configured.
 /// Communicates with Ollama's HTTP API at /api/chat endpoint.</para>
 /// </remarks>
-public class OllamaLlmProvider : ILlmProvider
+public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
     private readonly HttpClient httpClient;
     private readonly string endpoint;
@@ -44,6 +45,13 @@ public class OllamaLlmProvider : ILlmProvider
     public bool SupportsStreaming => true;
 
     /// <inheritdoc/>
+    /// <remarks>Images are encoded into Ollama's per-message <c>images</c> array of bare base64
+    /// strings. Ollama has no way to express an image the server should fetch, so a URL-referenced
+    /// image throws rather than being dropped (REQ-RAG-039).</remarks>
+    public bool SupportsInput(ChatContentKind kind) =>
+        kind is ChatContentKind.Text or ChatContentKind.Image;
+
+    /// <inheritdoc/>
     public event EventHandler<LlmCompletionEventArgs>? OnCompletionCompleted;
 
     /// <summary>
@@ -65,6 +73,22 @@ public class OllamaLlmProvider : ILlmProvider
             BaseAddress = new Uri(this.endpoint),
             Timeout = TimeSpan.FromSeconds(120)
         };
+    }
+
+    /// <summary>
+    /// Creates an Ollama provider with a caller-supplied <see cref="HttpClient"/>.
+    /// </summary>
+    /// <remarks>Test seam: allows a stubbed <see cref="HttpMessageHandler"/> to intercept requests.</remarks>
+    /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
+    /// <param name="model">Model name to use.</param>
+    /// <param name="logger">Logger instance.</param>
+    internal OllamaLlmProvider(HttpClient httpClient, string model, ILogger<OllamaLlmProvider>? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        endpoint = httpClient.BaseAddress?.ToString().TrimEnd('/') ?? "http://localhost:11434";
+        ModelName = model;
+        this.logger = logger ?? NullLogger<OllamaLlmProvider>.Instance;
     }
 
     /// <inheritdoc/>
@@ -150,6 +174,7 @@ public class OllamaLlmProvider : ILlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        var outputText = new StringBuilder();
 
         while (!reader.EndOfStream)
         {
@@ -168,11 +193,20 @@ public class OllamaLlmProvider : ILlmProvider
 
             if (!string.IsNullOrEmpty(chunk.Message?.Content))
             {
+                outputText.Append(chunk.Message.Content);
                 yield return chunk.Message.Content;
             }
         }
 
         sw.Stop();
+
+        // Fallback: estimate when the server sent no eval counts
+        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        {
+            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
+            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+        }
+
         RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
@@ -214,16 +248,25 @@ public class OllamaLlmProvider : ILlmProvider
 
     private object BuildRequest(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options, bool stream)
     {
-        var ollamaMessages = messages.Select(m => new
+        var ollamaMessages = messages.Select(m =>
         {
-            role = m.Role,
-            content = m.Content ?? string.Empty,
-            tool_call_id = m.ToolCallId
+            var msg = new Dictionary<string, object?>
+            {
+                ["role"] = m.Role,
+                ["content"] = BuildTextContent(m),
+                ["tool_call_id"] = m.ToolCallId
+            };
+
+            // Ollama keeps images beside the text rather than interleaved with it (REQ-RAG-039).
+            var images = CollectImages(m);
+            if (images.Count > 0) msg["images"] = images;
+
+            return msg;
         }).ToList();
 
         var request = new Dictionary<string, object>
         {
-            ["model"] = ModelName,
+            ["model"] = options?.Model ?? ModelName,
             ["messages"] = ollamaMessages,
             ["stream"] = stream
         };
@@ -257,6 +300,46 @@ public class OllamaLlmProvider : ILlmProvider
         return request;
     }
 
+    /// <summary>Flattens a message's text, whether it arrived as Content or as parts (REQ-RAG-039).</summary>
+    private static string BuildTextContent(ChatMessage message)
+    {
+        if (message.Parts is not { Count: > 0 })
+        {
+            return message.Content ?? string.Empty;
+        }
+
+        var texts = message.Parts
+            .Where(part => part.Kind == ChatContentKind.Text && !string.IsNullOrEmpty(part.Text))
+            .Select(part => part.Text!);
+
+        return string.Join("\n", texts);
+    }
+
+    /// <summary>Collects a message's images as the bare base64 strings Ollama expects (REQ-RAG-039).</summary>
+    /// <exception cref="NotSupportedException">An image is referenced by URL, which Ollama cannot fetch.</exception>
+    private static List<string> CollectImages(ChatMessage message)
+    {
+        var images = new List<string>();
+        if (message.Parts is not { Count: > 0 }) return images;
+
+        foreach (var part in message.Parts)
+        {
+            if (part.Kind != ChatContentKind.Image || part.Image is null) continue;
+
+            if (!part.Image.IsInline)
+            {
+                // Silently dropping it would send a question about a picture with no picture, and the
+                // model would answer confidently about nothing. Failing loudly is the only honest option.
+                throw new NotSupportedException(
+                    "Ollama cannot fetch an image by URL; it accepts inline bytes only. Download the image and use ChatImage.FromBytes.");
+            }
+
+            images.Add(part.Image.Base64Data!);
+        }
+
+        return images;
+    }
+
     private static List<ToolCall>? ParseToolCalls(List<OllamaToolCall>? ollamaToolCalls)
     {
         if (ollamaToolCalls is not { Count: > 0 }) return null;
@@ -273,6 +356,9 @@ public class OllamaLlmProvider : ILlmProvider
 
     private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
     {
+        TechieRagTelemetry.RecordLlmCompletion(
+            Name, ModelName, inputTokens, outputTokens, duration, isStreaming);
+
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
             InputTokens = inputTokens,

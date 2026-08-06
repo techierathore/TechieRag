@@ -30,10 +30,20 @@ public class TokenUsageTracker : ITokenTracker
     /// <summary>
     /// Creates a new token usage tracker with optional initial configuration.
     /// </summary>
-    /// <param name="config">Optional usage tracking configuration.</param>
+    /// <param name="config">Optional usage tracking configuration. Any entries in
+    /// <see cref="UsageTrackingConfig.Pricing"/> override the built-in default pricing,
+    /// so the cost table can be maintained entirely in configuration.</param>
     public TokenUsageTracker(UsageTrackingConfig? config = null)
     {
         InitializeDefaultPricing();
+
+        if (config is not null)
+        {
+            foreach (var entry in config.Pricing)
+            {
+                modelPricing[entry.Key] = (entry.Value.InputPerMillionUsd, entry.Value.OutputPerMillionUsd);
+            }
+        }
 
         if (config is not null && (config.MaxTotalTokens > 0 || config.MaxCostUsd > 0))
         {
@@ -204,6 +214,10 @@ public class TokenUsageTracker : ITokenTracker
         }
     }
 
+    /// <summary>
+    /// Seeds the built-in fallback pricing table. All values can be overridden (and new
+    /// models added) via <see cref="UsageTrackingConfig.Pricing"/> or <see cref="SetModelPricing"/>.
+    /// </summary>
     private void InitializeDefaultPricing()
     {
         modelPricing["gpt-4o"] = (2.50m, 10.00m);
