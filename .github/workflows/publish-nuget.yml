@@ -1,170 +1,157 @@
-name: Build and Publish NuGet Packages
+# Public release pipeline: NuGet.org via Trusted Publishing (OIDC).
+#
+# This workflow is deliberately SEPARATE from publish-github-packages.yml, which remains the
+# primary day-to-day feed (GitHub Packages, private). Nothing here runs automatically: a public
+# release is always a human choosing a specific commit-ish and clicking "Run workflow".
+#
+# The file NAME matters. The trusted publishing policy registered on nuget.org is bound to
+# (repository, workflow file name) = (techierathore/TechieRag, publish-nuget.yml). Renaming or
+# moving this file invalidates the policy until it is updated in the nuget.org UI.
+#
+# No API key is stored anywhere. NuGet/login@v1 exchanges the job's GitHub OIDC token for a
+# temporary nuget.org key that is valid for ~1 hour and can be minted from that token exactly
+# once - which is why the login step sits immediately before the push, after every gate has
+# already passed.
+#
+# See NUGET-PUBLISHING.md at the repo root for the full runbook.
+
+name: Publish to NuGet.org (Trusted Publishing)
 
 on:
-  push:
-    branches: [main, master]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
     inputs:
-      version_suffix:
-        description: 'Version suffix (e.g., preview, beta). Leave empty for release.'
-        required: false
-        default: ''
+      ref:
+        description: 'Tag, branch or SHA to publish. Required on purpose - a public release is always a deliberate choice of commit, never "whatever main happens to be".'
+        required: true
+        default: 'main'
+      dry_run:
+        description: 'Dry run: build, test, pack and inspect the packages, then stop. No OIDC login, no push.'
+        type: boolean
+        required: true
+        default: false
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
-
-# Workflow-level permissions
-permissions:
-  contents: read
-  packages: write
+  NUGET_ORG_SOURCE: https://api.nuget.org/v3/index.json
+  CORE_PROJECT: src/TechieRag/TechieRag.csproj
+  EMBEDDED_PROJECT: src/TechieRag.Embedded/TechieRag.Embedded.csproj
+  TEST_PROJECT: tests/TechieRag.Tests/TechieRag.Tests.csproj
 
 jobs:
-  build:
+  publish:
+    name: Pack and publish to NuGet.org
     runs-on: ubuntu-latest
-
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.NUGET_PACKAGES }}
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Determine version
-        id: version
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            VERSION="${{ github.ref_name }}"
-            VERSION="${VERSION#v}"
-          else
-            VERSION="1.0.0"
-            if [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
-              VERSION="${VERSION}-${{ github.event.inputs.version_suffix }}.${{ github.run_number }}"
-            elif [[ "${{ github.ref }}" != refs/tags/* ]]; then
-              VERSION="${VERSION}-preview.${{ github.run_number }}"
-            fi
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Building version: $VERSION"
-
-      - name: Restore dependencies
-        run: dotnet restore src/TechieRag/TechieRag.csproj && dotnet restore src/TechieRag.Embedded/TechieRag.Embedded.csproj
-
-      - name: Build
-        run: |
-          dotnet build src/TechieRag/TechieRag.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
-          dotnet build src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
-
-      - name: Run tests
-        # Blocking gate: test failures fail the build and prevent publish.
-        # Only the library test project is built/tested — the sample (samples/TechieRagWeb)
-        # cannot restore in CI (private TrBlazeUI feed), so never test the .slnx or globs.
-        run: dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release --verbosity normal
-
-      - name: Pack NuGet packages
-        run: |
-          dotnet pack src/TechieRag/TechieRag.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
-          dotnet pack src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
-
-      - name: List created packages
-        run: ls -la ./nupkgs/
-
-      - name: Upload NuGet packages as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: nuget-packages
-          path: ./nupkgs/*.nupkg
-          retention-days: 30
-
-  publish-github:
-    needs: build
-    runs-on: ubuntu-latest
-    # Run on push to main/master or on tags, also allow manual trigger
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     permissions:
-      packages: write
+      # Required for GitHub to issue the OIDC token that NuGet/login exchanges for a temp key.
+      id-token: write
       contents: read
 
     steps:
+      - name: Checkout ${{ inputs.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Show what is being published
+        run: |
+          echo "Requested ref : ${{ inputs.ref }}"
+          echo "Resolved SHA  : $(git rev-parse HEAD)"
+          echo "Dry run       : ${{ inputs.dry_run }}"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
-      - name: Download NuGet packages
-        uses: actions/download-artifact@v4
-        with:
-          name: nuget-packages
-          path: ./nupkgs
-
-      - name: List downloaded packages
-        run: ls -la ./nupkgs/
-
-      - name: Add GitHub Packages source
+      - name: Restore
         run: |
-          dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+          dotnet restore "$CORE_PROJECT"
+          dotnet restore "$EMBEDDED_PROJECT"
+          dotnet restore "$TEST_PROJECT"
 
-      - name: Publish to GitHub Packages
-        env:
-          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
         run: |
-          for package in ./nupkgs/*.nupkg; do
-            echo "Publishing $package..."
-            dotnet nuget push "$package" --source "github" --skip-duplicate --api-key ${{ secrets.GITHUB_TOKEN }}
+          dotnet build "$CORE_PROJECT"     --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+          dotnet build "$EMBEDDED_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Test
+        # Blocking gate: no green tests, no public release.
+        # Only the library test project is built/tested - the sample (samples/TechieRagWeb) cannot
+        # restore in CI (private TrBlazeUI feed), so never test the .slnx or a glob.
+        run: dotnet test "$TEST_PROJECT" --configuration Release --verbosity normal
+
+      - name: Pack
+        run: |
+          dotnet pack "$CORE_PROJECT"     --configuration Release --no-build -p:ContinuousIntegrationBuild=true --output ./artifacts
+          dotnet pack "$EMBEDDED_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true --output ./artifacts
+
+      - name: Resolve package version
+        id: pkg
+        run: |
+          set -euo pipefail
+          CORE_NUPKG=$(ls ./artifacts/TechieRag.[0-9]*.nupkg)
+          VERSION=$(basename "$CORE_NUPKG" .nupkg | sed 's/^TechieRag\.//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          echo "=============================================="
+          echo "  PUBLISHING TechieRag VERSION $VERSION"
+          echo "  from ref '${{ inputs.ref }}' ($(git rev-parse --short HEAD))"
+          echo "  dry_run = ${{ inputs.dry_run }}"
+          echo "=============================================="
+
+          {
+            echo "## TechieRag -> NuGet.org"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Version** | \`$VERSION\` |"
+            echo "| **Ref** | \`${{ inputs.ref }}\` |"
+            echo "| **Commit** | \`$(git rev-parse HEAD)\` |"
+            echo "| **Dry run** | \`${{ inputs.dry_run }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Inspect package contents
+        # Every run self-documents exactly what shipped: the file list of each .nupkg goes into
+        # the job log, so a package can be audited later without re-downloading it.
+        run: |
+          set -euo pipefail
+          ls -la ./artifacts/
+          for pkg in ./artifacts/*.nupkg ./artifacts/*.snupkg; do
+            [ -e "$pkg" ] || continue
+            echo ""
+            echo "=============================================="
+            echo "  CONTENTS OF $(basename "$pkg")"
+            echo "=============================================="
+            unzip -l "$pkg"
           done
 
-  # Publish to NuGet.org when a release tag is pushed, gated on the NUGET_API_KEY secret.
-  # GitHub Actions does not allow the `secrets` context in a job-level `if`, so the secret
-  # is mapped into job-level env and the push step is gated on it being non-empty.
-  publish-nuget-org:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+      # --- Everything below is skipped entirely on a dry run -------------------------------
 
-    env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-
-    steps:
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Download NuGet packages
-        uses: actions/download-artifact@v4
-        with:
-          name: nuget-packages
-          path: ./nupkgs
-
-      - name: Publish to NuGet.org
-        if: env.NUGET_API_KEY != ''
+      - name: Dry run - stopping before publish
+        if: ${{ inputs.dry_run }}
         run: |
-          for package in ./nupkgs/*.nupkg; do
-            echo "Publishing $package to NuGet.org..."
-            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
-          done
+          echo "dry_run was true: no OIDC login was performed and nothing was pushed."
+          echo "Version ${{ steps.pkg.outputs.version }} packed and inspected only."
 
-      - name: NuGet.org publish skipped (no NUGET_API_KEY secret)
-        if: env.NUGET_API_KEY == ''
-        run: echo "NUGET_API_KEY secret is not configured - skipping NuGet.org publish."
+      - name: NuGet.org login (OIDC -> temporary API key)
+        id: login
+        if: ${{ !inputs.dry_run }}
+        # Runs LAST before the push on purpose: the minted key lives ~1 hour and each OIDC token
+        # can be exchanged exactly once. Placing it after build/test/pack means a failing gate
+        # never burns a token.
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to NuGet.org
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          echo "Pushing TechieRag ${{ steps.pkg.outputs.version }} to $NUGET_ORG_SOURCE"
+          dotnet nuget push "./artifacts/*.nupkg" \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+            --source "$NUGET_ORG_SOURCE" \
+            --skip-duplicate

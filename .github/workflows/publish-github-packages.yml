@@ -1,0 +1,170 @@
+name: Build and Publish NuGet Packages
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      version_suffix:
+        description: 'Version suffix (e.g., preview, beta). Leave empty for release.'
+        required: false
+        default: ''
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+# Workflow-level permissions
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NUGET_PACKAGES }}
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="1.0.0"
+            if [[ -n "${{ github.event.inputs.version_suffix }}" ]]; then
+              VERSION="${VERSION}-${{ github.event.inputs.version_suffix }}.${{ github.run_number }}"
+            elif [[ "${{ github.ref }}" != refs/tags/* ]]; then
+              VERSION="${VERSION}-preview.${{ github.run_number }}"
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Restore dependencies
+        run: dotnet restore src/TechieRag/TechieRag.csproj && dotnet restore src/TechieRag.Embedded/TechieRag.Embedded.csproj
+
+      - name: Build
+        run: |
+          dotnet build src/TechieRag/TechieRag.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Run tests
+        # Blocking gate: test failures fail the build and prevent publish.
+        # Only the library test project is built/tested — the sample (samples/TechieRagWeb)
+        # cannot restore in CI (private TrBlazeUI feed), so never test the .slnx or globs.
+        run: dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release --verbosity normal
+
+      - name: Pack NuGet packages
+        run: |
+          dotnet pack src/TechieRag/TechieRag.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+          dotnet pack src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+
+      - name: List created packages
+        run: ls -la ./nupkgs/
+
+      - name: Upload NuGet packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./nupkgs/*.nupkg
+          retention-days: 30
+
+  publish-github:
+    needs: build
+    runs-on: ubuntu-latest
+    # Run on push to main/master or on tags, also allow manual trigger
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./nupkgs
+
+      - name: List downloaded packages
+        run: ls -la ./nupkgs/
+
+      - name: Add GitHub Packages source
+        run: |
+          dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+      - name: Publish to GitHub Packages
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for package in ./nupkgs/*.nupkg; do
+            echo "Publishing $package..."
+            dotnet nuget push "$package" --source "github" --skip-duplicate --api-key ${{ secrets.GITHUB_TOKEN }}
+          done
+
+  # Publish to NuGet.org when a release tag is pushed, gated on the NUGET_API_KEY secret.
+  # GitHub Actions does not allow the `secrets` context in a job-level `if`, so the secret
+  # is mapped into job-level env and the push step is gated on it being non-empty.
+  publish-nuget-org:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    env:
+      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download NuGet packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./nupkgs
+
+      - name: Publish to NuGet.org
+        if: env.NUGET_API_KEY != ''
+        run: |
+          for package in ./nupkgs/*.nupkg; do
+            echo "Publishing $package to NuGet.org..."
+            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done
+
+      - name: NuGet.org publish skipped (no NUGET_API_KEY secret)
+        if: env.NUGET_API_KEY == ''
+        run: echo "NUGET_API_KEY secret is not configured - skipping NuGet.org publish."
