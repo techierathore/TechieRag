@@ -61,3 +61,8 @@ playwright-report/
 logs/
 .DS_Store
 /docs/.last-verify.json
+
+# TechieFlow agent artifacts — machine-generated test harness & logs, never commit (managed by scaffold/update-framework.sh)
+tests/.artifacts/
+test-results-*/
+/scripts-*/
