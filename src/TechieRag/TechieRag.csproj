@@ -23,6 +23,20 @@
     <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Packing is an explicit, deliberate act (dotnet pack in a publish workflow), never a
+         side effect of `dotnet build` on a dev machine. See NUGET-PUBLISHING.md. -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- SourceLink: the .NET 8+ SDK bundles the GitHub SourceLink provider, so no PackageReference
+         is needed - only these switches. PublishRepositoryUrl stamps the repo URL into the built
+         assembly so debuggers can find the sources; EmbedUntrackedSources covers generated files
+         that are not in the repo. The publish workflow additionally passes
+         -p:ContinuousIntegrationBuild=true so the recorded source paths are deterministic. -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
