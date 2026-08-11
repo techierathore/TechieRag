@@ -9,7 +9,7 @@ after the fact.
 | `runs.jsonl` | framework command run | the task, at completion |
 | `gates.jsonl` | REQ verdict per verify run — **the primary stream** | `verify-phase` §6a, `triage-issues` |
 | `sessions.jsonl` | agent session | the `SessionEnd` hook |
-| `commits.jsonl` | commit | the repo's own `post-commit` hook |
+| `commits.jsonl` | commit | the repo's own `pre-commit` hook |
 
 Schema, enums, and every known limitation: `.tfcore/telemetry/SCHEMA.md`.
 Report: `/TechieFlow:agents:flow-master *metrics <AppName>` → `METRICS.md`.
@@ -39,20 +39,32 @@ dropped. Union merge can leave a record duplicated or out of chronological order
 every consumer sorts on `ts` and de-duplicates commits on `sha`, so neither costs
 you anything.
 
-**`commits.jsonl` needs no collecting.** The `post-commit` hook *reconciles*: on
-each commit it appends a record for every commit reachable from HEAD that the file
-does not already have. So after you pull another machine's work, your next commit
-here backfills all of it. The commit log is itself an append-only log that push
-and pull already replicate everywhere; this stream is a projection of it.
+**`commits.jsonl` needs no collecting.** The `pre-commit` hook *reconciles*: it
+writes a record for every commit reachable from HEAD that the file does not
+already have, then stages that one file so the records ship **inside** the commit
+you are making. So after you pull another machine's work, your next commit here
+records all of it. The commit log is itself an append-only log that push and pull
+already replicate everywhere; this stream is a projection of it.
 
-Two things worth knowing:
+Three things worth knowing:
 
-- The record for the newest commit lands in the **next** commit — the hook fires
-  after the commit is sealed. Nothing is lost; whichever machine commits next
-  writes it.
+- **It stages exactly one path** — `docs/metrics/commits.jsonl`, nothing else. On
+  a partial commit (`git commit -- <paths>`) it writes the record but does **not**
+  stage, so it can never smuggle a file into a commit you deliberately scoped.
+- **The lag is one commit, and it is committed rather than pending.** At
+  pre-commit time HEAD is still the previous commit, so the record for the commit
+  you are making ships in the next one. Your working tree is clean when the commit
+  finishes — that is the whole reason this is a pre-commit hook and not a
+  post-commit one.
 - The hook lives in `.git/hooks/`, which is **not** part of the repository, so
   every clone needs its own. `update-framework.sh <repo>` installs it, and
-  `tf-metrics.sh --report` warns when the clone you are standing in has none.
+  `tf-metrics.sh --report` warns when the clone you are standing in has none. If
+  you already have your own `pre-commit` hook, the installer leaves it alone and
+  tells you — add `bash .tfcore/telemetry/pre-commit` to it if you want both.
+
+Merge commits, `--no-verify`, rebases and cherry-picks skip the hook entirely.
+Nothing is lost: reconciling means the next ordinary commit — here or on any
+machine that pulls — notices those commits are missing and writes them.
 
 To fill in a machine's history immediately rather than waiting for a commit:
 
