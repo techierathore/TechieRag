@@ -1,0 +1,1 @@
+{"kind":"session","session_id":"25343bc6-e9e7-4c04-8ef3-7d1b8ce03a64","harness":"claude-code","model":"claude-fable-5-1","duration_s":6216,"input_tokens":18080,"output_tokens":560686,"cache_read_tokens":42071271,"cache_creation_tokens":1708402,"cost_usd":null,"ts":"2026-09-03T17:58:52Z","v":1,"project_type":"app","app":"TechieRag"}
