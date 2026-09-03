@@ -1,7 +1,8 @@
 # TechieRag
 
 [![Build and Publish NuGet](https://github.com/techierathore/TechieRag/actions/workflows/publish-nuget.yml/badge.svg)](https://github.com/techierathore/TechieRag/actions/workflows/publish-nuget.yml)
-[![NuGet](https://img.shields.io/badge/nuget-TechieRag-blue)](https://github.com/techierathore/TechieRag/packages)
+[![NuGet TechieRag](https://img.shields.io/nuget/v/TechieRag?label=TechieRag)](https://www.nuget.org/packages/TechieRag)
+[![NuGet TechieRag.Embedded](https://img.shields.io/nuget/v/TechieRag.Embedded?label=TechieRag.Embedded)](https://www.nuget.org/packages/TechieRag.Embedded)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. Build powerful document search and retrieval systems with minimal code.
@@ -23,15 +24,82 @@ A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. 
 
 ## Installation
 
-### From GitHub Packages
+Both packages are published on [nuget.org](https://www.nuget.org/packages/TechieRag). No account, no token,
+no `nuget.config` edit — the default NuGet feed every .NET SDK already has is all you need.
 
-1. **Create a Personal Access Token (PAT)** with `read:packages` scope:
-   - Go to GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-   - Generate new token with `read:packages` permission
+```bash
+# Core package — bring your own embedding service (Ollama, OpenAI, Azure OpenAI, LM Studio, ...)
+dotnet add package TechieRag
 
-2. **Add the GitHub Packages source** to your NuGet configuration:
+# OR the self-contained package — embedded BGE-M3 model, works fully offline
+dotnet add package TechieRag.Embedded
+```
 
-   **Option A: Using .NET CLI**
+Or in your `.csproj`:
+
+```xml
+<PackageReference Include="TechieRag" Version="1.*" />
+```
+
+`TechieRag` targets **.NET 8 and .NET 10**; `TechieRag.Embedded` targets **.NET 10**.
+
+### Your first search in five minutes
+
+The fastest zero-cost path uses [Ollama](https://ollama.com) for embeddings (a one-time ~1.2 GB model pull)
+and the built-in SQLite vector store. Nothing else to install or configure.
+
+```bash
+# 1. An embedding model, served locally
+ollama pull bge-m3
+
+# 2. A new console app with TechieRag
+dotnet new console -n MyRagApp && cd MyRagApp
+dotnet add package TechieRag
+```
+
+Replace `Program.cs` with:
+
+```csharp
+using TechieRag;
+
+var rag = new TechieRagBuilder()
+    .UseOllama("http://localhost:11434", "bge-m3")   // embeddings from Ollama
+    .UseSqliteVec("myapp.db")                         // local SQLite vector store
+    .Build();
+
+await rag.InitializeAsync();
+
+await rag.IngestTextAsync(
+    "TechieRag is a RAG library for .NET with pluggable embedding providers and vector stores.",
+    documentName: "about-techierag");
+await rag.IngestTextAsync(
+    "Ollama runs open-weight language and embedding models on your own machine.",
+    documentName: "about-ollama");
+
+var results = await rag.SearchAsync("What is TechieRag?", topK: 2);
+foreach (var result in results)
+    Console.WriteLine($"{result.Score:F3}  {result.Chunk.Text}");
+```
+
+```bash
+# 3. Run it
+dotnet run
+```
+
+You should see two scored results, the `about-techierag` chunk first. From here, `IngestAsync("file.pdf")`
+and `IngestDirectoryAsync("./docs", "*.md")` bring in real documents — see the [Quick Start](#quick-start).
+
+### GitHub Packages — internal development builds only
+
+> **Public consumers never need this section.** It exists for maintainers working on TechieRag itself
+> who want pre-release builds from the private feed. Every merge and every GitHub Release publishes there;
+> a release reaches nuget.org only when a maintainer runs the public workflow against its tag.
+
+<details>
+<summary>Consuming the private GitHub Packages feed</summary>
+
+1. Create a GitHub Personal Access Token (classic) with the `read:packages` scope.
+2. Register the source (or put the same three values in a `nuget.config` next to your solution):
    ```bash
    dotnet nuget add source "https://nuget.pkg.github.com/techierathore/index.json" \
      --name "github-techierathore" \
@@ -39,32 +107,15 @@ A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. 
      --password YOUR_GITHUB_PAT \
      --store-password-in-clear-text
    ```
-
-   **Option B: Using `nuget.config` file** (add to your solution root):
-   ```xml
-   <?xml version="1.0" encoding="utf-8"?>
-   <configuration>
-     <packageSources>
-       <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-       <add key="github-techierathore" value="https://nuget.pkg.github.com/techierathore/index.json" />
-     </packageSources>
-     <packageSourceCredentials>
-       <github-techierathore>
-         <add key="Username" value="YOUR_GITHUB_USERNAME" />
-         <add key="ClearTextPassword" value="YOUR_GITHUB_PAT" />
-       </github-techierathore>
-     </packageSourceCredentials>
-   </configuration>
-   ```
-
-3. **Install the package**:
+3. Pin the source when installing, so the private feed is a deliberate choice rather than a fallback:
    ```bash
-   # Core package (requires external embedding service)
-   dotnet add package TechieRag --source github-techierathore
-
-   # OR Self-contained with embedded model (works offline)
-   dotnet add package TechieRag.Embedded --source github-techierathore
+   dotnet add package TechieRag --source github-techierathore --prerelease
    ```
+
+Never commit a `nuget.config` that carries the token. The publishing pipeline for both feeds is described in
+[NUGET-PUBLISHING.md](NUGET-PUBLISHING.md).
+
+</details>
 
 ## Quick Start
 
@@ -98,7 +149,7 @@ await rag.IngestTextAsync(
 var results = await rag.SearchAsync("What is machine learning?", topK: 5);
 foreach (var result in results)
 {
-    Console.WriteLine($"Score: {result.Score:F3} - {result.Content}");
+    Console.WriteLine($"Score: {result.Score:F3} - {result.Chunk.Text}");
 }
 ```
 
@@ -235,10 +286,12 @@ var results = await rag.SearchAsync("your query", topK: 10);
 
 foreach (var result in results)
 {
-    Console.WriteLine($"Document: {result.DocumentId}");
+    Console.WriteLine($"Document: {result.Chunk.DocumentId}");
     Console.WriteLine($"Score: {result.Score}");
-    Console.WriteLine($"Content: {result.Content}");
-    Console.WriteLine($"Metadata: {result.Metadata}");
+    Console.WriteLine($"Content: {result.Chunk.Text}");
+    Console.WriteLine($"Page: {result.Chunk.PageNumber}  Chunk: {result.Chunk.ChunkIndex}");
+    foreach (var (key, value) in result.Chunk.Metadata)
+        Console.WriteLine($"  {key} = {value}");
 }
 ```
 
@@ -334,7 +387,7 @@ For comprehensive guides on using TechieRag, see:
 
 ## Requirements
 
-- .NET 10.0 or later
+- `TechieRag`: .NET 8.0 or .NET 10.0; `TechieRag.Embedded`: .NET 10.0
 - For `TechieRag.Embedded`: ~2.3GB disk space for the BGE-M3 model (downloaded on first use)
 
 ## License

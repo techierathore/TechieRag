@@ -16,10 +16,7 @@ TechieRag is a complete RAG (Retrieval-Augmented Generation) + LLM management pl
 
 ### NuGet Source
 
-Packages are hosted on **GitHub Packages**:
-- Source URL: `https://nuget.pkg.github.com/techierathore/index.json`
-- Username: GitHub username
-- Authentication: GitHub PAT with `read:packages` scope
+Packages are published on **nuget.org** — the default feed every .NET SDK already has. No account, no token, no `nuget.config` edit is needed to install them.
 
 ### Available Packages
 
@@ -28,27 +25,6 @@ Packages are hosted on **GitHub Packages**:
 | `TechieRag` | Core library - embeddings, vector stores, document processing, LLM providers, all services |
 | `TechieRag.Embedded` | ONNX-based embedded embedding provider (no external API needed) |
 
-### NuGet Configuration
-
-If the project has an existing `nuget.config`, add the TechieRag source to it. Otherwise create:
-
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <clear />
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-    <add key="TechieRag" value="https://nuget.pkg.github.com/techierathore/index.json" />
-  </packageSources>
-  <packageSourceCredentials>
-    <TechieRag>
-      <add key="Username" value="GITHUB_USERNAME" />
-      <add key="ClearTextPassword" value="GITHUB_PAT_WITH_READ_PACKAGES" />
-    </TechieRag>
-  </packageSourceCredentials>
-</configuration>
-```
-
 ### Install Commands
 
 ```bash
@@ -56,6 +32,29 @@ dotnet add package TechieRag
 # Optional: for embedded/offline embeddings (no Ollama/API needed)
 dotnet add package TechieRag.Embedded
 ```
+
+### NuGet Configuration
+
+No `nuget.config` change is required. If the project already has a `nuget.config` with `<clear />`, make sure nuget.org is listed — that is the only source TechieRag needs:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <clear />
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
+    <!-- Optional, maintainers only: internal pre-release feed (see below). Public consumers do not add this. -->
+    <!-- <add key="github-techierathore" value="https://nuget.pkg.github.com/techierathore/index.json" /> -->
+  </packageSources>
+</configuration>
+```
+
+### GitHub Packages (optional, internal pre-release feed)
+
+Public consumers never need this. It is an internal development feed for maintainers working on TechieRag itself who want pre-release builds. Only configure it when the human explicitly asks for internal pre-release builds:
+- Source URL: `https://nuget.pkg.github.com/techierathore/index.json`
+- Authentication: GitHub PAT with `read:packages` scope (username = GitHub username)
+- Install: `dotnet add package TechieRag --source github-techierathore --prerelease`
 
 ---
 

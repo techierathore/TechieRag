@@ -13,24 +13,30 @@ the public one, because that is the one that is irreversible.
 
 ## 1. The dual-feed model
 
-| | GitHub Packages (private) | NuGet.org (public) |
+| | GitHub Packages (internal) | NuGet.org (public) |
 |---|---|---|
-| **Purpose** | Daily / dev feed | On-demand public releases |
-| **Audience** | Us, and anything wired to the private feed | Everyone |
+| **Purpose** | Internal dev / pre-release feed | The public feed consumers install from |
+| **Audience** | Maintainers working on TechieRag itself | Everyone — `dotnet add package TechieRag`, no credentials |
 | **Workflow** | `.github/workflows/publish-github-packages.yml` | `.github/workflows/publish-nuget.yml` |
-| **Trigger** | Automatic — push to `main`/`master`, `v*` tags, PRs | Manual only — `workflow_dispatch` |
+| **Trigger** | Automatic — push to `main`/`master`, `v*` tags (GitHub Releases), PRs | **Manual only** — `workflow_dispatch` against a release tag (dry run from any ref; real run only from a tag) |
 | **Credential** | `GITHUB_TOKEN` (built in) | None stored — OIDC temp key (see §2) |
-| **Cadence** | Every merge | Deliberate, occasional |
+| **Cadence** | Every merge and every release | When the owner decides a release goes public |
 | **Reversible?** | Yes — versions can be deleted | **No** — see "unlist, not delete" in §6 |
 
 Three rules hold this together:
 
-1. **Public versions are always a subset of private-feed versions.** Nothing reaches NuGet.org that
-   has not already existed on the GitHub feed. There is no NuGet.org-only build.
+1. **Public versions are always a subset of internal-feed versions.** Nothing reaches NuGet.org that
+   has not already existed on the GitHub feed. There is no NuGet.org-only build. (The internal
+   workflow also fires on the same `v*` tag, so a tag lands on both feeds from the same commit.)
 2. **Same version number = same commit.** If `1.0.0` exists on both feeds, both were built from the
-   same commit. This is what makes the private feed a usable rehearsal for the public one.
-3. **The public feed never publishes itself.** No push trigger, no tag trigger, no schedule. A human
-   picks a ref and clicks Run workflow. Every public release is an intentional act.
+   same commit. This is what makes the internal feed a usable rehearsal for the public one.
+3. **The public feed never publishes itself.** No push trigger, no tag trigger, no schedule. A
+   GitHub Release creates the `v*` tag and feeds GitHub Packages automatically; nuget.org gets that
+   version only when a human opens Actions → *Publish to NuGet.org (Trusted Publishing)* → Run
+   workflow with the release tag as `ref`. (Reaffirmed 2026-09-03 after a one-day experiment with
+   a tag trigger — see `DECISIONS.md` 2026-09-03, second entry — so the ceremony matches the
+   owner's other libraries.) What changed on 2026-09-03 and stays: the version is derived from that
+   tag, and the run refuses a version already on nuget.org or one not greater than the latest.
 
 ### Packages published
 
@@ -149,61 +155,88 @@ are deterministic rather than machine-local.
 That `commit=` attribute is SourceLink working: consumers can step into the exact sources that built
 the binary.
 
-**Version is deliberately untouched.** The first public release is the **current stable version**
-(`1.0.0` at the time of writing), not a reset to `0.1.x`. TechieRag has been shipping on the private
-feed and going public does not restart its history. Bump versions in the `.csproj` as normal;
-the publish workflow reads whatever is there and prints it prominently.
+**The version comes from the tag, never from the csproj.** `publish-nuget.yml` runs
+`.github/workflows/scripts/determine-version.sh` as its first step after checkout. That script takes
+the `v*` tag the run sits on, strips the `v`, and passes the result as `-p:Version=` to build, test
+and pack, so the assembly version, the test build and the package all agree. The `<Version>` in the
+`.csproj` is a **dev-only number that never ships** to nuget.org — it only surfaces in a dry run from
+a non-tag ref, which packs `<csprojVersion>-dryrun.<run>` for inspection. Before anything is built,
+the same script queries nuget.org and **fails the run** if the tag's version is already published or
+is not greater than the latest published version for either package — a release increments, and a
+re-run of an old tag is an error, not a no-op. The first public release was `1.0.0`, the stable
+version TechieRag had been shipping on the internal feed; going public did not restart its history.
 
 ---
 
 ## 4. Running a public release
 
-Everything happens in the GitHub **Actions** tab → **Publish to NuGet.org (Trusted Publishing)** →
-**Run workflow**.
+Same ceremony as the owner's other libraries: **release first, publish second.**
 
-### Inputs
+### Step 1 — publish a GitHub Release (creates the tag, feeds GitHub Packages)
+
+GitHub → **Releases** → *Draft a new release* → new tag `v1.0.7` on the merged `main` commit →
+*Publish release*. GitHub creates the tag; `publish-github-packages.yml` fires on it and puts `1.0.7`
+on the internal feed. Nothing reaches nuget.org yet.
+
+### Step 2 — dispatch the public workflow against that tag
+
+GitHub **Actions** tab → **Publish to NuGet.org (Trusted Publishing)** → **Run workflow**.
 
 | Input | Meaning |
 |---|---|
-| `ref` | **Required.** Tag, branch or SHA to publish. Defaults to `main`, but it must be confirmed on every run — that is the guardrail. A release is a choice of a specific commit, never "whatever `main` happens to be at the moment I clicked". |
-| `dry_run` | `true` = build, test, pack, list package contents, then stop. No OIDC login, no push. `false` = the real thing. |
+| `ref` | **The release tag** (`v1.0.7`). A real run must be a `v*` tag — any other ref fails in `Determine version` before anything is built. A dry run accepts any branch or SHA. |
+| `dry_run` | `true` = build, test, pack, list package contents, then stop. No OIDC login, no push. From a non-tag ref it packs `<csprojVersion>-dryrun.<run>`, for inspection only. `false` = the real thing, and only from a tag. |
 
-### Always do it in two passes
+The version `1.0.7` is derived from the tag name (§3), checked against nuget.org, and published only if
+it is new and greater than the latest. Pick the tag deliberately — once the push succeeds, that version
+is on nuget.org for good.
 
-**Pass 1 — `dry_run: true`.** Costs nothing, touches nuget.org not at all, and is the last chance to
-see what would ship.
+### Recommended: rehearse before the real run
 
-**Pass 2 — `dry_run: false`.** Same ref. Publishes.
+**Pass 1 — `dry_run: true`** on the release tag (or on the commit before tagging). Costs nothing,
+touches nuget.org not at all, and is the last chance to see what would ship.
+
+**Pass 2 — `dry_run: false`** on the same tag. Publishes.
 
 ### What the log should show
 
-1. **"Show what is being published"** — the requested ref plus the *resolved SHA*. Check that the SHA
-   is the commit you meant.
-2. **Restore / Build / Test** — tests are a blocking gate. Red tests, no release.
-3. **Pack** — `Successfully created package …/TechieRag.<version>.nupkg` (and `.snupkg`), likewise for
+1. **"Checkout <ref>"** — the requested ref. Check the resolved SHA is the commit you meant.
+2. **"Determine version"** — `determine-version.sh` prints where the version came from. On a tag:
+   `TechieRag: latest on nuget.org = 1.0.6; 1.0.7 is new and greater.` (and the same line for
+   `TechieRag.Embedded`). This is the **increment check**: if the tag's version is already on
+   nuget.org, or is not greater than the latest published, the run fails **here**, before restore. On
+   a dry run from a non-tag ref it reports the `-dryrun.<run>` version instead. On a real run from a
+   non-tag ref it fails with *"A public release is cut from a v* tag…"* — dispatch the release tag instead.
+3. **Restore / Build / Test** — tests are a blocking gate. Red tests, no release. Every `dotnet`
+   invocation carries `-p:Version=<tag version>`.
+4. **Pack** — `Successfully created package …/TechieRag.<version>.nupkg` (and `.snupkg`), likewise for
    `TechieRag.Embedded`.
-4. **"Resolve package version"** — a banner box:
+5. **"Confirm packed version"** — verifies the `.nupkg` file names carry exactly the version
+   `Determine version` decided on (a mismatch means a csproj property fought the `-p:Version`
+   override, and the run stops), then prints the banner box:
    ```
    ==============================================
-     PUBLISHING TechieRag VERSION 1.0.0
-     from ref 'main' (e2e7218)
+     PUBLISHING TechieRag VERSION 1.0.7
+     from ref 'v1.0.7' (e2e7218)
      dry_run = false
    ==============================================
    ```
    The same facts are written to the run summary page. **Read this before anything else** — it is the
    single most important line in the run.
-5. **"Inspect package contents"** — a full `unzip -l` file listing of every `.nupkg` and `.snupkg`.
+6. **"Inspect package contents"** — a full `unzip -l` file listing of every `.nupkg` and `.snupkg`.
    This is what makes each run self-documenting: months later the job log still shows exactly which
    files shipped in that version. Sanity-check that `README.md`, `lib/net10.0/`, `lib/net8.0/` and the
    `build/` + `buildTransitive/` AI-agent content are present.
-6. On a **dry run**, it stops here with *"dry_run was true: no OIDC login was performed and nothing
+7. On a **dry run**, it stops here with *"dry_run was true: no OIDC login was performed and nothing
    was pushed."* That is success.
-7. On a **real run**, next comes **"NuGet.org login (OIDC → temporary API key)"** — the `NuGet/login@v1`
+8. On a **real run**, next comes **"NuGet.org login (OIDC → temporary API key)"** — the `NuGet/login@v1`
    step exchanging the token. It should complete in seconds. The key itself is masked in the log; you
    will never see it.
-8. **"Push to NuGet.org"** — `dotnet nuget push … --skip-duplicate` for each package. Expect
-   `Your package was pushed.` (or, on a re-run of a version already up, a skip message rather than an
-   error — that is `--skip-duplicate` doing its job, which makes re-running a run harmless).
+9. **"Push to NuGet.org"** — `dotnet nuget push …` for each package, **without `--skip-duplicate`**.
+   Expect `Your package was pushed.` A `409 Conflict` here is a **real failure**, not a skip:
+   `Determine version` already proved the version was absent, so a duplicate at this point means
+   something raced or the guard was bypassed. Re-running a run is no longer "harmless" — a version
+   that is already up fails in step 2, by design.
 
 ### After the push
 
@@ -257,6 +290,18 @@ Checklist on the nuget.org listing page:
 
 ## 6. Troubleshooting
 
+**`Determine version` failed: "already on nuget.org" / "is not greater than the latest published
+version".** The tag's version has already shipped, or it is lower than / equal to what is live. This
+is the increment guard working, not a bug. A published version is permanent (see "unlist, not
+delete" below), so the fix is always to **bump the tag**: publish a new GitHub Release with the next version
+(`v1.0.8`) and dispatch against that. Do not delete and re-create the same tag — the guard will
+reject it again.
+
+**`Determine version` failed: "A public release is cut from a v* tag, and '<ref>' is not one".** A
+real (non-dry) dispatch run was started on a branch or SHA. Either push a `v*` tag on that commit and
+let the tag path publish it, or re-run the dispatch with `dry_run: true` if you only wanted to
+inspect the packages.
+
 **Login step fails / OIDC rejected.**
 Check in this order: (a) does the job have `permissions: id-token: write`? (b) is the workflow file
 still named exactly `publish-nuget.yml`? (c) is `secrets.NUGET_USER` set to the nuget.org **profile
@@ -278,7 +323,9 @@ not a failure. Confirm via the direct package URL before doing anything else.
 **Unlist, not delete.** NuGet.org does **not** allow deleting a published version — this is
 deliberate, so that consumers' builds do not break. The most you can do is *unlist* it, which hides
 it from search and the package browser while leaving it restorable for anyone who already depends on
-it. Treat every public push as permanent. This is precisely what the dry run is for.
+it. Treat every public push as permanent. This is precisely what the dry run is for — and why the
+push carries no `--skip-duplicate`: re-running a version that is already up is refused by the
+`Determine version` guard rather than quietly skipped, so a failed re-run of an old tag is expected.
 
 **"Policy inactive" warning on nuget.org.** See §2 — restart the policy from the nuget.org UI. No
 repo change required.

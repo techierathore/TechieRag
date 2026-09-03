@@ -92,25 +92,21 @@ persona:
     - Async suffix on all async methods
   integration:
     description: >
-      TechieRag packages are hosted on GitHub Packages under the techierathore organization.
-      The main package is TechieRag (core library with everything). Optional: TechieRag.Embedded
-      for offline ONNX-based embeddings. On first build after install, agent skill files and
-      API reference documentation are auto-deployed to the project.
-    nuget_source: https://nuget.pkg.github.com/techierathore/index.json
-    nuget_config_example: |
+      TechieRag packages are published on nuget.org, the default NuGet feed every .NET SDK already
+      has. Install with a plain `dotnet add package` - no extra source, no nuget.config edit, no
+      token or PAT. The main package is TechieRag (core library with everything). Optional:
+      TechieRag.Embedded for offline ONNX-based embeddings. On first build after install, agent
+      skill files and API reference documentation are auto-deployed to the project.
+    nuget_source: https://api.nuget.org/v3/index.json   # default feed - nothing to configure
+    nuget_config_note: |
+      Do NOT add a package source or credentials for TechieRag. If the project has a nuget.config
+      with <clear />, just make sure nuget.org is listed:
       <?xml version="1.0" encoding="utf-8"?>
       <configuration>
         <packageSources>
           <clear />
           <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-          <add key="TechieRag" value="https://nuget.pkg.github.com/techierathore/index.json" />
         </packageSources>
-        <packageSourceCredentials>
-          <TechieRag>
-            <add key="Username" value="GITHUB_USERNAME" />
-            <add key="ClearTextPassword" value="GITHUB_PAT_WITH_READ_PACKAGES" />
-          </TechieRag>
-        </packageSourceCredentials>
       </configuration>
     packages:
       - TechieRag                # Core library - embeddings, vector stores, LLM, tools, everything
@@ -126,13 +122,16 @@ persona:
       - .opencode/command/techierag.md        (skill file for OpenCode)
       To force-redeploy (after NuGet update): dotnet build -t:TechieRagRedeployAgentFiles
     ci_cd_github_actions: |
-      - name: Add TechieRag NuGet source
-        run: |
-          dotnet nuget add source https://nuget.pkg.github.com/techierathore/index.json \
-            --name TechieRag \
-            --username ${{ github.actor }} \
-            --password ${{ secrets.GITHUB_TOKEN }} \
-            --store-password-in-clear-text
+      No extra step is needed - `dotnet restore` resolves TechieRag from nuget.org in any CI runner.
+    internal_prerelease_feed: |
+      ONLY when the human explicitly asks for internal pre-release / development builds of TechieRag
+      (maintainers working on TechieRag itself). Public consumers never need this - never add it by default.
+      dotnet nuget add source https://nuget.pkg.github.com/techierathore/index.json \
+        --name github-techierathore \
+        --username GITHUB_USERNAME \
+        --password GITHUB_PAT_WITH_READ_PACKAGES \
+        --store-password-in-clear-text
+      dotnet add package TechieRag --source github-techierathore --prerelease
 # All commands require * prefix when used (e.g., *help)
 commands:
   - help: Show numbered list of the following commands to allow selection

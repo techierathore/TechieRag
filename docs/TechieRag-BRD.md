@@ -76,7 +76,7 @@ As of this snapshot the library is **~96% complete**: the v1.1 core (config, vec
 
 <!-- Feature-level SNAPSHOT. Live per-REQ status: PROJECT-STATUS.md + the checklist Requirements Status tables. -->
 
-**Snapshot as of 2026-07-02.** Live, per-requirement status: see `PROJECT-STATUS.md` and the **Requirements Status** table in `docs/TechieRag-Checklist.md`. All feature work below is migrated from `docs/trrag-refactoring-roadmap.md` (v1.1, completed 2025-12-30) and `docs/techierag-v2-llm-implementation-spec.md` (v2, completed 2026-02-18).
+**Snapshot as of 2026-09-03.** Live, per-requirement status: see `PROJECT-STATUS.md` and the **Requirements Status** table in `docs/TechieRag-Checklist.md`. All feature work below is migrated from `docs/trrag-refactoring-roadmap.md` (v1.1, completed 2025-12-30) and `docs/techierag-v2-llm-implementation-spec.md` (v2, completed 2026-02-18).
 
 | Feature (F-code) | Phase | Status | % | Notes |
 |------------------|-------|--------|---|-------|
@@ -96,7 +96,7 @@ As of this snapshot the library is **~96% complete**: the v1.1 core (config, vec
 | F-FALLBACK: Fallback LLM provider | v2 | Done | 100 | Primary→fallback failover decorator |
 | F-PROMPT: Prompt templates | v2 | Done | 100 | Default engine + custom IPromptTemplate |
 | F-AUTODIST: AI-agent autodistribution | v1.1 | Done | 100 | MSBuild targets deploy skill files to consumers |
-| F-PKG: NuGet packaging & publishing | v1.1 | Done | 100 | GitHub Packages ✓; NuGet.org job un-commented + secret-gated (`v*` tag, `NUGET_API_KEY`); CI test step now a blocking gate (REQ-FN-003 Verified static, 2026-07-02) |
+| F-PKG: NuGet packaging & publishing | v1.1 | Done | 100 | ✅ 2026-09-03: REQ-FN-003 re-Verified — the public `publish-nuget.yml` (manual dispatch against the release tag, per the owner's standard ceremony) now derives the version from the selected tag with an already-published / non-increment guard (BRD-61 met on the public feed; DECISIONS.md 2026-09-03); REQ-FN-004 Verified — install docs lead with nuget.org, no auth; GitHub Packages relegated to an internal-builds section. Prior: UAT 2026-09-03 found both (nuget.org stuck at 1.0.0 while tags reached v1.0.6) |
 | F-WEB: TechieDesk application (formerly TechieRagWeb) | v1.1 + v2 | Done | 100 | 10 pages; v2 added 4 AI pages + TrBlazeUI migration |
 | F-WEB: TechieDesk rename (BRD-82) | v3 | Done | 100 | App renamed `TechieRagWeb` → TechieDesk: folder → `apps/TechieDesk`, csproj/RootNamespace/AssemblyName, slnx, namespaces, branding, log naming, Playwright refs. Build 0-err; boots as TechieDesk; render+visual 10/10 (REQ-UI-014 Verified, 2026-07-17) |
 | F-WEB: TechieDesk product repositioning (BRD-81) | v3 | Planned | 0 | Productize as self-hostable AnythingLLM alternative; phased GAP-LIB-*/GAP-APP-* roadmap per `docs/TechieRag-CompetitorAnalysis.md` (umbrella — per-phase REQs added via `*amend-docs`) |

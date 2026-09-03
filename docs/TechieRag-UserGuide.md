@@ -61,46 +61,40 @@ Use **TechieRag.Embedded** when you:
 
 ## Installation
 
-### From GitHub Packages
+### From NuGet.org
 
-1. **Create a Personal Access Token (PAT)** with `read:packages` scope:
-   - Go to GitHub → Settings → Developer settings → Personal access tokens
-   - Generate new token with `read:packages` permission
+TechieRag is published on [nuget.org](https://www.nuget.org/packages/TechieRag). No account, no token, no `nuget.config` edit — the default NuGet feed every .NET SDK already has is all you need.
 
-2. **Add the GitHub Packages source**:
+```bash
+dotnet add package TechieRag
+```
 
-   ```bash
-   dotnet nuget add source "https://nuget.pkg.github.com/techierathore/index.json" \
-     --name "github-techierathore" \
-     --username YOUR_GITHUB_USERNAME \
-     --password YOUR_GITHUB_PAT \
-     --store-password-in-clear-text
-   ```
-
-3. **Install the package**:
-
-   ```bash
-   dotnet add package TechieRag --source github-techierathore
-   ```
-
-### Using nuget.config
-
-Add to your solution root:
+Or add a `PackageReference` directly to your project file:
 
 ```xml
-<?xml version="1.0" encoding="utf-8"?>
-<configuration>
-  <packageSources>
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-    <add key="github-techierathore" value="https://nuget.pkg.github.com/techierathore/index.json" />
-  </packageSources>
-  <packageSourceCredentials>
-    <github-techierathore>
-      <add key="Username" value="YOUR_GITHUB_USERNAME" />
-      <add key="ClearTextPassword" value="YOUR_GITHUB_PAT" />
-    </github-techierathore>
-  </packageSourceCredentials>
-</configuration>
+<ItemGroup>
+  <PackageReference Include="TechieRag" Version="1.0.0" />
+</ItemGroup>
+```
+
+**Target frameworks:** `net10.0` and `net8.0`. Pick whichever your project already targets — no extra configuration is required for either.
+
+If you want the self-contained variant with an embedded BGE-M3 model that works offline, install `TechieRag.Embedded` instead (see the [TechieRag.Embedded User Guide](TechieRag.Embedded-UserGuide.md)).
+
+### GitHub Packages — internal development builds only
+
+> **Public consumers never need this section.** It exists for maintainers working on TechieRag itself who want pre-release builds from the internal GitHub Packages feed. Everyone else should install from nuget.org as shown above.
+
+Maintainers only: create a GitHub Personal Access Token with the `read:packages` scope, register the internal feed once, then install with `--prerelease`:
+
+```bash
+dotnet nuget add source "https://nuget.pkg.github.com/techierathore/index.json" \
+  --name "github-techierathore" \
+  --username YOUR_GITHUB_USERNAME \
+  --password YOUR_GITHUB_PAT \
+  --store-password-in-clear-text
+
+dotnet add package TechieRag --source github-techierathore --prerelease
 ```
 
 ---

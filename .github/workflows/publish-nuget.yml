@@ -1,8 +1,21 @@
 # Public release pipeline: NuGet.org via Trusted Publishing (OIDC).
 #
 # This workflow is deliberately SEPARATE from publish-github-packages.yml, which remains the
-# primary day-to-day feed (GitHub Packages, private). Nothing here runs automatically: a public
-# release is always a human choosing a specific commit-ish and clicking "Run workflow".
+# internal day-to-day feed (GitHub Packages, private, every merge to main and every release tag).
+# NOTHING HERE RUNS AUTOMATICALLY (DECISIONS.md 2026-09-03, second entry). A public release is a
+# human opening Actions -> "Run workflow", entering the release tag as `ref`, and clicking - the
+# same ceremony as the owner's other libraries: publish the GitHub Release (which creates the v*
+# tag and feeds GitHub Packages), then dispatch this workflow against that tag. A REAL run needs
+# `ref` to be (or sit exactly on) a `v*` tag; a DRY run may use any ref and packs a throwaway
+# `-dryrun.N` version for inspection.
+#
+# THE VERSION COMES FROM THE TAG, NEVER FROM THE CSPROJ. The csproj `<Version>` is a standing
+# development number (1.0.0) that was never bumped, and before 2026-09-03 this workflow packed
+# whatever it found there and pushed with --skip-duplicate — so every run after the first one
+# re-packed 1.0.0 and silently no-op'd (nuget.org sat at 1.0.0 while tags reached v1.0.6).
+# Now: `Determine version` derives it from the tag, refuses a version nuget.org already has,
+# refuses one that is not greater than the latest published, and the push no longer carries
+# --skip-duplicate, so a duplicate that somehow got this far fails loudly instead of vanishing.
 #
 # The file NAME matters. The trusted publishing policy registered on nuget.org is bound to
 # (repository, workflow file name) = (techierathore/TechieRag, publish-nuget.yml). Renaming or
@@ -21,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Tag, branch or SHA to publish. Required on purpose - a public release is always a deliberate choice of commit, never "whatever main happens to be".'
+        description: 'Release tag to publish (e.g. v1.0.7). A real run requires a v* tag; a branch/SHA is accepted only with dry_run.'
         required: true
         default: 'main'
       dry_run:
@@ -37,6 +50,9 @@ env:
   CORE_PROJECT: src/TechieRag/TechieRag.csproj
   EMBEDDED_PROJECT: src/TechieRag.Embedded/TechieRag.Embedded.csproj
   TEST_PROJECT: tests/TechieRag.Tests/TechieRag.Tests.csproj
+  # Package IDs whose published versions gate the increment check (lower-case, as the flat
+  # container API keys them). Both ship together at the same version.
+  PACKAGE_IDS: techierag techierag.embedded
 
 jobs:
   publish:
@@ -55,11 +71,16 @@ jobs:
           ref: ${{ inputs.ref }}
           fetch-depth: 0
 
-      - name: Show what is being published
+      - name: Determine version
+        id: version
+        # Pure bash on purpose - no `${{ }}` inside the script - so the exact same logic can be
+        # replayed locally: `GITHUB_REF=refs/tags/v1.0.7 GITHUB_REF_NAME=v1.0.7 bash <this script>`.
+        # tests/verify/publish-nuget-version.sh does exactly that.
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
-          echo "Requested ref : ${{ inputs.ref }}"
-          echo "Resolved SHA  : $(git rev-parse HEAD)"
-          echo "Dry run       : ${{ inputs.dry_run }}"
+          set -euo pipefail
+          bash .github/workflows/scripts/determine-version.sh
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -73,32 +94,43 @@ jobs:
           dotnet restore "$TEST_PROJECT"
 
       - name: Build
+        # -p:Version on every dotnet invocation below, so the assembly version, the test build and
+        # the nuspec all carry the SAME number. Passing it only to `pack --no-build` would ship an
+        # assembly stamped 1.0.0 inside a package labelled with the tag.
         run: |
-          dotnet build "$CORE_PROJECT"     --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
-          dotnet build "$EMBEDDED_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true
+          dotnet build "$CORE_PROJECT"     --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$EMBEDDED_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
 
       - name: Test
         # Blocking gate: no green tests, no public release.
-        # Only the library test project is built/tested - the sample (samples/TechieRagWeb) cannot
+        # Only the library test project is built/tested - the sample (apps/TechieDesk) cannot
         # restore in CI (private TrBlazeUI feed), so never test the .slnx or a glob.
-        run: dotnet test "$TEST_PROJECT" --configuration Release --verbosity normal
+        run: dotnet test "$TEST_PROJECT" --configuration Release --verbosity normal -p:Version=${{ steps.version.outputs.version }}
 
       - name: Pack
         run: |
-          dotnet pack "$CORE_PROJECT"     --configuration Release --no-build -p:ContinuousIntegrationBuild=true --output ./artifacts
-          dotnet pack "$EMBEDDED_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true --output ./artifacts
+          dotnet pack "$CORE_PROJECT"     --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
+          dotnet pack "$EMBEDDED_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
 
-      - name: Resolve package version
+      - name: Confirm packed version
         id: pkg
+        # The packed file names must carry exactly the version `Determine version` decided on.
+        # A mismatch here means a csproj property fought the -p:Version override - stop.
+        env:
+          EXPECTED: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          CORE_NUPKG=$(ls ./artifacts/TechieRag.[0-9]*.nupkg)
-          VERSION=$(basename "$CORE_NUPKG" .nupkg | sed 's/^TechieRag\.//')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          for id in TechieRag TechieRag.Embedded; do
+            pkg="./artifacts/${id}.${EXPECTED}.nupkg"
+            if [ ! -f "$pkg" ]; then
+              echo "::error::Expected $pkg but the pack step produced:"; ls -1 ./artifacts/; exit 1
+            fi
+          done
+          echo "version=$EXPECTED" >> "$GITHUB_OUTPUT"
 
           echo "=============================================="
-          echo "  PUBLISHING TechieRag VERSION $VERSION"
-          echo "  from ref '${{ inputs.ref }}' ($(git rev-parse --short HEAD))"
+          echo "  PUBLISHING TechieRag + TechieRag.Embedded VERSION $EXPECTED"
+          echo "  from ${{ inputs.ref }} ($(git rev-parse --short HEAD))"
           echo "  dry_run = ${{ inputs.dry_run }}"
           echo "=============================================="
 
@@ -107,7 +139,7 @@ jobs:
             echo ""
             echo "| | |"
             echo "|---|---|"
-            echo "| **Version** | \`$VERSION\` |"
+            echo "| **Version** | \`$EXPECTED\` |"
             echo "| **Ref** | \`${{ inputs.ref }}\` |"
             echo "| **Commit** | \`$(git rev-parse HEAD)\` |"
             echo "| **Dry run** | \`${{ inputs.dry_run }}\` |"
@@ -148,10 +180,12 @@ jobs:
 
       - name: Push to NuGet.org
         if: ${{ !inputs.dry_run }}
+        # No --skip-duplicate: `Determine version` already proved this version is not on
+        # nuget.org, so a 409 here is a real fault (a race with another run, or a package that
+        # was pushed and rolled back) and must fail the job rather than print "skipped".
         run: |
           set -euo pipefail
           echo "Pushing TechieRag ${{ steps.pkg.outputs.version }} to $NUGET_ORG_SOURCE"
           dotnet nuget push "./artifacts/*.nupkg" \
             --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
-            --source "$NUGET_ORG_SOURCE" \
-            --skip-duplicate
+            --source "$NUGET_ORG_SOURCE"

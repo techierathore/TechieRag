@@ -172,9 +172,9 @@ private async Task AskQuestion()
 
 ## Integrating TechieRag into an Existing .NET Application
 
-### Step 1: Configure NuGet Source
+### Step 1: Confirm the NuGet Source (usually nothing to do)
 
-TechieRag packages are hosted on **GitHub Packages**. If your project has an existing `nuget.config`, add the TechieRag source. Otherwise create:
+TechieRag packages are published on **nuget.org**, the default feed every .NET SDK already has. Do **not** add a package source, credentials, or a PAT. The only case that needs attention is a project whose `nuget.config` uses `<clear />` — then make sure nuget.org is still listed:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -182,14 +182,7 @@ TechieRag packages are hosted on **GitHub Packages**. If your project has an exi
   <packageSources>
     <clear />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-    <add key="TechieRag" value="https://nuget.pkg.github.com/techierathore/index.json" />
   </packageSources>
-  <packageSourceCredentials>
-    <TechieRag>
-      <add key="Username" value="GITHUB_USERNAME" />
-      <add key="ClearTextPassword" value="GITHUB_PAT_WITH_READ_PACKAGES" />
-    </TechieRag>
-  </packageSourceCredentials>
 </configuration>
 ```
 
@@ -249,14 +242,20 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 
 ### CI/CD (GitHub Actions)
 
-```yaml
-- name: Add TechieRag NuGet source
-  run: |
-    dotnet nuget add source https://nuget.pkg.github.com/techierathore/index.json \
-      --name TechieRag \
-      --username ${{ github.actor }} \
-      --password ${{ secrets.GITHUB_TOKEN }} \
-      --store-password-in-clear-text
+No extra step is needed. A plain `dotnet restore` resolves TechieRag from nuget.org in any CI runner.
+
+### Internal pre-release builds (maintainers only — never by default)
+
+Public consumers never need this. Only if the human **explicitly asks** for internal pre-release / development builds of TechieRag (i.e. they are working on TechieRag itself), register the internal GitHub Packages feed with a PAT that has the `read:packages` scope and install with `--prerelease`:
+
+```bash
+dotnet nuget add source https://nuget.pkg.github.com/techierathore/index.json \
+  --name github-techierathore \
+  --username GITHUB_USERNAME \
+  --password GITHUB_PAT_WITH_READ_PACKAGES \
+  --store-password-in-clear-text
+
+dotnet add package TechieRag --source github-techierathore --prerelease
 ```
 
 ## Commands

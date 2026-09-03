@@ -217,15 +217,18 @@ TechieRag is published as NuGet packages, not deployed as a service.
 
 ```mermaid
 flowchart LR
-  Dev["Dev push / tag v*"] --> CI["GitHub Actions — publish-nuget.yml"]
-  CI --> Restore["restore + build (Release)"]
-  Restore --> Test["xUnit tests (continue-on-error)"]
-  Test --> Pack["dotnet pack (version from tag / run number)"]
-  Pack --> GHP["GitHub Packages (always)"]
-  Pack --> NORG["NuGet.org (manual — needs NUGET_API_KEY)"]
+  Push["push to main / PR"] --> GHW["publish-github-packages.yml"]
+  Rel["GitHub Release → tag v*"] --> GHW
+  Dispatch["manual dispatch, ref = release tag\n(dry run: any ref; real: tag only)"] --> PUB["publish-nuget.yml"]
+  GHW --> GHB["restore → build → test (blocking) → pack\nversion: tag, else 1.0.0-preview.N"]
+  GHB --> GHP["GitHub Packages (internal dev / pre-release feed)"]
+  PUB --> VER["determine-version.sh\nversion = tag; fail if on nuget.org or not > latest"]
+  VER --> PB["restore → build → test (blocking) → pack, all -p:Version"]
+  PB --> OIDC["NuGet/login OIDC → temp key"]
+  OIDC --> NORG["NuGet.org (public feed) — push, no --skip-duplicate"]
 ```
 
-- **CI** — `.github/workflows/publish-nuget.yml` on `net10.0`. Version is taken from a `v*` tag, else `1.0.0-preview.{run_number}`. Packages publish to GitHub Packages automatically; NuGet.org push is present but gated on a secret.
+- **CI** — two workflows, one per feed. `.github/workflows/publish-github-packages.yml` runs on push to `main`, `v*` tags and PRs and publishes to GitHub Packages (the internal dev / pre-release feed); its version comes from the `v*` tag when present, else `1.0.0-preview.{run_number}`. `.github/workflows/publish-nuget.yml` is **manual dispatch only** (never a push or tag trigger): the owner selects the release tag as `ref` and it publishes to nuget.org (the public feed) via OIDC trusted publishing — no stored API key; its version is derived from that tag by `.github/workflows/scripts/determine-version.sh`, which fails the run if that version is already on nuget.org or does not increment past the latest published (a real run must be a tag; a dry run may use any ref).
 - **NuGet feeds** — `nuget.config` adds nuget.org plus a `TrBlazeUI` GitHub Packages source (`nuget.pkg.github.com/techierathore`) for the sample's UI dependency.
 - **AI-agent autodistribution** — `src/TechieRag/build/TechieRag.targets` runs post-build in any consumer project and copies the AI skill files (`.techierag/TechieRag-AI-Reference.md`, `.claude/commands/techierag.md`, `.opencode/command/techierag.md`) into the consuming repo, so `/techierag` is available with zero manual setup.
 
