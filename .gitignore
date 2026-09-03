@@ -66,3 +66,10 @@ logs/
 tests/.artifacts/
 test-results-*/
 /scripts-*/
+
+# TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)
+.codex/
+.agents/skills/
+
+# Build output — dotnet (managed by scaffold/update-framework.sh)
+TestResults/
