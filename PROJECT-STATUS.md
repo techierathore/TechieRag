@@ -1,8 +1,8 @@
 ---
 project: TechieRag
-stack: .NET 10 class library (NuGet) + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieDesk desktop app (MAUI Blazor Hybrid — macOS + Windows, TrBlazeUI, apps/TechieDesk)
+stack: .NET 10/8 class libraries (NuGet) — TechieRag + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieRag.Agents (Microsoft Agent Framework, planned) — and TechieDesk desktop app (MAUI Blazor Hybrid, moving to its own repository)
 last_updated: 2026-09-03
-current_phase: Build — TechieRag 0 open (publishing fix verified; owner tag push pending); TechieDesk 106 open
+current_phase: Build — TechieRag 11 open (Agents package + repo separation planned); TechieDesk 101 open
 last_verified_build: PASS
 last_verified_date: 2026-09-03
 ---
@@ -15,36 +15,39 @@ Requirements Status tables; library defects in the per-library feedback files.
 
 ## Where I am
 
-**Library (`docs/TechieRag-Checklist.md`):** the 2026-09-03 owner UAT report is closed. Triage reopened
-`REQ-FN-003` (the public `publish-nuget.yml` never took its version from the `v*` tag — nuget.org sat at
-`1.0.0` while tags reached `v1.0.6`) and logged `REQ-FN-004` (install docs led with GitHub Packages + PAT
-though both packages are public). Both are fixed and the chained verify pass graded them `Verified`: tag-push
-trigger + tag-derived version with a duplicate/non-increment guard (replayed 9/9 incl. live nuget.org), and a
-stranger walk from a nuget.org-only feed reached a working search in 36 s. Library tests 723 pass / 0 fail.
-`DECISIONS.md` 2026-09-03 records both, plus the owner's same-day decision to keep the public workflow
-**manual dispatch only** (GitHub Release → GitHub Packages automatically → dispatch nuget.org by hand).
-The hosted run itself still needs the owner's next release.
-**App (`docs/TechieDesk-Checklist.md`):** unchanged since 2026-08-05 — 106 open of 179.
+**Docs amended 2026-09-03 (`*amend-docs`, both BRDs, owner decision):** three library packages and a separate
+product. TechieRag BRD-83…87 add the agentic retrieval contract in core, the **`TechieRag.Agents`** package on
+Microsoft Agent Framework 1.20 with public seam adapters, three-package publishing, and **repository separation**
+(TechieDesk leaves this repo and consumes the packages from NuGet). TechieDesk BRD-146/147 mirror that: own
+repository with pinned packages, and the agent runtime on `TechieRag.Agents`. **Governance reversed:** library
+work is ledgered in the TechieRag checklist again — `REQ-RAG-042/044/046/050/051/052` migrated there with their
+status; TechieDesk `REQ-RAG-045` (MEAI interop) closed as superseded. Design: `docs/TechieRag.Agents-Proposal.md`.
+**Library:** `REQ-FN-003/004` (publishing) stay `Verified`; the hosted nuget.org run still needs the owner's next
+release. Library tests 723 pass / 0 fail (unchanged; no code touched today).
+**App (`docs/TechieDesk-Checklist.md`):** 101 open of 181 after the migration and the two new rows.
 
 ## Next command to run
 
 ```
-(owner-run) GitHub → Releases → new release, tag v1.0.7  →  Actions → "Publish to NuGet.org (Trusted Publishing)" → Run workflow, ref = v1.0.7
+/TechieFlow:agents:flow-master *build-phase TechieRag        (OpenCode: /flow-master *build-phase TechieRag)
 ```
-That first dispatch is the live proof of `REQ-FN-003` on the hosted runner; after it, the app resumes with `/TechieFlow:agents:flow-master *build-phase TechieDesk` (OpenCode: `/flow-master *build-phase TechieDesk`).
+Targets `REQ-RAG-015` → `REQ-RAG-016` → `REQ-RAG-017` → `REQ-FN-005` (contract, Agents package, adapters, publish); `REQ-FN-006` / TechieDesk `REQ-FN-054` (repository separation) start with the owner-run git half.
 
 ## Open requirements
 
-- **TechieRag: 0 open** of 38 — all `Verified` / `Done (pre-existing)`. `REQ-FN-003` and `REQ-FN-004`
-  closed 2026-09-03 (owner-found, fixed, verified same day).
-- **TechieDesk: 106 open** of 179 — 73 terminal (55 `Verified` + 18 `N/A`), 0 `FAIL`. Open: 44 `Implemented`,
-  44 `Needs re-verify`, 9 `Blocked`, 4 `PARTIAL`, 2 `Planned`, 2 `Not Started`, 1 `In Progress`.
-  Per-REQ detail in that checklist's Requirements Status table.
+- **TechieRag: 11 open** of 49 — 5 new `Not Started` (`REQ-RAG-015/016/017`, `REQ-FN-005/006`, added
+  2026-09-03) + 6 migrated from the app checklist (`REQ-RAG-042` 95%, `044` 85%, `050` 80%, `051` 95%,
+  `052` 95% `Implemented`; `046` `Not Started`, deferred). `REQ-FN-003/004` closed 2026-09-03.
+- **TechieDesk: 101 open** of 181 — 80 terminal (55 `Verified` + 25 `N/A`), 0 `FAIL`. Open: 39 `Implemented`,
+  44 `Needs re-verify`, 9 `Blocked`, 4 `PARTIAL`, 2 `Planned`, 2 `Not Started` (`REQ-FN-054`, `REQ-RAG-053`
+  added 2026-09-03), 1 `In Progress`. Per-REQ detail in that checklist's Requirements Status table.
 
 ## Known blockers
 
 - 🔶 **`REQ-FN-003` — hosted run unexecuted** (owner): the version logic is proven by replaying the exact
   CI script locally and against live nuget.org; the first real dispatch against `v1.0.7` is the owner's to make.
+- 🔶 **Repository separation (`REQ-FN-006` / TechieDesk `REQ-FN-054`)** (owner): creating the TechieDesk
+  repository and moving history is git work; the agent half (package references, solution, deletion here) follows.
 - 🔶 **TechieDesk `REQ-RAG-052` — RE-INGEST THE WHOLE CORPUS** (owner): vectors embedded before
   2026-08-04 are in a different space; the document library banner names the stale count.
 - 🔶 **TechieDesk verification endpoints** (owner): `.tfcore/core-config.yaml → runtimeVerification.services`
@@ -57,6 +60,7 @@ That first dispatch is the live proof of `REQ-FN-003` on the hosted runner; afte
 
 | Date | Phase | Result | Status table |
 |------|-------|--------|--------------|
+| 2026-09-03 | `*amend-docs` TechieRag + TechieDesk (BRD-83…87, BRD-146/147; governance reversal, 6 rows migrated) | 📝 docs only — no build/test run; 4 docs + 2 checklists amended, HTML re-rendered | [lib](docs/TechieRag-Checklist.md#requirements-status) · [app](docs/TechieDesk-Checklist.md#requirements-status) |
 | 2026-09-03 | `*triage-issues` → `*fix-issues` → verify chained (TechieRag REQ-FN-003, REQ-FN-004) | ✅ 2/2 Verified; 723 lib tests pass; version rules 9/9 (incl. live nuget.org); stranger walk 36 s; 3 misses opened + closed | [table](docs/TechieRag-Checklist.md#requirements-status) |
 | 2026-08-05 | `*build-phase` — TechieDesk REQ-RAG-052 banner (owner-scoped), no verify run | ✅ 2,308 pass / 0 fail; banner proven on screen; REQ-FN-053 not started (stated) | [table](docs/TechieDesk-Checklist.md#requirements-status) |
 | 2026-08-04 | `*verify` ×6 (second run, consent granted) | ✅ 2,306 pass; 0 promoted, REQ-RAG-052 demoted 95% → `Needs re-verify` 80% | [table](docs/TechieDesk-Checklist.md#requirements-status) |
@@ -81,7 +85,8 @@ That first dispatch is the live proof of `REQ-FN-003` on the hosted runner; afte
 
 ## Deferred / future
 
-- **`REQ-RAG-045/046`** (BRD-deferred by owner); **`REQ-RAG-044`**'s `PgVectorStore` test needs Docker installed, not merely started.
+- **`REQ-RAG-046`** (deferred, now in the library checklist); **`REQ-RAG-044`**'s `PgVectorStore` test needs Docker installed, not merely started. `REQ-RAG-045` is superseded by `TechieRag.Agents` (`REQ-RAG-016/017`).
+- `TechieRag.Agents` phase D items (proposal §7): MAF-native tool approval with resumable sessions, history over `IConversationStore`, MAF agent as a flow node, Azure OpenAI / OllamaSharp conveniences.
 - `AgentToolHandler` / `EgressGate` audience split at the render seam (now `REQ-UI-059`); `Models.AgentStep` / `ToolResult` code carriers.
 - A `drv.py` revive-and-retry wrapper (WDA drops the session between commands); `run_sweep` sidebar selectors only work at 1600×1240.
 - Joint `TechieRag*` + `TrBlazeUI*` nuget.org ID-prefix reservation once both families are live (NUGET-PUBLISHING.md §7).

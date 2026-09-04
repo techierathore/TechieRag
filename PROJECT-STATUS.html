@@ -124,14 +124,14 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
     <div class="subtitle">Rendered 2026-09-03 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner-run) GitHub → Releases → new release, tag v1.0.7  →  Actions → &quot;Publish to NuGet.org (Trusted Publishing)&quot; → Run workflow, ref = v1.0.7</div>
+      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *build-phase TechieRag        (OpenCode: /flow-master *build-phase TechieRag)</div>
     </div>
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>stack</th><td>.NET 10 class library (NuGet) + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieDesk desktop app (MAUI Blazor Hybrid — macOS + Windows, TrBlazeUI, apps/TechieDesk)</td></tr>
+<tr><th>stack</th><td>.NET 10/8 class libraries (NuGet) — TechieRag + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieRag.Agents (Microsoft Agent Framework, planned) — and TechieDesk desktop app (MAUI Blazor Hybrid, moving to its own repository)</td></tr>
 <tr><th>last_updated</th><td>2026-09-03</td></tr>
-<tr><th>current_phase</th><td>Build — TechieRag 0 open (publishing fix verified; owner tag push pending); TechieDesk 106 open</td></tr>
+<tr><th>current_phase</th><td>Build — TechieRag 11 open (Agents package + repo separation planned); TechieDesk 101 open</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
 <tr><th>last_verified_date</th><td>2026-09-03</td></tr>
 </tbody>
@@ -153,29 +153,31 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 per-REQ evidence lives in <code>docs/TechieRag-Checklist.md</code> (library) and <code>docs/TechieDesk-Checklist.md</code> (app),
 Requirements Status tables; library defects in the per-library feedback files.</p>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p><strong>Library (<code>docs/TechieRag-Checklist.md</code>):</strong> the 2026-09-03 owner UAT report is closed. Triage reopened
-<code>REQ-FN-003</code> (the public <code>publish-nuget.yml</code> never took its version from the <code>v*</code> tag — nuget.org sat at
-<code>1.0.0</code> while tags reached <code>v1.0.6</code>) and logged <code>REQ-FN-004</code> (install docs led with GitHub Packages + PAT
-though both packages are public). Both are fixed and the chained verify pass graded them <code>Verified</code>: tag-push
-trigger + tag-derived version with a duplicate/non-increment guard (replayed 9/9 incl. live nuget.org), and a
-stranger walk from a nuget.org-only feed reached a working search in 36 s. Library tests 723 pass / 0 fail.
-<code>DECISIONS.md</code> 2026-09-03 records both, plus the owner's same-day decision to keep the public workflow
-<strong>manual dispatch only</strong> (GitHub Release → GitHub Packages automatically → dispatch nuget.org by hand).
-The hosted run itself still needs the owner's next release.
-<strong>App (<code>docs/TechieDesk-Checklist.md</code>):</strong> unchanged since 2026-08-05 — 106 open of 179.</p>
+<p><strong>Docs amended 2026-09-03 (<code>*amend-docs</code>, both BRDs, owner decision):</strong> three library packages and a separate
+product. TechieRag BRD-83…87 add the agentic retrieval contract in core, the <strong><code>TechieRag.Agents</code></strong> package on
+Microsoft Agent Framework 1.20 with public seam adapters, three-package publishing, and <strong>repository separation</strong>
+(TechieDesk leaves this repo and consumes the packages from NuGet). TechieDesk BRD-146/147 mirror that: own
+repository with pinned packages, and the agent runtime on <code>TechieRag.Agents</code>. <strong>Governance reversed:</strong> library
+work is ledgered in the TechieRag checklist again — <code>REQ-RAG-042/044/046/050/051/052</code> migrated there with their
+status; TechieDesk <code>REQ-RAG-045</code> (MEAI interop) closed as superseded. Design: <code>docs/TechieRag.Agents-Proposal.md</code>.
+<strong>Library:</strong> <code>REQ-FN-003/004</code> (publishing) stay <code>Verified</code>; the hosted nuget.org run still needs the owner's next
+release. Library tests 723 pass / 0 fail (unchanged; no code touched today).
+<strong>App (<code>docs/TechieDesk-Checklist.md</code>):</strong> 101 open of 181 after the migration and the two new rows.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<pre><code>(owner-run) GitHub → Releases → new release, tag v1.0.7  →  Actions → "Publish to NuGet.org (Trusted Publishing)" → Run workflow, ref = v1.0.7</code></pre>
-<p>That first dispatch is the live proof of <code>REQ-FN-003</code> on the hosted runner; after it, the app resumes with <code>/TechieFlow:agents:flow-master *build-phase TechieDesk</code> (OpenCode: <code>/flow-master *build-phase TechieDesk</code>).</p>
+<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag        (OpenCode: /flow-master *build-phase TechieRag)</code></pre>
+<p>Targets <code>REQ-RAG-015</code> → <code>REQ-RAG-016</code> → <code>REQ-RAG-017</code> → <code>REQ-FN-005</code> (contract, Agents package, adapters, publish); <code>REQ-FN-006</code> / TechieDesk <code>REQ-FN-054</code> (repository separation) start with the owner-run git half.</p>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <ul>
-<li><strong>TechieRag: 0 open</strong> of 38 — all <code>Verified</code> / <code>Done (pre-existing)</code>. <code>REQ-FN-003</code> and <code>REQ-FN-004</code> closed 2026-09-03 (owner-found, fixed, verified same day).
+<li><strong>TechieRag: 11 open</strong> of 49 — 5 new <code>Not Started</code> (<code>REQ-RAG-015/016/017</code>, <code>REQ-FN-005/006</code>, added 2026-09-03) + 6 migrated from the app checklist (<code>REQ-RAG-042</code> 95%, <code>044</code> 85%, <code>050</code> 80%, <code>051</code> 95%, <code>052</code> 95% <code>Implemented</code>; <code>046</code> <code>Not Started</code>, deferred). <code>REQ-FN-003/004</code> closed 2026-09-03.
 </li>
-<li><strong>TechieDesk: 106 open</strong> of 179 — 73 terminal (55 <code>Verified</code> + 18 <code>N/A</code>), 0 <code>FAIL</code>. Open: 44 <code>Implemented</code>, 44 <code>Needs re-verify</code>, 9 <code>Blocked</code>, 4 <code>PARTIAL</code>, 2 <code>Planned</code>, 2 <code>Not Started</code>, 1 <code>In Progress</code>. Per-REQ detail in that checklist's Requirements Status table.
+<li><strong>TechieDesk: 101 open</strong> of 181 — 80 terminal (55 <code>Verified</code> + 25 <code>N/A</code>), 0 <code>FAIL</code>. Open: 39 <code>Implemented</code>, 44 <code>Needs re-verify</code>, 9 <code>Blocked</code>, 4 <code>PARTIAL</code>, 2 <code>Planned</code>, 2 <code>Not Started</code> (<code>REQ-FN-054</code>, <code>REQ-RAG-053</code> added 2026-09-03), 1 <code>In Progress</code>. Per-REQ detail in that checklist's Requirements Status table.
 </li>
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
 <li>🔶 <strong><code>REQ-FN-003</code> — hosted run unexecuted</strong> (owner): the version logic is proven by replaying the exact CI script locally and against live nuget.org; the first real dispatch against <code>v1.0.7</code> is the owner's to make.
+</li>
+<li>🔶 <strong>Repository separation (<code>REQ-FN-006</code> / TechieDesk <code>REQ-FN-054</code>)</strong> (owner): creating the TechieDesk repository and moving history is git work; the agent half (package references, solution, deletion here) follows.
 </li>
 <li>🔶 <strong>TechieDesk <code>REQ-RAG-052</code> — RE-INGEST THE WHOLE CORPUS</strong> (owner): vectors embedded before 2026-08-04 are in a different space; the document library banner names the stale count.
 </li>
@@ -190,6 +192,7 @@ The hosted run itself still needs the owner's next release.
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
+<tr><td>2026-09-03</td><td><code>*amend-docs</code> TechieRag + TechieDesk (BRD-83…87, BRD-146/147; governance reversal, 6 rows migrated)</td><td>📝 docs only — no build/test run; 4 docs + 2 checklists amended, HTML re-rendered</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">lib</a> · <a href="docs/TechieDesk-Checklist.md#requirements-status">app</a></td></tr>
 <tr><td>2026-09-03</td><td><code>*triage-issues</code> → <code>*fix-issues</code> → verify chained (TechieRag REQ-FN-003, REQ-FN-004)</td><td>✅ 2/2 Verified; 723 lib tests pass; version rules 9/9 (incl. live nuget.org); stranger walk 36 s; 3 misses opened + closed</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">table</a></td></tr>
 <tr><td>2026-08-05</td><td><code>*build-phase</code> — TechieDesk REQ-RAG-052 banner (owner-scoped), no verify run</td><td>✅ 2,308 pass / 0 fail; banner proven on screen; REQ-FN-053 not started (stated)</td><td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td></tr>
 <tr><td>2026-08-04</td><td><code>*verify</code> ×6 (second run, consent granted)</td><td>✅ 2,306 pass; 0 promoted, REQ-RAG-052 demoted 95% → <code>Needs re-verify</code> 80%</td><td><a href="docs/TechieDesk-Checklist.md#requirements-status">table</a></td></tr>
@@ -220,7 +223,9 @@ The hosted run itself still needs the owner's next release.
 </ul>
 <h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
-<li><strong><code>REQ-RAG-045/046</code></strong> (BRD-deferred by owner); <strong><code>REQ-RAG-044</code></strong>'s <code>PgVectorStore</code> test needs Docker installed, not merely started.
+<li><strong><code>REQ-RAG-046</code></strong> (deferred, now in the library checklist); <strong><code>REQ-RAG-044</code></strong>'s <code>PgVectorStore</code> test needs Docker installed, not merely started. <code>REQ-RAG-045</code> is superseded by <code>TechieRag.Agents</code> (<code>REQ-RAG-016/017</code>).
+</li>
+<li><code>TechieRag.Agents</code> phase D items (proposal §7): MAF-native tool approval with resumable sessions, history over <code>IConversationStore</code>, MAF agent as a flow node, Azure OpenAI / OllamaSharp conveniences.
 </li>
 <li><code>AgentToolHandler</code> / <code>EgressGate</code> audience split at the render seam (now <code>REQ-UI-059</code>); <code>Models.AgentStep</code> / <code>ToolResult</code> code carriers.
 </li>

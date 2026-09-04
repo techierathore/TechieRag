@@ -129,6 +129,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#f-rag-auto-rag-generation">F-RAG: Auto-RAG generation</a></li>
         <li class="h3"><a href="#f-struct-structured-typed-output">F-STRUCT: Structured / typed output</a></li>
         <li class="h3"><a href="#f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp;amp; agent loop</a></li>
+        <li class="h3"><a href="#f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">F-AGENTS: TechieRag.Agents package — agents on Microsoft Agent Framework</a></li>
         <li class="h3"><a href="#f-mem-conversation-memory">F-MEM: Conversation memory</a></li>
         <li class="h3"><a href="#f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp;amp; budgets</a></li>
         <li class="h3"><a href="#f-resil-resilience-retry">F-RESIL: Resilience &amp;amp; retry</a></li>
@@ -136,6 +137,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#f-prompt-prompt-templates">F-PROMPT: Prompt templates</a></li>
         <li class="h3"><a href="#f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution</a></li>
         <li class="h3"><a href="#f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp;amp; publishing</a></li>
+        <li class="h3"><a href="#f-repo-repository-separation">F-REPO: Repository separation</a></li>
         <li class="h3"><a href="#f-web-techiedesk-application">F-WEB: TechieDesk application</a></li>
         <li class="h3"><a href="#f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration</a></li>
         <li><a href="#functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)</a></li>
@@ -173,6 +175,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#f-rag-auto-rag-generation">F-RAG: Auto-RAG generation</a></li>
         <li class="h3"><a href="#f-struct-structured-typed-output">F-STRUCT: Structured / typed output</a></li>
         <li class="h3"><a href="#f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp;amp; agent loop</a></li>
+        <li class="h3"><a href="#f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">F-AGENTS: TechieRag.Agents package — agents on Microsoft Agent Framework</a></li>
         <li class="h3"><a href="#f-mem-conversation-memory">F-MEM: Conversation memory</a></li>
         <li class="h3"><a href="#f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp;amp; budgets</a></li>
         <li class="h3"><a href="#f-resil-resilience-retry">F-RESIL: Resilience &amp;amp; retry</a></li>
@@ -180,6 +183,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#f-prompt-prompt-templates">F-PROMPT: Prompt templates</a></li>
         <li class="h3"><a href="#f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution</a></li>
         <li class="h3"><a href="#f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp;amp; publishing</a></li>
+        <li class="h3"><a href="#f-repo-repository-separation">F-REPO: Repository separation</a></li>
         <li class="h3"><a href="#f-web-techiedesk-application">F-WEB: TechieDesk application</a></li>
         <li class="h3"><a href="#f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration</a></li>
         <li><a href="#functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)</a></li>
@@ -230,6 +234,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li><a href="#f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp; agent loop</a>
 </li>
+<li><a href="#f-agents-techieragagents-package-agents-on-microsoft-agent-framework">F-AGENTS: <code>TechieRag.Agents</code> package — agents on Microsoft Agent Framework</a>
+</li>
 <li><a href="#f-mem-conversation-memory">F-MEM: Conversation memory</a>
 </li>
 <li><a href="#f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp; budgets</a>
@@ -243,6 +249,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><a href="#f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution</a>
 </li>
 <li><a href="#f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp; publishing</a>
+</li>
+<li><a href="#f-repo-repository-separation">F-REPO: Repository separation</a>
 </li>
 <li><a href="#f-web-techiedesk-application">F-WEB: TechieDesk application</a>
 </li>
@@ -267,6 +275,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <p><strong>TechieRag</strong> is a configurable Retrieval-Augmented Generation (RAG) library for .NET, shipped as NuGet packages. It lets a .NET developer add document search, retrieval, and LLM-powered question-answering to an application with a few lines of fluent configuration — and switch embedding providers, vector stores, document formats, and LLM backends <strong>by configuration, not code</strong>. The library abstracts six embedding providers, three vector stores, nine document formats, and six LLM providers behind a single <code>ITechieRag</code> surface.</p>
 <p>The product exists to eliminate the repetitive, tightly-coupled RAG plumbing that every .NET team rebuilds, and to offer a genuinely <strong>offline</strong> option (<code>TechieRag.Embedded</code>) using a bundled BGE-M3 ONNX model so data never has to leave the machine. A companion Blazor Server application — <strong>TechieDesk</strong> (formerly <code>TechieRagWeb</code>; renamed 2026-07-17 per BRD-82 / REQ-UI-014) — showcases every capability end-to-end and is being productized as a self-hostable AnythingLLM alternative (BRD-81), and an MSBuild "autodistribution" mechanism ships AI-agent skill files into any consuming repo so tools like Claude Code and OpenCode gain a <code>/techierag</code> assistant automatically.</p>
 <p>As of this snapshot the library is <strong>~96% complete</strong>: the v1.1 core (config, vector stores, processors, embeddings, sample app, Qdrant admin) and the v2 LLM layer (6 providers, auto-RAG, agent loop, token tracking, resilience, memory, 7 new sample pages) are all shipped and validated by manual/integration testing. The remaining work is a formal automated test suite and optional OpenTelemetry exporters. <strong>Repositioned 2026-07-17:</strong> the companion app is now <strong>TechieDesk</strong>, a productized, self-hostable AnythingLLM alternative powered by the TechieRag library; the competitive roadmap lives in <code>docs/TechieRag-CompetitorAnalysis.md</code> (GAP-LIB-<em>/GAP-APP-</em> register), with phase-wise BRD-Ns appended as each phase is scheduled.</p>
+<p><strong>Amended 2026-09-03 (owner decision) — three packages, one separate product.</strong> The library becomes <strong>three NuGet packages</strong>: <code>TechieRag</code> (retrieval, ingestion, providers, the dependency-free agent loop), <code>TechieRag.Embedded</code> (offline embeddings), and the new <strong><code>TechieRag.Agents</code></strong> — an agent layer on <strong>Microsoft Agent Framework (MAF) 1.20</strong> with an agentic retrieval contract that lives in core (BRD-83…86). <strong>TechieDesk leaves this repository</strong> (BRD-87): it becomes a separate product in its own repository that consumes all three packages from NuGet exactly as any customer does, and is the <em>live implementation</em> of their capabilities. Consequently the library's requirements are ledgered <strong>here</strong> again from 2026-09-03 — the 2026-07-17 "single checklist in the TechieDesk BRD" arrangement is reversed — and the TechieDesk BRD keeps app requirements only.</p>
 <h2 id="business-objectives">2. Business objectives<a class="anchor-link" href="#business-objectives">#</a></h2>
 <ul>
 <li>Reduce the cost of adding RAG to a .NET app from "a multi-project integration effort" to "one NuGet reference + fluent config".
@@ -289,9 +298,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>The <code>TechieRag.Embedded</code> package: offline BGE-M3 ONNX embedding.
 </li>
-<li>The <strong>TechieDesk</strong> Blazor Server application (formerly <code>TechieRagWeb</code>) — demonstrates all library features (incl. Qdrant administration) and is being productized as a self-hostable AnythingLLM alternative (BRD-81/BRD-82; roadmap in <code>docs/TechieRag-CompetitorAnalysis.md</code>).
+<li>The <strong><code>TechieRag.Agents</code></strong> package <em>(added 2026-09-03)</em>: agents on Microsoft Agent Framework over TechieRag — fluent builder, agentic retrieval context provider, and public interop adapters at the library's <code>ILlmProvider</code> / <code>IToolHandler</code> / <code>IProgress&lt;AgentStep&gt;</code> / <code>IConversationMemory</code> seams (BRD-84, BRD-85). The agentic retrieval <strong>contract</strong> itself (tool description, schema, structured result, instructions) lives in core with zero packages (BRD-83).
 </li>
-<li>NuGet packaging/publishing and AI-agent skill autodistribution.
+<li><s>The <strong>TechieDesk</strong> Blazor Server application (formerly <code>TechieRagWeb</code>) — demonstrates all library features (incl. Qdrant administration) and is being productized as a self-hostable AnythingLLM alternative (BRD-81/BRD-82; roadmap in <code>docs/TechieRag-CompetitorAnalysis.md</code>).</s> <em>(Transferred 2026-09-03, BRD-87: TechieDesk is a separate product in its own repository and consumes the three packages from NuGet. Its requirements live in the TechieDesk BRD. The delivered F-WEB / F-QDRANT items below stay as historical record.)</em>
+</li>
+<li>NuGet packaging/publishing (three packages, two feeds) and AI-agent skill autodistribution.
+</li>
+<li><strong>Repository separation</strong> <em>(added 2026-09-03, BRD-87)</em>: this repository holds library and library-test projects only.
 </li>
 </ul>
 <p><strong>Out of scope (explicit, per v2 spec §1.4; revised 2026-07-17 per CompetitorAnalysis):</strong></p>
@@ -303,6 +316,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li>Formal RAG-evaluation tooling (precision/recall harnesses).
 </li>
 <li>Model hosting / inference-server provisioning (TechieRag consumes providers, it does not host them).
+</li>
+<li><strong>The TechieDesk product itself</strong> <em>(from 2026-09-03)</em>: its screens, app services, packaging and app-side verification are specified and tracked in the TechieDesk repository. This BRD covers only what TechieDesk consumes.
 </li>
 </ul>
 <p><strong>Formerly out of scope — moved to the roadmap 2026-07-17</strong> (<code>docs/TechieRag-CompetitorAnalysis.md</code>, Phases 5–6):</p>
@@ -326,7 +341,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>F-LLM: LLM provider integration</td><td>v2</td><td>Done</td><td>100</td><td>6 providers, complete/chat/stream</td></tr>
 <tr><td>F-RAG: Auto-RAG generation</td><td>v2</td><td>Done</td><td>100</td><td>Ask / AskStream / ChatWithRag (+stream)</td></tr>
 <tr><td>F-STRUCT: Structured / typed output</td><td>v2</td><td>Done</td><td>100</td><td><code>CompleteAsync&lt;T&gt;</code> JSON deserialization</td></tr>
-<tr><td>F-AGENT: Tool calling &amp; agent loop</td><td>v2</td><td>Done</td><td>100</td><td>AgentLoopRunner + ToolRegistry, max-iter guard</td></tr>
+<tr><td>F-AGENT: Tool calling &amp; agent loop</td><td>v2</td><td>Done</td><td>100</td><td>AgentLoopRunner + ToolRegistry, max-iter guard. <strong>2026-09-03:</strong> BRD-83 (agentic retrieval contract in core) added — Planned</td></tr>
+<tr><td>F-AGENTS: <code>TechieRag.Agents</code> package (Microsoft Agent Framework)</td><td>v4</td><td>Planned</td><td>0</td><td>Added 2026-09-03 (BRD-84, BRD-85). Builder in the existing style, LM Studio primary; retrieval context provider over BRD-83; public seam adapters. Supersedes the deferred "Microsoft.Extensions.AI interop" item (TechieDesk BRD-126 / GAP-LIB-20). Design: <code>docs/TechieRag.Agents-Proposal.md</code></td></tr>
+<tr><td>F-REPO: Repository separation</td><td>v4</td><td>Planned</td><td>0</td><td>Added 2026-09-03 (BRD-87). <code>apps/</code>, app tests, app docs, app workflows and the UI verification harness move to the TechieDesk repository; this solution keeps <code>src/*</code> + <code>tests/TechieRag.Tests</code></td></tr>
 <tr><td>F-MEM: Conversation memory</td><td>v2</td><td>Done</td><td>100</td><td>InMemory, token-budget trimming</td></tr>
 <tr><td>F-TOKEN: Token tracking &amp; budgets</td><td>v2</td><td>Done</td><td>100</td><td>Per-model usage, cost, alerts, blocking</td></tr>
 <tr><td>F-RESIL: Resilience &amp; retry</td><td>v2</td><td>Done</td><td>100</td><td>Backoff, 429, circuit breaker ✓; <code>Retry-After</code> now parsed (delta + HTTP-date, capped) via <code>LlmHttpGuard</code> in all 6 providers + 4 unit tests (REQ-RAG-012 Verified, 2026-07-02)</td></tr>
@@ -334,10 +351,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>F-PROMPT: Prompt templates</td><td>v2</td><td>Done</td><td>100</td><td>Default engine + custom IPromptTemplate</td></tr>
 <tr><td>F-AUTODIST: AI-agent autodistribution</td><td>v1.1</td><td>Done</td><td>100</td><td>MSBuild targets deploy skill files to consumers</td></tr>
 <tr><td>F-PKG: NuGet packaging &amp; publishing</td><td>v1.1</td><td>Done</td><td>100</td><td>✅ 2026-09-03: REQ-FN-003 re-Verified — the public <code>publish-nuget.yml</code> (manual dispatch against the release tag, per the owner's standard ceremony) now derives the version from the selected tag with an already-published / non-increment guard (BRD-61 met on the public feed; DECISIONS.md 2026-09-03); REQ-FN-004 Verified — install docs lead with nuget.org, no auth; GitHub Packages relegated to an internal-builds section. Prior: UAT 2026-09-03 found both (nuget.org stuck at 1.0.0 while tags reached v1.0.6)</td></tr>
-<tr><td>F-WEB: TechieDesk application (formerly TechieRagWeb)</td><td>v1.1 + v2</td><td>Done</td><td>100</td><td>10 pages; v2 added 4 AI pages + TrBlazeUI migration</td></tr>
-<tr><td>F-WEB: TechieDesk rename (BRD-82)</td><td>v3</td><td>Done</td><td>100</td><td>App renamed <code>TechieRagWeb</code> → TechieDesk: folder → <code>apps/TechieDesk</code>, csproj/RootNamespace/AssemblyName, slnx, namespaces, branding, log naming, Playwright refs. Build 0-err; boots as TechieDesk; render+visual 10/10 (REQ-UI-014 Verified, 2026-07-17)</td></tr>
-<tr><td>F-WEB: TechieDesk product repositioning (BRD-81)</td><td>v3</td><td>Planned</td><td>0</td><td>Productize as self-hostable AnythingLLM alternative; phased GAP-LIB-<em>/GAP-APP-</em> roadmap per <code>docs/TechieRag-CompetitorAnalysis.md</code> (umbrella — per-phase REQs added via <code>*amend-docs</code>)</td></tr>
-<tr><td>F-QDRANT: Qdrant database administration</td><td>v1.1</td><td>Done</td><td>100</td><td>Collection/vector CRUD live-verified 2026-07-02; container-row mobile overflow @390 fixed (inline scroll-wrapper; live <code>scrollWidth</code>==390 with a running container) — REQ-UI-011 Verified</td></tr>
+<tr><td>F-WEB: TechieDesk application (formerly TechieRagWeb)</td><td>v1.1 + v2</td><td>Done</td><td>100</td><td>10 pages; v2 added 4 AI pages + TrBlazeUI migration. <strong>Transferred 2026-09-03</strong> to the TechieDesk repository (BRD-87); historical record here</td></tr>
+<tr><td>F-WEB: TechieDesk rename (BRD-82)</td><td>v3</td><td>Done</td><td>100</td><td>App renamed <code>TechieRagWeb</code> → TechieDesk: folder → <code>apps/TechieDesk</code>, csproj/RootNamespace/AssemblyName, slnx, namespaces, branding, log naming, Playwright refs. Build 0-err; boots as TechieDesk; render+visual 10/10 (REQ-UI-014 Verified, 2026-07-17). <strong>Transferred 2026-09-03</strong> (BRD-87)</td></tr>
+<tr><td>F-WEB: TechieDesk product repositioning (BRD-81)</td><td>v3</td><td>Done</td><td>100</td><td><strong>Amended 2026-09-03:</strong> the mandate is now fulfilled by TechieDesk as a separate product in its own repository, consuming the three packages from NuGet; its roadmap and BRD live there. Nothing further is tracked under F-WEB here</td></tr>
+<tr><td>F-QDRANT: Qdrant database administration</td><td>v1.1</td><td>Done</td><td>100</td><td>Collection/vector CRUD live-verified 2026-07-02; container-row mobile overflow @390 fixed (inline scroll-wrapper; live <code>scrollWidth</code>==390 with a running container) — REQ-UI-011 Verified. <strong>Transferred 2026-09-03</strong> to the TechieDesk repository (BRD-87); historical record here</td></tr>
 <tr><td>(quality) Formal automated test suite</td><td>v2 Phase 7</td><td>Partial</td><td>40</td><td>11 xUnit tests (RetryHandler resilience/Retry-After + LmStudio provider tool-calling) + Playwright verify suite; broader coverage deferred</td></tr>
 <tr><td>(quality) OpenTelemetry exporters</td><td>Deferred</td><td>Planned</td><td>0</td><td>Metrics/tracing for Prometheus/Grafana/Jaeger</td></tr>
 </tbody>
@@ -353,6 +370,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Privacy-conscious / air-gapped team</td><td>Fully offline RAG (embedded ONNX); data never leaves the device</td></tr>
 <tr><td>DevOps / platform engineer</td><td>NuGet packaging, CI publishing, configuration-driven provider switching</td></tr>
 <tr><td>AI-coding-tool user</td><td>A <code>/techierag</code> skill auto-installed into the repo for guided integration</td></tr>
+<tr><td>Agent builder on Microsoft Agent Framework <em>(added 2026-09-03)</em></td><td>An <code>AIAgent</code> over their own documents in a few builder lines; MAF sessions, middleware, workflows and hosting available unchanged; existing TechieRag providers and tools reusable through public adapters</td></tr>
 </tbody>
 </table>
 <p><strong>Primary persona — the integrating .NET developer.</strong> Installs the NuGet package, configures an embedding provider + vector store (and optionally an LLM) via the builder or <code>appsettings.json</code>, ingests documents, then calls <code>SearchAsync</code> (retrieval) or <code>AskAsync</code> (full RAG). The whole library is shaped around making this path short and provider-agnostic.</p>
@@ -369,6 +387,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </div>
   <pre class="mermaid">flowchart LR
   Dev(["Consumer .NET app"]) --&gt; TR["TechieRag (library)"]
+  Dev --&gt; AG["TechieRag.Agents (Microsoft Agent Framework)"]
+  Desk(["TechieDesk — separate repository, consumes the packages"]) -.-&gt; TR
+  Desk -.-&gt; AG
+  AG --&gt; TR
+  AG --&gt; MAF[/"IChatClient — LM Studio / Ollama / OpenAI-compatible, or the configured ILlmProvider"/]
   TR --&gt; Emb[/"Embedding provider (Ollama / OpenAI / ONNX)"/]
   TR --&gt; Vec[("Vector store (SQLite-vec / pgvector / Qdrant)")]
   TR --&gt; Llm[/"LLM provider (Ollama / OpenAI / Azure / Gemini / Anthropic)"/]
@@ -415,7 +438,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
     <button data-pop title="Open in new tab">&#8599;</button>
   </div>
   <pre class="mermaid">flowchart TB
-  App["Consumer app / TechieDesk"] --&gt; ITR["ITechieRag"]
+  App["Consumer app / TechieDesk (via NuGet)"] --&gt; ITR["ITechieRag"]
+  App --&gt; Agent["TechieRag.Agents — ITechieRagAgent over AIAgent"]
+  Agent --&gt; Contract["TechieRag.Agentic — retrieval tool contract (core)"]
+  Contract --&gt; ITR
+  Agent --&gt; Adapt["Seam adapters — ILlmProvider / IToolHandler / AgentStep / IConversationMemory"]
   ITR --&gt; Proc["Document processors (9)"]
   ITR --&gt; Emb["Embedding providers (6)"]
   ITR --&gt; Vec[("Vector stores (3)")]
@@ -564,6 +591,27 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <h3 id="f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp; agent loop<a class="anchor-link" href="#f-agent-tool-calling-agent-loop">#</a></h3>
 <p><strong>Personas:</strong> agent builder, automation developer · <strong>Phase:</strong> v2</p>
 <p>Lets the LLM request tool/function execution, receive results, and iterate until it produces a final answer. Tools are declared via <code>ToolDefinition</code> (name, description, JSON-schema parameters) and either implemented through <code>IToolHandler</code> or registered as delegates through <code>ToolRegistry</code>. <code>AgentLoopRunner</code> orchestrates the loop with a configurable max-iteration guard (default 10).</p>
+<p><strong>Amended 2026-09-03 — agentic retrieval contract (BRD-83).</strong> Core gains a dependency-free namespace <code>TechieRag.Agentic</code> that makes retrieval <em>agentic</em> for any loop: two tools (<code>search_knowledge_base</code>, <code>list_documents</code>) with a stable, model-facing description and JSON schema; a structured tool result carrying citation refs (S1, S2, …), source document, page, relevance score, a match status of <code>strong</code> / <code>weak</code> / <code>none</code> / <code>limit_reached</code> and a next-step hint; a per-turn search budget; and default retrieve-first instructions (<code>AgenticInstructions.Default</code>). <code>IRetrievalSource</code> abstracts what is searched (an <code>ITechieRag</code>, or a delegate such as a workspace-scoped search). <code>ToolRegistry.RegisterKnowledgeBase(...)</code> binds it to this loop; <code>TechieRag.Agents</code> binds the same contract to Microsoft Agent Framework, so both loops retrieve, re-search and cite identically. Model-facing strings are invariant English by policy. Full text: <code>docs/TechieRag.Agents-Proposal.md</code> §3.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Q["User question"] --&gt; M["Model"]
+  M --&gt;|"search_knowledge_base(query, top_k, document_id)"| T["Tool: IRetrievalSource.SearchAsync"]
+  T --&gt; R["Result: refs + scores + status + hint"]
+  R --&gt; D{"status?"}
+  D --&gt;|"strong"| A["Answer with [S1] citations"]
+  D --&gt;|"weak / none"| M2["Rephrase, narrow by document, or raise top_k"]
+  M2 --&gt; M
+  D --&gt;|"limit_reached"| G["Answer with what was found; state the gaps"]</pre>
+</div>
 <div class="diagram">
   <div class="dt">
     <button data-zout title="Zoom out">&minus;</button>
@@ -581,7 +629,44 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   Ex --&gt; Llm
   D --&gt;|"no"| Ans["final answer"]</pre>
 </div>
-<p><strong>Requirements:</strong> BRD-40, BRD-41, BRD-42, BRD-43 (see §10)</p>
+<p><strong>Requirements:</strong> BRD-40, BRD-41, BRD-42, BRD-43, BRD-83 (see §10)</p>
+<h3 id="f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">F-AGENTS: <code>TechieRag.Agents</code> package — agents on Microsoft Agent Framework<a class="anchor-link" href="#f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">#</a></h3>
+<p><strong>Personas:</strong> agent builder, .NET application developer, TechieDesk (as a package consumer) · <strong>Phase:</strong> v4 · <strong>Added:</strong> 2026-09-03 (owner decision) · <strong>Design:</strong> <code>docs/TechieRag.Agents-Proposal.md</code></p>
+<p>A third NuGet package that puts a <strong>Microsoft Agent Framework (MAF) 1.20</strong> <code>ChatClientAgent</code> over TechieRag. It exists so that a consumer gets MAF's ecosystem — <code>AgentSession</code> persistence, middleware, tool approval, workflows, hosting, agent-as-tool — while TechieRag core stays dependency-free (Architecture ADR-003). Verified against the live MAF docs on 2026-09-03: current stable is <code>Microsoft.Agents.AI</code> <strong>1.20.0</strong> over <code>Microsoft.Extensions.AI</code> <strong>10.9.0</strong>; conversation state is <code>AgentSession</code> (there is no <code>AgentThread</code>); any <code>IChatClient</code> backs a <code>ChatClientAgent</code>; tools are <code>AIFunction</code>s; <code>ChatClientAgent</code> wraps the client in <code>FunctionInvokingChatClient</code> automatically.</p>
+<p><strong>Shape.</strong> <code>new TechieRagAgentBuilder(rag)</code> reads like the core builder: <code>UseLmStudio(endpoint, model)</code> (primary local target, Chat Completions at <code>/v1</code>), <code>UseOllama</code>, <code>UseOpenAI</code>, <code>UseOpenAICompatible</code>, <code>UseConfiguredLlm()</code> (the LLM core already has, through the <code>ILlmProvider</code> adapter), <code>UseCustomChatClient(...)</code>, <code>WithRetrieval(...)</code>, <code>WithToolHandler(IToolHandler)</code>, <code>WithTools(AITool[])</code>, <code>WithInstructions</code> / <code>WithAdditionalInstructions</code>, <code>WithMaxToolIterations</code>, <code>WithTrace(IProgress&lt;AgentStep&gt;)</code>, <code>WithPrefetch()</code>, <code>Build()</code> → <code>ITechieRagAgent { AIAgent Agent; ITechieRag Rag; CreateSessionAsync; AskAsync; AskStreamAsync }</code>. MAF types are exposed, not wrapped. DI: <code>services.AddTechieRagAgent(...)</code>.</p>
+<p><strong>Seam adapters (BRD-85) are public API</strong>, because a package consumer such as TechieDesk must keep one provider configuration, one tool catalogue, one egress gate and one trace renderer:</p>
+<table>
+<thead><tr><th>Seam</th><th>Adapter</th><th>Direction</th></tr></thead>
+<tbody>
+<tr><td>Model</td><td><code>ILlmProvider</code> → <code>IChatClient</code> (<code>LlmProviderChatClient</code>)</td><td>all six providers, routing, retry, fallback, token events preserved</td></tr>
+<tr><td>Tools</td><td><code>IToolHandler</code> → <code>IList&lt;AITool&gt;</code> (raw JSON schema, <code>RequiresConfirmation</code> → <code>ApprovalRequiredAIFunction</code>) and <code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code></td><td>both directions, so MAF agents can be flow nodes</td></tr>
+<tr><td>Trace</td><td>MAF agent-run + function middleware → <code>IProgress&lt;AgentStep&gt;</code></td><td>the existing four <code>AgentStepKind</code>s only; never a forked format</td></tr>
+<tr><td>Memory</td><td><code>IConversationMemory</code> → <code>ChatHistoryProvider</code></td><td>on demand</td></tr>
+</tbody>
+</table>
+<p><strong>Constraints carried from the product:</strong> no <code>HarnessAgent</code> (it adds a hosted web-search tool and file memory by default), no MAF exporters, sessions persisted locally only, model-facing strings invariant English. Package: <code>net10.0;net8.0</code>; references <code>Microsoft.Agents.AI</code> 1.20.0, <code>Microsoft.Extensions.AI</code> 10.9.0, <code>Microsoft.Extensions.AI.OpenAI</code> 10.9.0; <strong>no</strong> MSBuild targets of its own (core's already write into consumer repos).</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart TB
+  B["TechieRagAgentBuilder(rag)"] --&gt; CC["IChatClient — OpenAI-compatible route, or ILlmProvider adapter"]
+  B --&gt; CP["RetrievalContextProvider — tools over TechieRag.Agentic"]
+  B --&gt; TH["IToolHandler adapter — skills, MCP tools, egress gate below it"]
+  CC --&gt; A["ChatClientAgent (AIAgent)"]
+  CP --&gt; A
+  TH --&gt; A
+  A --&gt; S["AgentSession"]
+  A --&gt; TR["Trace adapter → IProgress&lt;AgentStep&gt;"]
+  A --&gt; R["AgentRagResponse — Answer, Sources (SearchResult), Searches, Raw"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-84, BRD-85 (see §10)</p>
 <h3 id="f-mem-conversation-memory">F-MEM: Conversation memory<a class="anchor-link" href="#f-mem-conversation-memory">#</a></h3>
 <p><strong>Personas:</strong> chatbot developer · <strong>Phase:</strong> v2</p>
 <p>Optional multi-turn history via <code>IConversationMemory</code>, with automatic context-window trimming to a token budget (keeps the system message + most recent turns). <code>InMemoryConversationMemory</code> is the default per-session implementation; custom implementations are supported.</p>
@@ -624,9 +709,34 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <h3 id="f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp; publishing<a class="anchor-link" href="#f-pkg-nuget-packaging-publishing">#</a></h3>
 <p><strong>Personas:</strong> maintainer, DevOps · <strong>Phase:</strong> v1.1</p>
 <p>Both packages are built and published through GitHub Actions (<code>publish-nuget.yml</code>): restore → build (Release) → test → pack → publish to GitHub Packages (always) and NuGet.org (gated on a secret). Versioning is semantic, overridden at pack time from a <code>v*</code> tag or the run number. <code>TechieRag.Embedded</code> packs its ONNX runtime assets.</p>
-<p><strong>Requirements:</strong> BRD-59, BRD-60, BRD-61 (see §10)</p>
+<p><strong>Amended 2026-09-03.</strong> Three packages (<code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Agents</code>) ship together at the same version (BRD-86). The shipped process, per <code>DECISIONS.md</code> 2026-08-09 / 2026-09-03: <code>publish-github-packages.yml</code> feeds <strong>GitHub Packages</strong> automatically on push to <code>main</code> and on release tags (pre-release feed); <code>publish-nuget.yml</code> publishes to <strong>nuget.org</strong> by <strong>manual dispatch only</strong>, selecting the release tag, with the version derived from that tag and trusted publishing (OIDC) — no stored API key. This is also the mechanism the separated TechieDesk repository consumes (BRD-87).</p>
+<p><strong>Requirements:</strong> BRD-59, BRD-60, BRD-61, BRD-86 (see §10)</p>
+<h3 id="f-repo-repository-separation">F-REPO: Repository separation<a class="anchor-link" href="#f-repo-repository-separation">#</a></h3>
+<p><strong>Personas:</strong> maintainer, TechieDesk developer · <strong>Phase:</strong> v4 · <strong>Added:</strong> 2026-09-03 (owner decision) · <strong>Plan:</strong> <code>docs/TechieRag.Agents-Proposal.md</code> §10</p>
+<p>TechieDesk moves to its own repository and consumes the three packages from NuGet, the way every customer does. This repository keeps library and library-test projects only. What moves: <code>apps/*</code> (five projects), <code>tests/TechieDesk.Tests</code>, <code>tests/appium</code>, <code>tests/verify</code> + <code>playwright.config.ts</code>, <code>.github/workflows/publish-desktop.yml</code>, <code>docs/TechieDesk-*</code>, <code>docs/devguides</code>, <code>docs/mockups</code>, <code>docs/screenshots/TechieDesk</code>, <code>uiIssues/</code>, and a copy of <code>.tfcore/</code> configured for an app. What stays: <code>src/*</code>, <code>tests/TechieRag.Tests</code>, the two library workflows and their scripts, library docs, <code>README.md</code> (its sample-application section becomes a link). Verified precondition: no app project uses library internals (<code>InternalsVisibleTo</code> names only <code>TechieRag.Tests</code>), so <code>PackageReference</code> is a drop-in for <code>ProjectReference</code>.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Lib["TechieRag repository — src/*, tests/TechieRag.Tests"] --&gt;|"release → tag"| GHP["GitHub Packages (pre-release)"]
+  Lib --&gt;|"manual dispatch"| NO["nuget.org (public)"]
+  Lib --&gt;|"dotnet pack -o local-feed (same-day iteration)"| LF["local folder feed"]
+  GHP --&gt; Desk["TechieDesk repository — apps/*, app tests, app docs, Appium/Playwright"]
+  NO --&gt; Desk
+  LF --&gt; Desk</pre>
+</div>
+<p><strong>Governance consequence:</strong> library requirements are ledgered in this BRD and <code>docs/TechieRag-Checklist.md</code> again from 2026-09-03; the TechieDesk BRD keeps app requirements and names library dependencies as package versions. Open library rows migrate from the TechieDesk checklist with their status and remarks preserved.</p>
+<p><strong>Requirements:</strong> BRD-87 (see §10)</p>
 <h3 id="f-web-techiedesk-application">F-WEB: TechieDesk application<a class="anchor-link" href="#f-web-techiedesk-application">#</a></h3>
 <p><strong>Personas:</strong> new user, reference-implementation seeker, self-hosting end user · <strong>Phase:</strong> v1.1 + v2 (repositioned v3, 2026-07-17)</p>
+<p><strong>Transferred 2026-09-03 (BRD-87).</strong> TechieDesk is now a separate product in its own repository and consumes <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Agents</code> from NuGet; its requirements live in the TechieDesk BRD. The delivered items below (BRD-62…70, BRD-82) are retained as historical record and no further requirements are added under F-WEB here.</p>
 <p><strong>TechieDesk</strong> (formerly <code>TechieRagWeb</code>; renamed 2026-07-17 per BRD-82 / REQ-UI-014) is a Blazor Server application built with TrBlazeUI components and Lucide icons. Originally the capability-demonstration sample, it is now positioned as a <strong>productized, self-hostable AnythingLLM alternative</strong> powered by the TechieRag library (BRD-81) — the competitive roadmap (workspaces, multi-user, persistent history, connectors, developer API, agents) is tracked as the GAP-APP-<em>/GAP-LIB-</em> register in <code>docs/TechieRag-CompetitorAnalysis.md</code>. Ten routed pages cover configuration, ingestion, RAG chat, direct LLM playground, tool demo, token dashboard, and Qdrant admin.</p>
 <table>
 <thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
@@ -647,6 +757,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <h3 id="f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration<a class="anchor-link" href="#f-qdrant-qdrant-database-administration">#</a></h3>
 <p><strong>Personas:</strong> DevOps, vector-DB operator · <strong>Phase:</strong> v1.1</p>
 <p>In TechieDesk, programmatic Docker container lifecycle management plus a Qdrant admin UI: connection status, create/start/stop/remove container, collection CRUD, paginated vector browsing/search, vector detail (payload + chunk + source), bulk delete, and cluster info.</p>
+<p><strong>Transferred 2026-09-03 (BRD-87):</strong> this is TechieDesk UI and moves with it; retained here as historical record.</p>
 <p><strong>Requirements:</strong> BRD-71, BRD-72, BRD-73 (see §10)</p>
 <h2 id="functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)<a class="anchor-link" href="#functional-requirements-brd-ledger">#</a></h2>
 <p><strong>F-ING — Document ingestion &amp; processing (Phase v1.1)</strong></p>
@@ -764,6 +875,15 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li><strong>BRD-43</strong> — The system shall cap agent-loop iterations (default 10) to prevent infinite loops <em>(F-AGENT)</em>
 </li>
+<li><strong>BRD-83</strong> — The library shall provide, in core with no new package dependencies, an agentic retrieval contract (<code>TechieRag.Agentic</code>): <code>search_knowledge_base</code> and <code>list_documents</code> tools with a stable model-facing description and JSON schema; a structured tool result carrying citation refs, source document, page, relevance score, a <code>strong</code> / <code>weak</code> / <code>none</code> / <code>limit_reached</code> status and a next-step hint; a per-turn search budget; and default retrieve-first, re-search-on-weak, cite-by-ref instructions — bindable to <code>ToolRegistry</code> / <code>IToolHandler</code> and to <code>TechieRag.Agents</code>, over an <code>IRetrievalSource</code> that may be an <code>ITechieRag</code> or a delegate <em>(F-AGENT; added 2026-09-03)</em>
+</li>
+</ul>
+<p><strong>F-AGENTS — <code>TechieRag.Agents</code> package on Microsoft Agent Framework (Phase v4; added 2026-09-03)</strong></p>
+<ul>
+<li><strong>BRD-84</strong> — A developer can add a Microsoft Agent Framework 1.20 agent over TechieRag by referencing <code>TechieRag.Agents</code> and using <code>TechieRagAgentBuilder</code> in the existing fluent style — <code>UseLmStudio(endpoint, model)</code> as the primary local target, <code>UseOllama</code>, <code>UseOpenAI</code>, <code>UseOpenAICompatible</code>, <code>UseConfiguredLlm()</code>, <code>UseCustomChatClient(...)</code> — obtaining an <code>ITechieRagAgent</code> that exposes the MAF <code>AIAgent</code>, creates <code>AgentSession</code>s, answers with typed <code>SearchResult</code> sources and retrieval traces, streams <code>RagStreamEvent</code>s, and registers through <code>AddTechieRagAgent(...)</code>; the package targets <code>net10.0;net8.0</code>, ships no MSBuild targets, never uses <code>HarnessAgent</code> or MAF hosted tools, and keeps model-facing strings invariant English <em>(F-AGENTS)</em>
+</li>
+<li><strong>BRD-85</strong> — <code>TechieRag.Agents</code> shall expose public interop adapters at the library's seams so a package consumer keeps one provider configuration, one tool catalogue, one egress gate and one trace: <code>ILlmProvider</code> → <code>IChatClient</code> (all providers, routing, retry, fallback and token events preserved); <code>IToolHandler</code> → <code>AITool</code> (raw JSON schema, <code>RequiresConfirmation</code> → approval-required) and <code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code> (so a MAF agent can be a flow node); MAF middleware → <code>IProgress&lt;AgentStep&gt;</code> emitting only the existing four <code>AgentStepKind</code>s; <code>IConversationMemory</code> → <code>ChatHistoryProvider</code> <em>(F-AGENTS)</em>
+</li>
 </ul>
 <p><strong>F-MEM — Conversation memory (Phase v2)</strong></p>
 <ul>
@@ -815,11 +935,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <p><strong>F-PKG — NuGet packaging &amp; publishing (Phase v1.1)</strong></p>
 <ul>
-<li><strong>BRD-59</strong> — The system shall build and pack <code>TechieRag</code> and <code>TechieRag.Embedded</code> via GitHub Actions <em>(F-PKG)</em>
+<li><strong>BRD-59</strong> — The system shall build and pack <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Agents</code> via GitHub Actions <em>(F-PKG; amended 2026-09-03: was two packages)</em>
 </li>
-<li><strong>BRD-60</strong> — The system shall publish to GitHub Packages automatically and to NuGet.org when a secret is present <em>(F-PKG)</em>
+<li><strong>BRD-60</strong> — The system shall publish to GitHub Packages automatically (push to <code>main</code>, release tags) and to NuGet.org by manual dispatch against a release tag using trusted publishing <em>(F-PKG; amended 2026-09-03 to the shipped process per DECISIONS.md — was "when a secret is present")</em>
 </li>
 <li><strong>BRD-61</strong> — The system shall version packages semantically, overridden at pack time from tag/run number <em>(F-PKG)</em>
+</li>
+<li><strong>BRD-86</strong> — <code>TechieRag.Agents</code> shall be packed and published alongside the other two packages on both feeds at the same version, with the same SourceLink, symbol and README metadata <em>(F-PKG; added 2026-09-03)</em>
+</li>
+</ul>
+<p><strong>F-REPO — Repository separation (Phase v4; added 2026-09-03)</strong></p>
+<ul>
+<li><strong>BRD-87</strong> — TechieDesk shall move to its own repository: <code>apps/*</code>, <code>tests/TechieDesk.Tests</code>, <code>tests/appium</code>, <code>tests/verify</code>, <code>playwright.config.ts</code>, <code>publish-desktop.yml</code>, the TechieDesk docs, mockups, screenshots, <code>uiIssues/</code> and an app-configured <code>.tfcore/</code> leave this repository; the solution keeps <code>src/*</code> and <code>tests/TechieRag.Tests</code> only; the README's sample-application section links to the TechieDesk repository; TechieDesk consumes the three packages from NuGet at pinned versions; and library requirements are ledgered in this BRD and checklist from 2026-09-03 <em>(F-REPO)</em>
 </li>
 </ul>
 <p><strong>F-WEB — TechieDesk application (Phase v1.1 + v2; repositioned v3, 2026-07-17)</strong></p>
@@ -842,7 +969,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li><strong>BRD-70</strong> — The app shall render all pages with TrBlazeUI components and Lucide icons <em>(F-WEB)</em>
 </li>
-<li><strong>BRD-81</strong> — TechieDesk product mandate: the companion app shall be a productized, self-hostable AnythingLLM-alternative application powered by the TechieRag library; the competitive roadmap is the GAP-LIB-<em>/GAP-APP-</em> register in <code>docs/TechieRag-CompetitorAnalysis.md</code>, with phase-wise BRD-Ns appended (append-only) as each phase is scheduled <em>(F-WEB; added 2026-07-17)</em>
+<li><strong>BRD-81</strong> — TechieDesk product mandate: the companion app shall be a productized, self-hostable AnythingLLM-alternative application powered by the TechieRag library; the competitive roadmap is the GAP-LIB-<em>/GAP-APP-</em> register in <code>docs/TechieRag-CompetitorAnalysis.md</code>, with phase-wise BRD-Ns appended (append-only) as each phase is scheduled <em>(F-WEB; added 2026-07-17)</em> — <strong>amended 2026-09-03:</strong> TechieDesk is a separate product in its own repository (BRD-87) that consumes <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Agents</code> as NuGet packages and is the live implementation of their capabilities; its roadmap and requirements live in the TechieDesk BRD, and no product BRD-Ns are appended here
 </li>
 <li><strong>BRD-82</strong> — The application shall be renamed <code>TechieRagWeb</code> → <code>TechieDesk</code>: project folder <code>samples/TechieRagWeb</code> → <code>apps/TechieDesk</code>, csproj / RootNamespace / AssemblyName, <code>TechieRag.slnx</code> entry, namespaces and <code>@using</code>s, in-app branding (page titles, Home page), config/log file naming, and Playwright/verify references <em>(F-WEB; added 2026-07-17)</em>
 </li>
@@ -887,13 +1014,17 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="constraints-assumptions">12. Constraints &amp; assumptions<a class="anchor-link" href="#constraints-assumptions">#</a></h2>
 <ul>
-<li>Target runtime is <code>net10.0</code>; consumers must target a compatible framework.
+<li>Target runtimes are <code>net10.0</code> and <code>net8.0</code> for <code>TechieRag</code>, <code>TechieRag.Telemetry</code> and <code>TechieRag.Agents</code>; <code>TechieRag.Embedded</code> is <code>net10.0</code> only <em>(amended 2026-09-03; was "net10.0")</em>.
 </li>
 <li>Local providers (Ollama, LM Studio) and external stores (PostgreSQL, Qdrant) must be reachable when selected; cloud providers require the consumer's own API keys.
 </li>
 <li>The embedded model requires a one-time ~2.3GB download and sufficient local disk + CPU/GPU for ONNX inference.
 </li>
-<li>The TechieDesk app (folder <code>apps/TechieDesk</code>, renamed per BRD-82) depends on <code>TrBlazeUI.*</code> from GitHub Packages, which requires an authenticated <code>nuget.config</code> token to restore.
+<li><s>The TechieDesk app (folder <code>apps/TechieDesk</code>, renamed per BRD-82) depends on <code>TrBlazeUI.*</code> from GitHub Packages, which requires an authenticated <code>nuget.config</code> token to restore.</s> <em>(Moved with TechieDesk 2026-09-03, BRD-87. The library packages restore from nuget.org alone.)</em>
+</li>
+<li><code>TechieRag.Agents</code> depends on <code>Microsoft.Agents.AI</code> 1.20.0, <code>Microsoft.Extensions.AI</code> 10.9.0 and <code>Microsoft.Extensions.AI.OpenAI</code> 10.9.0; the last pins the <code>OpenAI</code> SDK to 2.12.x, which restores cleanly beside core's <code>Azure.AI.OpenAI</code> 2.1.0 (open upper bound) but unifies the SDK version in any consumer that references both packages <em>(added 2026-09-03)</em>.
+</li>
+<li>Model-facing text in the library (tool descriptions, agent instructions) is invariant English by policy; consumers localize only user-facing output <em>(added 2026-09-03)</em>.
 </li>
 <li>The codebase uses standard Microsoft camelCase naming (no <code>obj</code>/<code>a</code>/<code>v</code> prefixes, no underscores) — recorded in Coding-Standards.
 </li>
@@ -916,7 +1047,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
 <tbody>
 <tr><td>No formal automated test suite</td><td>High</td><td>Medium</td><td>Manual/integration validation done (21 scenarios); add xUnit suite (v2 Phase 7)</td></tr>
-<tr><td>TechieDesk build blocked on TrBlazeUI GitHub Packages auth</td><td>Medium</td><td>Low</td><td>Document the token requirement; library packages restore from nuget.org alone</td></tr>
+<tr><td><s>TechieDesk build blocked on TrBlazeUI GitHub Packages auth</s></td><td>—</td><td>—</td><td>Moved with TechieDesk 2026-09-03 (BRD-87)</td></tr>
+<tr><td>Microsoft Agent Framework ships monthly; API renames have happened (e.g. <code>AgentThread</code> → <code>AgentSession</code>)</td><td>Medium</td><td>Medium</td><td>Pin <code>Microsoft.Agents.AI</code> exactly; expose MAF types rather than wrapping them so upgrades are mechanical; verify against live docs before each bump (added 2026-09-03)</td></tr>
+<tr><td><code>OpenAI</code> SDK version unification (2.12.x via <code>Microsoft.Extensions.AI.OpenAI</code>) beside core's <code>Azure.AI.OpenAI</code> 2.1.0</td><td>Low</td><td>Medium</td><td>Test in <code>TechieRag.Agents.Tests</code> that core's Azure OpenAI embedding provider constructs under the unified SDK (added 2026-09-03)</td></tr>
+<tr><td>Local models without native tool support return tool-call text instead of a tool-call array (LM Studio)</td><td>Medium</td><td>Medium</td><td>Live smoke asserts a real <code>FunctionCallContent</code>; <code>WithPrefetch()</code> for reluctant models; document tool-capable models (added 2026-09-03)</td></tr>
+<tr><td>A library fix is invisible to TechieDesk until a package exists (two repositories)</td><td>Medium</td><td>Low</td><td>Local folder feed for same-day iteration; GitHub Packages pre-release on push to <code>main</code> (added 2026-09-03)</td></tr>
 <tr><td>Provider API drift (LLM vendors change endpoints)</td><td>Medium</td><td>Medium</td><td>Raw HttpClient providers are small and isolated; update per provider</td></tr>
 <tr><td>Token-count estimates ±10% for providers without tokenizer detail</td><td>Medium</td><td>Low</td><td>Documented; exact counts where the provider returns them</td></tr>
 <tr><td>SQLite multi-process locking</td><td>Low</td><td>Medium</td><td>Documented; recommend single-instance or server-backed store for multi-user</td></tr>
@@ -931,7 +1066,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li><strong>TechieRag.Embedded</strong> — the offline variant bundling a BGE-M3 ONNX embedding model.
 </li>
-<li><strong>TechieDesk</strong> — the Blazor Server application (formerly <code>TechieRagWeb</code>): TechieRag's showcase, being productized as a self-hostable AnythingLLM alternative (BRD-81/82).
+<li><strong>TechieDesk</strong> — the desktop product (formerly <code>TechieRagWeb</code>): since 2026-09-03 a separate repository that consumes the three TechieRag packages and is the live implementation of their capabilities (BRD-81/82/87).
+</li>
+<li><strong>TechieRag.Agents</strong> — the third package: agents on Microsoft Agent Framework over TechieRag, with seam adapters (BRD-84/85).
+</li>
+<li><strong>MAF</strong> — Microsoft Agent Framework (<code>Microsoft.Agents.AI</code>), the successor to Semantic Kernel Agents and AutoGen; <code>ChatClientAgent</code>, <code>AgentSession</code>, <code>AIContextProvider</code>.
+</li>
+<li><strong>MEAI</strong> — <code>Microsoft.Extensions.AI</code>: <code>IChatClient</code>, <code>AITool</code> / <code>AIFunction</code>, <code>FunctionInvokingChatClient</code>; the abstractions MAF is built on.
 </li>
 <li><strong>TrBlazeUI</strong> — the Blazor UI component library used by TechieDesk.
 </li>
@@ -945,7 +1086,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <hr>
 <p>Last updated: 2026-06-25
 Last amended: 2026-07-17 — TechieDesk repositioning: app renamed TechieRagWeb → TechieDesk (BRD-82) and productized as an AnythingLLM alternative (BRD-81); multi-agent orchestration + audio moved from out-of-scope to the roadmap (docs/TechieRag-CompetitorAnalysis.md)
-Highest BRD ID: BRD-82
+Last amended: 2026-09-03 — Three packages and a separate product: added BRD-83 (agentic retrieval contract in core), BRD-84/85 (F-AGENTS: <code>TechieRag.Agents</code> on Microsoft Agent Framework + public seam adapters), BRD-86 (three-package publishing), BRD-87 (F-REPO: TechieDesk moves to its own repository; library requirements ledgered here again); amended BRD-59/60/81; F-WEB / F-QDRANT annotated as transferred (no IDs struck). Design: docs/TechieRag.Agents-Proposal.md
+Highest BRD ID: BRD-87
 Sources harvested: docs/techierag-v2-llm-implementation-spec.md, docs/trrag-refactoring-roadmap.md, docs/TechieRag-AI-Reference.md, docs/TechieRag-UserGuide.md, docs/TechieRag.Embedded-UserGuide.md, docs/ai-agent-autodistribution-guide.md, docs/brainstorming-session-results.md, docs/SETUP-AND-TESTING-GUIDE.md, docs/integration-testing-guide.md, docs/NUGET-PUBLISHING-GUIDE.md, docs/EMBEDDED-PACKAGE-GUIDE.md, docs/Coding-Standards.md, README.md
 Custom instructions applied: none
 Drafted from reverse-doc — review and edit. New BRDs may be added (append-only); do not renumber.</p>

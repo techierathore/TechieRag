@@ -1,7 +1,7 @@
 # TechieDesk — Architecture
 
 **Last updated:** 2026-07-26
-**Status:** Current + planned target — the shipped code is a Blazor Server app; the target is the MAUI Blazor Hybrid desktop app the BRD now specifies (BRD-128). Both are described below, and every section says which one it is talking about.
+**Status:** Current + planned target — the shipped code is a Blazor Server app; the target is the MAUI Blazor Hybrid desktop app the BRD now specifies (BRD-128). Both are described below, and every section says which one it is talking about. — amended 2026-09-03: TechieDesk moves to its own repository and consumes `TechieRag`, `TechieRag.Embedded` and `TechieRag.Agents` as NuGet packages (ADR-014, BRD-146); the agent runtime becomes `TechieRag.Agents` on Microsoft Agent Framework (ADR-015, BRD-147).
 
 <!-- AGENT-ONLY AUTHORING NOTES.
   Created 2026-07-26 (owner request during the mockup review). Until now TechieDesk had no
@@ -38,8 +38,10 @@
 | Host (current) | Blazor Server + Kestrel | — | Being retired (ADR-002) |
 | UI | TrBlazeUI | 1.0.7 | Known gaps TR-002…TR-013 tracked in the checklist |
 | WebView | WKWebView (Mac Catalyst) · WebView2 (Windows) | platform | Fixed per platform — BRD-98 evergreen-browser support was retired with the web head |
-| AI/RAG | TechieRag (NuGet) | v2 | Library-first boundary, BRD §3 |
-| Embeddings | TechieRag.Embedded — BGE-M3 ONNX | — | Offline default, 1024-dim |
+| AI/RAG | TechieRag (NuGet) | v2 | Library-first boundary, BRD §3. **From 2026-09-03 a `PackageReference` pinned in `Directory.Packages.props`, never a `ProjectReference`** (ADR-014) |
+| Embeddings | TechieRag.Embedded — BGE-M3 ONNX | — | Offline default, 1024-dim. Package reference (ADR-014) |
+| Agents | TechieRag.Agents (NuGet) — Microsoft Agent Framework 1.20 over TechieRag | — | *Added 2026-09-03.* The agent runtime (ADR-015, BRD-147): `ChatClientAgent`, `AgentSession`, the library's agentic retrieval contract, and the public seam adapters the app hands its tool handler, egress gate, retrieval scope and trace sink to |
+| Package feeds | nuget.org (releases) · GitHub Packages (pre-releases) · local folder feed (same-day iteration) | — | *Added 2026-09-03.* `NuGet.config` lists all three; the local feed is never committed as a pin |
 | App DB | SQLite via **Dapper** | — | EF Core banned (ADR-005). PostgreSQL dropped 2026-07-26 (ADR-006) |
 | Vector store | SqliteVec (default) · Qdrant (optional) | — | Qdrant reachable on a configurable Docker daemon (BRD-134) |
 | Migrations | DbUp via TechieDeskDb | — | Runs **in-process at launch** (ADR-007) |
@@ -86,12 +88,15 @@ flowchart TB
   DAL --> DB[("App DB — SQLite, per-user data directory")]
   MIG --> DB
   MGR --> Rag["TechieRag library (NuGet)"]
-  AGENT --> Rag
-  FLOW --> Rag
+  AGENT --> Agents["TechieRag.Agents (NuGet) — agent runtime, seam adapters"]
+  FLOW --> Agents
+  Agents --> Rag
   Rag --> Vec[("Vector store: SqliteVec or Qdrant")]
   Rag --> LLM[/"LLM and embedding providers"/]
   AMC --> AM[/"AppManager API v1.4"/]
 ```
+
+*Amended 2026-09-03:* the three library boxes are **NuGet packages from a separate repository** (ADR-014). `AgentRegistry + AgentRunner` and `FlowInterpreter` reach the model through `TechieRag.Agents` (ADR-015); nothing in the app calls `AgentLoopRunner` directly any more.
 
 **The single most important property of this diagram is what is missing from it:** there is no HTTP boundary between the UI and the app services, no reverse proxy, no session store, and no container. A Razor component calls `WorkspaceService` as an ordinary C# method on the same thread. Most of the accidental complexity in the current Blazor Server code — circuit lifetime, session continuity, antiforgery, the `td.sid` cookie — exists only to bridge a boundary the target host does not have.
 
@@ -132,7 +137,8 @@ Two details are load-bearing. **Sources are emitted before the first token** so 
 | `DocumentLibraryService` | Document records, workspace links, ingest orchestration, source-file tracking | Extraction, chunking, embedding (library) |
 | `ConnectorService` | Connector configuration, job queue, per-item results and failure reasons | Fetch/parse per source — library connectors |
 | `AgentRegistry` | Named agents (BRD-138): handle, instructions, model, skill subset, knowledge scope, guardrails | Tool implementations — every skill is a library `ITool` |
-| `AgentRunner` | Applies the two-level permission model, enforces guardrails, records the trace | The agent loop itself (library) |
+| `AgentRunner` | Applies the two-level permission model, enforces guardrails, records the trace. *Amended 2026-09-03:* composes the permitted `IToolHandler` (skills ∩ catalogue, `EgressGate` wrapping, per-turn MCP tools), a `DelegateRetrievalSource` over `WorkspaceManager.SearchScopedAsync` with the turn's scope, the time-limit token and the trace sink, and hands them to `TechieRagAgentBuilder` (`UseConfiguredLlm().UseRetrievalSource(...).WithToolHandler(...).WithMaxToolIterations(agent.MaxToolCalls).WithTrace(progress)`) | The agent loop itself — `TechieRag.Agents` on Microsoft Agent Framework (was core's `AgentLoopRunner` until BRD-147) |
+| `Package boundary` *(new 2026-09-03)* | `Directory.Packages.props` (central pins for `TechieRag`, `TechieRag.Embedded`, `TechieRag.Agents` and every other package) and `NuGet.config` (nuget.org, GitHub Packages, local folder feed) | Building the libraries — a library change reaches this repository only as a package (ADR-014) |
 | `SchedulerService` | Schedule records, next-run computation, run history, catch-up | Where it is hosted — same class in-app or in the helper |
 | `FlowInterpreter` | Turns a natural-language instruction into a reviewable step list (BRD-140) and back | Executing steps — library orchestration |
 | `TechieRagManager` | Builds/refreshes the configured `ITechieRag`, provider config, rerank wiring | Provider protocols (library) |
@@ -211,6 +217,38 @@ sequenceDiagram
 
 Interpretation is constrained to the **actions the app actually exposes**, so the model selects rather than invents. The confirm step shows the full understood result — schedule, every step, delivery — because a summary would hide exactly the misreading the confirm step exists to catch. Interpretation uses the configured local model, so automation authoring does not require a cloud provider (BRD-99).
 
+### Agent turn on `TechieRag.Agents` (added 2026-09-03, BRD-147)
+
+```mermaid
+sequenceDiagram
+  actor U as Owner
+  participant UI as "WorkspaceChat (BlazorWebView)"
+  participant AR as "AgentRunner — permissions, egress gate, MCP, trace"
+  participant B as "TechieRagAgentBuilder (TechieRag.Agents)"
+  participant A as "AIAgent — ChatClientAgent (MAF)"
+  participant KB as "KnowledgeBaseTools (TechieRag.Agentic)"
+  participant WM as "WorkspaceManager.SearchScopedAsync"
+  participant P as "Configured LLM provider via ILlmProvider adapter"
+  U->>UI: "@analyst …" with per-turn mode, model, scope
+  UI->>AR: resolve agent, permitted skills ∩ catalogue, gate, MCP servers for this turn
+  AR->>B: UseConfiguredLlm().UseRetrievalSource(scope).WithToolHandler(tools).WithMaxToolIterations(MaxToolCalls).WithTrace(trace)
+  B-->>AR: ITechieRagAgent
+  AR->>A: AskAsync(prior turns + question, timeout token)
+  A->>P: model call — instructions + search_knowledge_base + list_documents + permitted skills
+  P-->>A: FunctionCallContent search_knowledge_base(query, top_k)
+  A->>KB: ExecuteSearchAsync
+  KB->>WM: search within scope, workspace threshold, rerank setting
+  WM-->>KB: SearchResult list
+  KB-->>A: refs S1.., scores, status, hint
+  A->>P: model call with the tool result (repeat while weak/none and budget remains)
+  P-->>A: final text with [S1] refs
+  A-->>AR: AgentRagResponse — Answer, Sources, Searches; AgentStep trace via the adapter
+  AR->>UI: citations from Sources, trace rows, streamed answer
+  UI->>U: answer, expandable citations, execution trace
+```
+
+An egress-gated skill (web scrape, HTTP MCP tool) still suspends inside `EgressGate` below the tool adapter, so the confirmation dialog and the decline path are unchanged. The per-run time limit is the same `CancellationTokenSource(agent.TimeLimitSeconds)`, passed into `AskAsync`.
+
 ## 6. Data architecture
 
 Everything persistent lives in **one per-user directory** (BRD-130): `~/Library/Application Support/TechieDesk` on macOS, `%LOCALAPPDATA%\TechieDesk` on Windows.
@@ -245,6 +283,8 @@ Signing is a **secret-gated step, not a precondition**: the workflow builds and 
 
 The only optional installed component is the scheduler helper (BRD-139), installed and removed from the app UI.
 
+**Repository and packages (added 2026-09-03, ADR-014 / BRD-146).** TechieDesk lives in its own repository. The library packages are consumed, never built here: `Directory.Packages.props` pins `TechieRag`, `TechieRag.Embedded` and `TechieRag.Agents` (and every other package, so the monorepo-era drift between `src/` and `apps/` pins cannot recur); `NuGet.config` lists nuget.org for releases, GitHub Packages for pre-releases (fed on every push to the library's `main`), and a local folder feed for same-day iteration (`dotnet pack -o <feed> -p:Version=x.y.z-local.N` on the library side; a `-local` pin is never committed). What moved with the app: the five projects under `apps/`, `tests/TechieDesk.Tests`, `tests/appium`, `tests/verify` + `playwright.config.ts`, `publish-desktop.yml`, the TechieDesk docs, mockups, screenshots, `uiIssues/`, and an app-configured `.tfcore/` (`metrics.project_type: app`, `runtimeVerification` for Appium/FlaUI). The library's `TechieRag.targets` now runs here as in any consumer and writes the AI-skill files into this repository — intended dogfooding, not a leak.
+
 Docker remains in the picture for exactly one purpose: **administering a Qdrant container** on a configurable daemon (BRD-134). TechieDesk itself is never containerized.
 
 ## 9. Verification architecture
@@ -275,6 +315,9 @@ This section exists because the pivot invalidated the project's entire runtime-v
 - **ADR-012 — Teams are N single-user installs joined by seats and portable files, NOT a shared instance (2026-07-29).** *Reason:* BRD-142/143. The owner needs to sell to teams and enterprises, but a shared instance would require reinstating roles, a capability matrix, per-workspace assignment and ultimately a server head — reversing ADR-002 and the 2026-07-26 desktop-only pivot. Instead an organisation buys **AppManager seats**, and each seat is one person on one ordinary single-user install. *Consequence:* nothing multi-tenant returns; `ProductRoleMapper` / `CapabilityService` / `IWorkspaceAssignmentRepository` (deleted by REQ-FN-041) are **not** reinstated and the `WorkspaceAssignment` table stays dropped. *Supersedes* the 2026-07-26 statement that sign-in exists "never to partition a shared instance" only in scope, not in mechanism — there is still no shared instance to partition. *Rejected alternatives:* multi-profile on one install (no competitor does it; serves only teams who literally share a machine); a sync engine (needs conflict resolution and a storage backend that does not exist); un-retiring the Blazor Server head (this is the benchmark's answer, and it discards the entire desktop-only architecture). *Benchmark note (re-scanned 2026-07-29):* AnythingLLM Desktop remains *"a 'single-player' application"* and its team story is Docker/Cloud with 3 fixed roles; its founder has declined even to let the desktop client connect to a self-hosted instance, citing permissioning.
 - **ADR-013 — Data moves between installs as an inert archive FILE; the live data directory is never cloud-synced (2026-07-29).** *Reason:* BRD-144/145. Handing a workspace to a colleague via OneDrive/Drive/Dropbox is the team workflow, but the obvious implementation — pointing the BRD-130 data directory at a synced folder — **corrupts data**: it holds a live SQLite database and a live embedded vector store, and consumer sync clients perform partial-write sync with no locking semantics and produce conflict copies. Export/import of a self-contained archive is therefore the only supported exchange, and live-directory sync is explicitly prohibited. *Consequences, each taken from a known failure:* archives **stream** to and from disk and support **per-workspace** granularity, because the benchmark removed its own export partly because large instances "crash during zipping"; restore **refuses an archive whose embedding-model identity differs**, because same-dimension vectors from a different model corrupt retrieval silently instead of failing; restore presents an explicit **skip / duplicate / replace** choice and never silently merges, because the benchmark's restore was an all-or-nothing instance rollback; unpacking **never writes outside the data directory** (zip-slip); and archives **carry no credentials** — tokens, provider keys and connector secrets stay in the OS credential store (ADR-004), since an archive is expected to land in a third-party sync folder. *Note:* AnythingLLM's own export was removed as the remediation for CVE-2024-22422, an unauthenticated DoS in an HTTP export endpoint — that class does not apply here (no HTTP surface), but its scale and merge-less-restore lessons do.
 
+- **ADR-014 — TechieDesk is its own repository and consumes the libraries as NuGet packages (2026-09-03).** *Reason:* owner decision (BRD-146). TechieDesk is the live implementation of `TechieRag`, `TechieRag.Embedded` and `TechieRag.Agents`, and it should consume them exactly as a customer does; the monorepo let the app take `ProjectReference` shortcuts and let library and app pins drift. *Consequences:* central package management from day one; a library change reaches the app only through a package (local feed for same-day work, GitHub Packages pre-release otherwise); the single-checklist governance of 2026-07-17 is reversed — library work is ledgered in the TechieRag BRD/checklist, app work here; the verification harness (Appium/FlaUI, Playwright) and the desktop publish workflow move with the app. *Supersedes* the monorepo assumption in TechieRag ADR-007 ("repo split deferred until post-MVP"). *Precondition verified:* no app project uses library internals.
+- **ADR-015 — The agent runtime is `TechieRag.Agents`; catalogue, egress and trace stay at the library seams (2026-09-03).** *Reason:* BRD-147 and ADR-001 — an agent loop is reusable capability, so it belongs in a library package, and the product must prove that package rather than keep a private loop beside it. *Mechanism:* the app keeps composing what it composes today (skills ∩ catalogue with permission-by-absence, `EgressGate` wrapping, per-turn MCP tools, time limit, trace sink, workspace-scoped retrieval) and passes it into `TechieRagAgentBuilder` through the package's public adapters (`ILlmProvider` → `IChatClient`, `IToolHandler` ↔ `AITool`, middleware → `IProgress<AgentStep>`). *Consequences:* `ConfirmEgress`, MCP provenance, `MaxToolCalls`, `ShowTrace` and citations behave identically; the `rag-search` skill and the system prompt adopt the library's agentic retrieval contract (refs, scores, strong/weak/none/limit status, hint; retrieve-first instructions) and `list_documents` joins under the same catalogue permission; flows run MAF agents as Agent nodes through the reverse tool adapter; `AgentLoopRunner` is no longer called by the app. *Guard:* the existing TechieDesk.Tests agent suites must pass unchanged against the new runtime before the old path is removed. *Extends* ADR-011 (two-level permissions) rather than replacing it.
+
 ## 11. Migration — Blazor Server to MAUI Hybrid
 
 Sequence matters; several of these steps are unsafe out of order.
@@ -300,7 +343,10 @@ Deleting the session machinery before step 4 would break a working application w
 | Retiring shipped, verified work (F-ROLES, F-DEPLOY, the session stack) can rot half-removed | Medium | Tracked as REQ-FN-041; delete rather than comment out; retired BRD IDs stay struck through so the decision stays legible |
 | TrBlazeUI accessibility defects (TR-008) are not app-fixable | Medium | NFR-005 cannot reach `Verified` without an upstream release |
 | Qdrant remains reachable only where a Docker daemon is | Low | BRD-134 makes the endpoint configurable; SqliteVec remains the zero-dependency default |
+| A library fix is invisible until a package exists (two repositories, added 2026-09-03) | Medium | Local folder feed for same-day iteration; GitHub Packages pre-release on push to the library's `main`; a bump is one line in `Directory.Packages.props` |
+| Moving the agent runtime to `TechieRag.Agents` regresses permissions, egress, MCP provenance or the trace (added 2026-09-03) | High | Existing TechieDesk.Tests agent suites must pass unchanged on the new runtime before the old path is deleted; live smoke of an `@agent` turn with a tool call, an egress prompt and a rendered trace |
 
 ---
 Last updated: 2026-07-26
 Created 2026-07-26 — TechieDesk had no Architecture doc before this; its architecture lived in BRD §6/§8.
+Last amended: 2026-09-03 — own repository consuming the three library packages (ADR-014); agent runtime on `TechieRag.Agents` with the app's permissions, egress gate, MCP and trace kept at the library seams (ADR-015); new agent-turn flow, package-boundary module, deployment and risk updates.
