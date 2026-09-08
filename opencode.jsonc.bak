@@ -1,0 +1,140 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    ".bmad-core/core-config.yaml"
+  ],
+  // Solo-dev BMAD v4: only the agents the compressed workflow actually uses.
+  // Stock story-flow agents (dev/pm/po/qa/sm/ux-expert) were trimmed 2026-06-12 —
+  // archived in docs/OldDocs/stock-bmad/ of the framework repo.
+  "agent": {
+    "bmad-orchestrator": {
+      "prompt": "{file:./.bmad-core/agents/bmad-orchestrator.md}",
+      "mode": "primary",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "description": "Backend/business-logic implementation (*build-functional-phase) and multi-agent coordination"
+    },
+    "bmad-master": {
+      "prompt": "{file:./.bmad-core/agents/bmad-master.md}",
+      "mode": "all",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "description": "HTML renders (*render-workflow-docs, *generate-html), status refresh, handoff (*handoff-phase), one-off tasks"
+    },
+    "bmad-architect": {
+      "prompt": "{file:./.bmad-core/agents/architect.md}",
+      "mode": "all",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "description": "Optional deep architecture dive; /analyst covers day-1 architecture by default"
+    },
+    "bmad-analyst": {
+      "prompt": "{file:./.bmad-core/agents/analyst.md}",
+      "mode": "all",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "description": "Day-1 docs (*day1-brownfield / *day1-greenfield), requirements split (*split-brd), brainstorming, research"
+    },
+    "bmad-verifier": {
+      "prompt": "{file:./.bmad-core/agents/verifier.md}",
+      "mode": "all",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "description": "Vera — autonomous verification (*verify ui|functional|all); writes verdicts into the checklist Requirements Status tables"
+    }
+  },
+  "command": {
+    "bmad:tasks:day1-brownfield": {
+      "template": "{file:./.bmad-core/tasks/day1-brownfield.md}",
+      "description": "Day-1 master task for an EXISTING project: Architecture + BRD + Coding-Standards + .editorconfig + PROJECT-STATUS + CLAUDE.md (+ checklist migration if a dev plan exists), all HTML-rendered."
+    },
+    "bmad:tasks:day1-greenfield": {
+      "template": "{file:./.bmad-core/tasks/day1-greenfield.md}",
+      "description": "Day-1 master task for a NEW project: target Architecture + BRD + Coding-Standards + .editorconfig + PROJECT-STATUS + CLAUDE.md, all HTML-rendered."
+    },
+    "bmad:tasks:split-brd": {
+      "template": "{file:./.bmad-core/tasks/split-brd.md}",
+      "description": "Split the BRD into UI-Checklist (REQ-UI-*) and Functional-Checklist (REQ-FN/RAG/NFR-*) with Requirements Status tables."
+    },
+    "bmad:tasks:build-ui-phase": {
+      "template": "{file:./.bmad-core/tasks/build-ui-phase.md}",
+      "description": "Implement every open REQ-UI-* with TrBlazeUI per Coding Standards; self-smoke; chain the verifier. Normally driven by /trblazeui."
+    },
+    "bmad:tasks:build-functional-phase": {
+      "template": "{file:./.bmad-core/tasks/build-functional-phase.md}",
+      "description": "Implement every open REQ-FN-*/REQ-NFR-* per Coding Standards; self-smoke; chain the verifier. Normally driven by /bmad-orchestrator."
+    },
+    "bmad:tasks:build-rag-phase": {
+      "template": "{file:./.bmad-core/tasks/build-rag-phase.md}",
+      "description": "Implement every open REQ-RAG-* with TechieRag per Coding Standards; self-smoke. Normally driven by /techierag."
+    },
+    "bmad:tasks:verify-phase": {
+      "template": "{file:./.bmad-core/tasks/verify-phase.md}",
+      "description": "Autonomous verification of a scope (ui | functional | all | REQ list | legacy phase-N); verdicts land in the checklist Requirements Status tables."
+    },
+    "bmad:tasks:handoff-phase": {
+      "template": "{file:./.bmad-core/tasks/handoff-phase.md}",
+      "description": "Final wrap-up: Usage/Testing/Setup doc, PROJECT-STATUS → Handoff, HTML re-renders, Library-Feedback consolidation."
+    },
+    "bmad:tasks:render-workflow-docs": {
+      "template": "{file:./.bmad-core/tasks/render-workflow-docs.md}",
+      "description": "Re-render the canonical trio: BRD.html + Architecture.html + PROJECT-STATUS.html (with NEXT COMMAND call-to-action)."
+    },
+    "bmad:tasks:generate-html": {
+      "template": "{file:./.bmad-core/tasks/generate-html.md}",
+      "description": "Render any markdown file(s) or a non-recursive directory to self-contained HTML using the shared shell."
+    },
+    "bmad:tasks:author-brd": {
+      "template": "{file:./.bmad-core/tasks/author-brd.md}",
+      "description": "Interactively extend docs/{AppName}-BRD.md with confirmed BRD-N requirements (per-item elicitation)."
+    },
+    "bmad:tasks:document-project": {
+      "template": "{file:./.bmad-core/tasks/document-project.md}",
+      "description": "Generate comprehensive documentation for existing projects optimized for AI development agents."
+    },
+    "bmad:tasks:create-doc": {
+      "template": "{file:./.bmad-core/tasks/create-doc.md}"
+    },
+    "bmad:tasks:create-deep-research-prompt": {
+      "template": "{file:./.bmad-core/tasks/create-deep-research-prompt.md}",
+      "description": "Generate well-structured research prompts."
+    },
+    "bmad:tasks:facilitate-brainstorming-session": {
+      "template": "{file:./.bmad-core/tasks/facilitate-brainstorming-session.md}"
+    },
+    "bmad:tasks:advanced-elicitation": {
+      "template": "{file:./.bmad-core/tasks/advanced-elicitation.md}",
+      "description": "Reflective/brainstorming actions for deeper exploration and iterative refinement of drafted content."
+    },
+    "bmad:tasks:execute-checklist": {
+      "template": "{file:./.bmad-core/tasks/execute-checklist.md}"
+    },
+    "bmad:tasks:index-docs": {
+      "template": "{file:./.bmad-core/tasks/index-docs.md}",
+      "description": "Maintain docs/index.md by scanning all documentation files and indexing them with descriptions."
+    },
+    "bmad:tasks:kb-mode-interaction": {
+      "template": "{file:./.bmad-core/tasks/kb-mode-interaction.md}",
+      "description": "User-friendly interface to the BMad knowledge base."
+    },
+    "bmad:tasks:shard-doc": {
+      "template": "{file:./.bmad-core/tasks/shard-doc.md}",
+      "description": "Split a large document into smaller documents by level-2 sections, preserving content integrity."
+    }
+  }
+}
