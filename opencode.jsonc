@@ -897,6 +897,30 @@
       "template": "{file:./.tfcore/tasks/create-doc.md}",
       "description": "Create a document from a YAML-driven TechieFlow template (interactive, section by section)."
     },
+    "techieflow:tasks:verify": {
+      "template": "{file:./.tfcore/tasks/verify-phase.md}",
+      "description": "The verifier's *verify. Boot the app, run the seven checks on every row in scope, write the verdicts."
+    },
+    "techieflow:tasks:metrics": {
+      "template": "{file:./.tfcore/tasks/metrics-report.md}",
+      "description": "The flow-master's *metrics. Read the telemetry streams and write the metrics report."
+    },
+    "techieflow:tasks:brainstorm": {
+      "template": "{file:./.tfcore/tasks/facilitate-brainstorming-session.md}",
+      "description": "The analyst's *brainstorm. Run a structured brainstorming session."
+    },
+    "techieflow:tasks:research-prompt": {
+      "template": "{file:./.tfcore/tasks/create-deep-research-prompt.md}",
+      "description": "The analyst's *research-prompt. Generate a well-structured research prompt."
+    },
+    "techieflow:tasks:research": {
+      "template": "{file:./.tfcore/tasks/create-deep-research-prompt.md}",
+      "description": "The architect's *research. Generate a well-structured research prompt."
+    },
+    "techieflow:tasks:create-project-brief": {
+      "template": "{file:./.tfcore/tasks/create-project-brief.md}",
+      "description": "Write the one-page project brief that day-1 takes as input: product, users, must-do, out of scope. The analyst's *create-project-brief."
+    },
     "techieflow:tasks:create-deep-research-prompt": {
       "template": "{file:./.tfcore/tasks/create-deep-research-prompt.md}",
       "description": "Generate well-structured research prompts."
