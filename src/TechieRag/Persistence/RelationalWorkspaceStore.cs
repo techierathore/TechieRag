@@ -188,6 +188,18 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
     }
 
     /// <inheritdoc/>
+    public async Task RemoveDocumentFromAllWorkspacesAsync(string documentId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(documentId);
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await connection.ExecuteAsync(
+            "DELETE FROM TrWorkspaceDocument WHERE DocumentId = @DocumentId",
+            new { DocumentId = documentId }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<WorkspaceDocument>> ListDocumentsAsync(
         string workspaceId,
         CancellationToken cancellationToken = default)

@@ -36,7 +36,7 @@ public static class DocumentMetadataKeys
     /// <summary>Absolute URL the document was retrieved from, when it came from the web.</summary>
     public const string SourceUrl = "SourceUrl";
 
-    /// <summary>Short identifier of the ingestion route, for example <c>web</c> or <c>youtube</c>.</summary>
+    /// <summary>Short identifier of the ingestion route, for example <c>web</c> or a connector's source type.</summary>
     public const string SourceType = "SourceType";
 
     /// <summary>Display name of the connector or site the document came from.</summary>

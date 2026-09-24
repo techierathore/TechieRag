@@ -118,7 +118,7 @@ Nothing blocks the library's own work: these are the application's findings agai
 - **Suggested fix:** verify the agent-loop `ChatAsync` request includes the tool schema for LmStudio/OpenAICompatible and that the response's `tool_calls` are parsed and surfaced as `AgentStep`s; add an integration test that asserts ≥1 `ToolExecuted` step for a weather/time prompt.
 - ✅ FIXED 2026-07-01 — Root cause was in `LmStudioLlmProvider` only (the OpenAICompatible sibling was already correct). Fixed in `src/TechieRag/Llm/LmStudioLlmProvider.cs`: `SupportsToolCalling` now `true`; `BuildOpenAIRequest` now emits the `tools`/`tool_choice` blocks and a full message projection (`content`/`tool_call_id`/`tool_calls`) so follow-up agent turns are well-formed; `ChatAsync` now parses `tool_calls` via a new `ParseToolCalls` helper and passes `HasToolCalls` to the completion event. Unit tests added (`tests/TechieRag.Tests/Llm/LmStudioLlmProviderTests.cs`) asserting the serialized request carries a `tools` array and that a `finish_reason:"tool_calls"` response is parsed into `LlmResponse.ToolCalls` (`HasToolCalls == true`). Build + tests green. Commit `[REQ-RAG-009] ... (TR-RAG-006)`.
 
-### TR-RAG-009 — Non-workspace context path still truncates silently (minor, found 2026-07-25)
+### TR-RAG-009 — Non-workspace context path still truncates silently (minor, found 2026-07-25) — ✅ **FIXED 2026-09-24** (REQ-RAG-096: `PromptTemplateEngine.ContextTruncated`)
 
 - **Severity:** minor
 - **Blocks:** no
@@ -193,7 +193,7 @@ Nothing blocks the library's own work: these are the application's findings agai
 - **Workaround:** web ingestion now writes the URL to **both** `SourceUrl` and `SourcePath` in the ingestion metadata (`src/TechieRag/Web/WebIngestionExtensions.cs`), because `SourcePath` *is* lifted from chunk metadata onto the document row. A new `Document.WebSourceUrl()` extension reads whichever survived, and `WebIngestionService.ReadCatalogueAsync` calls it instead of indexing `Metadata` directly. Regression tests: `IngestedDocumentsReportTheSourceUrlAfterAStoreRoundTrip` and `EachCrawledDocumentReportsItsOwnSourceUrl` in `tests/TechieDesk.Tests/Web/WebIngestionServiceTests.cs`, which run through the real SQLite-vec store.
 - **Suggested fix:** serialize the document's metadata into the `Documents.Metadata` column instead of `"{}"`. The column, the JSON round-trip in `DocumentRow.ToDocument()`, and the deserialization are all already there and correct — only the write is stubbed. Worth checking `PgVectorStore` and `QdrantStore` for the same stub, and worth a store-contract test asserting metadata round-trips, since a consumer cannot tell from the API that the guarantee does not hold.
 
-### TR-RAG-015 — YouTube transcript ingestion is non-functional: timed-text URLs return HTTP 200 with a zero-byte body
+### TR-RAG-015 — YouTube transcript ingestion is non-functional: timed-text URLs return HTTP 200 with a zero-byte body — **CLOSED 2026-09-24** (feature removed by owner decision: BRD-120 struck, reader, entry point and tests deleted under BRD-164 / REQ-RAG-107; the text below is the historic record)
 - **Severity:** major (external platform change; the library cannot currently deliver REQ-RAG-018)
 - **Blocks:** no
 - **Repro:**
@@ -267,7 +267,7 @@ Nothing blocks the library's own work: these are the application's findings agai
 - **Encountered in:** REQ-RAG-032 / BRD-113, design requirement "caps on item count and total bytes".
 - **Workaround / fix applied:** `ConnectorRunOptions.MaxTotalBytes` (default 64 MB), enforced in `ConnectorRunner` on real UTF-8 byte counts of fetched text. The item that crosses the budget is kept and its version recorded — discarding it would re-fetch it forever and a source larger than the budget could never converge. Tests: `StopsAtMaxTotalBytes`, `KeepsTheItemThatReachedTheByteBudget`, `CountsMultiByteTextByItsBytes`, `DoesNotReportALimitWhenTheBudgetWasNotReached`.
 
-### TR-RAG-020 — `ConnectorRunner` materialises every fetched document in memory; there is no streaming run API — **OPEN**
+### TR-RAG-020 — `ConnectorRunner` materialises every fetched document in memory; there is no streaming run API — ✅ **FIXED 2026-09-24** (REQ-RAG-083: `ConnectorRunner.RunAsync(..., onDocument, ...)`)
 - **Severity:** minor (design limit, bounded but not removed)
 - **Blocks:** no
 - **Repro:**
@@ -281,7 +281,7 @@ Nothing blocks the library's own work: these are the application's findings agai
 - **Workaround:** set `MaxTotalBytes` to what the host can afford; `ConnectorRunResult.ReachedLimit` plus the returned `Sync` make a truncated run resumable, so a source larger than the budget converges over several runs rather than failing.
 - **Suggested fix:** an `IAsyncEnumerable<ConnectorRunEvent>` overload yielding a discriminated union of fetched-document / item-failure / progress, with the sync state available at completion. That shape keeps failures un-ignorable (they are in the same stream) while removing the aggregate memory cost, and it is also exactly what a progress-reporting background job wants to consume.
 
-### TR-RAG-021 — `IConnectorTransport` is GET-only, which forecloses the search APIs these sources offer — **OPEN**
+### TR-RAG-021 — `IConnectorTransport` is GET-only, which forecloses the search APIs these sources offer — ✅ **FIXED 2026-09-24** (REQ-RAG-083: `IConnectorTransport.SendAsync`, `ConnectorHttpRequest.Method/Body`)
 - **Severity:** minor
 - **Blocks:** no
 - **Repro:** `IConnectorTransport` exposes a single `GetAsync(ConnectorHttpRequest, CancellationToken)`. There is no POST, no request body, and no method selector.
@@ -291,7 +291,7 @@ Nothing blocks the library's own work: these are the application's findings agai
 - **Workaround:** none needed yet; the truncation is reported rather than silently ingesting a prefix of the repository.
 - **Suggested fix:** widen to `SendAsync(ConnectorHttpRequest, CancellationToken)` with `Method` and optional `Body` on the request record, keeping `GetAsync` as a default-implemented convenience so no existing implementation breaks. Worth doing before a fourth connector rather than after.
 
-### TR-RAG-022 — the answer to TR-RAG-020: a streaming run API also has to make cancellation non-lossy — **OPEN**
+### TR-RAG-022 — the answer to TR-RAG-020: a streaming run API also has to make cancellation non-lossy — ✅ **FIXED 2026-09-24** (REQ-RAG-083: `IngestConnectorAsync` ingests each document as it is fetched; incremental sync-state events not built)
 - **Severity:** major (data loss on cancellation; TR-RAG-020 filed the memory half of the same gap as minor)
 - **Blocks:** no
 - **Repro:**
@@ -583,7 +583,7 @@ Nothing blocks the library's own work: these are the application's findings agai
   4. **`SqliteVecStore` / `QdrantStore` / `PgVectorStore`.** SqliteVec no longer writes a hardcoded `{}` — it lifts the document-scoped keys onto the document row. Qdrant carries them in a single `Metadata` payload string and reads them back (it previously returned a `Document` with no metadata at all). PgVector already persisted the whole chunk dictionary, so only its **read** path changed.
 - **The third trap, which is the one worth remembering.** Deserializing a metadata column into `Dictionary<string, object>` produces `JsonElement` values, and `JsonElement` does not implement `IConvertible`. The size would then be stored correctly, returned correctly, and still be unreadable to `Convert.ToInt64` — which on a guarded caller is indistinguishable on screen from the original bug. `DocumentMetadataKeys.FromJson` unwraps to CLR primitives, and all three stores now use it. (A follow-on of the same shape: the obvious `TryGetInt64(out var n) ? n : GetDouble()` has the natural type `double`, so the `long` was widened before boxing. Caught by the live smoke printing `Double`, not by any assertion — there is now one.)
 - **Tests:** `tests/TechieRag.Tests/Ingestion/DocumentSizeMetadataTests.cs` (7) drives file, text and folder ingestion through a real `SqliteVecStore`; `tests/TechieRag.Tests/Connectors/ConnectorIngestionTests.cs` (+2) covers the source-reported size and its absence; `tests/TechieDesk.Tests/Workspaces/DocumentSizeDisplayTests.cs` (5) drives the real `WorkspaceManager` into a real store and asserts the shipping display probe renders `4.0 KB` / `640 B` / `—`.
-- **Routes that deliberately still show `—`, and why:** (a) any document ingested before this change — the source artefact is not retained, so there is nothing to read; (b) a connector item whose source reports no `SizeBytes` falls back to the ingested text's byte count, which is a real number but is the *stored text's* size, not the remote artefact's — stated here rather than presented as equivalent; (c) the same caveat applies to a crawled web page and a YouTube transcript: what is recorded is the size of the readable text that was stored, because the HTTP payload (or the video) is not the thing the library holds and reporting it would describe something the user cannot retrieve.
+- **Routes that deliberately still show `—`, and why:** (a) any document ingested before this change — the source artefact is not retained, so there is nothing to read; (b) a connector item whose source reports no `SizeBytes` falls back to the ingested text's byte count, which is a real number but is the *stored text's* size, not the remote artefact's — stated here rather than presented as equivalent; (c) the same caveat applies to a crawled web page: what is recorded is the size of the readable text that was stored, because the HTTP payload (or the video) is not the thing the library holds and reporting it would describe something the user cannot retrieve.
 - **Live proof (real production database, `~/Library/Application Support/TechieDesk/techierag.db`):** a 7,080-byte file ingested through `WorkspaceManager.IngestFileAsync` stored `{"FileSize":7080}` on its document row and rendered `6.9 KB`; a 90-byte file rendered `90 B`. The 12 documents ingested before the fix still render `—` and neither throw nor get backfilled — which is the correct answer for them, since their source artefacts were never retained.
 - **Known limits, stated rather than papered over:** (a) there is **no backfill** — a size that was never recorded cannot be recovered honestly, and reconstructing one from stored chunk text would be inflated by chunk overlap; (b) PgVector persists a **superset** (the whole first chunk's metadata, its long-standing behaviour) while SqliteVec and Qdrant persist the allowlist, so document metadata is not byte-identical across stores. Narrowing PgVector would delete data an existing deployment may be reading, so it was left alone.
 

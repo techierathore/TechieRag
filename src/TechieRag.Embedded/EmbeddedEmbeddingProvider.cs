@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using Microsoft.ML.Tokenizers;
@@ -9,34 +8,38 @@ using TechieRag.Models;
 namespace TechieRag.Embedded;
 
 /// <summary>
-/// Embedding provider with BGE-M3 ONNX model.
-/// Model is auto-downloaded on first use and cached locally (~2.3GB).
+/// Offline embedding provider running an ONNX model in process: bge-m3 on desktops, all-MiniLM-L6-v2
+/// on phones, downloaded once into the model root.
 /// </summary>
 /// <remarks>
-/// <para><b>Purpose:</b> High-quality multilingual embeddings with auto-download.</para>
-/// <para><b>Model:</b> BGE-M3 (1024 dimensions, 100+ languages, best quality)</para>
-/// <para><b>First Use:</b> Downloads ~2.3GB model (cached for subsequent uses)</para>
+/// <para><b>Purpose:</b> Embeddings with no server and no network after the first download.</para>
+/// <para><b>Models:</b> <see cref="EmbeddedModel.BgeM3"/> (1024 dimensions, 100+ languages, 2.3 GB)
+/// and <see cref="EmbeddedModel.MiniLM"/> (384 dimensions, English, 91 MB).
+/// <see cref="CreateDefault"/> picks <see cref="EmbeddedModel.PlatformDefault"/>.</para>
+/// <para><b>Where files go:</b> <c>&lt;ModelRoot&gt;/&lt;model name&gt;</c>, the per-user application
+/// data folder unless the host moves it (REQ-RAG-053).</para>
+/// <para><b>Download:</b> through <see cref="ModelDownloadService"/>, which reports the size before the
+/// first byte and progress after (REQ-RAG-055).</para>
 /// </remarks>
 public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 {
-    private const string EmbeddedModelName = "bge-m3";
-    private const int EmbeddedModelDimensions = 1024;
-    private const string DefaultModelBaseUrl = "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx";
-
     /// <summary>
     /// Environment variable that redirects the one-time model download to an internal mirror.
     /// </summary>
     /// <remarks>
     /// REQ-NFR-008 (data locality): the only outbound call this provider ever makes is the
-    /// first-run fetch of the BGE-M3 weights — no instance data is transmitted, and once the
+    /// first-run fetch of the model weights — no instance data is transmitted, and once the
     /// model is cached the provider is fully offline. Air-gapped or policy-restricted
     /// deployments can point this at an internal artifact store instead of huggingface.co, or
-    /// pre-seed the model directory so no download occurs at all.
+    /// pre-seed the model directory so no download occurs at all. bge-m3's files are fetched from
+    /// <c>&lt;mirror&gt;/&lt;file&gt;</c>; any other model's from <c>&lt;mirror&gt;/&lt;name&gt;/&lt;file&gt;</c>.
     /// </remarks>
     public const string ModelBaseUrlEnvironmentVariable = "TECHIERAG_MODEL_BASE_URL";
 
+    private const string DefaultModelBaseUrl = "https://huggingface.co/BAAI/bge-m3/resolve/main/onnx";
+
     /// <summary>
-    /// Gets the base URL the model weights are downloaded from — the configured mirror when
+    /// Gets the base URL the bge-m3 weights are downloaded from — the configured mirror when
     /// <see cref="ModelBaseUrlEnvironmentVariable"/> is set, otherwise the public Hugging Face
     /// repository.
     /// </summary>
@@ -51,28 +54,20 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
         }
     }
 
-    private static readonly SemaphoreSlim DownloadSemaphore = new(1, 1);
-    private static string? cachedModelDir;
-    private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromHours(2) };
-
-    // File information with approximate sizes in bytes
-    private static readonly (string Filename, string DisplaySize, long ApproxBytes)[] ModelFiles =
-    [
-        ("model.onnx", "725 KB", 742_400),
-        ("model.onnx_data", "2.27 GB", 2_437_000_000),
-        ("tokenizer.json", "17 MB", 17_825_792),
-        ("sentencepiece.bpe.model", "5 MB", 5_242_880),
-        ("config.json", "698 B", 698)
-    ];
-
     /// <inheritdoc />
     public string Name => "Embedded-ONNX";
 
     /// <inheritdoc />
-    public string ModelName { get; private set; } = EmbeddedModelName;
+    public string ModelName { get; private set; }
 
     /// <inheritdoc />
-    public int Dimensions { get; private set; } = EmbeddedModelDimensions;
+    public int Dimensions { get; private set; }
+
+    /// <summary>
+    /// Gets the downloadable model this provider runs, or <see langword="null"/> when it was created
+    /// from a folder the caller supplied.
+    /// </summary>
+    public EmbeddedModel? Model { get; }
 
     /// <summary>
     /// The encoding revision of this provider (REQ-RAG-052).
@@ -86,7 +81,8 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
     /// <c>&lt;/s&gt;</c>. Neither the provider nor the model changed, which is precisely why a
     /// revision is needed and why a provider/model pair alone would not have caught it.</para>
     /// <para>Bump this for ANY change that alters the vector for identical input — encoding, pooling,
-    /// normalisation, or a different export of the same weights.</para>
+    /// normalisation, or a different export of the same weights. The MiniLM path added on 2026-09-24
+    /// is a different model name, so its signature differs already and r2 is kept.</para>
     /// </remarks>
     private const int EncodingRevision = 2;
 
@@ -99,75 +95,82 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
     private InferenceSession? session;
     private Tokenizer? tokenizer;
+    private bool feedsTokenTypeIds;
     private readonly int maxSequenceLength;
     private bool disposed;
     private bool initialized;
-    private readonly string? preloadedModelDirectory;
+    private readonly SemaphoreSlim initLock = new(1, 1);
 
     /// <summary>
-    /// Creates the default embedded provider using BGE-M3.
+    /// Creates the provider for this platform's default model (<see cref="EmbeddedModel.PlatformDefault"/>:
+    /// bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS).
     /// Model download is deferred until first use or explicit initialization.
     /// </summary>
-    public static EmbeddedEmbeddingProvider CreateDefault()
+    /// <returns>A provider that downloads on first use.</returns>
+    public static EmbeddedEmbeddingProvider CreateDefault() => Create(EmbeddedModel.PlatformDefault);
+
+    /// <summary>
+    /// Creates the provider for one model. Model download is deferred until first use.
+    /// </summary>
+    /// <param name="model">The model to run.</param>
+    /// <returns>A provider that downloads on first use.</returns>
+    /// <exception cref="NotSupportedException">The model is too large for this platform (bge-m3 on a phone).</exception>
+    public static EmbeddedEmbeddingProvider Create(EmbeddedModel model)
     {
-        return new EmbeddedEmbeddingProvider();
+        ArgumentNullException.ThrowIfNull(model);
+        model.EnsureSupported(EmbeddedModel.IsPhonePlatform);
+        return new EmbeddedEmbeddingProvider(model);
     }
 
     /// <summary>
-    /// Creates and initializes the provider asynchronously with progress reporting.
+    /// Creates and initializes the default provider asynchronously with progress reporting.
     /// </summary>
+    /// <param name="cancellationToken">Cancels the download or load.</param>
+    /// <returns>An initialized provider.</returns>
     public static async Task<EmbeddedEmbeddingProvider> CreateDefaultAsync(CancellationToken cancellationToken = default)
     {
-        var provider = new EmbeddedEmbeddingProvider();
-        await provider.InitializeAsync(cancellationToken);
+        var provider = CreateDefault();
+        await provider.InitializeAsync(cancellationToken).ConfigureAwait(false);
         return provider;
     }
 
     /// <summary>
-    /// Checks if the BGE-M3 model is already downloaded and ready.
+    /// Checks if this platform's default model is already downloaded and ready.
     /// </summary>
-    public static bool IsModelDownloaded()
-    {
-        var modelDir = GetModelDirectory();
-        var modelPath = Path.Combine(modelDir, "model.onnx");
-        var dataPath = Path.Combine(modelDir, "model.onnx_data");
-
-        if (!File.Exists(modelPath) || !File.Exists(dataPath))
-            return false;
-
-        var dataSize = new FileInfo(dataPath).Length;
-        return dataSize > 2_000_000_000; // > 2GB means complete
-    }
+    /// <returns><see langword="true"/> when no download is needed.</returns>
+    public static bool IsModelDownloaded() => EmbeddedModel.PlatformDefault.IsDownloaded();
 
     /// <summary>
-    /// Gets the model directory path.
+    /// Gets the folder this platform's default model lives in: <c>&lt;ModelRoot&gt;/&lt;model name&gt;</c>.
     /// </summary>
-    public static string GetModelDirectory()
-    {
-        var assemblyLocation = Assembly.GetExecutingAssembly().Location;
-        var assemblyDir = Path.GetDirectoryName(assemblyLocation) ?? AppContext.BaseDirectory;
-        return Path.Combine(assemblyDir, "models", EmbeddedModelName);
-    }
+    /// <returns>The absolute folder path.</returns>
+    public static string GetModelDirectory() => EmbeddedModel.PlatformDefault.GetModelDirectory();
 
     /// <summary>
-    /// Creates a lazy-initializing embedded provider.
-    /// Call InitializeAsync() or first embed call will trigger initialization.
+    /// Creates a lazy-initializing provider for a downloadable model.
     /// </summary>
-    private EmbeddedEmbeddingProvider(int maxSequenceLength = 8192)
+    /// <param name="model">The model; platform checks are the caller's.</param>
+    internal EmbeddedEmbeddingProvider(EmbeddedModel model)
     {
-        this.maxSequenceLength = maxSequenceLength;
+        Model = model;
+        ModelName = model.Name;
+        Dimensions = model.Dimensions;
+        maxSequenceLength = model.MaxSequenceLength;
     }
 
     /// <summary>
     /// Creates embedded provider from a pre-downloaded model directory.
     /// </summary>
+    /// <param name="modelDirectory">Folder holding an ONNX model and its tokenizer files.</param>
+    /// <param name="dimensions">The width of the vectors the model produces.</param>
+    /// <param name="maxSequenceLength">The longest input, in tokens.</param>
     public EmbeddedEmbeddingProvider(string modelDirectory, int dimensions = 1024, int maxSequenceLength = 8192)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelDirectory);
 
-        this.preloadedModelDirectory = modelDirectory;
         this.maxSequenceLength = maxSequenceLength;
         Dimensions = dimensions;
+        ModelName = dimensions == EmbeddedModel.BgeM3.Dimensions ? EmbeddedModel.BgeM3.Name : $"embedded-onnx-{dimensions}d";
 
         // Initialize immediately for pre-loaded models
         InitializeFromDirectory(modelDirectory);
@@ -175,35 +178,31 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
     /// <summary>
     /// Initializes the provider, downloading the model if needed.
-    /// Reports progress through ModelDownloadService.
+    /// Reports the size and progress through <see cref="ModelDownloadService"/>.
     /// </summary>
+    /// <param name="cancellationToken">Cancels the download or load.</param>
+    /// <returns>A task that completes when the model is loaded.</returns>
+    /// <exception cref="ModelDownloadDeclinedException">The host declined the download.</exception>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         if (initialized) return;
 
-        var service = ModelDownloadService.Instance;
-
+        await initLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            service.UpdateProgress(p =>
-            {
-                p.Status = ModelDownloadStatus.Checking;
-                p.TotalFiles = ModelFiles.Length;
-            });
+            if (initialized || Model is null) return;
 
-            var modelDir = await EnsureModelDownloadedAsync(cancellationToken);
-            InitializeFromDirectory(modelDir);
+            var service = ModelDownloadService.Instance;
+            var modelDirectory = Model.ResolveDirectory();
+            await service.DownloadAsync(Model.Name, modelDirectory, Model.GetDownloadFiles(), cancellationToken)
+                .ConfigureAwait(false);
 
+            InitializeFromDirectory(modelDirectory);
             service.UpdateProgress(p => p.Status = ModelDownloadStatus.Completed);
         }
-        catch (Exception ex)
+        finally
         {
-            service.UpdateProgress(p =>
-            {
-                p.Status = ModelDownloadStatus.Failed;
-                p.ErrorMessage = ex.Message;
-            });
-            throw;
+            initLock.Release();
         }
     }
 
@@ -222,6 +221,7 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
         };
 
         session = new InferenceSession(modelPath, sessionOptions);
+        feedsTokenTypeIds = session.InputMetadata.ContainsKey("token_type_ids");
         tokenizer = LoadTokenizer(tokenizerPath, modelDirectory);
         initialized = true;
     }
@@ -230,149 +230,22 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
     {
         if (!initialized)
         {
-            await InitializeAsync(cancellationToken);
+            await InitializeAsync(cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    private static async Task<string> EnsureModelDownloadedAsync(CancellationToken cancellationToken)
-    {
-        var modelDir = GetModelDirectory();
-        var service = ModelDownloadService.Instance;
-
-        // Quick check without lock
-        if (IsModelDownloaded())
-        {
-            cachedModelDir = modelDir;
-            service.UpdateProgress(p =>
-            {
-                p.Status = ModelDownloadStatus.Completed;
-                p.CompletedFiles = ModelFiles.Length;
-            });
-            return modelDir;
-        }
-
-        await DownloadSemaphore.WaitAsync(cancellationToken);
-        try
-        {
-            // Double-check after acquiring lock
-            if (cachedModelDir != null && Directory.Exists(cachedModelDir))
-            {
-                service.UpdateProgress(p => p.Status = ModelDownloadStatus.Completed);
-                return cachedModelDir;
-            }
-
-            Directory.CreateDirectory(modelDir);
-
-            service.UpdateProgress(p =>
-            {
-                p.Status = ModelDownloadStatus.Downloading;
-                p.TotalFiles = ModelFiles.Length;
-                p.CompletedFiles = 0;
-            });
-
-            for (int i = 0; i < ModelFiles.Length; i++)
-            {
-                var (filename, displaySize, approxBytes) = ModelFiles[i];
-                var destPath = Path.Combine(modelDir, filename);
-
-                // Check if file already exists and is complete
-                if (File.Exists(destPath))
-                {
-                    if (filename == "model.onnx_data")
-                    {
-                        var existingSize = new FileInfo(destPath).Length;
-                        if (existingSize > 2_000_000_000)
-                        {
-                            service.UpdateProgress(p => p.CompletedFiles = i + 1);
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        service.UpdateProgress(p => p.CompletedFiles = i + 1);
-                        continue;
-                    }
-                }
-
-                service.UpdateProgress(p =>
-                {
-                    p.CurrentFile = filename;
-                    p.CurrentFileSize = displaySize;
-                    p.CurrentFileTotalBytes = approxBytes;
-                    p.CurrentFileBytesDownloaded = 0;
-                });
-
-                Console.WriteLine($"[TechieRag.Embedded] Downloading {filename} ({displaySize})...");
-
-                var url = $"{ModelBaseUrl}/{filename}";
-                await DownloadFileWithProgressAsync(url, destPath, approxBytes, cancellationToken);
-
-                service.UpdateProgress(p => p.CompletedFiles = i + 1);
-                Console.WriteLine($"[TechieRag.Embedded] Downloaded {filename}");
-            }
-
-            cachedModelDir = modelDir;
-            Console.WriteLine("[TechieRag.Embedded] BGE-M3 model ready!");
-
-            return modelDir;
-        }
-        finally
-        {
-            DownloadSemaphore.Release();
-        }
-    }
-
-    private static async Task DownloadFileWithProgressAsync(
-        string url,
-        string destPath,
-        long expectedSize,
-        CancellationToken cancellationToken)
-    {
-        var service = ModelDownloadService.Instance;
-
-        using var response = await HttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        var totalBytes = response.Content.Headers.ContentLength ?? expectedSize;
-        service.UpdateProgress(p => p.CurrentFileTotalBytes = totalBytes);
-
-        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        await using var fileStream = File.Create(destPath);
-
-        var buffer = new byte[81920]; // 80KB buffer
-        long totalRead = 0;
-        int bytesRead;
-        var lastProgressUpdate = DateTime.UtcNow;
-
-        while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken);
-            totalRead += bytesRead;
-
-            // Update progress every 500ms to avoid too frequent updates
-            if ((DateTime.UtcNow - lastProgressUpdate).TotalMilliseconds > 500)
-            {
-                service.UpdateProgress(p => p.CurrentFileBytesDownloaded = totalRead);
-                lastProgressUpdate = DateTime.UtcNow;
-            }
-        }
-
-        // Final progress update
-        service.UpdateProgress(p => p.CurrentFileBytesDownloaded = totalRead);
     }
 
     /// <inheritdoc />
     public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
-        var results = await EmbedBatchAsync([text], cancellationToken);
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
+        var results = await EmbedBatchAsync([text], cancellationToken).ConfigureAwait(false);
         return results[0];
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<float[]>> EmbedBatchAsync(IEnumerable<string> texts, CancellationToken cancellationToken = default)
     {
-        await EnsureInitializedAsync(cancellationToken);
+        await EnsureInitializedAsync(cancellationToken).ConfigureAwait(false);
 
         var textList = texts.ToList();
         var results = new List<float[]>(textList.Count);
@@ -437,27 +310,14 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
         if (tokenizer == null || session == null)
             throw new InvalidOperationException("Provider not initialized. Call InitializeAsync() first.");
 
-        // Two slots are reserved so the <s>/</s> wrapper cannot push a maximum-length input over the
-        // model's sequence limit.
-        var encoded = tokenizer.EncodeToIds(text, Math.Max(1, maxSequenceLength - 2), out _, out _);
-
-        // XLM-RoBERTa encoding: <s> text </s>, with the piece ids shifted into the model's
-        // vocabulary (TR-RAG-044 / REQ-RAG-052). Both halves were missing: the ids went in raw, and
-        // the sequence carried no special tokens at all.
-        var seqLength = Math.Min(encoded.Count, maxSequenceLength - 2) + 2;
-        var inputIds = new long[seqLength];
+        var inputIds = tokenizer is BertTokenizer wordPiece
+            ? EncodeWordPiece(wordPiece, text)
+            : EncodeXlmRoberta(tokenizer, text);
+        var seqLength = inputIds.Length;
         var attentionMask = new long[seqLength];
-
-        inputIds[0] = BosTokenId;
-        for (var i = 0; i < seqLength - 2; i++)
-        {
-            inputIds[i + 1] = ToModelId(encoded[i]);
-        }
-
-        inputIds[seqLength - 1] = EosTokenId;
         Array.Fill(attentionMask, 1L);
 
-        // The count reported is what the model actually processed, wrapper included.
+        // The count reported is what the model actually processed, special tokens included.
         tokenCount = seqLength;
 
         var inputIdsTensor = new DenseTensor<long>(inputIds, [1, seqLength]);
@@ -468,6 +328,12 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
             NamedOnnxValue.CreateFromTensor("input_ids", inputIdsTensor),
             NamedOnnxValue.CreateFromTensor("attention_mask", attentionMaskTensor)
         };
+
+        // BERT exports (all-MiniLM-L6-v2) declare a third input; a single segment is all zeros.
+        if (feedsTokenTypeIds)
+        {
+            inputs.Add(NamedOnnxValue.CreateFromTensor("token_type_ids", new DenseTensor<long>(new long[seqLength], [1, seqLength])));
+        }
 
         using var outputs = session.Run(inputs);
 
@@ -487,6 +353,53 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
         var pooled = MeanPooling(outputTensor, attentionMask);
         return Normalize(pooled);
+    }
+
+    /// <summary>
+    /// Encodes text for a BERT WordPiece model: <c>[CLS] pieces [SEP]</c>, ids unshifted.
+    /// </summary>
+    /// <param name="wordPiece">The WordPiece tokenizer.</param>
+    /// <param name="text">The text.</param>
+    /// <returns>The model's input ids, at most <see cref="maxSequenceLength"/> long.</returns>
+    private long[] EncodeWordPiece(BertTokenizer wordPiece, string text)
+    {
+        var ids = wordPiece.EncodeToIds(text, maxSequenceLength, addSpecialTokens: true, out _, out _);
+        var result = new long[ids.Count];
+        for (var i = 0; i < ids.Count; i++)
+        {
+            result[i] = ids[i];
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Encodes text for an XLM-RoBERTa SentencePiece model (bge-m3): <c>&lt;s&gt; pieces &lt;/s&gt;</c>
+    /// with the fairseq shift (TR-RAG-044 / REQ-RAG-052).
+    /// </summary>
+    /// <param name="sentencePiece">The SentencePiece tokenizer.</param>
+    /// <param name="text">The text.</param>
+    /// <returns>The model's input ids, at most <see cref="maxSequenceLength"/> long.</returns>
+    private long[] EncodeXlmRoberta(Tokenizer sentencePiece, string text)
+    {
+        // Two slots are reserved so the <s>/</s> wrapper cannot push a maximum-length input over the
+        // model's sequence limit.
+        var encoded = sentencePiece.EncodeToIds(text, Math.Max(1, maxSequenceLength - 2), out _, out _);
+
+        // XLM-RoBERTa encoding: <s> text </s>, with the piece ids shifted into the model's
+        // vocabulary (TR-RAG-044 / REQ-RAG-052). Both halves were missing: the ids went in raw, and
+        // the sequence carried no special tokens at all.
+        var seqLength = Math.Min(encoded.Count, maxSequenceLength - 2) + 2;
+        var inputIds = new long[seqLength];
+
+        inputIds[0] = BosTokenId;
+        for (var i = 0; i < seqLength - 2; i++)
+        {
+            inputIds[i + 1] = ToModelId(encoded[i]);
+        }
+
+        inputIds[seqLength - 1] = EosTokenId;
+        return inputIds;
     }
 
     private float[] MeanPooling(Tensor<float> hiddenStates, long[] attentionMask)
@@ -579,6 +492,7 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
     {
         if (disposed) return;
         session?.Dispose();
+        initLock.Dispose();
         disposed = true;
         GC.SuppressFinalize(this);
     }

@@ -8,6 +8,8 @@
 **Application Under Test:** TechieRagWeb (Blazor Server Sample Application)
 **Prerequisite:** TechieRag v2 implementation complete (Components #1-25)
 
+> **Historical (2026-09-24, BRD-87 / `REQ-FN-006`).** The application this guide walks through (TechieRagWeb, later TechieDesk) is now **Sevak** and lives in its own repository; it consumes `TechieRag` / `TechieRag.Embedded` 1.0.7 from NuGet. This repository no longer contains `apps/`, so the launch steps below cannot be run from here — run them in the Sevak repository. The seed documents and scenarios are kept as reference.
+
 ---
 
 ## Table of Contents

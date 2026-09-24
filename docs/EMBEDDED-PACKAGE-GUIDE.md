@@ -1,4 +1,4 @@
-# TechieRag.Embedded - Zero-Config Offline RAG
+# TechieRag.Embedded - Zero-Config RAG that downloads once, then works offline
 
 **TechieRag.Embedded** has the embedding model **built into the DLL**. No downloads, no configuration, just works!
 
@@ -75,7 +75,7 @@ var rag = new TechieRagBuilder()
 using TechieRag;
 using TechieRag.Embedded;
 
-// Fully offline RAG - works without internet!
+// The model downloads once on first use; after that this works without internet
 var rag = new TechieRagBuilder()
     .UseEmbedded()
     .UseSqliteVec("my-knowledge-base.db")
@@ -87,7 +87,7 @@ await rag.InitializeAsync();
 // Ingest documents
 await rag.IngestDirectoryAsync("./documents", "*.pdf");
 
-// Search - completely offline!
+// Search - offline once the model has downloaded
 var results = await rag.SearchAsync("What is machine learning?", topK: 5);
 
 foreach (var result in results)
@@ -133,7 +133,7 @@ The model gets embedded into the DLL automatically.
 | First-run setup | Install services | **Just works** |
 
 Perfect for:
-- Air-gapped environments
+- Air-gapped environments, once the model files are staged or downloaded (it downloads once, then works offline)
 - Edge deployments
 - Privacy-sensitive applications
 - Quick prototyping

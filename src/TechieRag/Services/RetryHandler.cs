@@ -102,6 +102,21 @@ public class RetryHandler : ILlmProvider
     }
 
     /// <inheritdoc/>
+    /// <remarks>Like the string streams, a stream is not retried once it has started (a retry would
+    /// replay text the caller has already shown); the circuit breaker still applies (REQ-RAG-067).</remarks>
+    public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        EnsureCircuitNotOpen();
+
+        await foreach (var streamEvent in inner.ChatStreamEventsAsync(messages, options, cancellationToken).ConfigureAwait(false))
+        {
+            yield return streamEvent;
+        }
+
+        RecordSuccess();
+    }
+
+    /// <inheritdoc/>
     public Task<T> CompleteAsync<T>(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) where T : class
         => ExecuteWithRetryAsync(() => inner.CompleteAsync<T>(prompt, options, cancellationToken), cancellationToken);
 

@@ -32,7 +32,7 @@ public class SearchRerankSwitchTests
     /// A call that asks for no reranking keeps raw vector-similarity order even though the
     /// library-wide <c>Rerank.Enabled</c> flag is on.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-098 PerCallRerankFalseOverridesGlobalEnabled")]
     public async Task PerCallRerankFalseOverridesGlobalEnabled()
     {
         var client = CreateClient(globalRerank: true);

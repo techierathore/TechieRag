@@ -5,6 +5,40 @@ what was decided and, where it is not obvious, why — so that a future reader d
 
 ---
 
+## 2026-09-24 (later) — Subscription sign-in: vendor policy and flow, checked live (research findings, REQ-FN-062 / BRD-114)
+
+**This entry records facts with their sources, not a new product decision.** It is the check BRD-114 requires
+before BRD-112 is built. All sources were read on **2026-09-24**. What the library does with these facts is
+already decided (entry below, point 5): terms are dated facts in `LlmConnectorCatalog`, a vendor with no
+permitted flow gets a catalog row saying so and no builder method, and no workaround is ever written.
+
+| Vendor | Third-party app may use the consumer subscription? | For whom | Flow and client id | Library outcome |
+|---|---|---|---|---|
+| OpenAI (ChatGPT) | **Yes** — stated publicly by OpenAI, not in a contract clause | Individual ChatGPT plans (Free, Go, Plus, Pro); a Business / Enterprise workspace only where its admin enables device-code sign-in | OAuth device code at `https://auth.openai.com`: `POST /api/accounts/deviceauth/usercode` `{client_id}` → `device_auth_id`, `user_code`, `interval`; user opens `https://auth.openai.com/codex/device`; poll `POST /api/accounts/deviceauth/token` (403/404 = pending, 15-minute limit) → `authorization_code` + PKCE `code_verifier`; exchange at `POST /oauth/token` (`authorization_code`, `redirect_uri=https://auth.openai.com/deviceauth/callback`); refresh with `grant_type=refresh_token`. Model calls go to the Codex backend (`https://chatgpt.com/backend-api/codex/responses`, Responses-API wire format, `ChatGPT-Account-Id` header), not `api.openai.com`. **Client id:** OpenAI runs no third-party client registration; the one client is Codex's public PKCE client `app_EMoamEEZ73f0CkXaXp7hrann`, and OpenAI's statements endorse the open-source tools that use it (OpenCode, Cline, pi, OpenClaw). | `chatgpt-subscription` row, **permitted**; `UseChatGptSubscriptionLlm` built |
+| Anthropic (Claude) | **No** | Free, Pro, Max | OAuth exists only for Claude Code and Claude.ai. Quote: *"The use of OAuth tokens obtained via Claude Free, Pro, or Max accounts in any other product, tool, or service — including the Agent SDK — is not permitted and constitutes a violation of the Consumer Terms of Service."* Terms updated 2026-02-20, server-side enforcement completed 2026-04-04. Matches the entry below. | `claude-subscription` row, **not permitted**; no method |
+| Google (Gemini) | **No** | Personal Google accounts and Google AI Pro / Ultra | Gemini CLI's Google sign-in reaches the Gemini Code Assist service. Quote: *"Directly accessing the services powering Gemini CLI (for example, the Gemini Code Assist service) using third-party software, tools, or services (for example, using OpenClaw with Gemini CLI OAuth) is a violation of applicable terms and policies."* Third-party access is the Gemini API key or Vertex AI. | `gemini-subscription` row, **not permitted**; no method |
+| xAI (Grok) | **Not confirmed** — no xAI-published terms or client registration found | SuperGrok and X Premium+ (as third parties describe it) | Several third-party apps (LobeHub, Hermes Agent, Kilo Code, Zed) run an RFC 8628 device-code flow against `auth.x.ai` / `accounts.x.ai`. None cites an xAI document permitting it or issuing it a client id; the xAI Grok FAQ is silent on third-party use and treats API credits as separate from subscriptions. | `grok-subscription` row, **not confirmed**; no method until xAI publishes one |
+| Groq | **No consumer subscription exists** | — | GroqCloud is API-key only; its Services Agreement says the Cloud Services "are not for consumer use". There is no sign-in flow to use. | `groq-subscription` row, **no flow**; no method |
+| Meta (Meta AI / Llama) | **No flow exists** | — | The Meta AI assistant is free with no subscription sign-in for other apps; the Llama API was an API-key developer preview (secondary sources report it retired 2026-07-06; Meta's own page did not state this when checked). | `meta-subscription` row, **no flow**; no method |
+
+**Where live sources and the entry below agree and differ.** OpenAI permits and Anthropic prohibits:
+**both confirmed.** Two points the entry below did not carry: (1) OpenAI's permission rests on public statements
+by OpenAI staff and an official OpenAI programme page, not on a clause in its terms, and OpenAI issues no client
+id to third parties — the library therefore uses Codex's public client id by default, and a host can set its own
+through `ChatGptSubscriptionOptions.ClientId` should OpenAI ever issue one; (2) "personal use" is how third
+parties summarise it — OpenAI's own words are about using "your ChatGPT account" in other tools, and workspace
+accounts depend on their admin. Neither changes the build; both are flagged for the owner in the checklist.
+
+**Sources (read 2026-09-24).**
+- OpenAI: [Codex authentication](https://learn.chatgpt.com/docs/auth.md) (redirected from `developers.openai.com/codex/auth`) · [Codex for Open Source — "Developers should code in the tools they prefer, whether that's Codex, OpenCode, Cline, pi, OpenClaw, or something else"](https://developers.openai.com/community/codex-for-oss) · [Tibo Sottiaux, OpenAI: "Reminder you can use your ChatGPT account in a flourishing set of other tools"](https://x.com/thsottiaux/status/2058071172361998482) · [Tibo Sottiaux: "You can already build on top of [Codex] directly, which includes ChatGPT [sign-in]"](https://x.com/thsottiaux/status/2009714843587342393) · [Codex device-code source](https://github.com/openai/codex/blob/main/codex-rs/login/src/device_code_auth.rs) · [Codex login server source](https://github.com/openai/codex/blob/main/codex-rs/login/src/server.rs) · [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan) (returned 403 to the checker)
+- Anthropic: [Claude Code — Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) · [The Register, 2026-02-20](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/)
+- Google: [Gemini CLI — Terms of Service and Privacy Notice](https://geminicli.com/docs/resources/tos-privacy/) · [same, in the repository](https://github.com/google-gemini/gemini-cli/blob/main/docs/resources/tos-privacy.md)
+- xAI: [xAI Grok FAQ](https://docs.x.ai/grok/faq) · third-party only: [Hermes Agent guide](https://hermes-agent.nousresearch.com/docs/guides/xai-grok-oauth), [LobeHub SuperGrok](https://lobehub.com/docs/usage/providers/supergrok), [Kilo Code xAI](https://kilo.ai/docs/ai-providers/xai)
+- Groq: [Groq Services Agreement](https://console.groq.com/docs/legal/services-agreement)
+- Meta: [Meta developer site](https://dev.meta.ai/) (redirected from `llama.developer.meta.com`) · secondary: [Promptfoo — Meta Llama API](https://www.promptfoo.dev/docs/providers/llamaApi/)
+
+---
+
 ## 2026-09-24 — Sevak, a fourth package, and two contract additions (brainstorm on plans 08/09)
 
 Source: `docs/TechieRag-Update-Brief.md` (ten decisions), `docs/OldDocs/Sevak-Decision-Request.md` D1. BRD-87 and

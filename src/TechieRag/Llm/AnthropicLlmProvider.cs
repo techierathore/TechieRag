@@ -161,7 +161,14 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <remarks>The text-only projection of <see cref="ChatStreamEventsAsync"/> (REQ-RAG-067).</remarks>
+    public IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        ChatStreamEventsAsync(messages, options, cancellationToken).ToTextStreamAsync(cancellationToken);
+
+    /// <inheritdoc/>
+    /// <remarks>Anthropic streams a <c>tool_use</c> block's input as <c>input_json_delta</c> fragments;
+    /// they are assembled and the call is emitted when its block stops (REQ-RAG-067 / BRD-110).</remarks>
+    public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         var request = BuildAnthropicRequest(messages, options);
@@ -176,70 +183,35 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
-        int totalInputTokens = 0;
-        int totalOutputTokens = 0;
-        var outputText = new StringBuilder();
+        var state = new AnthropicStreamState();
 
-        while (!reader.EndOfStream)
+        // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
+        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (string.IsNullOrEmpty(line)) continue;
 
             if (line.StartsWith("event: "))
             {
-                var eventType = line["event: ".Length..];
-                if (eventType == "message_stop") break;
+                if (line["event: ".Length..] == "message_stop") break;
                 continue;
             }
 
             if (!line.StartsWith("data: ")) continue;
 
-            var data = line["data: ".Length..];
-            var eventData = JsonSerializer.Deserialize<JsonElement>(data);
-
-            if (eventData.TryGetProperty("type", out var typeEl))
+            var streamEvent = state.Apply(JsonSerializer.Deserialize<JsonElement>(line["data: ".Length..]));
+            if (streamEvent is not null)
             {
-                var type = typeEl.GetString();
-
-                if (type == "message_start" && eventData.TryGetProperty("message", out var msg))
-                {
-                    if (msg.TryGetProperty("usage", out var usage) && usage.TryGetProperty("input_tokens", out var inputTok))
-                    {
-                        totalInputTokens = inputTok.GetInt32();
-                    }
-                }
-                else if (type == "content_block_delta" && eventData.TryGetProperty("delta", out var delta))
-                {
-                    if (delta.TryGetProperty("text", out var text))
-                    {
-                        var textValue = text.GetString();
-                        if (!string.IsNullOrEmpty(textValue))
-                        {
-                            outputText.Append(textValue);
-                            yield return textValue;
-                        }
-                    }
-                }
-                else if (type == "message_delta" && eventData.TryGetProperty("usage", out var usageDelta))
-                {
-                    if (usageDelta.TryGetProperty("output_tokens", out var outputTok))
-                    {
-                        totalOutputTokens = outputTok.GetInt32();
-                    }
-                }
+                yield return streamEvent;
             }
         }
 
+        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { });
+        var usage = context.BuildUsage(state.InputTokens, state.OutputTokens, state.CacheReadTokens, state.OutputText.ToString(), state.CacheWriteTokens);
         sw.Stop();
+        RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, state.ToolCallCount > 0, usage.CacheReadTokens, usage.CacheWriteTokens);
 
-        // Fallback: estimate when the API sent no usage events
-        if (totalInputTokens == 0 && totalOutputTokens == 0)
-        {
-            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
-            totalOutputTokens = EstimateTokenCount(outputText.ToString());
-        }
-
-        RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
+        var finishReason = state.StopReason == "tool_use" ? "tool_calls" : state.StopReason ?? (state.ToolCallCount > 0 ? "tool_calls" : "stop");
+        yield return LlmStreamEvent.FromCompleted(usage, finishReason, ModelName);
     }
 
     /// <inheritdoc/>

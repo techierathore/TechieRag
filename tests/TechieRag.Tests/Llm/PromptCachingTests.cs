@@ -22,7 +22,7 @@ public class PromptCachingTests
     ];
 
     /// <summary>Caching the system prompt forces the block form and attaches the breakpoint.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-102 AnthropicMarksTheSystemPrompt")]
     public async Task AnthropicMarksTheSystemPrompt()
     {
         var handler = new CapturingHandler(AnthropicResponseJson);
@@ -276,7 +276,7 @@ public class PromptCachingTests
     }
 
     /// <summary>Gemini's cache is a named out-of-band resource, passed straight through.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-102 GeminiSendsTheCachedContentName")]
     public async Task GeminiSendsTheCachedContentName()
     {
         var handler = new CapturingHandler(GeminiResponseJson);

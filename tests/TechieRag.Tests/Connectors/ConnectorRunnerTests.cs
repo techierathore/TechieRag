@@ -33,6 +33,7 @@ public sealed class ConnectorRunnerTests
 
         Assert.Equal(2, result.Documents.Count);
         Assert.True(result.ReachedLimit);
+        Assert.Equal(ConnectorErrorCodes.RunItemLimitReached, result.LimitCode);
     }
 
     /// <summary>
@@ -48,10 +49,11 @@ public sealed class ConnectorRunnerTests
 
         Assert.Equal(2, result.Documents.Count);
         Assert.True(result.ReachedLimit);
+        Assert.Equal(ConnectorErrorCodes.RunPageLimitReached, result.LimitCode);
     }
 
     /// <summary>One item that will not fetch is recorded and the run carries on.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-078 RecordsItemFailureAndContinues")]
     public async Task RecordsItemFailureAndContinues()
     {
         var connector = new FakeDataConnector()
@@ -296,7 +298,7 @@ public sealed class ConnectorRunnerTests
     /// <see cref="ConnectorRunOptions.MaxItems"/>, which is exactly the shape a docs repository has:
     /// thousands of individually reasonable files that no per-item limit can add up.
     /// </remarks>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-082 StopsAtMaxTotalBytes")]
     public async Task StopsAtMaxTotalBytes()
     {
         var connector = new FakeDataConnector()
@@ -314,6 +316,7 @@ public sealed class ConnectorRunnerTests
 
         Assert.Equal(2, result.Documents.Count);
         Assert.True(result.ReachedLimit);
+        Assert.Equal(ConnectorErrorCodes.RunByteBudgetReached, result.LimitCode);
         Assert.Equal(["a", "b"], connector.Fetched);
     }
 
@@ -370,6 +373,7 @@ public sealed class ConnectorRunnerTests
 
         Assert.Equal(2, result.Documents.Count);
         Assert.False(result.ReachedLimit);
+        Assert.Null(result.LimitCode);
     }
 
     /// <summary>Cancelling a run stops it, and stops it as a cancellation.</summary>

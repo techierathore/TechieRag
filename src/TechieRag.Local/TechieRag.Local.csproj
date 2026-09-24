@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- REQ-RAG-057 / BRD-96, ADR-014: the in-process local language model lives in its OWN package,
+         so a consumer of the core never inherits a local inference runtime. net10.0 only, like
+         TechieRag.Embedded, whose ModelDownloadService it reuses (REQ-RAG-061). -->
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Package Metadata -->
+    <PackageId>TechieRag.Local</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Techie Rathor</Authors>
+    <Company>TechieRathor</Company>
+    <Description>An in-process local language model for TechieRag: UseLocalLlm() gives an ILlmProvider that runs a small open-weight model inside the app (a small model on Android and iOS, a larger one on desktops). The weights download once, after the host accepts the model's terms, into the per-user application data folder, SHA-256 verified and resumable; after that the model works offline. Memory is checked before loading, over-long prompts are refused before inference, and typed streaming, JSON output and the model's real tokenizer are supported.</Description>
+    <PackageTags>RAG;AI;LLM;LocalLLM;OnDevice;Offline;EdgeAI;SLM;MAUI;TechieRag</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Same publishing posture as TechieRag core - see NUGET-PUBLISHING.md §3. Packing is explicit
+         (a publish workflow's dotnet pack), SourceLink via the SDK's bundled GitHub provider, symbols
+         as a .snupkg alongside the .nupkg. -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TechieRag.Local.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
+    <!-- ModelDownloadService (size before the first byte, progress events, resume) and the
+         TECHIERAG_MODEL_BASE_URL mirror convention are reused, not forked (REQ-RAG-061, REQ-RAG-055). -->
+    <ProjectReference Include="..\TechieRag.Embedded\TechieRag.Embedded.csproj" />
+  </ItemGroup>
+
+  <!-- No inference runtime is referenced yet. The runtime behind ILocalLlmRuntime (LLamaSharp or
+       ONNX Runtime GenAI, per platform) is the owner's decision after the measured comparison
+       (DECISIONS.md 2026-09-24 item 3; docs/TechieRag-Decision-Request.md). Its package reference and
+       the buildTransitive native wiring (REQ-FN-058) land with that decision.
+       Model weights are never packed (ADR-004, BRD-101). -->
+
+</Project>

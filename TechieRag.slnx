@@ -13,6 +13,12 @@
          the core still links no exporter (REQ-NFR-008). -->
     <Project Path="src/TechieRag.Telemetry/TechieRag.Telemetry.csproj" />
     <Project Path="src/TechieRag/TechieRag.csproj" />
+    <!-- REQ-RAG-016 / BRD-84, ADR-008: agents on Microsoft Agent Framework, a sibling package so the
+         core never references MAF. -->
+    <Project Path="src/TechieRag.Agents/TechieRag.Agents.csproj" />
+    <!-- REQ-RAG-057 / BRD-96, ADR-014: the in-process local language model, a sibling package so the
+         core never references a local inference runtime. -->
+    <Project Path="src/TechieRag.Local/TechieRag.Local.csproj" />
   </Folder>
   <Folder Name="/docs/">
     <File Path="docs/TechieRag-BRD.md" />
@@ -35,5 +41,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TechieRag.Tests/TechieRag.Tests.csproj" />
+    <Project Path="tests/TechieRag.Agents.Tests/TechieRag.Agents.Tests.csproj" />
+    <Project Path="tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj" />
   </Folder>
 </Solution>

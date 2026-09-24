@@ -61,11 +61,33 @@ public sealed class HttpConnectorTransport : IConnectorTransport
     }
 
     /// <inheritdoc />
-    public async Task<ConnectorHttpResponse> GetAsync(
+    public Task<ConnectorHttpResponse> GetAsync(
         ConnectorHttpRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        return SendCoreAsync(request, HttpMethod.Get, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Every method goes through the same guard, cap and header rules as GET: the SSRF check is on
+    /// the connection, not on the verb, and a POST carries the same credential a GET does.
+    /// </remarks>
+    public Task<ConnectorHttpResponse> SendAsync(
+        ConnectorHttpRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.Method);
+        return SendCoreAsync(request, new HttpMethod(request.Method.ToUpperInvariant()), cancellationToken);
+    }
+
+    private async Task<ConnectorHttpResponse> SendCoreAsync(
+        ConnectorHttpRequest request,
+        HttpMethod method,
+        CancellationToken cancellationToken)
+    {
         ArgumentException.ThrowIfNullOrEmpty(request.Url);
 
         if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var uri)
@@ -83,7 +105,13 @@ public sealed class HttpConnectorTransport : IConnectorTransport
             throw new ConnectorException("http", $"'{uri.Host}' is a private-network address and was refused.");
         }
 
-        using var message = new HttpRequestMessage(HttpMethod.Get, uri);
+        using var message = new HttpRequestMessage(method, uri);
+        if (request.Body is not null && method != HttpMethod.Get)
+        {
+            message.Content = new StringContent(
+                request.Body, System.Text.Encoding.UTF8, request.ContentType ?? "application/json");
+        }
+
         if (request.Headers is not null)
         {
             foreach (var header in request.Headers)
@@ -134,7 +162,7 @@ public sealed class HttpConnectorTransport : IConnectorTransport
             }
 
             var body = await ReadCappedAsync(response, uri, cancellationToken).ConfigureAwait(false);
-            logger.LogDebug("GET {Url} -> {Status}", uri, (int)response.StatusCode);
+            logger.LogDebug("{Method} {Url} -> {Status}", method.Method, uri, (int)response.StatusCode);
             return new ConnectorHttpResponse((int)response.StatusCode, body, CollectHeaders(response));
         }
     }

@@ -174,7 +174,12 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <remarks>The text-only projection of <see cref="ChatStreamEventsAsync"/> (REQ-RAG-067).</remarks>
+    public IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        ChatStreamEventsAsync(messages, options, cancellationToken).ToTextStreamAsync(cancellationToken);
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: true);
@@ -188,44 +193,13 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
-        var totalInputTokens = 0;
-        var totalOutputTokens = 0;
-        var outputText = new StringBuilder();
+        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (usage, involvedToolCalls) =>
+            RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, involvedToolCalls, usage.CacheReadTokens));
 
-        while (!reader.EndOfStream)
+        await foreach (var streamEvent in OpenAIStreamReader.ReadAsync(reader, context, cancellationToken).ConfigureAwait(false))
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(line) || !line.StartsWith("data: ")) continue;
-
-            var data = line["data: ".Length..];
-            if (data == "[DONE]") break;
-
-            var chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            if (chunk?.Usage is not null)
-            {
-                totalInputTokens = chunk.Usage.PromptTokens;
-                totalOutputTokens = chunk.Usage.CompletionTokens;
-            }
-
-            var delta = chunk?.Choices?.FirstOrDefault()?.Delta?.Content;
-            if (!string.IsNullOrEmpty(delta))
-            {
-                outputText.Append(delta);
-                yield return delta;
-            }
+            yield return streamEvent;
         }
-
-        sw.Stop();
-
-        // Fallback: estimate when the server sent no usage chunk
-        if (totalInputTokens == 0 && totalOutputTokens == 0)
-        {
-            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
-            totalOutputTokens = EstimateTokenCount(outputText.ToString());
-        }
-
-        RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
     }
 
     /// <inheritdoc/>

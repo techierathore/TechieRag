@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — decisions I need from you</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieRag — decisions I need from you</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-Decision-Request.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#what-happened">What happened</a></li>
+        <li><a href="#what-i-need-you-to-decide">What I need you to decide</a></li>
+        <li class="h3"><a href="#which-engine-runs-the-local-model-on-windows-android-and-iphone">1. Which engine runs the local model on Windows, Android and iPhone</a></li>
+        <li class="h3"><a href="#what-the-mac-app-does-about-the-local-model">2. What the Mac app does about the local model</a></li>
+        <li class="h3"><a href="#where-the-small-model-s-onnx-files-come-from">3. Where the small model&#x27;s ONNX files come from</a></li>
+        <li class="h3"><a href="#which-sign-in-id-the-chatgpt-subscription-sign-in-uses">4. Which sign-in id the ChatGPT subscription sign-in uses</a></li>
+        <li><a href="#what-i-do-when-you-answer">What I do when you answer</a></li>
+        <li><a href="#copy-this-back-to-me">Copy this back to me</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Written</td><td>2026-09-24</td></tr>
+<tr><td>Waiting on</td><td>4 decisions. Nothing has been changed yet (decision 4 keeps what is built today).</td></tr>
+</tbody>
+</table>
+<h2 id="what-happened">What happened<a class="anchor-link" href="#what-happened">#</a></h2>
+<p>I built the new <code>TechieRag.Local</code> package up to the point where a real inference engine plugs in: the one public provider, the model list, the terms-first download with its SHA-256 check, the memory check, the chat formats, the refusal of over-long prompts, and the hook that lets <code>local/&lt;model&gt;</code> work from configuration. All of it is tested against a stand-in engine.</p>
+<p>The decision log says the engine for each platform (LLamaSharp or ONNX Runtime GenAI) is chosen from measured numbers before the real engine goes in, and the status page says that choice is yours. So I measured both on your Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB), in Windows and in its Linux subsystem, with the same two models in each engine's own format, and checked on nuget.org which platforms each engine actually ships for. Phones and the Mac need your devices. The raw numbers are in <code>tests/.artifacts/local-llm-bench/</code>.</p>
+<h2 id="what-i-need-you-to-decide">What I need you to decide<a class="anchor-link" href="#what-i-need-you-to-decide">#</a></h2>
+<h3 id="which-engine-runs-the-local-model-on-windows-android-and-iphone">1. Which engine runs the local model on Windows, Android and iPhone<a class="anchor-link" href="#which-engine-runs-the-local-model-on-windows-android-and-iphone">#</a></h3>
+<p>On this laptop ONNX Runtime GenAI 0.16.0 answered faster than LLamaSharp 0.27.0 with both models. Small phone model (Qwen2.5 0.5B, a 128-token answer; a token is a word or piece of a word): Windows 45–52 against 25–31 tokens per second, first token after 0.2–0.4 s against 0.4–0.8 s; Linux best runs 86 against 64. Desktop model (Phi-3 mini): Windows 7.5 against 5.9, Linux 8.4 against 6.7. LLamaSharp loads 2–4 times faster (0.4–1.5 s against 1.1–3.3 s for the small model) and used 510 MB against 555 MB for the small model, but 3.6 GB against 3.0–3.3 GB for Phi-3. Both engines count tokens identically on every test sentence. LLamaSharp ships nothing for iPhone; ONNX Runtime GenAI ships for Windows, Android and iPhone.</p>
+<table>
+<thead><tr><th>Option</th><th>What happens</th><th>What it costs</th></tr></thead>
+<tbody>
+<tr><td><strong>A — ONNX Runtime GenAI everywhere it ships</strong></td><td>One engine for Windows, Android and iPhone; it shares ONNX Runtime with the embedding package</td><td>The embedding package's ONNX Runtime moves from 1.24.1 to 1.30.0; downloads are 0.9 GB and 2.7 GB</td></tr>
+<tr><td><strong>B — LLamaSharp on Windows and Android, ONNX Runtime GenAI on iPhone</strong></td><td>Faster loading and smaller downloads (0.5 GB and 2.4 GB) where LLamaSharp ships</td><td>Two engines to keep working; slower answers on this laptop</td></tr>
+</tbody>
+</table>
+<p><strong>My recommendation: A</strong> — it is faster where it matters (answer speed), covers three platforms with one engine, and is the only one that runs on an iPhone.</p>
+<h3 id="what-the-mac-app-does-about-the-local-model">2. What the Mac app does about the local model<a class="anchor-link" href="#what-the-mac-app-does-about-the-local-model">#</a></h3>
+<p>Neither engine ships a build for Mac Catalyst, the way a MAUI app runs on a Mac: ONNX Runtime GenAI's package holds an empty placeholder there, LLamaSharp has nothing. I will not build one by hand.</p>
+<table>
+<thead><tr><th>Option</th><th>What happens</th><th>What it costs</th></tr></thead>
+<tbody>
+<tr><td><strong>A — Not supported on the Mac for now</strong></td><td>The support table says "not supported"; the Mac app uses a server model such as LM Studio; I file the gap with ONNX Runtime GenAI</td><td>Mac users get no in-app model until the vendor ships one</td></tr>
+<tr><td><strong>B — Wait on the Mac before shipping anywhere</strong></td><td>Nothing ships until a Mac build exists</td><td>Windows, Android and iPhone wait too</td></tr>
+</tbody>
+</table>
+<p><strong>My recommendation: A</strong> — the other three platforms should not wait on a vendor.</p>
+<h3 id="where-the-small-model-s-onnx-files-come-from">3. Where the small model's ONNX files come from<a class="anchor-link" href="#where-the-small-model-s-onnx-files-come-from">#</a></h3>
+<p>Qwen publishes the small model's LLamaSharp file itself (Apache-2.0). Its ONNX Runtime GenAI version exists only as a copy made by one person (<code>xiaoyao9184</code>), with no licence tag on the copy. I pinned the exact files and their fingerprints, so nothing can change under us, but the source is a stranger.</p>
+<table>
+<thead><tr><th>Option</th><th>What happens</th><th>What it costs</th></tr></thead>
+<tbody>
+<tr><td><strong>A — Host your own copy</strong></td><td>I convert the model with Microsoft's own tool and you put the files on your download mirror (<code>TECHIERAG_MODEL_BASE_URL</code>, or a new default address)</td><td>About an hour of work, plus somewhere to host 0.9 GB</td></tr>
+<tr><td><strong>B — Keep the pinned copy</strong></td><td>Works today; fingerprints stop a swapped file</td><td>The files come from someone we do not know</td></tr>
+</tbody>
+</table>
+<p><strong>My recommendation: A</strong> — the default download on every phone should come from a source you control.</p>
+<h3 id="which-sign-in-id-the-chatgpt-subscription-sign-in-uses">4. Which sign-in id the ChatGPT subscription sign-in uses<a class="anchor-link" href="#which-sign-in-id-the-chatgpt-subscription-sign-in-uses">#</a></h3>
+<p><code>UseChatGptSubscriptionLlm</code> is built and tested against a stand-in OpenAI server. To sign in, OpenAI's server needs an id that says which program is asking. OpenAI gives these ids to no outside developer. The only one that exists is the id of OpenAI's own Codex tool, and OpenAI staff have said in public that other tools may sign in with it (sources in <code>DECISIONS.md</code>, 2026-09-24 research entry). The library uses that id by default, and a host can set its own through <code>ChatGptSubscriptionOptions.ClientId</code>. It does not pretend to be Codex in any other way: it names itself <code>techierag</code> on every call.</p>
+<table>
+<thead><tr><th>Option</th><th>What happens</th><th>What it costs</th></tr></thead>
+<tbody>
+<tr><td><strong>A — Keep the Codex id as the default</strong></td><td>ChatGPT sign-in works for any app that uses the library</td><td>It rests on public statements by OpenAI staff, not on a written term; if OpenAI changes its mind, sign-in stops working until you change the id</td></tr>
+<tr><td><strong>B — No default id</strong></td><td>Each host app must supply an id itself</td><td>In practice nobody can, since OpenAI issues none, so the feature is unusable</td></tr>
+<tr><td><strong>C — Remove the ChatGPT sign-in</strong></td><td>Only API-key providers remain</td><td>The Chatur request (TR-RAG-001) is not met</td></tr>
+</tbody>
+</table>
+<p><strong>My recommendation: A</strong> — it is the only option that works today, it is what OpenAI has said other tools may do, and the id can be changed in one line.</p>
+<h2 id="what-i-do-when-you-answer">What I do when you answer<a class="anchor-link" href="#what-i-do-when-you-answer">#</a></h2>
+<ol>
+<li>Write your choices, with these numbers, into <code>DECISIONS.md</code> as the recorded comparison.
+</li>
+<li>Add the chosen engine's package to <code>TechieRag.Local</code>, one runtime class per platform, and its native wiring for each app head (the <code>buildTransitive</code> targets).
+</li>
+<li>Point the small model's ONNX files at your mirror, if you chose that.
+</li>
+<li>Run the conformance suite and the live tests against the real engine here, then the probe's second button on Windows and the Android emulator; you run it on your phone, iPhone and Mac.
+</li>
+<li>Update the support table with the per-device numbers.
+</li>
+</ol>
+<p>About one working session for steps 1 to 4 on Windows and Android.</p>
+<h2 id="copy-this-back-to-me">Copy this back to me<a class="anchor-link" href="#copy-this-back-to-me">#</a></h2>
+<pre><code>TechieRag: decision 1 — go with option A. Use ONNX Runtime GenAI for the local model on Windows, Android and iPhone.</code></pre>
+<pre><code>TechieRag: decision 2 — go with option A. The local model is not supported on the Mac for now; file the gap with ONNX Runtime GenAI.</code></pre>
+<pre><code>TechieRag: decision 3 — go with option A. Convert the small model to ONNX yourself and I will host the files on my mirror.</code></pre>
+<pre><code>TechieRag: decision 4 — go with option A. Keep the Codex sign-in id as the default for the ChatGPT sign-in.</code></pre>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

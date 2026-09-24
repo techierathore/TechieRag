@@ -88,7 +88,7 @@ public class SqliteConversationStoreTests : IDisposable
     }
 
     /// <summary>Trimmed history keeps the system message plus the most recent turns within budget.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-091 TrimsHistoryToTokenBudget")]
     public async Task TrimsHistoryToTokenBudget()
     {
         var thread = await store.CreateThreadAsync("user1");
@@ -103,6 +103,37 @@ public class SqliteConversationStoreTests : IDisposable
         Assert.Equal("system", trimmed[0].Role);
         Assert.Equal("newest", trimmed[^1].Content);
         Assert.DoesNotContain(trimmed, m => m.Content == "oldest");
+    }
+
+    /// <summary>
+    /// REQ-RAG-090 / BRD-137: an assistant message stored with sources and its structured content
+    /// (<c>ContentJson</c>) reloads from a second store over the same database with its role, text,
+    /// structured content and every source field intact.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-090 MessageReloadsWithRoleContentAndSources")]
+    public async Task MessageReloadsWithRoleContentAndSources()
+    {
+        const string structured = """{"code":"answer.cited","args":["doc-7"]}""";
+        var thread = await store.CreateThreadAsync("user1", workspaceId: "ws1");
+        var sources = new List<SearchResult>
+        {
+            TestData.Result("doc-7", "the cited clause", 0.91f),
+            TestData.Result("doc-8", "a second clause", 0.52f)
+        };
+        await store.AddMessageAsync(thread.ThreadId, ChatMessage.User("Which clause applies?"));
+        await store.AddMessageAsync(thread.ThreadId, ChatMessage.Assistant("Clause seven."), sources, contentJson: structured);
+
+        var reopened = new SqliteConversationStore($"Data Source={dbPath}");
+        var messages = await reopened.GetMessagesAsync(thread.ThreadId);
+
+        Assert.Equal(["user", "assistant"], messages.Select(m => m.Role));
+        Assert.Equal("Which clause applies?", messages[0].Content);
+        var answer = messages[1];
+        Assert.Equal("Clause seven.", answer.Content);
+        Assert.Equal(structured, answer.ContentJson);
+        Assert.Equal(["doc-7", "doc-8"], answer.Sources!.Select(s => s.Chunk.DocumentId));
+        Assert.Equal(["the cited clause", "a second clause"], answer.Sources!.Select(s => s.Chunk.Text));
+        Assert.Equal([0.91f, 0.52f], answer.Sources!.Select(s => s.Score));
     }
 
     /// <inheritdoc/>

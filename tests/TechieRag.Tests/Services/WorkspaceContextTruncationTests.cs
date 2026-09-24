@@ -61,7 +61,7 @@ public class WorkspaceContextTruncationTests : IDisposable
     /// Over the budget, retrieved chunks are evicted from the tail and pinned chunks keep their
     /// slots — the eviction order is deliberate, not a by-product of sort order.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-094 RetrievedChunksAreEvictedBeforePinnedChunks")]
     public async Task RetrievedChunksAreEvictedBeforePinnedChunks()
     {
         var manager = CreateManager(DocumentSet(7));

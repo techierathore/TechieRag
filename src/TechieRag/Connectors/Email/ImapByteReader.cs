@@ -103,7 +103,10 @@ internal sealed class ImapByteReader
                 {
                     throw new ConnectorException(
                         "email",
-                        $"{host} sent a response line longer than {maxLineBytes} bytes without terminating it. The connection was dropped.");
+                        $"{host} sent a response line longer than {maxLineBytes} bytes without terminating it. The connection was dropped.")
+                    {
+                        ErrorCode = ConnectorErrorCodes.ImapResponseLineTooLong,
+                    };
                 }
             }
         }

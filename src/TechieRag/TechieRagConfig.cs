@@ -478,7 +478,20 @@ public enum LlmSource
     /// <summary>Google Gemini API.</summary>
     GoogleGemini,
     /// <summary>Anthropic Claude API.</summary>
-    Anthropic
+    Anthropic,
+    /// <summary>
+    /// A consumer subscription reached through the vendor's own sign-in flow, not an API key
+    /// (REQ-RAG-070 / BRD-113). Created by a per-vendor builder method such as
+    /// <c>UseChatGptSubscriptionLlm</c>, and only for vendors whose terms permit it.
+    /// </summary>
+    Subscription,
+    /// <summary>
+    /// An in-process local language model from the <c>TechieRag.Local</c> package: no endpoint and
+    /// no API key (REQ-RAG-064 / BRD-104). Configure it with <c>UseLocalLlm()</c>; the factory and
+    /// the <c>local/&lt;model&gt;</c> route reach it once the package has registered itself
+    /// (<see cref="Llm.LocalLlmProviderRegistry"/>).
+    /// </summary>
+    Local
 }
 
 /// <summary>Configuration for LLM provider selection and settings.</summary>

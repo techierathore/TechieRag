@@ -87,7 +87,8 @@ public interface ITechieRag
         SearchAsync(query, options?.TopK ?? 5, options?.DocumentFilter, cancellationToken);
 
     /// <summary>
-    /// Deletes a document and all its chunks from the vector store.
+    /// Deletes a document and all its chunks from the vector store, and its membership from every
+    /// workspace when a workspace store is configured (REQ-RAG-095).
     /// </summary>
     /// <param name="documentId">The ID of the document to delete.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>

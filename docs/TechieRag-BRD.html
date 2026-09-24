@@ -136,6 +136,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li><a href="#development-status">7. Development status</a></li>
         <li><a href="#context-diagram">8. Context diagram</a></li>
         <li><a href="#constraints-and-assumptions">9. Constraints and assumptions</a></li>
+        <li class="h3"><a href="#platform-support-matrix-brd-88-req-fn-054">Platform support matrix (BRD-88, REQ-FN-054)</a></li>
         <li><a href="#risks">10. Risks</a></li>
         <li><a href="#glossary">11. Glossary</a></li>
     </ol>
@@ -174,6 +175,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li><a href="#development-status">7. Development status</a></li>
         <li><a href="#context-diagram">8. Context diagram</a></li>
         <li><a href="#constraints-and-assumptions">9. Constraints and assumptions</a></li>
+        <li class="h3"><a href="#platform-support-matrix-brd-88-req-fn-054">Platform support matrix (BRD-88, REQ-FN-054)</a></li>
         <li><a href="#risks">10. Risks</a></li>
         <li><a href="#glossary">11. Glossary</a></li>
       </ol>
@@ -432,7 +434,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <h3 id="embedded-package">Embedded package<a class="anchor-link" href="#embedded-package">#</a></h3>
 <p>Gives a fully offline embedding path with a model downloaded once.</p>
 <ul>
-<li><strong>BRD-24</strong> — A developer can enable fully offline embedding via <code>.UseEmbedded()</code> (bundled BGE-M3 ONNX) <em>(F-EMBEDDED)</em> <em>Screen:</em> Embedded package
+<li><strong>BRD-24</strong> — A developer can enable embedding that downloads once, then works offline, via <code>.UseEmbedded()</code> (BGE-M3 ONNX) <em>(F-EMBEDDED)</em> <em>Screen:</em> Embedded package
 <ul>
 <li><em>Acceptance:</em> When a developer calls <code>UseEmbedded()</code> on the Embedded package and embeds text, then a 1024-dimension vector returns with no network after the first run.
 </li>
@@ -847,7 +849,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </div>
   <pre class="mermaid">flowchart LR
   Dev(["Consumer .NET app (Sevak, MyDiary, any)"]) --&gt; TR["TechieRag (core package)"]
-  Dev --&gt; EMB["TechieRag.Embedded (ONNX, offline)"]
+  Dev --&gt; EMB["TechieRag.Embedded (ONNX, downloads once, then offline)"]
   Dev -.-&gt; AG["TechieRag.Agents — phase 2"]
   Dev -.-&gt; LOC["TechieRag.Local — phase 2, in-process model"]
   EMB --&gt; TR
@@ -878,6 +880,25 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li>Subscription sign-in depends on each vendor's policy, recorded with the date checked; the library never asserts a permission it has not verified.
 </li>
 </ul>
+<h3 id="platform-support-matrix-brd-88-req-fn-054">Platform support matrix (BRD-88, REQ-FN-054)<a class="anchor-link" href="#platform-support-matrix-brd-88-req-fn-054">#</a></h3>
+<p>Each cell reads <strong>supported</strong> (built for it, no recorded run on that platform yet), <strong>tested</strong> (the probe app ran there: device and date), or <strong>not supported</strong>. A cell moves to tested only when the owner records a probe run (UsageGuide, Platform notes, the runbook). Last updated 2026-09-24.</p>
+<table>
+<thead><tr><th>Package</th><th>Windows</th><th>macOS / Mac Catalyst</th><th>Android</th><th>iOS</th></tr></thead>
+<tbody>
+<tr><td><code>TechieRag</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
+<tr><td><code>TechieRag.Embedded</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
+<tr><td><code>TechieRag.Agents</code></td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td></tr>
+<tr><td><code>TechieRag.Local</code></td><td>not supported ³</td><td>not supported ³</td><td>not supported ³</td><td>not supported ³</td></tr>
+</tbody>
+</table>
+<ol>
+<li>The probe ran on an Android emulator (Pixel 5 profile, Android 12, x86_64) on 2026-09-24: all-MiniLM-L6-v2 selected by default, top result correct. An emulator is not a device, so the cell stays supported until a phone run is recorded.
+</li>
+<li>The package is being built (REQ-RAG-045); the cells change when it ships and the probe exercises it.
+</li>
+<li>The package is built up to its inference runtime (2026-09-24); every cell stays not supported until the owner chooses the runtime per platform (<code>docs/TechieRag-Decision-Request.md</code>). Engines shipped today: ONNX Runtime GenAI for Windows, Android and iOS (not Mac Catalyst), LLamaSharp for Windows and Android (not iOS or Mac Catalyst). Desktop engine numbers: UsageGuide, Platform notes, "Local model: runtime comparison"; the probe's second button (BRD-106) records per-device numbers.
+</li>
+</ol>
 <h2 id="risks">10. Risks<a class="anchor-link" href="#risks">#</a></h2>
 <table>
 <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>

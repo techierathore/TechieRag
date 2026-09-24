@@ -227,7 +227,7 @@ public sealed class AgentAsToolTests
     /// A guardrail-refused sub-flow reports <c>IsSuccess = false</c> and names the refusal under a
     /// translatable code (REQ-RAG-051, first of the two failure modes).
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-051 ABlockedSubFlowReportsAFailedToolCallCarryingTheRefusalCode")]
     public async Task ABlockedSubFlowReportsAFailedToolCallCarryingTheRefusalCode()
     {
         var inner = new ScriptedLlmProvider("inner", ScriptedLlmProvider.Says("never reached"));
@@ -266,7 +266,7 @@ public sealed class AgentAsToolTests
     /// A sub-flow that ran out of steps reports <c>IsSuccess = false</c> too (REQ-RAG-051, second
     /// failure mode).
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-051 ABudgetExhaustedSubFlowReportsAFailedToolCall")]
     public async Task ABudgetExhaustedSubFlowReportsAFailedToolCall()
     {
         // Two agent nodes wired in a cycle, with a budget smaller than the cycle needs to settle.
@@ -343,14 +343,16 @@ public sealed class AgentAsToolTests
             ScriptedLlmProvider.CallsTool("run-research", """{"input":"look into widgets"}"""),
             ScriptedLlmProvider.Says("I could not run that research."));
 
-        var steps = new List<AgentStep>();
+        // Not Progress<T>: with no synchronization context it posts every report to the thread pool,
+        // so the assertion below raced the callbacks — an empty list, or "Collection was modified"
+        // mid-enumeration, under a loaded full-suite run. The loop reports inline, so an inline sink
+        // sees every step before RunAsync returns.
+        var progress = new RecordingProgress();
         var loop = new AgentLoopRunner(caller, handler);
 
-        await loop.RunAsync(
-            [ChatMessage.User("research widgets")],
-            progress: new Progress<AgentStep>(steps.Add));
+        await loop.RunAsync([ChatMessage.User("research widgets")], progress: progress);
 
-        var toolRow = Assert.Single(steps, step => step.Kind == AgentStepKind.ToolExecuted);
+        var toolRow = Assert.Single(progress.Steps, step => step.Kind == AgentStepKind.ToolExecuted);
 
         // This is the assertion the whole REQ is about. It was true-by-default before the fix.
         Assert.False(toolRow.IsSuccess);

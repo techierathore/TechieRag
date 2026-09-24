@@ -120,7 +120,7 @@ public sealed class HttpConnectorTransportTests
     /// <see cref="HttpClient"/> gets no <c>ConnectCallback</c>, so this final-URL check is the only
     /// thing standing between it and an internal response body.
     /// </remarks>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-077 RedirectEndingOnAPrivateAddressIsRefused")]
     public async Task RedirectEndingOnAPrivateAddressIsRefused()
     {
         using var client = new HttpClient(new ArrivedAtHandler("http://169.254.169.254/latest/meta-data/"));

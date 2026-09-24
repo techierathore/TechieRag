@@ -33,6 +33,29 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
     public string Name => "PGVector";
 
     /// <summary>
+    /// Gets the width of the <c>Embedding vector(N)</c> column this store creates and expects
+    /// (REQ-RAG-106 / BRD-158).
+    /// </summary>
+    public int VectorDimension => vectorDimension;
+
+    /// <summary>
+    /// Gets the DDL that creates the <c>Chunks</c> table, with the vector column sized to
+    /// <see cref="VectorDimension"/> (REQ-RAG-106).
+    /// </summary>
+    internal string ChunksTableSql => $"""
+        CREATE TABLE IF NOT EXISTS Chunks (
+            Id TEXT PRIMARY KEY,
+            DocumentId TEXT NOT NULL REFERENCES Documents(Id) ON DELETE CASCADE,
+            Text TEXT NOT NULL,
+            Embedding vector({vectorDimension}),
+            PageNumber INTEGER,
+            ChunkIndex INTEGER,
+            Metadata JSONB,
+            CreatedAt TIMESTAMPTZ NOT NULL
+        )
+        """;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="PgVectorStore"/> class.
     /// </summary>
     /// <param name="connectionString">The PostgreSQL connection string.</param>
@@ -100,18 +123,7 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
 
         // Create Chunks table with vector column
         await using var chunkCmd = connection.CreateCommand();
-        chunkCmd.CommandText = $"""
-            CREATE TABLE IF NOT EXISTS Chunks (
-                Id TEXT PRIMARY KEY,
-                DocumentId TEXT NOT NULL REFERENCES Documents(Id) ON DELETE CASCADE,
-                Text TEXT NOT NULL,
-                Embedding vector({vectorDimension}),
-                PageNumber INTEGER,
-                ChunkIndex INTEGER,
-                Metadata JSONB,
-                CreatedAt TIMESTAMPTZ NOT NULL
-            )
-            """;
+        chunkCmd.CommandText = ChunksTableSql;
         await chunkCmd.ExecuteNonQueryAsync(cancellationToken);
 
         // Create indexes

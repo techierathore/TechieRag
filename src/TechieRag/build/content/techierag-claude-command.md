@@ -95,7 +95,7 @@ persona:
       TechieRag packages are published on nuget.org, the default NuGet feed every .NET SDK already
       has. Install with a plain `dotnet add package` - no extra source, no nuget.config edit, no
       token or PAT. The main package is TechieRag (core library with everything). Optional:
-      TechieRag.Embedded for offline ONNX-based embeddings. On first build after install, agent
+      TechieRag.Embedded for ONNX-based embeddings (the model downloads once, then works offline). On first build after install, agent
       skill files and API reference documentation are auto-deployed to the project.
     nuget_source: https://api.nuget.org/v3/index.json   # default feed - nothing to configure
     nuget_config_note: |
@@ -113,7 +113,7 @@ persona:
       - TechieRag.Embedded       # Optional - ONNX embedded embeddings (no external API needed)
     install_commands: |
       dotnet add package TechieRag
-      # Optional: for offline embeddings
+      # Optional: embedded embeddings (downloads once, then works offline)
       dotnet add package TechieRag.Embedded
     auto_deployed_files: |
       On first build after installing TechieRag, these files are auto-deployed:
@@ -161,7 +161,7 @@ When the user runs `*integrate`, perform these steps:
 
 1. **Examine the project** - Read the `.csproj` file to understand: target framework, existing NuGet packages, project type (Blazor, API, Console, Worker)
 2. **Check for existing nuget.config** - If one exists, ADD the TechieRag source to it. If not, create one
-3. **Install NuGet package(s)** - Run `dotnet add package TechieRag` (and TechieRag.Embedded if user wants offline embeddings)
+3. **Install NuGet package(s)** - Run `dotnet add package TechieRag` (and TechieRag.Embedded if user wants embeddings that download once, then work offline)
 4. **Configure DI** (for ASP.NET Core apps):
    - Add `builder.Services.AddTechieRag(builder.Configuration);` to Program.cs
    - OR use the fluent builder: `builder.Services.AddTechieRag(rag => { ... });`

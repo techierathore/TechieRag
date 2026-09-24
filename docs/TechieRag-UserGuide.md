@@ -53,7 +53,7 @@ Use **TechieRag** when you:
 - Want a smaller package size
 
 Use **TechieRag.Embedded** when you:
-- Need completely offline operation
+- Need operation that downloads once, then works offline
 - Don't want to manage external embedding services
 - Prefer a zero-configuration setup
 
@@ -79,7 +79,7 @@ Or add a `PackageReference` directly to your project file:
 
 **Target frameworks:** `net10.0` and `net8.0`. Pick whichever your project already targets — no extra configuration is required for either.
 
-If you want the self-contained variant with an embedded BGE-M3 model that works offline, install `TechieRag.Embedded` instead (see the [TechieRag.Embedded User Guide](TechieRag.Embedded-UserGuide.md)).
+If you want the embedded variant whose BGE-M3 model downloads once, then works offline, install `TechieRag.Embedded` instead (see the [TechieRag.Embedded User Guide](TechieRag.Embedded-UserGuide.md)).
 
 ### GitHub Packages — internal development builds only
 
@@ -817,4 +817,4 @@ catch (OperationCanceledException)
 
 ---
 
-*This guide is for TechieRag v1.0.0. For the embedded version with offline capabilities, see the [TechieRag.Embedded User Guide](TechieRag.Embedded-UserGuide.md).*
+*This guide is for TechieRag v1.0.0. For the embedded version, which downloads once, then works offline, see the [TechieRag.Embedded User Guide](TechieRag.Embedded-UserGuide.md).*

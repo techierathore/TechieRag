@@ -21,7 +21,7 @@ public class McpToolProvenanceTests
         """{"tools":[{"name":"search","description":"Searches","inputSchema":{"type":"object"}}]}""";
 
     /// <summary>Each qualified tool name resolves to the server that advertised it.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-085 EveryQualifiedToolNameResolvesToItsServer")]
     public async Task EveryQualifiedToolNameResolvesToItsServer()
     {
         await using var handler = await McpToolHandler.CreateAsync(

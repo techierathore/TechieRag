@@ -51,6 +51,30 @@ public interface ILlmProvider
         LlmCompletionOptions? options = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Sends a multi-turn chat conversation and streams typed events: text deltas as they arrive,
+    /// each decided tool call, then one completed event with usage and finish reason
+    /// (REQ-RAG-067 / BRD-110).
+    /// </summary>
+    /// <param name="messages">The conversation so far.</param>
+    /// <param name="options">Completion options; <see cref="LlmCompletionOptions.Tools"/> are honoured.</param>
+    /// <param name="cancellationToken">Token to cancel the stream.</param>
+    /// <returns>The events of one model call, <see cref="LlmStreamEventKind.Completed"/> last.</returns>
+    /// <remarks>
+    /// <para>Additive with a default implementation (ADR-005), so a provider written before this
+    /// method existed keeps compiling. The default calls <see cref="ChatAsync"/> when tools are
+    /// supplied or streaming is unsupported (text arrives as one delta, then the tool calls), and
+    /// otherwise projects <see cref="ChatStreamAsync"/> into text deltas with estimated usage.</para>
+    /// <para>All six built-in providers override it with a real streaming implementation, and
+    /// their <see cref="ChatStreamAsync"/> is the text-only projection of it. A custom provider that
+    /// does the same must override this method too, or the two defaults call each other.</para>
+    /// </remarks>
+    IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(
+        IReadOnlyList<ChatMessage> messages,
+        LlmCompletionOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        Llm.LlmStreamEventFallback.StreamAsync(this, messages, options, cancellationToken);
+
     /// <summary>Generates a typed/structured response by requesting JSON output from the LLM.</summary>
     Task<T> CompleteAsync<T>(
         string prompt,

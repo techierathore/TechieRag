@@ -25,7 +25,7 @@ public sealed class ImapHostileServerTests
     /// allocates a buffer of the announced size before reading a byte, so <c>{2000000000}</c> is a
     /// two-gigabyte allocation chosen by the server.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-082 RefusesALiteralLargerThanTheMessageBudget")]
     public async Task RefusesALiteralLargerThanTheMessageBudget()
     {
         var connection = new HostileImapConnection(
@@ -43,6 +43,8 @@ public sealed class ImapHostileServerTests
             () => Transport(connection).SearchAsync("INBOX", new MailSearchCriteria(), 0, 10));
 
         Assert.Contains("limit", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ConnectorErrorCodes.ImapLiteralTooLarge, error.ErrorCode);
+        Assert.Equal("email", error.SourceType);
         Assert.Equal(0, connection.LargestRead);
     }
 

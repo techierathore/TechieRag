@@ -154,7 +154,7 @@ Lets a developer configure everything by builder, appsettings section, DI or a c
 
 Gives a fully offline embedding path with a model downloaded once.
 
-- **BRD-24** — A developer can enable fully offline embedding via `.UseEmbedded()` (bundled BGE-M3 ONNX) *(F-EMBEDDED)* *Screen:* Embedded package
+- **BRD-24** — A developer can enable embedding that downloads once, then works offline, via `.UseEmbedded()` (BGE-M3 ONNX) *(F-EMBEDDED)* *Screen:* Embedded package
   - *Acceptance:* When a developer calls `UseEmbedded()` on the Embedded package and embeds text, then a 1024-dimension vector returns with no network after the first run.
 - **BRD-25** — The system shall download the embedded model once to a platform cache and run offline thereafter *(F-EMBEDDED)* *Screen:* Embedded package
   - *Acceptance:* When the model is absent on first `InitializeAsync`, then it downloads once to the model folder and a second run makes no network call.
@@ -366,7 +366,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 ```mermaid
 flowchart LR
   Dev(["Consumer .NET app (Sevak, MyDiary, any)"]) --> TR["TechieRag (core package)"]
-  Dev --> EMB["TechieRag.Embedded (ONNX, offline)"]
+  Dev --> EMB["TechieRag.Embedded (ONNX, downloads once, then offline)"]
   Dev -.-> AG["TechieRag.Agents — phase 2"]
   Dev -.-> LOC["TechieRag.Local — phase 2, in-process model"]
   EMB --> TR
@@ -389,6 +389,21 @@ flowchart LR
 - Agents never run git; the owner commits. Real-device runs (Mac, Android phone, iPhone) are the owner's.
 - `TechieRag.Local` depends on a native inference runtime chosen per platform after a measured comparison recorded in `DECISIONS.md`; costly to reverse.
 - Subscription sign-in depends on each vendor's policy, recorded with the date checked; the library never asserts a permission it has not verified.
+
+### Platform support matrix (BRD-88, REQ-FN-054)
+
+Each cell reads **supported** (built for it, no recorded run on that platform yet), **tested** (the probe app ran there: device and date), or **not supported**. A cell moves to tested only when the owner records a probe run (UsageGuide, Platform notes, the runbook). Last updated 2026-09-24.
+
+| Package | Windows | macOS / Mac Catalyst | Android | iOS |
+|---|---|---|---|---|
+| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | supported | supported ¹ | supported |
+| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | supported | supported ¹ | supported |
+| `TechieRag.Agents` | not supported ² | not supported ² | not supported ² | not supported ² |
+| `TechieRag.Local` | not supported ³ | not supported ³ | not supported ³ | not supported ³ |
+
+1. The probe ran on an Android emulator (Pixel 5 profile, Android 12, x86_64) on 2026-09-24: all-MiniLM-L6-v2 selected by default, top result correct. An emulator is not a device, so the cell stays supported until a phone run is recorded.
+2. The package is being built (REQ-RAG-045); the cells change when it ships and the probe exercises it.
+3. The package is built up to its inference runtime (2026-09-24); every cell stays not supported until the owner chooses the runtime per platform (`docs/TechieRag-Decision-Request.md`). Engines shipped today: ONNX Runtime GenAI for Windows, Android and iOS (not Mac Catalyst), LLamaSharp for Windows and Android (not iOS or Mac Catalyst). Desktop engine numbers: UsageGuide, Platform notes, "Local model: runtime comparison"; the probe's second button (BRD-106) records per-device numbers.
 
 ## 10. Risks
 

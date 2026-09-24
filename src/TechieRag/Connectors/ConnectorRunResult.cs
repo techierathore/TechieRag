@@ -18,4 +18,12 @@ public sealed record ConnectorRunResult(
     IReadOnlyList<ConnectorItem> Unchanged,
     IReadOnlyList<ConnectorItemFailure> Failures,
     ConnectorSyncState Sync,
-    bool ReachedLimit = false);
+    bool ReachedLimit = false)
+{
+    /// <summary>
+    /// Gets the stable code of the budget that stopped the run, from <see cref="ConnectorErrorCodes"/>
+    /// (for example <see cref="ConnectorErrorCodes.RunByteBudgetReached"/>); null when
+    /// <see cref="ReachedLimit"/> is false (REQ-RAG-082).
+    /// </summary>
+    public string? LimitCode { get; init; }
+}

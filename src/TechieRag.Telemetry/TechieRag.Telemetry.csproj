@@ -24,6 +24,15 @@
     <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- REQ-FN-065 / BRD-156: same publishing posture as TechieRag core - see NUGET-PUBLISHING.md §3.
+         Packing is explicit (a publish workflow's dotnet pack), SourceLink via the SDK's bundled
+         GitHub provider, symbols as a .snupkg alongside the .nupkg. -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

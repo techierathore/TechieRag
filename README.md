@@ -13,14 +13,14 @@ A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. 
 - **Multiple Vector Stores**: SQLite-vec (local), PostgreSQL/pgvector, Qdrant
 - **Built-in Document Processors**: PDF, DOCX, HTML, Markdown, JSON, TOML, and code files
 - **Fluent Builder API**: Easy configuration with method chaining
-- **Offline Capable**: Use `TechieRag.Embedded` for completely offline operation with BGE-M3 model
+- **Offline after one download**: `TechieRag.Embedded` downloads the BGE-M3 model once, then works offline; `TechieRag.Local` does the same for an in-process language model
 
 ## Packages
 
 | Package | Description | User Guide |
 |---------|-------------|------------|
 | `TechieRag` | Core library with all embedding providers and vector stores | [User Guide](docs/TechieRag-UserGuide.md) |
-| `TechieRag.Embedded` | Self-contained package with embedded BGE-M3 ONNX model for offline use | [User Guide](docs/TechieRag.Embedded-UserGuide.md) |
+| `TechieRag.Embedded` | ONNX embeddings and reranking; the BGE-M3 model downloads once, then works offline | [User Guide](docs/TechieRag.Embedded-UserGuide.md) |
 
 ## Installation
 
@@ -31,7 +31,7 @@ no `nuget.config` edit — the default NuGet feed every .NET SDK already has is 
 # Core package — bring your own embedding service (Ollama, OpenAI, Azure OpenAI, LM Studio, ...)
 dotnet add package TechieRag
 
-# OR the self-contained package — embedded BGE-M3 model, works fully offline
+# OR the embedded package — the BGE-M3 model downloads once, then works offline
 dotnet add package TechieRag.Embedded
 ```
 
@@ -119,7 +119,7 @@ Never commit a `nuget.config` that carries the token. The publishing pipeline fo
 
 ## Quick Start
 
-### Using TechieRag.Embedded (Offline, No Setup Required)
+### Using TechieRag.Embedded (downloads once, then works offline)
 
 ```csharp
 using TechieRag;

@@ -33,7 +33,7 @@ public sealed class LivePgVectorStoreTests
     /// without a server. Search is asserted to return the chunk's TEXT, not merely a row count, so a
     /// store that persisted an empty body would fail.
     /// </remarks>
-    [LivePostgresFact]
+    [LivePostgresFact(DisplayName = "REQ-RAG-044 AChunkSurvivesAnUpsertAndComesBackFromASearch")]
     public async Task AChunkSurvivesAnUpsertAndComesBackFromASearch()
     {
         var documentId = NewDocumentId();
@@ -99,7 +99,7 @@ public sealed class LivePgVectorStoreTests
     /// Asserted through a search rather than a count, because "the row is gone" and "the vector is no
     /// longer retrievable" are different claims, and it is the second one a user experiences.
     /// </remarks>
-    [LivePostgresFact]
+    [LivePostgresFact(DisplayName = "REQ-RAG-044 DeletingADocumentRemovesItsVectorsFromSearch")]
     public async Task DeletingADocumentRemovesItsVectorsFromSearch()
     {
         var documentId = NewDocumentId();

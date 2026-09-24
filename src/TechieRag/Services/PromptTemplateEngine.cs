@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
 using TechieRag.Models;
 
@@ -9,20 +11,47 @@ namespace TechieRag.Services;
 /// <remarks>
 /// <para><b>Purpose:</b> Builds well-structured prompts that combine the user's query
 /// with relevant context from the vector store, formatted for optimal LLM performance.</para>
+/// <para><b>Truncation is signalled, never silent (REQ-RAG-096 / BRD-143, TR-RAG-009).</b> When
+/// <see cref="PromptConfig.MaxContextChunks"/> drops search results, the engine logs a warning and
+/// raises <see cref="ContextTruncated"/> with the same <see cref="ContextTruncatedEventArgs"/> and
+/// <see cref="WorkspaceContext"/> diagnostics <see cref="WorkspaceManager.ContextTruncated"/> uses,
+/// so one handler serves both. A budget of zero or less disables trimming, as it does there.</para>
 /// </remarks>
 public class PromptTemplateEngine : IPromptTemplate
 {
     private readonly PromptConfig config;
+    private readonly ILogger<PromptTemplateEngine> logger;
 
     /// <summary>
     /// Creates a new prompt template engine.
     /// </summary>
     /// <param name="config">Prompt configuration settings.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="config"/> is null.</exception>
     public PromptTemplateEngine(PromptConfig config)
+        : this(config, null)
+    {
+    }
+
+    /// <summary>
+    /// Creates a new prompt template engine that logs context truncation.
+    /// </summary>
+    /// <param name="config">Prompt configuration settings.</param>
+    /// <param name="logger">Receives a warning whenever context is truncated; null logs nothing.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="config"/> is null.</exception>
+    public PromptTemplateEngine(PromptConfig config, ILogger<PromptTemplateEngine>? logger)
     {
         ArgumentNullException.ThrowIfNull(config);
         this.config = config;
+        this.logger = logger ?? NullLogger<PromptTemplateEngine>.Instance;
     }
+
+    /// <summary>
+    /// Raised when <see cref="PromptConfig.MaxContextChunks"/> dropped search results while a prompt
+    /// was built (REQ-RAG-096). <see cref="ContextTruncatedEventArgs.WorkspaceId"/> is empty because
+    /// the engine does not know which workspace, if any, the results came from;
+    /// <see cref="ContextTruncatedEventArgs.Context"/> counts every dropped result as retrieved.
+    /// </summary>
+    public event EventHandler<ContextTruncatedEventArgs>? ContextTruncated;
 
     /// <inheritdoc/>
     public IReadOnlyList<ChatMessage> BuildRagPrompt(
@@ -33,7 +62,7 @@ public class PromptTemplateEngine : IPromptTemplate
         ArgumentException.ThrowIfNullOrEmpty(userQuery);
         ArgumentNullException.ThrowIfNull(searchResults);
 
-        var contextText = FormatContext(searchResults);
+        var contextText = FormatContext(userQuery, searchResults);
         var fullSystemPrompt = BuildSystemPromptWithContext(systemPrompt ?? config.SystemPrompt, contextText);
 
         return new List<ChatMessage>
@@ -53,7 +82,7 @@ public class PromptTemplateEngine : IPromptTemplate
         ArgumentException.ThrowIfNullOrEmpty(userMessage);
         ArgumentNullException.ThrowIfNull(searchResults);
 
-        var contextText = FormatContext(searchResults);
+        var contextText = FormatContext(userMessage, searchResults);
         var fullSystemPrompt = BuildSystemPromptWithContext(systemPrompt ?? config.SystemPrompt, contextText);
 
         var messages = new List<ChatMessage> { ChatMessage.System(fullSystemPrompt) };
@@ -74,12 +103,12 @@ public class PromptTemplateEngine : IPromptTemplate
         return messages;
     }
 
-    private string FormatContext(IReadOnlyList<SearchResult> searchResults)
+    private string FormatContext(string question, IReadOnlyList<SearchResult> searchResults)
     {
         if (searchResults.Count == 0)
             return string.Empty;
 
-        var chunks = searchResults.Take(config.MaxContextChunks).ToList();
+        var chunks = ApplyContextBudget(question, searchResults);
         var contextParts = new List<string>();
 
         for (int i = 0; i < chunks.Count; i++)
@@ -102,6 +131,43 @@ public class PromptTemplateEngine : IPromptTemplate
         }
 
         return string.Join("\n\n", contextParts);
+    }
+
+    /// <summary>
+    /// Trims the results to <see cref="PromptConfig.MaxContextChunks"/> and signals any truncation.
+    /// </summary>
+    /// <param name="question">The user text the prompt is being built for.</param>
+    /// <param name="searchResults">The results offered as context, most relevant first.</param>
+    /// <returns>The results that fit the budget.</returns>
+    private List<SearchResult> ApplyContextBudget(string question, IReadOnlyList<SearchResult> searchResults)
+    {
+        var limit = config.MaxContextChunks;
+        if (limit <= 0 || searchResults.Count <= limit)
+            return searchResults.ToList();
+
+        var kept = searchResults.Take(limit).ToList();
+        var context = new WorkspaceContext
+        {
+            Results = kept,
+            PinnedIncluded = 0,
+            RetrievedIncluded = kept.Count,
+            PinnedEvicted = 0,
+            RetrievedEvicted = searchResults.Count - kept.Count,
+            MaxContextChunks = limit
+        };
+
+        logger.LogWarning(
+            "Prompt context truncated to MaxContextChunks={Limit}: dropped {Dropped} of {Offered} search result(s).",
+            limit, context.RetrievedEvicted, searchResults.Count);
+
+        ContextTruncated?.Invoke(this, new ContextTruncatedEventArgs
+        {
+            WorkspaceId = string.Empty,
+            Question = question,
+            Context = context
+        });
+
+        return kept;
     }
 
     private static string BuildSystemPromptWithContext(string systemPrompt, string contextText)

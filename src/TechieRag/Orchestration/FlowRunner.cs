@@ -118,11 +118,22 @@ public sealed class FlowRunner
         var current = flow.ResolveStartNode();
         PendingHandoff? pending = null;
 
+        // The run's own deadline (REQ-RAG-088 / BRD-135), linked to the caller's token so either
+        // stops the run; which one fired decides whether it ended Cancelled or TimedOut.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var timeLimit = EffectiveTimeLimit(runtime.TimeLimit);
+        if (timeLimit is { } limit)
+        {
+            deadline.CancelAfter(limit);
+        }
+
+        var runToken = deadline.Token;
+
         try
         {
             while (current is not null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                runToken.ThrowIfCancellationRequested();
 
                 if (run.StepsExecuted >= flow.MaxSteps)
                 {
@@ -156,7 +167,11 @@ public sealed class FlowRunner
                     return run.Finish(FlowRunOutcome.StepBudgetExhausted, state, current.Id, null);
                 }
 
-                var step = await ExecuteNodeAsync(current, state, pending, run, cancellationToken).ConfigureAwait(false);
+                // WaitAsync, not only the token: a node waiting on a host confirmation that never
+                // observes cancellation must still let the run end at the deadline.
+                var step = await ExecuteNodeAsync(current, state, pending, run, runToken)
+                    .WaitAsync(runToken)
+                    .ConfigureAwait(false);
                 pending = null;
 
                 if (step.Blocked is not null)
@@ -221,11 +236,55 @@ public sealed class FlowRunner
         {
             return run.Finish(FlowRunOutcome.Cancelled, state, null, null);
         }
+        catch (OperationCanceledException) when (deadline.IsCancellationRequested && timeLimit is not null)
+        {
+            return ReportTimeout(timeLimit.Value, current, state, run);
+        }
 
         // Nothing satisfied an outgoing edge: the run is over with whatever it produced. Reported as
         // a completion rather than a failure — the validator already warns about branch sets with no
         // default, so this is a shape the author was told about.
         return run.Finish(FlowRunOutcome.Completed, state, null, null);
+    }
+
+    /// <summary>Normalises the runtime's time limit: null when there is none to apply.</summary>
+    /// <param name="configured">The runtime's configured limit.</param>
+    /// <returns>A positive, finite limit, or null for no limit.</returns>
+    private static TimeSpan? EffectiveTimeLimit(TimeSpan? configured) =>
+        configured is { } limit && limit > TimeSpan.Zero && limit != Timeout.InfiniteTimeSpan ? limit : null;
+
+    /// <summary>Records and returns a run stopped by its time limit (REQ-RAG-088 / BRD-135).</summary>
+    /// <param name="limit">The limit that passed.</param>
+    /// <param name="node">The node that was running or waiting when it passed, or null.</param>
+    /// <param name="state">The run state.</param>
+    /// <param name="run">The accumulator collecting the trace.</param>
+    /// <returns>The timed-out run result.</returns>
+    private FlowRunResult ReportTimeout(TimeSpan limit, FlowNode? node, FlowState state, RunAccumulator run)
+    {
+        var timedOut = FlowMessage.Create(
+            FlowMessageCodes.FlowTimedOut,
+            "The flow did not finish within its time limit of {0} seconds and was stopped at '{1}'.",
+            limit.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+            node?.DisplayName ?? string.Empty);
+
+        run.Report(new FlowStep
+        {
+            RunId = run.RunId,
+            Iteration = run.StepsExecuted,
+            Kind = AgentStepKind.FlowTimedOut,
+            NodeId = node?.Id,
+            NodeName = node?.DisplayName,
+            NodeKind = node?.Kind,
+            Depth = depth,
+            IsSuccess = false,
+            Content = timedOut.Text,
+            ContentMessage = timedOut,
+            ErrorMessage = timedOut.Text,
+            FailureMessage = timedOut
+        });
+
+        logger.LogWarning("Flow {FlowId} timed out after {Limit} at node {NodeId}", flow.Id, limit, node?.Id);
+        return run.End(FlowRunOutcome.TimedOut, timedOut, state, node?.Id);
     }
 
     /// <summary>Runs one node through its guardrails and produces its output.</summary>
@@ -822,6 +881,28 @@ public sealed class FlowRunner
             VisitedNodeIds = visited,
             Variables = new Dictionary<string, string>(state.Variables, StringComparer.Ordinal),
             StepsExecuted = StepsExecuted,
+            Usage = usage
+        };
+
+        /// <summary>Builds the result for a run that stopped for a reason the caller must be told.</summary>
+        /// <param name="outcome">How it ended.</param>
+        /// <param name="reason">Why, as a code plus its arguments.</param>
+        /// <param name="state">The final state.</param>
+        /// <param name="lastNodeId">The node it stopped at.</param>
+        /// <returns>The run result.</returns>
+        public FlowRunResult End(FlowRunOutcome outcome, FlowMessage reason, FlowState state, string? lastNodeId) => new()
+        {
+            RunId = RunId,
+            FlowId = flowId,
+            Outcome = outcome,
+            Output = state.LastOutput,
+            LastNodeId = lastNodeId ?? visited.LastOrDefault(),
+            Steps = steps,
+            VisitedNodeIds = visited,
+            Variables = new Dictionary<string, string>(state.Variables, StringComparer.Ordinal),
+            StepsExecuted = StepsExecuted,
+            FailureReason = reason.Text,
+            FailureMessage = reason,
             Usage = usage
         };
 

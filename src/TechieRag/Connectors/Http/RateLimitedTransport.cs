@@ -54,17 +54,34 @@ public sealed class RateLimitedTransport : IConnectorTransport
     public TimeSpan DefaultDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     /// <inheritdoc />
-    public async Task<ConnectorHttpResponse> GetAsync(
+    public Task<ConnectorHttpResponse> GetAsync(
         ConnectorHttpRequest request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        return SendWithRetryAsync(request, inner.GetAsync, cancellationToken);
+    }
 
+    /// <inheritdoc />
+    /// <remarks>Waits out a throttle exactly as <see cref="GetAsync"/> does (REQ-RAG-083 / TR-RAG-021).</remarks>
+    public Task<ConnectorHttpResponse> SendAsync(
+        ConnectorHttpRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return SendWithRetryAsync(request, inner.SendAsync, cancellationToken);
+    }
+
+    private async Task<ConnectorHttpResponse> SendWithRetryAsync(
+        ConnectorHttpRequest request,
+        Func<ConnectorHttpRequest, CancellationToken, Task<ConnectorHttpResponse>> send,
+        CancellationToken cancellationToken)
+    {
         var backoff = DefaultDelay;
 
         for (var attempt = 1; ; attempt++)
         {
-            var response = await inner.GetAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await send(request, cancellationToken).ConfigureAwait(false);
 
             if (!IsThrottled(response))
             {

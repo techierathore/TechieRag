@@ -67,13 +67,23 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
+      # Every packable project is listed by path, in the same order, in Restore, Build and Pack - and
+      # in publish-nuget.yml - so all packages ship together at one version (REQ-FN-005, REQ-FN-065).
       - name: Restore dependencies
-        run: dotnet restore src/TechieRag/TechieRag.csproj && dotnet restore src/TechieRag.Embedded/TechieRag.Embedded.csproj
+        run: |
+          dotnet restore src/TechieRag/TechieRag.csproj
+          dotnet restore src/TechieRag.Embedded/TechieRag.Embedded.csproj
+          dotnet restore src/TechieRag.Telemetry/TechieRag.Telemetry.csproj
+          dotnet restore src/TechieRag.Agents/TechieRag.Agents.csproj
+          dotnet restore src/TechieRag.Local/TechieRag.Local.csproj
 
       - name: Build
         run: |
           dotnet build src/TechieRag/TechieRag.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
           dotnet build src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build src/TechieRag.Telemetry/TechieRag.Telemetry.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build src/TechieRag.Agents/TechieRag.Agents.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build src/TechieRag.Local/TechieRag.Local.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Run tests
         # Blocking gate: test failures fail the build and prevent publish.
@@ -85,6 +95,9 @@ jobs:
         run: |
           dotnet pack src/TechieRag/TechieRag.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
           dotnet pack src/TechieRag.Embedded/TechieRag.Embedded.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+          dotnet pack src/TechieRag.Telemetry/TechieRag.Telemetry.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+          dotnet pack src/TechieRag.Agents/TechieRag.Agents.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+          dotnet pack src/TechieRag.Local/TechieRag.Local.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
 
       - name: List created packages
         run: ls -la ./nupkgs/
@@ -134,37 +147,8 @@ jobs:
             dotnet nuget push "$package" --source "github" --skip-duplicate --api-key ${{ secrets.GITHUB_TOKEN }}
           done
 
-  # Publish to NuGet.org when a release tag is pushed, gated on the NUGET_API_KEY secret.
-  # GitHub Actions does not allow the `secrets` context in a job-level `if`, so the secret
-  # is mapped into job-level env and the push step is gated on it being non-empty.
-  publish-nuget-org:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    env:
-      NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-
-    steps:
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Download NuGet packages
-        uses: actions/download-artifact@v4
-        with:
-          name: nuget-packages
-          path: ./nupkgs
-
-      - name: Publish to NuGet.org
-        if: env.NUGET_API_KEY != ''
-        run: |
-          for package in ./nupkgs/*.nupkg; do
-            echo "Publishing $package to NuGet.org..."
-            dotnet nuget push "$package" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
-          done
-
-      - name: NuGet.org publish skipped (no NUGET_API_KEY secret)
-        if: env.NUGET_API_KEY == ''
-        run: echo "NUGET_API_KEY secret is not configured - skipping NuGet.org publish."
+  # There is deliberately NO nuget.org job in this workflow (REQ-FN-067 / BRD-160, DECISIONS.md
+  # 2026-09-03 second entry). A v* tag lands on GitHub Packages only; nuget.org receives a version
+  # solely through a human dispatching publish-nuget.yml (Trusted Publishing / OIDC) against that tag.
+  # The former `publish-nuget-org` job, gated on a NUGET_API_KEY secret, was a second path to the
+  # public feed and was removed on 2026-09-24. Do not re-add one - see NUGET-PUBLISHING.md §1.

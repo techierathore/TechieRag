@@ -39,6 +39,9 @@ public class TechieRagClient : ITechieRag
     private readonly IConversationStore? conversationStore;
     private readonly WorkspaceManager? workspaceManager;
 
+    /// <summary>Gets the vector store this client writes to, for tests of what the builder built (REQ-RAG-106).</summary>
+    internal IVectorStore VectorStore => vectorStore;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="TechieRagClient"/> class.
     /// </summary>
@@ -471,14 +474,24 @@ public class TechieRagClient : ITechieRag
     /// <inheritdoc/>
     /// <remarks>
     /// <para><b>Flow:</b> Delegates to the vector store's DeleteByDocumentAsync method,
-    /// which removes both the document record and all associated chunks.</para>
+    /// which removes both the document record and all associated chunks, then removes the
+    /// document's membership from every workspace when a workspace store is configured
+    /// (REQ-RAG-095 / BRD-142), so no workspace keeps a row pointing at a deleted document.</para>
     /// </remarks>
     public async Task DeleteDocumentAsync(string documentId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(documentId);
 
         logger.LogInformation("Deleting document {DocumentId}", documentId);
-        await vectorStore.DeleteByDocumentAsync(documentId, cancellationToken);
+        await vectorStore.DeleteByDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
+
+        if (workspaceManager is not null)
+        {
+            await workspaceManager.GetStore()
+                .RemoveDocumentFromAllWorkspacesAsync(documentId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         logger.LogInformation("Successfully deleted document {DocumentId}", documentId);
     }
 

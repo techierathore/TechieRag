@@ -1,0 +1,109 @@
+<Project>
+  <!--
+    TechieRag.Embedded native ONNX Runtime wiring for MAUI heads (REQ-FN-055 / BRD-90).
+
+    A consuming app writes NO native wiring of its own. What Microsoft.ML.OnnxRuntime already does,
+    and what this file adds, per platform:
+
+      Android      ORT's own buildTransitive adds runtimes/android/native/onnxruntime.aar as an
+                   AndroidLibrary (jni/arm64-v8a, jni/x86_64, plus armeabi-v7a and x86). This file
+                   checks it arrived and adds it itself when it did not.
+      iOS          ORT's own buildTransitive adds the static onnxruntime.xcframework NativeReference
+                   (ForceLoad, -lc++, CoreML weak). This file adds the Debug custom-ops stub below.
+      Mac Catalyst ORT ships an EMPTY placeholder (_._) for maccatalyst, so no native library is
+                   linked while the managed assembly still P/Invokes it; the link fails on
+                   _RegisterCustomOps. The xcframework DOES carry an ios-arm64_x86_64-maccatalyst
+                   slice, so this file declares the same NativeReference ORT declares for iOS, and
+                   the Debug stub.
+      Windows, macOS, Linux (plain net10.0) need nothing here: runtimes/<rid>/native is copied by
+                   NuGet, and OnnxNativeLibraryResolver maps the library name on macOS and Linux.
+
+    The Debug custom-ops stub: ORT's managed assembly declares a P/Invoke to RegisterCustomOps, a
+    symbol no shipped ORT binary defines (it lives in onnxruntime-extensions). Release trims the
+    unused P/Invoke; Debug does not trim, so every P/Invoke becomes a required native symbol and the
+    link fails. The stub (onnx-customops-stub.c beside this file) is compiled with xcrun clang at
+    build time and returns NULL, ORT's "OK". The embedding models TechieRag ships use no custom ops.
+
+    Knobs a consuming app may set:
+      TechieRagOnnxRuntimeVersion      the Microsoft.ML.OnnxRuntime version the app restores when it
+                                       overrides the one TechieRag.Embedded references (default below)
+      TechieRagDisableOnnxNativeWiring true to switch everything in this file off
+      TechieRagDisableOnnxCustomOpsStub true to skip only the Debug stub (e.g. when the app links
+                                       onnxruntime-extensions for real custom ops)
+
+    Moved here from Sevak's csproj, where it was hand-written (REQ-FN-035). Sevak's MtouchInterpreter
+    setting concerns Docker.DotNet and Newtonsoft.Json, not ONNX Runtime, so it stays in Sevak.
+  -->
+  <PropertyGroup>
+    <!-- Keep in step with the Microsoft.ML.OnnxRuntime PackageReference in TechieRag.Embedded.csproj;
+         EmbeddedPackagingTests asserts they match. -->
+    <TechieRagOnnxRuntimeVersion Condition="'$(TechieRagOnnxRuntimeVersion)' == ''">1.24.1</TechieRagOnnxRuntimeVersion>
+    <TechieRagOnnxRuntimePackageRoot Condition="'$(TechieRagOnnxRuntimePackageRoot)' == ''">$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))microsoft.ml.onnxruntime/$(TechieRagOnnxRuntimeVersion)/</TechieRagOnnxRuntimePackageRoot>
+    <_TechieRagTargetPlatform>$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))</_TechieRagTargetPlatform>
+    <_TechieRagIsApp Condition="'$(OutputType)' != 'Library' OR '$(IsAppExtension)' == 'True'">true</_TechieRagIsApp>
+    <_TechieRagWireOnnx Condition="'$(TechieRagDisableOnnxNativeWiring)' != 'true' AND '$(_TechieRagIsApp)' == 'true'">true</_TechieRagWireOnnx>
+    <_TechieRagXcframework>$(TechieRagOnnxRuntimePackageRoot)runtimes/ios/native/onnxruntime.xcframework.zip</_TechieRagXcframework>
+    <_TechieRagAar>$(TechieRagOnnxRuntimePackageRoot)runtimes/android/native/onnxruntime.aar</_TechieRagAar>
+    <_TechieRagCustomOpsStubSource>$(MSBuildThisFileDirectory)onnx-customops-stub.c</_TechieRagCustomOpsStubSource>
+  </PropertyGroup>
+
+  <!-- Mac Catalyst: the static library ORT never wires up. -->
+  <ItemGroup Condition="'$(_TechieRagWireOnnx)' == 'true' AND '$(_TechieRagTargetPlatform)' == 'maccatalyst'">
+    <NativeReference Include="$(_TechieRagXcframework)">
+      <Kind>Static</Kind>
+      <IsCxx>True</IsCxx>
+      <SmartLink>True</SmartLink>
+      <ForceLoad>True</ForceLoad>
+      <LinkerFlags>-lc++</LinkerFlags>
+      <WeakFrameworks>CoreML</WeakFrameworks>
+    </NativeReference>
+  </ItemGroup>
+
+  <Target Name="TechieRagCheckOnnxXcframework"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(_TechieRagWireOnnx)' == 'true' AND '$(_TechieRagTargetPlatform)' == 'maccatalyst'">
+    <Error Condition="!Exists('$(_TechieRagXcframework)')"
+           Text="TechieRag.Embedded: ONNX Runtime's xcframework was not found at '$(_TechieRagXcframework)'. Set the MSBuild property TechieRagOnnxRuntimeVersion to the Microsoft.ML.OnnxRuntime version this app restores." />
+  </Target>
+
+  <!-- Android: make sure ORT's .aar (arm64-v8a, x86_64, ...) reached the app. -->
+  <Target Name="TechieRagEnsureOnnxAndroidLibrary"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(_TechieRagWireOnnx)' == 'true' AND '$(_TechieRagTargetPlatform)' == 'android'">
+    <ItemGroup>
+      <_TechieRagOnnxAar Include="@(AndroidLibrary)" Condition="'%(Filename)%(Extension)' == 'onnxruntime.aar'" />
+    </ItemGroup>
+    <Error Condition="'@(_TechieRagOnnxAar)' == '' AND !Exists('$(_TechieRagAar)')"
+           Text="TechieRag.Embedded: ONNX Runtime's Android library was not found at '$(_TechieRagAar)'. Set the MSBuild property TechieRagOnnxRuntimeVersion to the Microsoft.ML.OnnxRuntime version this app restores." />
+    <ItemGroup Condition="'@(_TechieRagOnnxAar)' == ''">
+      <AndroidLibrary Include="$(_TechieRagAar)" Bind="false" />
+    </ItemGroup>
+  </Target>
+
+  <!-- iOS and Mac Catalyst, Debug only: compile the RegisterCustomOps stub and link it. -->
+  <Target Name="TechieRagBuildOnnxCustomOpsStub"
+          BeforeTargets="_ExpandNativeReferences;_CompileNativeExecutable"
+          Condition="'$(_TechieRagWireOnnx)' == 'true' AND '$(TechieRagDisableOnnxCustomOpsStub)' != 'true' AND '$(Configuration)' == 'Debug' AND ('$(_TechieRagTargetPlatform)' == 'maccatalyst' OR '$(_TechieRagTargetPlatform)' == 'ios')">
+    <PropertyGroup>
+      <_TechieRagStubArch Condition="$(RuntimeIdentifier.EndsWith('-arm64'))">arm64</_TechieRagStubArch>
+      <_TechieRagStubArch Condition="$(RuntimeIdentifier.EndsWith('-x64'))">x86_64</_TechieRagStubArch>
+      <_TechieRagStubEnvironment Condition="'$(_TechieRagTargetPlatform)' == 'maccatalyst'">-macabi</_TechieRagStubEnvironment>
+      <_TechieRagStubEnvironment Condition="$(RuntimeIdentifier.StartsWith('iossimulator'))">-simulator</_TechieRagStubEnvironment>
+      <_TechieRagStubMinOs>$(SupportedOSPlatformVersion)</_TechieRagStubMinOs>
+      <_TechieRagStubMinOs Condition="'$(_TechieRagStubMinOs)' == ''">15.0</_TechieRagStubMinOs>
+      <_TechieRagStubTriple>$(_TechieRagStubArch)-apple-ios$(_TechieRagStubMinOs)$(_TechieRagStubEnvironment)</_TechieRagStubTriple>
+      <_TechieRagStubDirectory>$(IntermediateOutputPath)techierag/</_TechieRagStubDirectory>
+      <_TechieRagStubArchive>$(_TechieRagStubDirectory)onnx-customops-stub.a</_TechieRagStubArchive>
+    </PropertyGroup>
+    <Error Condition="'$(_TechieRagStubArch)' == ''"
+           Text="TechieRag.Embedded: cannot build the ONNX custom-ops stub for RuntimeIdentifier '$(RuntimeIdentifier)'. Set TechieRagDisableOnnxCustomOpsStub=true or build for a single arm64 or x64 RuntimeIdentifier." />
+    <MakeDir Directories="$(_TechieRagStubDirectory)" />
+    <Exec Command="xcrun clang -target $(_TechieRagStubTriple) -c &quot;$(_TechieRagCustomOpsStubSource)&quot; -o &quot;$(_TechieRagStubDirectory)onnx-customops-stub.o&quot; &amp;&amp; xcrun ar rcs &quot;$(_TechieRagStubArchive)&quot; &quot;$(_TechieRagStubDirectory)onnx-customops-stub.o&quot;" />
+    <ItemGroup>
+      <NativeReference Include="$(_TechieRagStubArchive)">
+        <Kind>Static</Kind>
+        <ForceLoad>True</ForceLoad>
+      </NativeReference>
+    </ItemGroup>
+  </Target>
+</Project>

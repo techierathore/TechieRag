@@ -36,7 +36,10 @@ public enum AgentStepKind
     StepBudgetExhausted,
 
     /// <summary>An orchestrated flow reached a terminal node and stopped (REQ-RAG-042).</summary>
-    FlowCompleted
+    FlowCompleted,
+
+    /// <summary>An orchestrated flow ran past its time limit and was stopped (REQ-RAG-088 / BRD-135).</summary>
+    FlowTimedOut
 }
 
 /// <summary>

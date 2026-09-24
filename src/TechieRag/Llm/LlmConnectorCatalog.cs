@@ -142,7 +142,18 @@ public static class LlmConnectorCatalog
             Source = LlmSource.LmStudio,
             Endpoint = "http://localhost:1234",
             RequiresApiKey = false
-        }
+        },
+        // REQ-RAG-064 / BRD-104: the in-process model of TechieRag.Local. No endpoint and no key;
+        // no prefixes, because open-weight names are not one service's, so it is "local/<model>" only.
+        new()
+        {
+            Name = "local",
+            DisplayName = "Local model (in-process)",
+            Source = LlmSource.Local,
+            RequiresApiKey = false
+        },
+        // Consumer-subscription sign-in, one row per vendor researched (REQ-RAG-070 / BRD-113).
+        .. SubscriptionConnectorRows.All
     ];
 
     /// <summary>Gets every connector the library knows by name.</summary>

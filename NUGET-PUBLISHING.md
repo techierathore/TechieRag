@@ -18,7 +18,7 @@ the public one, because that is the one that is irreversible.
 | **Purpose** | Internal dev / pre-release feed | The public feed consumers install from |
 | **Audience** | Maintainers working on TechieRag itself | Everyone — `dotnet add package TechieRag`, no credentials |
 | **Workflow** | `.github/workflows/publish-github-packages.yml` | `.github/workflows/publish-nuget.yml` |
-| **Trigger** | Automatic — push to `main`/`master`, `v*` tags (GitHub Releases), PRs | **Manual only** — `workflow_dispatch` against a release tag (dry run from any ref; real run only from a tag) |
+| **Trigger** | Automatic — push to `main`/`master`, `v*` tags (GitHub Releases), PRs (PRs build and pack only) | **Manual only** — `workflow_dispatch` against a release tag (dry run from any ref; real run only from a tag) |
 | **Credential** | `GITHUB_TOKEN` (built in) | None stored — OIDC temp key (see §2) |
 | **Cadence** | Every merge and every release | When the owner decides a release goes public |
 | **Reversible?** | Yes — versions can be deleted | **No** — see "unlist, not delete" in §6 |
@@ -27,7 +27,8 @@ Three rules hold this together:
 
 1. **Public versions are always a subset of internal-feed versions.** Nothing reaches NuGet.org that
    has not already existed on the GitHub feed. There is no NuGet.org-only build. (The internal
-   workflow also fires on the same `v*` tag, so a tag lands on both feeds from the same commit.)
+   workflow fires on the `v*` tag, so the version lands on GitHub Packages first; the public dispatch
+   later builds the same tag, so both feeds carry the same commit.)
 2. **Same version number = same commit.** If `1.0.0` exists on both feeds, both were built from the
    same commit. This is what makes the internal feed a usable rehearsal for the public one.
 3. **The public feed never publishes itself.** No push trigger, no tag trigger, no schedule. A
@@ -37,16 +38,25 @@ Three rules hold this together:
    a tag trigger — see `DECISIONS.md` 2026-09-03, second entry — so the ceremony matches the
    owner's other libraries.) What changed on 2026-09-03 and stays: the version is derived from that
    tag, and the run refuses a version already on nuget.org or one not greater than the latest.
+   **Exactly one path reaches nuget.org** (REQ-FN-067 / BRD-160, 2026-09-24): the manual dispatch of
+   `publish-nuget.yml`. `publish-github-packages.yml` has no nuget.org job at all — pushing a `v*` tag
+   feeds GitHub Packages and nothing else.
 
 ### Packages published
 
-Both packable projects go to both feeds:
+All four packable projects go to both feeds, listed by path in the Restore, Build and Pack steps of
+both workflows:
 
 - **`TechieRag`** — `src/TechieRag/TechieRag.csproj` (targets `net10.0;net8.0`)
 - **`TechieRag.Embedded`** — `src/TechieRag.Embedded/TechieRag.Embedded.csproj` (targets `net10.0`)
+- **`TechieRag.Telemetry`** — `src/TechieRag.Telemetry/TechieRag.Telemetry.csproj` (targets `net10.0;net8.0`; REQ-FN-065, added 2026-09-24)
+- **`TechieRag.Agents`** — `src/TechieRag.Agents/TechieRag.Agents.csproj` (REQ-FN-005, added 2026-09-24)
 
-`TechieRag.Embedded` depends on `TechieRag`, so they are pushed in the same run and always share a
-version number. Symbol packages (`.snupkg`) are pushed alongside to NuGet.org's symbol server.
+The three satellites depend on `TechieRag`, so all four are pushed in the same run and always share a
+version number (`publish-nuget.yml` checks every one in `Determine version` and `Confirm packed
+version`). Symbol packages (`.snupkg`) are pushed alongside to NuGet.org's symbol server. Adding a
+fifth package means adding its path to both workflows and its id to `PACKAGE_IDS`;
+`PublishingWorkflowTests` fails until both workflows pack every packable `src/` project.
 
 ### A note on the workflow file names
 
@@ -57,9 +67,10 @@ nuget.org is bound to the file name `publish-nuget.yml` (§2), and that name had
 public pipeline. The only consequence is cosmetic — pre-rename runs are listed in the Actions
 sidebar under the old file name.
 
-The old private workflow still contains a dormant `publish-nuget-org` job gated on a `NUGET_API_KEY`
-secret. **That secret does not exist and must never be created.** The job no-ops (it prints
-"skipping") and was left untouched by design. The real public path is `publish-nuget.yml` and OIDC.
+The old private workflow used to contain a dormant `publish-nuget-org` job gated on a `NUGET_API_KEY`
+secret. It was **removed on 2026-09-24** (REQ-FN-067 / BRD-160): a second path to the public feed,
+even a dormant one, was one created secret away from publishing on every tag push. **The
+`NUGET_API_KEY` secret must never be created.** The only public path is `publish-nuget.yml` and OIDC.
 
 ---
 
@@ -121,13 +132,13 @@ So: once the dry run looks right, do the real run reasonably promptly rather tha
 
 ## 3. Package metadata checklist
 
-Audited and enforced on both packable projects. Verified by unpacking a locally built `.nupkg`.
+Audited and enforced on all four packable projects. Verified by unpacking a locally built `.nupkg`.
 
 | Requirement | Property | Status |
 |---|---|---|
-| Package ID | `PackageId` | `TechieRag`, `TechieRag.Embedded` |
+| Package ID | `PackageId` | `TechieRag`, `TechieRag.Embedded`, `TechieRag.Telemetry`, `TechieRag.Agents` |
 | Author | `Authors` | `Techie Rathor` |
-| Description | `Description` | Present on both, consumer-facing |
+| Description | `Description` | Present on every package, consumer-facing |
 | License | `PackageLicenseExpression` | `MIT` (renders as a license link on nuget.org) |
 | Project URL | `PackageProjectUrl` | `https://github.com/techierathore/TechieRag` |
 | Repository URL | `RepositoryUrl` + `RepositoryType` | `…/TechieRag.git`, `git` |
@@ -176,7 +187,8 @@ Same ceremony as the owner's other libraries: **release first, publish second.**
 
 GitHub → **Releases** → *Draft a new release* → new tag `v1.0.7` on the merged `main` commit →
 *Publish release*. GitHub creates the tag; `publish-github-packages.yml` fires on it and puts `1.0.7`
-on the internal feed. Nothing reaches nuget.org yet.
+on the internal feed. Nothing reaches nuget.org yet — that workflow has no nuget.org job, so nothing
+reaches it until Step 2.
 
 ### Step 2 — dispatch the public workflow against that tag
 
@@ -203,20 +215,21 @@ touches nuget.org not at all, and is the last chance to see what would ship.
 1. **"Checkout <ref>"** — the requested ref. Check the resolved SHA is the commit you meant.
 2. **"Determine version"** — `determine-version.sh` prints where the version came from. On a tag:
    `TechieRag: latest on nuget.org = 1.0.6; 1.0.7 is new and greater.` (and the same line for
-   `TechieRag.Embedded`). This is the **increment check**: if the tag's version is already on
+   `TechieRag.Embedded`, `TechieRag.Telemetry` and `TechieRag.Agents`; a package never published yet
+   reports `<none>`). This is the **increment check**: if the tag's version is already on
    nuget.org, or is not greater than the latest published, the run fails **here**, before restore. On
    a dry run from a non-tag ref it reports the `-dryrun.<run>` version instead. On a real run from a
    non-tag ref it fails with *"A public release is cut from a v* tag…"* — dispatch the release tag instead.
 3. **Restore / Build / Test** — tests are a blocking gate. Red tests, no release. Every `dotnet`
    invocation carries `-p:Version=<tag version>`.
 4. **Pack** — `Successfully created package …/TechieRag.<version>.nupkg` (and `.snupkg`), likewise for
-   `TechieRag.Embedded`.
+   `TechieRag.Embedded`, `TechieRag.Telemetry` and `TechieRag.Agents`.
 5. **"Confirm packed version"** — verifies the `.nupkg` file names carry exactly the version
    `Determine version` decided on (a mismatch means a csproj property fought the `-p:Version`
    override, and the run stops), then prints the banner box:
    ```
    ==============================================
-     PUBLISHING TechieRag VERSION 1.0.7
+     PUBLISHING TechieRag, .Embedded, .Telemetry, .Agents VERSION 1.0.7
      from ref 'v1.0.7' (e2e7218)
      dry_run = false
    ==============================================
@@ -299,7 +312,7 @@ reject it again.
 
 **`Determine version` failed: "A public release is cut from a v* tag, and '<ref>' is not one".** A
 real (non-dry) dispatch run was started on a branch or SHA. Either push a `v*` tag on that commit and
-let the tag path publish it, or re-run the dispatch with `dry_run: true` if you only wanted to
+dispatch against that tag, or re-run the dispatch with `dry_run: true` if you only wanted to
 inspect the packages.
 
 **Login step fails / OIDC rejected.**

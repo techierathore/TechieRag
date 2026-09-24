@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    REQ-FN-056 / BRD-94: the four-platform probe. One screen, one button: embed three texts, store
+    them, search, show the top result and the embed, store and search timings. A second button
+    (local-model generation, BRD-106) joins it later in the same actions panel.
+
+    Heads: Android, iOS and Mac Catalyst everywhere; Windows only on a Windows host (MAUI cannot build
+    a Windows head elsewhere). iOS and Mac Catalyst link only on a Mac. Build one head at a time with
+    -f, as CI (.github/workflows/probe.yml) and the UsageGuide runbook do. Not part of TechieRag.slnx:
+    the library's own build and test must not need the MAUI workloads.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TechieRag.Probe</RootNamespace>
+    <UseMaui>true</UseMaui>
+    <SingleProject>true</SingleProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+
+    <ApplicationTitle>TechieRag Probe</ApplicationTitle>
+    <ApplicationId>com.techierathore.techierag.probe</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
+    <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+
+    <!-- The Windows head runs unpackaged: a plain folder with TechieRag.Probe.exe, no MSIX, no certificate. -->
+    <WindowsPackageType Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">None</WindowsPackageType>
+
+    <!-- Android: the two ABIs the probe is proven on (phones: arm64-v8a; emulators: x86_64). -->
+    <RuntimeIdentifiers Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">android-arm64;android-x64</RuntimeIdentifiers>
+    <!-- A Debug APK that carries its assemblies, so `adb install` alone runs it (no fast-deployment host). -->
+    <EmbedAssembliesIntoApk Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">true</EmbedAssembliesIntoApk>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TechieRag\TechieRag.csproj" />
+    <ProjectReference Include="..\..\src\TechieRag.Embedded\TechieRag.Embedded.csproj" />
+    <!-- REQ-FN-059: the second button runs the local model. -->
+    <ProjectReference Include="..\..\src\TechieRag.Local\TechieRag.Local.csproj" />
+  </ItemGroup>
+
+  <!--
+    REQ-FN-055: the ONLY native wiring line, and it is not wiring: a NuGet consumer gets
+    TechieRag.Embedded.targets automatically from the package's buildTransitive folder. A
+    ProjectReference carries no NuGet build assets, so the probe imports the same file by path.
+  -->
+  <Import Project="..\..\src\TechieRag.Embedded\buildTransitive\TechieRag.Embedded.targets" />
+
+</Project>

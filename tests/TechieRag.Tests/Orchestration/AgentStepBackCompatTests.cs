@@ -150,7 +150,8 @@ public sealed class AgentStepBackCompatTests
             AgentStepKind.HandoffPerformed,
             AgentStepKind.GuardrailBlocked,
             AgentStepKind.StepBudgetExhausted,
-            AgentStepKind.FlowCompleted
+            AgentStepKind.FlowCompleted,
+            AgentStepKind.FlowTimedOut
         ];
 
         Assert.Empty(original.Intersect(added));

@@ -65,11 +65,15 @@ public class MarkdownChunker : IChunker
         var fence = new StringBuilder();
         var inFence = false;
 
+        // True once the current heading has been emitted with a code fence, so a section that holds
+        // only a fence does not also produce a second, heading-only chunk after it.
+        var headingEmitted = false;
+
         void FlushSection()
         {
             var bodyText = body.ToString().Trim();
             body.Clear();
-            if (bodyText.Length == 0 && heading.Length == 0) return;
+            if (bodyText.Length == 0 && (heading.Length == 0 || headingEmitted)) return;
             var full = heading.Length > 0
                 ? (bodyText.Length > 0 ? $"{heading}\n{bodyText}" : heading)
                 : bodyText;
@@ -94,6 +98,7 @@ public class MarkdownChunker : IChunker
                     fence.Append(line);
                     blocks.Add(new MarkdownBlock(fence.ToString().Trim(), heading, fence.ToString().Trim(), true));
                     inFence = false;
+                    headingEmitted = true;
                 }
                 continue;
             }
@@ -108,6 +113,7 @@ public class MarkdownChunker : IChunker
             {
                 FlushSection();
                 heading = trimmed;
+                headingEmitted = false;
                 continue;
             }
 
@@ -118,6 +124,7 @@ public class MarkdownChunker : IChunker
         {
             // Unterminated fence: emit what we have as a code block
             blocks.Add(new MarkdownBlock(fence.ToString().Trim(), heading, fence.ToString().Trim(), true));
+            headingEmitted = true;
         }
 
         FlushSection();

@@ -390,6 +390,45 @@ public class TechieRagBuilder
     }
 
     /// <summary>
+    /// Uses the signed-in user's ChatGPT subscription as the LLM, through OpenAI's device-code sign-in
+    /// instead of an API key (REQ-RAG-069 / BRD-112).
+    /// </summary>
+    /// <param name="signInCallback">Called with the sign-in page and one-time code when the user must
+    /// sign in. The host opens the page in a browser (or shows it with the code) and returns; the library
+    /// waits for the authorisation. Called on the first model call, or on
+    /// <see cref="ChatGptSubscriptionLlmProvider.SignInAsync"/>, and again only if the session is refused.</param>
+    /// <param name="options">Model, session store and endpoints; null uses the defaults (model
+    /// <c>gpt-6-luna</c>, in-memory session).</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="signInCallback"/> is null.</exception>
+    /// <remarks>
+    /// <para>Persist the session across restarts by setting <see cref="ChatGptSubscriptionOptions.SessionStore"/>
+    /// to an <see cref="ISubscriptionSessionStore"/> over the platform's secure store.</para>
+    /// <para>OpenAI's terms for this, as checked, are in <see cref="LlmConnectorCatalog"/> under
+    /// <c>chatgpt-subscription</c>; show them before sign-in. Vendors whose terms do not permit subscription
+    /// sign-in have no method.</para>
+    /// </remarks>
+    public TechieRagBuilder UseChatGptSubscriptionLlm(
+        Func<Models.SubscriptionSignInPrompt, CancellationToken, Task> signInCallback,
+        ChatGptSubscriptionOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(signInCallback);
+
+        var providerOptions = options ?? new ChatGptSubscriptionOptions();
+        config.Llm = new LlmConfig
+        {
+            Source = LlmSource.Subscription,
+            Model = providerOptions.Model,
+            Connector = SubscriptionConnectorRows.ChatGptName
+        };
+        customLlmProviderFactory = () => new ChatGptSubscriptionLlmProvider(
+            signInCallback,
+            providerOptions,
+            config.LoggerFactory?.CreateLogger<ChatGptSubscriptionLlmProvider>());
+        return this;
+    }
+
+    /// <summary>
     /// Configures a fallback LLM provider that activates when the primary provider fails.
     /// </summary>
     public TechieRagBuilder WithFallbackLlm(Action<LlmConfig> configure)
@@ -603,8 +642,11 @@ public class TechieRagBuilder
 
     public ITechieRag Build()
     {
-        var vectorStore = CreateVectorStore();
+        // The embedder is built first so the store's vector width is the one the embedder actually
+        // produces (REQ-RAG-106 / BRD-158); a 1536- or 3072-dimension model against a store fixed at
+        // 1024 fails on the first upsert.
         var embeddingProvider = CreateEmbeddingProvider();
+        var vectorStore = CreateVectorStore(embeddingProvider);
         var processors = CreateProcessors();
         var logger = config.LoggerFactory?.CreateLogger<TechieRagClient>()
             ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<TechieRagClient>.Instance;
@@ -657,7 +699,8 @@ public class TechieRagBuilder
             : null;
 
         // Create prompt template
-        IPromptTemplate promptTemplate = customPromptTemplateFactory?.Invoke() ?? new PromptTemplateEngine(config.Prompt);
+        IPromptTemplate promptTemplate = customPromptTemplateFactory?.Invoke()
+            ?? new PromptTemplateEngine(config.Prompt, config.LoggerFactory?.CreateLogger<PromptTemplateEngine>());
 
         // Create reranker (if configured)
         var reranker = CreateReranker();
@@ -807,6 +850,9 @@ public class TechieRagBuilder
 
         return llmConfig.Source switch
         {
+            // REQ-RAG-064: the in-process model of TechieRag.Local; no endpoint, no key.
+            LlmSource.Local => LocalLlmProviderRegistry.Create(llmConfig.Model, config.LoggerFactory),
+
             LlmSource.Ollama => new OllamaLlmProvider(
                 llmConfig.Endpoint ?? "http://localhost:11434",
                 llmConfig.Model,
@@ -847,22 +893,38 @@ public class TechieRagBuilder
         };
     }
 
-    private Abstractions.IVectorStore CreateVectorStore()
+    /// <summary>
+    /// Creates the configured vector store sized to the embedding provider's vector width
+    /// (REQ-RAG-106 / BRD-158).
+    /// </summary>
+    /// <param name="embeddingProvider">The provider whose vectors the store will hold.</param>
+    /// <returns>The vector store.</returns>
+    /// <remarks>
+    /// A provider reporting zero or fewer dimensions has not said what it produces, so the store
+    /// keeps its 1024 default rather than being created with an unusable width.
+    /// </remarks>
+    internal Abstractions.IVectorStore CreateVectorStore(Abstractions.IEmbeddingProvider embeddingProvider)
     {
+        ArgumentNullException.ThrowIfNull(embeddingProvider);
+        var dimensions = embeddingProvider.Dimensions > 0 ? embeddingProvider.Dimensions : DefaultVectorDimensions;
+
         return config.VectorStore.Type switch
         {
-            VectorStoreType.SqliteVec => new VectorStores.SqliteVecStore(config.VectorStore.ConnectionString),
-            VectorStoreType.PgVector => CreatePgVectorStore(),
-            VectorStoreType.Qdrant => new VectorStores.QdrantStore(config.VectorStore.ConnectionString, apiKey: config.VectorStore.ApiKey),
+            VectorStoreType.SqliteVec => new VectorStores.SqliteVecStore(config.VectorStore.ConnectionString, dimensions),
+            VectorStoreType.PgVector => CreatePgVectorStore(dimensions),
+            VectorStoreType.Qdrant => new VectorStores.QdrantStore(config.VectorStore.ConnectionString, dimensions, apiKey: config.VectorStore.ApiKey),
             _ => throw new InvalidOperationException($"Unsupported vector store type: {config.VectorStore.Type}")
         };
     }
 
-    private VectorStores.PgVectorStore CreatePgVectorStore()
+    /// <summary>The vector width a store falls back to when the embedder reports none (BGE-M3).</summary>
+    private const int DefaultVectorDimensions = 1024;
+
+    private VectorStores.PgVectorStore CreatePgVectorStore(int dimensions)
     {
         var pgLogger = config.LoggerFactory?.CreateLogger<VectorStores.PgVectorStore>()
             ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<VectorStores.PgVectorStore>.Instance;
-        return new VectorStores.PgVectorStore(config.VectorStore.ConnectionString, pgLogger);
+        return new VectorStores.PgVectorStore(config.VectorStore.ConnectionString, pgLogger, dimensions);
     }
 
     private Abstractions.IEmbeddingProvider CreateEmbeddingProvider()

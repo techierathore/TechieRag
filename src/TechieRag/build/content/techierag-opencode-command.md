@@ -190,7 +190,7 @@ TechieRag packages are published on **nuget.org**, the default feed every .NET S
 
 ```bash
 dotnet add package TechieRag
-# Optional: offline embeddings
+# Optional: embedded embeddings (downloads once, then works offline)
 dotnet add package TechieRag.Embedded
 ```
 

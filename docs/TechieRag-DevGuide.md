@@ -41,7 +41,7 @@ flowchart LR
 | Storage | `src/TechieRag/VectorStores/`, `Persistence/` | `SqliteVecStore`, `PgVectorStore`, `QdrantStore`; conversation and workspace stores |
 | Services | `src/TechieRag/Services/` | Retry, fallback, token tracking, tools, agent loop, prompt engine, workspaces, memory |
 | Agents | `src/TechieRag/Orchestration/`, `Mcp/` | `FlowRunner`, guardrails, `AgentToolHandler`; MCP client, transports, trust policy |
-| Sources | `src/TechieRag/Connectors/`, `Web/` | Confluence, repository, email connectors; page, site and YouTube ingestion |
+| Sources | `src/TechieRag/Connectors/`, `Web/` | Confluence, repository, email connectors; page and site ingestion |
 | Diagnostics | `src/TechieRag/Diagnostics/`, `src/TechieRag.Telemetry/` | BCL `ActivitySource`/`Meter`; opt-in OTLP and console exporters |
 | Local models | `src/TechieRag.Embedded/` | BGE-M3 ONNX embeddings, cross-encoder reranker, model download, native resolver |
 
@@ -76,7 +76,7 @@ Static-only (unconfirmed): the sample's Ingestion screen let a user pick files o
 
 ![Text ingestion](screenshots/TechieRag/text-ingestion.png)
 
-Static-only (unconfirmed): the sample's Text Ingestion screen took pasted text plus a document name and called `ITechieRag.IngestTextAsync` (`src/TechieRag/ITechieRag.cs:38`). The same method is the sink for every non-file source: web pages (`src/TechieRag/Web/WebIngestionExtensions.cs:165`), YouTube transcripts (`:102`), connector items (`src/TechieRag/Connectors/ConnectorIngestionExtensions.cs:57`) and workspace text (`src/TechieRag/Services/WorkspaceManager.cs:170`).
+Static-only (unconfirmed): the sample's Text Ingestion screen took pasted text plus a document name and called `ITechieRag.IngestTextAsync` (`src/TechieRag/ITechieRag.cs:38`). The same method is the sink for every non-file source: web pages (`src/TechieRag/Web/WebIngestionExtensions.cs:165`), connector items (`src/TechieRag/Connectors/ConnectorIngestionExtensions.cs:57`) and workspace text (`src/TechieRag/Services/WorkspaceManager.cs:170`).
 
 **Call chain:** `TechieRagClient.IngestTextAsync` (`src/TechieRag/TechieRagClient.cs:226`) → `TextChunker.ChunkText` (`src/TechieRag/Processors/TextChunker.cs:34`) → `IChunker.Chunk` (`src/TechieRag/Processors/Chunking/RecursiveChunker.cs:22` for the default) → `TechieRagClient.EmbedAndStampAsync` (`:845`) → `IEmbeddingProvider.EmbedBatchAsync` → `IVectorStore.UpsertBatchAsync` (`SqliteVecStore.cs:206`) → `TechieRagTelemetry.RecordIngestion(count, "text")` (`:303`).
 
@@ -309,7 +309,7 @@ Break at `ConnectorRunner.cs:150` and watch `item.Id` and `item.Version`; a vers
 
 ### Web ingestion
 
-`IngestUrlAsync` (`src/TechieRag/Web/WebIngestionExtensions.cs:24`) fetches one page through `IWebContentFetcher.FetchAsync` (`:34`; `HttpWebContentFetcher.FetchAsync` at `src/TechieRag/Web/HttpWebContentFetcher.cs:40`, capped at `MaxContentBytes` 8 MB, `:19`) and calls `IngestPageAsync` (`:153`), which writes `SourceUrl` and `SourcePath` both as the final URL (`:172-177`). `IngestSiteAsync` (`:45`) runs `SiteCrawler.CrawlAsync` (`src/TechieRag/Web/SiteCrawler.cs:43`), which refuses non-http seeds (`:51`) and private-network hosts (`:57`), bounds pages (`:71`) and depth (`:103`) and delays between requests (`:78`). `IngestYouTubeAsync` (`:88`) reads captions via `YouTubeTranscriptReader.ReadAsync` (`src/TechieRag/Web/YouTubeTranscriptReader.cs:46`). `HttpWebContentFetcher.CreateGuardedHandler` (`:291`) blocks private addresses at connect time (`:310`). Break at `WebIngestionExtensions.cs:158` and watch `page.Text`.
+`IngestUrlAsync` (`src/TechieRag/Web/WebIngestionExtensions.cs:24`) fetches one page through `IWebContentFetcher.FetchAsync` (`:34`; `HttpWebContentFetcher.FetchAsync` at `src/TechieRag/Web/HttpWebContentFetcher.cs:40`, capped at `MaxContentBytes` 8 MB, `:19`) and calls `IngestPageAsync` (`:118`), which writes `SourceUrl` and `SourcePath` both as the final URL (`:137-142`). `IngestSiteAsync` (`:45`) runs `SiteCrawler.CrawlAsync` (`src/TechieRag/Web/SiteCrawler.cs:43`), which refuses non-http seeds (`:51`) and private-network hosts (`:57`), bounds pages (`:71`) and depth (`:103`) and delays between requests (`:78`). `HttpWebContentFetcher.CreateGuardedHandler` (`:291`) blocks private addresses at connect time (`:310`). Break at `WebIngestionExtensions.cs:123` and watch `page.Text`.
 
 ### Workspaces and persistent memory
 

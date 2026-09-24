@@ -21,7 +21,14 @@ public enum FlowRunOutcome
     Failed,
 
     /// <summary>The caller cancelled the run.</summary>
-    Cancelled
+    Cancelled,
+
+    /// <summary>
+    /// The run did not finish within <see cref="FlowRuntime.TimeLimit"/> and was stopped
+    /// (REQ-RAG-088 / BRD-135); <see cref="FlowRunResult.FailureMessage"/> carries
+    /// <see cref="FlowMessageCodes.FlowTimedOut"/>.
+    /// </summary>
+    TimedOut
 }
 
 /// <summary>
@@ -89,7 +96,7 @@ public sealed class FlowRunResult
     /// </remarks>
     public FlowMessage? BlockMessage { get; init; }
 
-    /// <summary>Gets why the run failed, for <see cref="FlowRunOutcome.Failed"/>.</summary>
+    /// <summary>Gets why the run failed, for <see cref="FlowRunOutcome.Failed"/> and <see cref="FlowRunOutcome.TimedOut"/>.</summary>
     public string? FailureReason { get; init; }
 
     /// <summary>

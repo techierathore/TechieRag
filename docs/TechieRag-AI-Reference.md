@@ -29,7 +29,7 @@ Packages are published on **nuget.org** — the default feed every .NET SDK alre
 
 ```bash
 dotnet add package TechieRag
-# Optional: for embedded/offline embeddings (no Ollama/API needed)
+# Optional: embedded embeddings (no Ollama/API needed; the model downloads once, then works offline)
 dotnet add package TechieRag.Embedded
 ```
 

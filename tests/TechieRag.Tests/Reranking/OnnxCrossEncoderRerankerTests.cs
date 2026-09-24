@@ -71,7 +71,8 @@ public sealed class OnnxCrossEncoderRerankerTests
     }
 
     /// <summary>
-    /// The model directory is a stable, absolute location under the executing assembly.
+    /// The model directory is a stable, absolute location under the model root
+    /// (<c>&lt;LocalApplicationData&gt;/TechieRag/models</c> by default, REQ-RAG-053).
     /// </summary>
     /// <remarks>
     /// Asserted because this path is the contract between the download step and every consumer that
@@ -109,8 +110,10 @@ public sealed class OnnxCrossEncoderRerankerTests
             return;
         }
 
-        var modelPath = Path.Combine(directory, "model.onnx");
-        var isPlausible = File.Exists(modelPath) && new FileInfo(modelPath).Length > 1_000_000_000;
+        // The weights are in the external-data sidecar; model.onnx is a 656 KB stub.
+        var dataPath = Path.Combine(directory, "model.onnx_data");
+        var isPlausible = File.Exists(Path.Combine(directory, "model.onnx"))
+            && File.Exists(dataPath) && new FileInfo(dataPath).Length > 2_000_000_000;
         Assert.Equal(isPlausible && File.Exists(Path.Combine(directory, "sentencepiece.bpe.model")),
             OnnxCrossEncoderReranker.IsModelDownloaded());
     }

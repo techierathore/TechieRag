@@ -20,11 +20,41 @@ public class ModelRouterTests
     }
 
     /// <summary>A GPT model name routes to OpenAI.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-099 GptModelRoutesToOpenAi")]
     public void GptModelRoutesToOpenAi()
     {
         Assert.Equal("openai", ModelRouter.Require("gpt-4o-mini").Connector.Name);
     }
+
+    /// <summary>
+    /// REQ-RAG-099 / BRD-146: <c>UseLlmForModel("gpt-4o")</c> alone — no provider, endpoint or connector
+    /// named — builds an instance whose LLM is the OpenAI-compatible provider for gpt-4o, pointed at
+    /// the OpenAI connector's endpoint.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-099 BuilderResolvesOpenAiFromTheModelNameAlone")]
+    public void BuilderResolvesOpenAiFromTheModelNameAlone()
+    {
+        var rag = new TechieRagBuilder()
+            .UseCustomEmbeddingProvider(() => new TestDoubles.FakeEmbeddingProvider())
+            .UseSqliteVec(Path.Combine(Path.GetTempPath(), $"trroute-{Guid.NewGuid():N}.db"))
+            .UseLlmForModel("gpt-4o", "test-key")
+            .Build();
+
+        var llm = rag.GetLlmProvider();
+
+        Assert.NotNull(llm);
+        Assert.Equal("gpt-4o", llm!.ModelName);
+        var provider = Assert.IsType<OpenAICompatibleLlmProvider>(FieldOfType<TechieRag.Abstractions.ILlmProvider>(llm));
+        var http = FieldOfType<HttpClient>(provider);
+        Assert.Equal("api.openai.com", http.BaseAddress!.Host);
+    }
+
+    private static T FieldOfType<T>(object owner) where T : class =>
+        owner.GetType()
+            .GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .Select(field => field.GetValue(owner))
+            .OfType<T>()
+            .First();
 
     /// <summary>A Gemini model name routes to Google's native provider.</summary>
     [Fact]

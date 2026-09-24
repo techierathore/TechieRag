@@ -21,7 +21,7 @@ public class VisionRequestTests
         ChatMessage.UserWithImages("What is this?", ChatImage.FromBase64(ImageBase64, "image/png"));
 
     /// <summary>Anthropic takes a native image content block carrying the base64 source.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-101 AnthropicSendsBase64ImageBlock")]
     public async Task AnthropicSendsBase64ImageBlock()
     {
         var handler = new CapturingHandler(AnthropicResponseJson);
@@ -80,7 +80,7 @@ public class VisionRequestTests
     }
 
     /// <summary>The OpenAI dialect wraps inline bytes in a data URI under image_url.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-101 OpenAiCompatibleSendsImageUrlPart")]
     public async Task OpenAiCompatibleSendsImageUrlPart()
     {
         var handler = new CapturingHandler(OpenAiResponseJson);
@@ -117,7 +117,7 @@ public class VisionRequestTests
     }
 
     /// <summary>Gemini takes inline bytes as an inlineData part with a mimeType.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-101 GeminiSendsInlineDataPart")]
     public async Task GeminiSendsInlineDataPart()
     {
         var handler = new CapturingHandler(GeminiResponseJson);

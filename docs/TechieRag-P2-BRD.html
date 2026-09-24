@@ -145,7 +145,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-163.</p>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-165. BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
 <h2 id="screens-and-flow">2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -158,7 +158,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Local model</td><td><code>TechieRag.Local</code>: <code>UseLocalLlm()</code></td><td>App developer</td><td>— (library, no mockup)</td><td>model id, folder, memory gate, terms, download</td></tr>
 <tr><td>Typed streaming</td><td><code>ILlmProvider</code> typed streaming method, <code>AgentLoopRunner</code> streaming run</td><td>Developer</td><td>— (library, no mockup)</td><td>LlmTextDelta, LlmToolCallEvent, LlmStreamCompleted</td></tr>
 <tr><td>Subscription sign-in</td><td><code>UseChatGptSubscriptionLlm(callback)</code>, <code>LlmConnectorCatalog</code></td><td>App developer</td><td>— (library, no mockup)</td><td>URL, user code, session store, VendorTerms</td></tr>
-<tr><td>Ingestion breadth</td><td><code>IChunker</code>, <code>Processors/</code>, <code>Web/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>chunking strategy, XLSX/PPTX/CSV/audio, URL, crawl, YouTube</td></tr>
+<tr><td>Ingestion breadth</td><td><code>IChunker</code>, <code>Processors/</code>, <code>Web/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>chunking strategy, XLSX/PPTX/CSV/audio, URL, crawl</td></tr>
 <tr><td>Data connectors</td><td><code>IDataConnector</code>, <code>ConnectorRunner</code>, <code>Connectors/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>repository, Confluence, email, sync state, transport guards</td></tr>
 <tr><td>MCP tools</td><td><code>McpClient</code>, <code>McpToolHandler</code>, <code>IMcpServerRegistry</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>stdio, HTTP, trust policy</td></tr>
 <tr><td>Flow orchestration</td><td><code>FlowRunner</code>, <code>FlowRuntime</code>, <code>IFlowGuardrail</code>, <code>AgentToolHandler</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>nodes, conditions, MaxSteps, guardrails, FlowMessage</td></tr>
@@ -316,6 +316,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-95</strong> — CI shall build the probe for all four heads on every push (macOS runner for Catalyst and iOS) and run the probe's button on an Android emulator where CI allows; a head that cannot be built in CI is reported as such, never skipped silently <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
 <ul>
 <li><em>Acceptance:</em> When a developer opens the workflow run on the CI run page after a push, then all four probe heads show built, failed or not run.
+</li>
+</ul>
+</li>
+<li><strong>BRD-165</strong> — The UsageGuide's Platform notes shall carry the owner's step-by-step runbook for the probe app: how to build and deploy it to a Mac, an Android phone and an iPhone from this repository, how to press its two buttons, and how to record the results in the support matrix (BRD-88) and the runtime comparison table of plan 08 step 2 <em>(added 2026-09-24, owner request)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When the owner opens the Platform notes on the UsageGuide, then numbered build, deploy, run and record steps for the probe exist per device.
 </li>
 </ul>
 </li>
@@ -479,15 +485,21 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
-<li><strong>BRD-120</strong> — A developer can ingest a YouTube video's transcript by URL (<code>YouTubeTranscriptReader</code>); blocked today because YouTube's timed-text endpoint returns empty bodies, an owner decision on the approach is pending <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-62, library part; TechieDesk checklist REQ-RAG-018 Blocked 40%)</em> <em>Screen:</em> Ingestion breadth
+<li><s><strong>BRD-120</strong></s> — <s>A developer can ingest a YouTube video's transcript by URL (<code>YouTubeTranscriptReader</code>)</s> <em>(removed 2026-09-24: owner decision. The owner never asked for YouTube ingestion in the library; it arrived through the competitor gap list (GAP-LIB-05) and was built in August 2026 while the application shared this repository. It had also stopped working: YouTube's timed-text endpoint returns empty bodies. If a consumer wants it, it is an application feature. Code removal is BRD-164; miss logged 2026-09-24.)</em> <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-62, library part; TechieDesk checklist REQ-RAG-018 Blocked 40%)</em> <em>Screen:</em> Ingestion breadth
 <ul>
-<li><em>Acceptance:</em> When a developer ingests a YouTube URL, then the transcript is chunked and embedded, or a clear coded error explains why not.
+<li><em>Acceptance:</em> When a developer looks for YouTube ingestion on the web ingestion API, then no such member exists and the documents say it was removed.
 </li>
 </ul>
 </li>
 <li><strong>BRD-121</strong> — Every outbound web fetch shall pass a connect-time SSRF guard (<code>HttpWebContentFetcher.CreateGuardedHandler</code>) that refuses private, loopback and link-local targets after redirects and DNS rebinding <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-112, library part; TechieDesk checklist REQ-RAG-031 remarks)</em> <em>Screen:</em> Ingestion breadth
 <ul>
 <li><em>Acceptance:</em> When a fetch redirects to a private or loopback address, then the guarded handler refuses the connection and the error names the guard.
+</li>
+</ul>
+</li>
+<li><strong>BRD-164</strong> — <code>YouTubeTranscriptReader</code>, <code>YouTubeUrl</code>, the YouTube entry point in <code>WebIngestionExtensions</code> and their tests (including <code>Web/Live/LiveYouTubeTranscriptTests.cs</code>) shall be removed from the library, and every document and the AI reference stop naming YouTube ingestion <em>(added 2026-09-24, owner decision; the removal side of BRD-120)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer searches <code>src/</code> and <code>docs/</code> for YouTube after the build, then no type, entry point, test or sentence about YouTube ingestion remains.
 </li>
 </ul>
 </li>
@@ -734,19 +746,19 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>Surface: Agents package</td><td>3</td><td>0</td><td>3</td><td>Planned</td></tr>
-<tr><td>Surface: Packaging and quality follow-ups</td><td>9</td><td>2</td><td>7</td><td>Partial</td></tr>
-<tr><td>Surface: Repository separation</td><td>1</td><td>0</td><td>1</td><td>In progress</td></tr>
-<tr><td>Surface: Flow orchestration</td><td>6</td><td>0</td><td>6</td><td>In progress</td></tr>
-<tr><td>Surface: Provider breadth</td><td>10</td><td>9</td><td>1</td><td>Partial</td></tr>
-<tr><td>Surface: Platform groundwork</td><td>8</td><td>0</td><td>8</td><td>Planned</td></tr>
-<tr><td>Surface: Local model</td><td>14</td><td>0</td><td>14</td><td>Planned</td></tr>
-<tr><td>Surface: Typed streaming</td><td>2</td><td>0</td><td>2</td><td>Planned</td></tr>
-<tr><td>Surface: Subscription sign-in</td><td>3</td><td>0</td><td>3</td><td>Planned</td></tr>
-<tr><td>Surface: Ingestion breadth</td><td>7</td><td>5</td><td>2</td><td>Partial</td></tr>
-<tr><td>Surface: Data connectors</td><td>6</td><td>4</td><td>2</td><td>Partial</td></tr>
-<tr><td>Surface: MCP tools</td><td>2</td><td>1</td><td>1</td><td>Partial</td></tr>
-<tr><td>Surface: Workspaces and memory</td><td>8</td><td>6</td><td>2</td><td>Partial</td></tr>
+<tr><td>Surface: Agents package</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Packaging and quality follow-ups</td><td>9</td><td>8</td><td>1</td><td>Partial</td></tr>
+<tr><td>Surface: Repository separation</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Flow orchestration</td><td>6</td><td>6</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Provider breadth</td><td>10</td><td>10</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Platform groundwork</td><td>9</td><td>5</td><td>4</td><td>Partial</td></tr>
+<tr><td>Surface: Local model</td><td>14</td><td>7</td><td>7</td><td>Partial</td></tr>
+<tr><td>Surface: Typed streaming</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Subscription sign-in</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Ingestion breadth</td><td>7</td><td>7</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Data connectors</td><td>6</td><td>6</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: MCP tools</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Workspaces and memory</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Reranking</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
@@ -756,6 +768,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tbody>
 <tr><td>Scope, users and roles, the context diagram</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
 <tr><td>Non-functional requirements for the whole library</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
+<tr><td>The platform support matrix (BRD-88), package × platform</td><td><a href="TechieRag-BRD.md#platform-support-matrix-brd-88-req-fn-054">phase 1 BRD §9</a>, mirrored in the UsageGuide's Platform notes</td></tr>
 <tr><td>Constraints, assumptions and risks</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
 <tr><td>Every phase, its surfaces and its BRD range</td><td><a href="TechieRag-Phases.md">TechieRag-Phases.md</a></td></tr>
 <tr><td>This phase's work list</td><td><a href="TechieRag-P2-Checklist.md">TechieRag-P2-Checklist.md</a></td></tr>

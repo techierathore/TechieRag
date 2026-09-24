@@ -49,10 +49,14 @@ env:
   NUGET_ORG_SOURCE: https://api.nuget.org/v3/index.json
   CORE_PROJECT: src/TechieRag/TechieRag.csproj
   EMBEDDED_PROJECT: src/TechieRag.Embedded/TechieRag.Embedded.csproj
+  TELEMETRY_PROJECT: src/TechieRag.Telemetry/TechieRag.Telemetry.csproj
+  AGENTS_PROJECT: src/TechieRag.Agents/TechieRag.Agents.csproj
+  LOCAL_PROJECT: src/TechieRag.Local/TechieRag.Local.csproj
   TEST_PROJECT: tests/TechieRag.Tests/TechieRag.Tests.csproj
   # Package IDs whose published versions gate the increment check (lower-case, as the flat
-  # container API keys them). Both ship together at the same version.
-  PACKAGE_IDS: techierag techierag.embedded
+  # container API keys them). All five ship together at the same version (REQ-FN-005, REQ-FN-065);
+  # a package never published yet (404) simply has no latest version to beat.
+  PACKAGE_IDS: techierag techierag.embedded techierag.telemetry techierag.agents techierag.local
 
 jobs:
   publish:
@@ -91,6 +95,9 @@ jobs:
         run: |
           dotnet restore "$CORE_PROJECT"
           dotnet restore "$EMBEDDED_PROJECT"
+          dotnet restore "$TELEMETRY_PROJECT"
+          dotnet restore "$AGENTS_PROJECT"
+          dotnet restore "$LOCAL_PROJECT"
           dotnet restore "$TEST_PROJECT"
 
       - name: Build
@@ -100,6 +107,9 @@ jobs:
         run: |
           dotnet build "$CORE_PROJECT"     --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
           dotnet build "$EMBEDDED_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$TELEMETRY_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$AGENTS_PROJECT"   --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$LOCAL_PROJECT"    --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
 
       - name: Test
         # Blocking gate: no green tests, no public release.
@@ -112,6 +122,9 @@ jobs:
         run: |
           dotnet pack "$CORE_PROJECT"     --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
           dotnet pack "$EMBEDDED_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
+          dotnet pack "$TELEMETRY_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
+          dotnet pack "$AGENTS_PROJECT"   --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
+          dotnet pack "$LOCAL_PROJECT"    --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
 
       - name: Confirm packed version
         id: pkg
@@ -121,7 +134,7 @@ jobs:
           EXPECTED: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          for id in TechieRag TechieRag.Embedded; do
+          for id in TechieRag TechieRag.Embedded TechieRag.Telemetry TechieRag.Agents TechieRag.Local; do
             pkg="./artifacts/${id}.${EXPECTED}.nupkg"
             if [ ! -f "$pkg" ]; then
               echo "::error::Expected $pkg but the pack step produced:"; ls -1 ./artifacts/; exit 1
@@ -130,7 +143,7 @@ jobs:
           echo "version=$EXPECTED" >> "$GITHUB_OUTPUT"
 
           echo "=============================================="
-          echo "  PUBLISHING TechieRag + TechieRag.Embedded VERSION $EXPECTED"
+          echo "  PUBLISHING TechieRag, .Embedded, .Telemetry, .Agents, .Local VERSION $EXPECTED"
           echo "  from ${{ inputs.ref }} ($(git rev-parse --short HEAD))"
           echo "  dry_run = ${{ inputs.dry_run }}"
           echo "=============================================="

@@ -59,6 +59,9 @@ public class QdrantStore : IVectorStore
     /// <inheritdoc/>
     public string Name => StoreName;
 
+    /// <summary>Gets the vector width this store was created for (REQ-RAG-106 / BRD-158).</summary>
+    public int Dimensions => dimensions;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="QdrantStore"/> class.
     /// </summary>

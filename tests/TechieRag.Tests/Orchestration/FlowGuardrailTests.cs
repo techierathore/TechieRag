@@ -112,7 +112,7 @@ public sealed class FlowGuardrailTests
     /// The seam that matters: a HOST guardrail applies to a node that names none, and cannot be
     /// removed by editing the flow. This is how <c>EgressGate</c> stays unavoidable.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-086 AHostGuardrailAppliesToANodeThatNamesNoGuardrails")]
     public async Task AHostGuardrailAppliesToANodeThatNamesNoGuardrails()
     {
         var provider = new ScriptedLlmProvider("agent", ScriptedLlmProvider.Says("should never be reached"));
@@ -136,7 +136,7 @@ public sealed class FlowGuardrailTests
     /// and the AGENT still finishes its turn — the same "unavailable, carry on" contract the app's
     /// gate already keeps.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-086 AHostToolCallGuardrailStopsTheCallAndLetsTheAgentCarryOn")]
     public async Task AHostToolCallGuardrailStopsTheCallAndLetsTheAgentCarryOn()
     {
         var provider = new ScriptedLlmProvider(
@@ -220,7 +220,7 @@ public sealed class FlowGuardrailTests
     }
 
     /// <summary>Host guardrails run before the flow's own, so a flow check cannot pre-empt a host one.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-086 HostGuardrailsAreEvaluatedBeforeTheFlowsOwn")]
     public async Task HostGuardrailsAreEvaluatedBeforeTheFlowsOwn()
     {
         var provider = new ScriptedLlmProvider("agent", ScriptedLlmProvider.Says("unreachable"));
