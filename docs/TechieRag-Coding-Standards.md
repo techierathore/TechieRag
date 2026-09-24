@@ -1,162 +1,63 @@
-# TechieRag Coding Standards
+# TechieRag — Coding Standards
 
-**Last Updated:** 2026-06-25
-**Status:** Authoritative for all code under `src/` and `tests/`. Conformance enforced via repo-root `.editorconfig` + verifier grep checks in §"Enforcement".
-
-> **Per-project naming decision (recorded).** The TechieRag codebase (~96% complete, shipped) uses **standard Microsoft conventions — bare `camelCase`, no prefix, no underscores** for instance fields, parameters, and locals (≥95% dominance, e.g. `private readonly ILlmProvider llmProvider;`). This project therefore adopts the **no-prefix** convention and does **NOT** use the TechieFlow default `obj`/`a`/`v` prefixes. New code follows the established camelCase convention so the codebase stays internally consistent. The one hard rule shared with TechieFlow is **no underscores anywhere**.
-
-## Database Naming Conventions
-
-> TechieRag is a library with no application-owned relational schema, but its SQL-backed vector stores (SQLite-vec, pgvector) and any consumer schema should follow these.
-
-### Tables and Columns
-- PascalCase: `CustomerOrder` NOT `customer_order`
-- Singular: `CustomerOrder` NOT `CustomerOrders`
-- **NEVER use underscores** in any DB object name
-- FK columns: `{TableName}Id` (e.g., `CustomerId`)
-- PK: `{TableName}Id` (e.g., `UserId`)
-
-### Stored Procedures & Functions
-- PascalCase verb prefix: `GetCustomerOrders`, `InsertOrder`, `CalculateTotal`
-- Action prefixes: Get / Insert / Update / Delete / Calculate
-
-### Indexes & Constraints
-- Index: `IX{Table}{Column}` · PK: `Pk{Table}` · FK: `Fk{Table}{Ref}` · Unique: `Uc{Table}{Column}`
-
-## C# Conventions
-
-### Classes & Interfaces
-- PascalCase for classes; `I` prefix for interfaces; descriptive names.
-- Async methods end with `Async`.
-
-### Fields, Parameters, Locals
-
-**NEVER use underscores** anywhere in any identifier.
-
-| Kind | Convention | Example |
-|------|-----------|---------|
-| **Instance fields** | `camelCase`, no prefix (no underscores) | `private readonly ILogger<X> logger;`<br>`private readonly HttpClient httpClient;`<br>`private bool initialized;` |
-| **Static / `const` fields** | PascalCase, no prefix | `private const string CachePrefix = "…";` |
-| **Method parameters** | `camelCase`, no prefix | `LoginAsync(string email, string password)` |
-| **Local variables** | `camelCase` via `var` | `var response = await …` |
-| **Booleans** | `Is`/`Has`/`Can` phrasing | `IsAuthenticated`, `isValid`, `hasAccess` |
-| **Properties** | PascalCase, no prefix | `public string ConnectionString { get; set; }` |
-| **Constants** | PascalCase, no underscores | `MaxRetryCount` NOT `MAX_RETRY_COUNT` |
-| **Test methods** | Short PascalCase, no underscores — full scenario in XML `<summary>` | `LoginRejectsBadPassword` not `Login_BadPassword_ReturnsUnauthorized` |
-
-**Rejected forms:** `_underscore` field prefixes, snake_case anywhere, Hungarian prefixes (`strName`), `obj`/`a`/`v` prefixes (not used in this codebase), underscores in test method names.
-
-### Controller-action parameters
-Parameter names stay `camelCase` and flow through to OpenAPI. Body DTO **property** names are PascalCase.
-
-### Environment Variables
-**PascalCase, no separators.** `TechieRagBaseUrl` NOT `TECHIERAG_BASE_URL` and NOT `TechieRag__BaseUrl`. Read via `IConfiguration["Section:Key"]` (TechieRag binds its `TechieRag` config section) — never `Environment.GetEnvironmentVariable(...)`.
-
-### File Structure
-```csharp
-using System;
-
-namespace TechieRag.Services.Example;
-
-public class DatabaseService
-{
-    private readonly ILogger<DatabaseService> logger;
-    private readonly IConfiguration configuration;
-
-    public DatabaseService(ILogger<DatabaseService> logger, IConfiguration configuration)
-    {
-        this.logger = logger;
-        this.configuration = configuration;
-    }
-
-    public string ConnectionString { get; set; }
-
-    public async Task<DataTable> GetDataAsync(string queryName)
-    {
-        var connString = configuration.GetConnectionString("Default");
-        var result = await ExecuteQueryAsync(connString, queryName);
-        return result;
-    }
-}
-```
-
-### Best Practices
-- One class per file. File name matches class.
-- File-scoped namespaces. Nullable reference types enabled.
-- Methods small (<20 lines). Single responsibility.
-- Max 3 nesting levels. Early returns for validation.
-- `ConfigureAwait(false)` in library code.
-- StringBuilder for loop concatenation. Dispose `IDisposable`. Cache expensive ops.
-- LLM/embedding providers use raw `HttpClient` + `System.Text.Json` (keep the core dependency-light).
-
-### XML Documentation (MANDATORY on public members)
-`<summary>`, `<remarks>`, `<param>`, `<returns>`, `<exception>` — all required on public types and members (this is a published SDK; consumers read the IntelliSense).
-
-### Testing
-- Short PascalCase test name, no underscores. Full scenario in XML `<summary>`.
-- Arrange-Act-Assert. One assertion per test where practical.
-
-### Security
-- Never hardcode credentials or API keys. Parameterized queries. Validate inputs. Log security events.
-
-### UI strings — localized when written (REQ-UI-050 / BRD-91, owner decision 2026-07-31)
-TechieDesk ships **English (`en`) and Hindi (`hi`)**. New UI is localized **as it is written**; it is
-never added in English for a later translation pass to pick up. Four clusters ship UI concurrently, so
-anything left to "catch up later" grows the untranslated surface faster than a translation tranche can
-shrink it.
-
-Writing a user-visible string in a `.razor` file:
-1. `@inject IStringLocalizer<AppStrings> Localizer` (the type and the `AppStrings` alias are already in
-   `Components/_Imports.razor`).
-2. `@Localizer["YourKey"]` in markup, `Tooltip="@Localizer["YourKey"]"` in a text-bearing attribute,
-   `ToastService.Success(Localizer["TitleKey"], Localizer["BodyKey"])` in toasts.
-3. Add the key to **both** `apps/TechieDesk.Core/Resources/AppStrings.resx` **and**
-   `AppStrings.hi.resx`. A key present in only the neutral file does **not** fail on its own — it
-   renders English inside a Hindi screen with `ResourceNotFound` false.
-4. Composite text uses indexed placeholders (`Localizer["Key", count]` against `Deleted {0} items.`),
-   never string interpolation — an interpolated string cannot be translated.
-
-**Never localize**: CSS classes, `Class`/`Style`/`Href`/`Name`/`Variant`, log and exception messages,
-enum names, API and JSON field names, route templates, or product/protocol nouns (`Qdrant`, `LLM`,
-`RAG`, `HTTP`, connector brand names) — those stay in Latin script inside the Hindi text too.
-
-**Accessible names on TrBlazeUI components**: write the raw HTML attribute `aria-label="…"`, never a
-`AriaLabel="…"` *parameter* — no TrBlazeUI component declares one, so Blazor splats it verbatim as the
-meaningless `arialabel="…"` and the name is silently never emitted (TR-008, amended). Most components
-(`SelectTrigger`, `FieldLabel`, `Progress`, `Input`) splat `aria-label` correctly; `Slider` and
-`FileUpload` have no splat at all and stay genuinely unnameable — see `docs/TechieRag-TrBlazeUI-Feedback.md`.
-
-Enforced by `tests/TechieDesk.Tests/Localization/`:
-| Test | Fails when |
+| | |
 |---|---|
-| `LocalizedFilesNeverRegainAHardcodedString` | an English literal is added to an already-localized file |
-| `EveryCleanFileIsOnTheLocalizedFileRegistry` | a file is deleted from that registry to dodge the above |
-| `LocalizedSiteCountNeverFalls` | localization is removed (ratchet on the **absolute** site count) |
-| `ResolvesEveryKeyTheRazorComponentsAskFor` | a key a screen names is missing from `en` or `hi` |
-| `EveryPlaceholderSurvivesTranslation` | a `{0}` is dropped in translation |
-| `EveryHindiStringIsWrittenInDevanagari` | a Hindi value was never actually translated |
+| App | TechieRag |
+| Stack answer set | dotnet |
+| Date | 2026-09-24 |
+
+## Standards applied
+
+| File | Applies | Notes |
+|---|---|---|
+| `.tfcore/standards/coding-standards-core.md` | yes | every project |
+| `.tfcore/standards/coding-standards-dotnet.md` | yes | from the Stack answer set `dotnet`; where it assumes an application (Serilog, AppManager, a UI library) the Architecture's Stack decisions record the library override |
+
+Per-project choices the stack file leaves open, taken from the drift scan of 2026-09-24 (256 of 256 private instance fields, 208 of 208 files) and the June 2026 standards this file replaces (`docs/OldDocs/TechieRag-Coding-Standards.md`):
+
+| Choice | Decision |
+|---|---|
+| Instance-field prefix | **None.** Bare camelCase, no underscore, no `obj`/`a`/`v` (`private readonly ILlmProvider llmProvider;`). 100 percent of the codebase; constructor assignment uses `this.field = field`. |
+| Static and const fields | PascalCase, no prefix (`private const string CachePrefix`). |
+| Locals and parameters | camelCase; `var` for locals (about 88 percent today; new code always). |
+| Namespaces | File-scoped, one class per file, file name equals type name. |
+| Nullable and implicit usings | Enabled in every project; no `#nullable` directives, no `global using` files. |
+| Async | Every async method ends in `Async`; library code awaits with `ConfigureAwait(false)` (about 55 percent today; new and touched code always, Architecture open question 9). |
+| Test names | Short PascalCase, no underscores (`LoginRejectsBadPassword`); the full scenario in the XML `<summary>`. |
+| Public API documentation | XML `<summary>`, `<param>`, `<returns>`, `<exception>` on every public type and member; `GenerateDocumentationFile` is on in every package project. |
+| Environment variables the library reads | `TECHIERAG_` prefix, upper snake case (`TECHIERAG_MODEL_BASE_URL`, `TECHIERAG_RERANKER_BASE_URL`): these are the shipped public names and stay. Consumers configure everything else through `IConfiguration`. |
+| Database object names | PascalCase, singular, no underscores (`Documents`, `Chunks`, `TrThread`, `IdxChunksDocument`, `IxTrThreadUserId`); library-owned tables created in a consumer's database carry the `Tr` prefix from the persistence stores onward. |
+
+## Project rules
+
+Rules that hold in this project only.
+
+| Rule | Why | Since |
+|---|---|---|
+| LLM and embedding providers use raw `HttpClient` + `System.Text.Json`; no vendor AI SDK enters `TechieRag` | Keeps the core package light and uniform across vendors (ADR-003) | 2026-06-25 |
+| A heavy or fast-moving dependency (ONNX Runtime, OpenTelemetry exporters, Microsoft Agent Framework, a local inference runtime) lives in a sibling package, never in core | Consumers of the core never inherit a monthly-churning dependency (ADR-008, ADR-014) | 2026-09-03 |
+| Every change to `ILlmProvider`, `IEmbeddingProvider`, `IVectorStore` or `ITechieRag` is additive with a default interface implementation until a major version is decided | `LlmSource.None` keeps v1 behaviour; external implementers keep compiling (ADR-005, ADR-013) | 2026-06-25 |
+| Model-facing text (tool descriptions, agent instructions) is invariant English; user-visible library messages are codes with arguments (`FlowMessage`, `FlowValidationCodes`), never English sentences | The library has no localisation; the host renders in the user's language (REQ-RAG-050) | 2026-08-02 |
+| A read against an unreachable store throws; it never returns an empty list | A down database must not masquerade as an empty one (REQ-RAG-044) | 2026-08-04 |
+| Every outbound HTTP the library makes on a consumer's behalf goes through the connect-time SSRF guard (`HttpWebContentFetcher.CreateGuardedHandler`) | Redirects and DNS rebinding cannot reach private addresses (BRD-121, BRD-126) | 2026-08 |
+| Model weights are downloaded once to the model root and never packed into a NuGet package or an app bundle | Package size and licence terms (ADR-004, BRD-101) | 2026-06-25 |
+| A live test is gated by a `FactAttribute` subclass that sets `Skip` with a reason when its credential, server or model is absent; it never fails for a missing environment | The suite stays green on any machine; `TechieRagLiveNetworkTests`, `TechieRagTestPostgres`, staged weights | 2026-07 |
+| Download progress goes through `ModelDownloadService` events, never `Console.WriteLine` | A package must not write to a host's console (BRD-92; three legacy calls remain, Architecture open question 10) | 2026-09-24 |
+| No `git` or `gh` from an agent; the owner commits | Framework rule, enforced by hook | 2026-06-25 |
 
 ## Enforcement
 
-### .editorconfig (machine-checkable)
-- File-scoped namespaces (`warning`)
-- Async-method `Async` suffix (`warning`)
-- `var` for locals (`warning`)
-- Nullable reference types enabled
-- No `_` prefix on private fields (`warning` via custom naming rule)
+- **Editor configuration:** `.editorconfig` at the repository root carries the machine-checkable subset: file-scoped namespaces (warning), `Async` suffix (warning), `var` for locals (warning), nullable on, no `_` prefix on private fields (warning through the naming rule).
+- **Analyzers:** none beyond the SDK's; `GenerateDocumentationFile` makes a missing XML comment a CS1591 warning in every package project.
+- **Verifier checks:** the standards check runs the greps listed in the stack file's Enforcement section, plus:
 
-### Verifier grep checks
 ```bash
-# Forbidden underscore-prefix fields
-grep -rE "private(\s+readonly)?\s+\w+\s+_[a-z]" src/ tests/ 2>/dev/null
-
-# Forbidden test-method underscores
-grep -rE "public\s+(async\s+)?Task\s+\w+_\w+\s*\(" tests/ 2>/dev/null
+# forbidden underscore-prefix fields
+grep -rE "private(\s+readonly)?\s+\w+\s+_[a-z]" src/ tests/
+# forbidden test-method underscores
+grep -rE "public\s+(async\s+)?Task\s+\w+_\w+\s*\(" tests/
+# a vendor AI SDK in the core project
+grep -E "OpenAI|Anthropic|Azure\.AI|Google\.|Microsoft\.Agents|OnnxRuntime|OpenTelemetry" src/TechieRag/TechieRag.csproj | grep -v "Azure.AI.OpenAI"
+# console output in a package
+grep -rn "Console\.Write" src/
 ```
-
-> Note: this is a **no-prefix** project — there is no "missing obj prefix" grep (that check applies only to obj-style projects). The two greps above plus the `.editorconfig` no-underscore rule are the enforcement surface.
-
-### Severity
-- **Error**: file-scoped namespace, underscore field prefix
-- **Warning**: nullable, async suffix
-- **Info**: consider fixing

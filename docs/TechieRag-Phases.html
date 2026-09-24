@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TechieRag — Status</title>
+<title>TechieRag — Phases</title>
 <script>
 /* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
    pick by time of day — light 07:00–19:00 local, softened dark at night. */
@@ -103,137 +103,29 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </head>
 <body>
 <button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
-<div class="layout">
-  <nav class="side">
-    <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-09-24</div>
-    <div class="group">Contents</div>
-    <ol>
-        <li><a href="#where-i-am">Where I am</a></li>
-        <li><a href="#next-command-to-run">Next command to run</a></li>
-        <li><a href="#open-requirements">Open requirements</a></li>
-        <li><a href="#known-blockers">Known blockers</a></li>
-        <li><a href="#verification-log">Verification log</a></li>
-        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-        <li><a href="#standards-compliance">Standards compliance</a></li>
-        <li><a href="#deferred-future">Deferred / future</a></li>
-    </ol>
-  </nav>
+<div class="layout no-toc">
   <main>
-    <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>PROJECT-STATUS.md</code></div>
-    <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
-      <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *build-phase TechieRag</div>
-    </div>
+    <h1>TechieRag — Phases</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-Phases.md</code></div>
+
 <table>
+<thead><tr><th></th><th></th></tr></thead>
 <tbody>
-<tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-09-24</td></tr>
-<tr><th>current_phase</th><td>Phase 2 of 2 · Build — 39 not built, 29 of 81 verified</td></tr>
-<tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-09-03</td></tr>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Kind</td><td>library</td></tr>
+<tr><td>Size</td><td>Large</td></tr>
+<tr><td>Date</td><td>2026-09-24</td></tr>
 </tbody>
 </table>
-    <div class="toc-inline">
-      <div>Contents</div>
-      <ol>
-        <li><a href="#where-i-am">Where I am</a></li>
-        <li><a href="#next-command-to-run">Next command to run</a></li>
-        <li><a href="#open-requirements">Open requirements</a></li>
-        <li><a href="#known-blockers">Known blockers</a></li>
-        <li><a href="#verification-log">Verification log</a></li>
-        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-        <li><a href="#standards-compliance">Standards compliance</a></li>
-        <li><a href="#deferred-future">Deferred / future</a></li>
-      </ol>
-    </div>
-<h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Day-1 brownfield rewrite done 2026-09-24: the library is a Large, two-phase project (<code>docs/TechieRag-Phases.md</code>). Phase 1 (BRD-1…82) is the shipped core, all rows Done or N/A. Phase 2 (BRD-83…163) holds the agents package, the executed repository separation, four-platform groundwork, <code>TechieRag.Local</code>, typed streaming, subscription sign-in and 49 harvested v3 items. The application (Sevak) left this repository today; <code>apps/</code> is deleted and the library tests pass through the build ladder.</p>
-<h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<p>Claude Code:</p>
-<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag</code></pre>
-<p>OpenCode:</p>
-<pre><code>/flow-master *build-phase TechieRag</code></pre>
-<p>Start with <code>REQ-FN-006</code> verify, then <code>REQ-RAG-067</code> (typed streaming) before <code>REQ-RAG-057…066</code>; <code>REQ-RAG-106</code>, <code>REQ-FN-065…067</code> are small scan-found fixes.</p>
-<h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
+<h2 id="phases">Phases<a class="anchor-link" href="#phases">#</a></h2>
 <table>
-<thead><tr><th>Status</th><th>Count</th></tr></thead>
+<thead><tr><th>Phase</th><th>Name</th><th>Screens</th><th>BRD range</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>Not Started</td><td>38</td></tr>
-<tr><td>In Progress</td><td>1</td></tr>
-<tr><td>Implemented</td><td>11</td></tr>
-<tr><td>Needs re-verify</td><td>1</td></tr>
-<tr><td>Blocked</td><td>1</td></tr>
+<tr><td>1</td><td>Shipped core library (v1.1 to v3)</td><td>Ingestion, Embedding providers, Vector stores, Semantic search, Configuration, Embedded package, LLM providers, RAG generation, Structured output, Agent loop, Conversation memory, Token tracking, Resilience, Fallback provider, Prompt templates, Autodistribution, Packaging, Sevak application (moved)</td><td>BRD-1 to BRD-82</td><td>done</td></tr>
+<tr><td>2</td><td>Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger</td><td>Agents package, Packaging and quality follow-ups, Repository separation, Platform groundwork, Local model, Typed streaming, Subscription sign-in, Ingestion breadth, Data connectors, MCP tools, Flow orchestration, Workspaces and memory, Reranking, Provider breadth</td><td>BRD-83 to BRD-163</td><td>building</td></tr>
 </tbody>
 </table>
-<ul>
-<li>[ ] REQ-FN-006 — repository separation, library side (Implemented; deletion done today, awaiting verify)
-</li>
-<li>[ ] REQ-RAG-067 — typed streaming events on <code>ILlmProvider</code> (prerequisite for <code>TechieRag.Local</code>)
-</li>
-<li>[ ] REQ-RAG-106 — pass the embedder's dimensions into every vector store (scan finding)
-</li>
-<li>[ ] REQ-FN-065 — pack and publish <code>TechieRag.Telemetry</code> (scan finding)
-</li>
-<li>[ ] REQ-FN-067 — one nuget.org publish path (scan finding)
-</li>
-<li>[ ] REQ-FN-066 — <code>AddTechieRag(IConfiguration)</code> maps every field (scan finding)
-</li>
-<li>[ ] REQ-RAG-015 / 016 / 017 — agentic contract and <code>TechieRag.Agents</code>
-</li>
-<li>[ ] REQ-RAG-057 — <code>TechieRag.Local</code>, <code>UseLocalLlm()</code> (after the runtime decision)
-</li>
-<li>[ ] REQ-RAG-076 — YouTube transcripts (Blocked, owner decision)
-</li>
-<li>[ ] REQ-RAG-088 — flow run time limit (In Progress)
-</li>
-</ul>
-<h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
-<ul>
-<li>🔶 <strong>Owner git:</strong> the 2026-09-24 deletions and rewrites are uncommitted; <code>tests/TechieDesk.Tests/TestResults/res.trx</code> is still tracked (<code>git rm -r --cached 'tests/TechieDesk.Tests/TestResults'</code>).
-</li>
-<li>🔶 <strong>Runtime decision for <code>TechieRag.Local</code></strong> (owner, plan 08 step 3): LLamaSharp vs ONNX Runtime GenAI per platform, recorded in <code>DECISIONS.md</code> before <code>REQ-RAG-057…059</code> start.
-</li>
-<li>🔶 <strong>Real devices</strong> (owner): a Mac, an Android phone and an iPhone for <code>REQ-FN-056/059/060</code>.
-</li>
-<li>🔶 <strong><code>REQ-RAG-076</code> YouTube</strong> (owner): timed-text endpoint returns empty bodies; choose an approach or drop it.
-</li>
-<li>🔶 <strong><code>REQ-RAG-044</code> PostgreSQL</strong> (owner): <code>TechieRagTestPostgres</code> needs a real server for the live tests.
-</li>
-</ul>
-<h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
-<table>
-<thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
-<tbody>
-<tr><td>2026-09-24</td><td><code>*day1-brownfield</code> TechieRag (Large, 2 phases; BRD-115…163 harvested; apps/ deleted)</td><td>📝 docs rewritten; library tests PASS via build ladder (rung 2); no verify run</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">P1</a> · <a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-<tr><td>2026-09-24</td><td><code>*amend-docs</code> TechieRag (BRD-81/87 amended; BRD-88…114 added)</td><td>📝 docs only</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-<tr><td>2026-09-03</td><td><code>*amend-docs</code> TechieRag + TechieDesk (BRD-83…87; governance reversal)</td><td>📝 docs only</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-<tr><td>2026-09-03</td><td><code>*triage-issues</code> → <code>*fix-issues</code> → verify (REQ-FN-003, REQ-FN-004)</td><td>✅ 2/2 Verified; 723 lib tests pass; version rules 9/9</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">P1</a></td></tr>
-<tr><td>2026-08-04</td><td><code>*verify</code> ×6 (library rows migrated from the app ledger)</td><td>✅ 2,306 pass; REQ-RAG-052 demoted</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-</tbody>
-</table>
-<h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
-<ul>
-<li>Sevak (the former app) to TechieRag: 36 open · 7 closed, 0 blocking — <code>docs/Sevak-TechieRag-Feedback.md</code> (renamed 2026-09-24; its 43 legacy entries still fail the feedback template's per-entry rules)
-</li>
-<li>Downstream: Chatur TR-RAG-001/002 and MyDiary TR-RAG-001 accepted 2026-09-24 → BRD-96…114.
-</li>
-</ul>
-<h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
-<ul>
-<li>Build ladder 2026-09-24: <code>PASS test on wsl via ~/.dotnet/dotnet (rung 2)</code> for <code>tests/TechieRag.Tests</code>; 41 warnings. Drift scan: 256/256 fields bare camelCase, 208/208 file-scoped namespaces. Doc checker: 0 FAIL on the eight rewritten documents.
-</li>
-</ul>
-<h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
-<ul>
-<li>OS built-in models (Apple, Android Gemini Nano) as a later <code>ILocalLlmRuntime</code>.
-</li>
-<li><code>REQ-RAG-046</code> deferred endpoints; <code>TechieRag.Agents</code> phase D items (proposal §7).
-</li>
-<li>Sevak free-tier limits (Sevak repository); agent skills as library tools (built app-side today).
-</li>
-</ul>
+<p>Phase 1 is everything shipped and validated before 2026-09-03 (the items with ids 1 to 82, of which 62 to 73, 81 and 82 describe the application that moved to Sevak). Phase 2 holds the 2026-09-03 amendments (agents, repository separation), the 2026-09-24 amendments (four platforms, <code>TechieRag.Local</code>, typed streaming, subscription sign-in) and the library features built between July and September 2026 that were ledgered in the application's BRD and harvested on 2026-09-24. A "screen" in this library is a public surface: the builder methods, interface or package a developer reaches for.</p>
   </main>
 </div>
 

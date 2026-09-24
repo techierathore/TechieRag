@@ -32,7 +32,6 @@ nuget.config
 # Local dev secrets — real AppManager BaseUrl/ApiKey/ApiSecret/ApplicationId live here, never commit.
 # .NET auto-layers appsettings.Development.json over appsettings.json in the Development environment.
 appsettings.Development.json
-apps/TechieDesk/appsettings.Development.json
 
 # Claude/AI tooling
 .tfcore/
@@ -44,7 +43,6 @@ CLAUDE.md
 /.verify
 /WORKFLOW.html
 *.json
-/test-results/qdrant-crud-Qdrant-Admin-C-abb04--real-server-version-1-15-5
 /nuget.config
 
 # TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)
@@ -55,8 +53,6 @@ CLAUDE.md
 /package.json
 /package-lock.json
 node_modules/
-test-results/
-playwright-report/
 .verify/
 logs/
 .DS_Store
@@ -64,7 +60,6 @@ logs/
 
 # TechieFlow agent artifacts — machine-generated test harness & logs, never commit (managed by scaffold/update-framework.sh)
 tests/.artifacts/
-test-results-*/
 /scripts-*/
 
 # TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)

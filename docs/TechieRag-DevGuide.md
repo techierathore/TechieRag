@@ -1,848 +1,342 @@
-# TechieRag — Developer Guide (Screen-by-Screen Code Map)
+# TechieRag — Developer Guide
 
-> 🔁 **App renamed 2026-07-17 (REQ-UI-014 / BRD-82): `TechieRagWeb` → TechieDesk.** All screen file paths below are now under **`apps/TechieDesk/`** (was `samples/TechieRagWeb/`); the project/assembly/namespace root is **TechieDesk**. Code, lineage, and controls per screen are unchanged by the rename — only the folder and identity moved. Re-verified live at handoff: build 0-err, app boots on `:5099` as TechieDesk, Playwright render+visual sweep 10/10 PASS @1280/390 (all screens regression-clean).
+| | |
+|---|---|
+| App | TechieRag |
+| Kind | library |
+| Size | Large |
+| Phase | 1 of 2 |
+| Verified on | 2026-09-24 |
+| Date | 2026-09-24 |
 
-> ✅ **Runtime-verified 2026-07-02 as Anonymous (verifier `*verify all` — all 10 screens exercised live)** — live boot on `http://localhost:5099`, LM Studio `qwen2.5-coder-32b-instruct` at `192.168.1.13:1234`, Qdrant 1.15.5 live in Docker. Each screen in §4 now carries its own dated **Runtime-verified 2026-07-02** blockquote recording exactly what was exercised (including live LLM, ingest write-path, and Qdrant CRUD data-paths); those blockquotes supersede the 2026-07-01 sweep note below.
+⚠ STATIC-ONLY — not runtime-verified
 
-> ✅ **RUNTIME-VERIFIED (2026-07-01 — verifier `*verify ui`)** — the **TechieDesk** app (formerly `TechieRagWeb`) now restores + boots (TrBlazeUI PAT refreshed → GitHub Packages 200) and was driven live on `http://localhost:5099` with headless Playwright. All 11 screens passed the **§4a render gate + §4b visual-truth gate** at 1280×800 and 390×844: every control renders and every screen looks right (no overlap/clip/off-canvas, no `#blazor-error-ui`). Full-page screenshots under `test-results/screens/`. Live data observed: Ingestion/Text-Ingestion stats (2 docs / 151 chunks / 768 KB), Tool Demo Available-Tools table (4 tools), Qdrant Admin live status (Docker Available / Qdrant Disconnected / Version N/A). Backend note: the running instance has **no LLM provider configured (Source=None)** and **Qdrant is down**, so LLM data-paths (Chat streamed tokens, Playground completion/typed-parse, Tool Demo execution trace) and Qdrant collection/vector CRUD were NOT exercised this run — those keep their prior status. The prior STATIC-ONLY caveat is superseded for the screens below; controls still tagged `static-only` are ones not re-swept.
-
-> **Purpose — this is the document a HUMAN developer uses to trace any screen, control, or number on the page all the way down to its data source, so they can find and fix a bug, or verify that AI-generated code is actually correct.** The BRD explains *what* the app does; the Architecture explains *how the system is shaped*. Neither tells a developer "the Chat footer's token count comes from `Chat.razor`'s `HandleAutoRag()` → `TechieRagManager.AskAsync()` → `TechieRagClient.AskAsync()` → `response.Usage`." This guide does exactly that, per screen, down to the provider call.
->
-> It documents the **AS-BUILT code**, not the plan. Regenerate it with `*devguide TechieRag` after meaningful code changes.
-
-> **What "the database" means here.** TechieRag is a **configurable RAG library**, not a CRUD app — there is **no relational database and no stored procedures**. The sample app's "data layer" is the library API (`ITechieRag` / `TechieRagClient`) over pluggable providers: an **embedding provider** (HTTP to Ollama/LM Studio/Azure, or in-process ONNX), a **vector store** (SQLite-vec default · PostgreSQL/pgvector · Qdrant), and an **LLM provider** (HTTP to Ollama/LM Studio/OpenAI-compatible/Azure/Gemini/Anthropic). Config is persisted to a JSON file (`techierag-config.json`), not a DB. So every lineage row reads **Razor → sample Service (or injected `ITechieRag`) → library API → provider / JSON file**.
-
-## Table of Contents
-
-1. [How to use this guide](#how-to-use-this-guide)
-2. [Architecture cheat-sheet](#architecture-cheat-sheet)
-3. [Roles and menu map](#roles-and-menu-map)
-4. [Screen-by-screen code map](#screen-by-screen-code-map)
-5. [Cross-cutting flows](#cross-cutting-flows)
-6. [How to fix a bug with this guide](#how-to-fix-a-bug-with-this-guide)
-
----
-
-## How to use this guide
-
-- **Find your screen** in §4. There is only one role (the sample has no authentication — a single anonymous user), so screens are grouped by sidebar menu group in navigation order. Each screen tells you the route, the Razor file, every control, and where each control's data comes from.
-- **Chasing a wrong number / missing data?** Find the control in that screen's *Data lineage* table → it names the Razor handler → the service method → the library API call → the provider/persistence target. Open those files in order.
-- **Verifying AI-generated code?** Compare what this guide claims against the actual files. If a row says a value comes from `response.Usage` but the streaming branch never reads it, the guide (or the code) is wrong — that mismatch is exactly the kind of bug this guide is meant to catch (several real ones are flagged in §4 "Known issues").
-- **Render-status is STATIC-ONLY.** Nothing here was observed at runtime. Treat every "renders" claim as a hypothesis until `*verify` (or a re-run of `*devguide` with the app booted) confirms it.
+This guide maps each public service of the TechieRag library (packages `TechieRag`, `TechieRag.Embedded`, `TechieRag.Telemetry` under `src/`, tests under `tests/TechieRag.Tests`) to the code that serves it, read at file and line on 2026-09-24. The ten screenshots under `docs/screenshots/TechieRag/` were captured in July 2026 from the sample application of that time (TechieDesk, now Sevak, which moved to its own repository on 2026-09-24). No sample application can boot in this repository today, so every entry describes what the screenshot showed as static-only (unconfirmed) and links the sample screen that exercised the service. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.
 
 ## Architecture cheat-sheet
 
-Brief — just enough to navigate the code. (Full detail in `docs/TechieRag-Architecture.md`.)
+```mermaid
+flowchart LR
+  Host["Host application"] --> Builder["TechieRagBuilder / AddTechieRag"]
+  Builder --> Client["TechieRagClient : ITechieRag"]
+  Client --> Proc["IDocumentProcessor + IChunker"]
+  Client --> Emb["IEmbeddingProvider"]
+  Client --> Store["IVectorStore"]
+  Client --> Rerank["IReranker"]
+  Client --> Prompt["IPromptTemplate"]
+  Client --> Llm["ILlmProvider (Retry → Fallback → provider)"]
+  Llm --> Tracker["TokenUsageTracker"]
+  Host --> Agent["AgentLoopRunner + IToolHandler"]
+  Agent --> Llm
+  Store --> DB[("SQLite / PostgreSQL / Qdrant")]
+```
 
-| Layer | Project / folder | What lives here | Example types |
-|-------|------------------|-----------------|---------------|
-| UI (Blazor Server) | `apps/TechieDesk/Components/Pages` | The 11 routed Razor pages + layout/sidebar | `Chat.razor`, `Settings.razor`, `MainLayout.razor` |
-| Sample services | `apps/TechieDesk/Services` | Builds/holds the live `ITechieRag`; config persistence; Qdrant/Docker admin | `TechieRagManager`, `TechieRagConfigService`, `QdrantAdminService`, `DockerContainerService` |
-| Library (orchestrator) | `src/TechieRag` | The RAG engine consumed via `ITechieRag` | `TechieRagClient`, `AgentLoopRunner`, `ToolRegistry`, `TokenUsageTracker` |
-| Provider abstractions | `src/TechieRag/Abstractions` | Pluggable backend contracts (the keystone) | `IEmbeddingProvider`, `IVectorStore`, `ILlmProvider`, `ITokenTracker` |
-| Embedding (offline) | `src/TechieRag.Embedded` | BGE-M3 ONNX provider + model download | `EmbeddedEmbeddingProvider`, `ModelDownloadService` |
-| Persistence | (no DB) | Vector store backends + a JSON config file | SQLite-vec / pgvector / Qdrant; `techierag-config.json` |
+| Layer | Project or folder | What lives here |
+|---|---|---|
+| Entry point | `src/TechieRag/TechieRagClient.cs`, `ITechieRag.cs` | Ingest, search, ask, chat; owns every abstraction below |
+| Composition | `src/TechieRag/TechieRagBuilder.cs`, `DependencyInjection/` | Fluent builder, `Build()`, three `AddTechieRag` overloads |
+| Abstractions | `src/TechieRag/Abstractions/` | `ILlmProvider`, `IEmbeddingProvider`, `IVectorStore`, `IReranker`, `IChunker`, `IToolHandler`, `ITokenTracker`, stores |
+| Providers | `src/TechieRag/Llm/`, `Embedding/`, `Reranking/`, `Speech/` | HTTP clients per vendor; `LlmConnectorCatalog`, `ModelRouter`, `LlmProviderFactory` |
+| Processing | `src/TechieRag/Processors/`, `Processors/Chunking/` | One processor per file type, `TextChunker`, four chunkers |
+| Storage | `src/TechieRag/VectorStores/`, `Persistence/` | `SqliteVecStore`, `PgVectorStore`, `QdrantStore`; conversation and workspace stores |
+| Services | `src/TechieRag/Services/` | Retry, fallback, token tracking, tools, agent loop, prompt engine, workspaces, memory |
+| Agents | `src/TechieRag/Orchestration/`, `Mcp/` | `FlowRunner`, guardrails, `AgentToolHandler`; MCP client, transports, trust policy |
+| Sources | `src/TechieRag/Connectors/`, `Web/` | Confluence, repository, email connectors; page, site and YouTube ingestion |
+| Diagnostics | `src/TechieRag/Diagnostics/`, `src/TechieRag.Telemetry/` | BCL `ActivitySource`/`Meter`; opt-in OTLP and console exporters |
+| Local models | `src/TechieRag.Embedded/` | BGE-M3 ONNX embeddings, cross-encoder reranker, model download, native resolver |
 
-- **No stored procs / no ORM entities.** Reads/writes go through the library: ingestion = `processor/chunker → embeddingProvider.EmbedBatchAsync → vectorStore.UpsertBatchAsync`; query = `embeddingProvider.EmbedAsync → vectorStore.SearchAsync → promptTemplate.BuildRagPrompt → llmProvider.Chat/Complete`.
-- **How a Razor page gets its data:** two patterns. The **ingestion/chat-style pages inject `ITechieRag Rag` directly** (the singleton built at startup) and call it. The **config/admin pages inject the sample services** (`TechieRagConfigService` for JSON load/save, `TechieRagManager` to rebuild the live client, `QdrantAdminService`/`DockerContainerService` for the Qdrant console).
-- **`TechieRagManager`** is the bridge: `ReconfigureAsync()` rebuilds the `ITechieRag` instance from the saved config; `GetLlmProvider()` / `GetTokenTracker()` expose library sub-services to the playground/monitoring pages. Note `GetLlmProvider()` blocks sync-over-async (`GetInstanceAsync().GetAwaiter().GetResult()`, `TechieRagManager.cs:367`).
-
-## Roles and menu map
-
-The sample app has **no authentication, no login, and no roles** (confirmed: zero `[Authorize]` / `AddAuthentication` / `AddAuthorization` in `apps/TechieDesk`; `docs/TechieRag-UsageGuide.md` test-users table records "none — no auth"). It is a single-user, config-driven demo.
-
-| Role | Test user | Authorization | Menus this role sees | Detail |
-|------|-----------|---------------|----------------------|--------|
-| Anonymous (single user) | none — no login | none (no auth anywhere in the sample) | All groups: General · Configuration · Data · AI Features · Monitoring · Admin | §4 (this doc) |
-
-**Landing-truth.** There is no post-login redirect because there is no login. The router (`Components/Routes.razor`) has no custom redirect; the default landing is `Home` at `@page "/"` (`Components/Pages/Home.razor:1`), reached directly by URL. The sidebar (`Components/Layout/MainLayout.razor`) is the only navigation; every page is reached by its menu item below — none is inferred from folder names.
-
-### Anonymous — menu structure (`MainLayout.razor` sidebar)
-- **General** → **Home** → opens `/` (`Pages/Home.razor`) — see [§4 · Home](#anonymous--home)
-- **Configuration** → **Settings** → opens `/settings` (`Pages/Settings.razor`) — see [§4 · Settings](#anonymous--settings)
-- **Configuration** → **LLM Settings** → opens `/llm-settings` (`Pages/LlmSettings.razor`) — see [§4 · LlmSettings](#anonymous--llmsettings)
-- **Data** → **File Ingestion** → opens `/ingestion` (`Pages/Ingestion.razor`) — see [§4 · Ingestion](#anonymous--ingestion-file-ingestion)
-- **Data** → **Text Ingestion** → opens `/text-ingestion` (`Pages/TextIngestion.razor`) — see [§4 · TextIngestion](#anonymous--textingestion-text-ingestion)
-- **AI Features** → **RAG Chat** → opens `/chat` (`Pages/Chat.razor`) — see [§4 · RAG Chat](#anonymous--rag-chat)
-- **AI Features** → **LLM Playground** → opens `/llm-playground` (`Pages/LlmPlayground.razor`) — see [§4 · LLM Playground](#anonymous--llm-playground)
-- **AI Features** → **Tool Demo** → opens `/tool-demo` (`Pages/ToolDemo.razor`) — see [§4 · Tool Demo](#anonymous--tool-calling-demo)
-- **Monitoring** → **Token Usage** → opens `/token-usage` (`Pages/TokenUsage.razor`) — see [§4 · Token Usage](#anonymous--token-usage)
-- **Admin** → **Qdrant Admin** → opens `/qdrant-admin` (`Pages/QdrantAdmin.razor`) — see [§4 · Qdrant Admin](#anonymous--qdrant-admin)
-
-> **Discovery count:** 1 role, 11 distinct screens (Home + 10 feature pages; `NavMenu.razor` is an empty stub — nav lives in `MainLayout.razor`).
+Every LLM call passes through the same decorator chain built in `TechieRagBuilder.Build()`: the concrete provider is wrapped in `RetryHandler` (`TechieRagBuilder.cs:619`), then optionally in `FallbackLlmHandler` (`:626`). The token tracker subscribes to `OnCompletionCompleted` on the outermost wrapper (`:638`). Nothing in the library reads configuration files itself; a host binds `TechieRagConfig` and hands it to the builder.
 
 ## Screen-by-screen code map
 
----
-
-### Anonymous · Home
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. All six navigation cards render and their links navigate correctly.
-
-- **Route:** `@page "/"` (`apps/TechieDesk/Components/Pages/Home.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/Home.razor`
-- **Reached via:** General → Home; **Log in as:** no auth (single anonymous user). This is the default landing route `/`.
-- **What this screen does:** Static landing dashboard. Renders six navigation cards (Document Ingestion, RAG Chat, LLM Playground, Tool Calling Demo, Token Usage, Configuration) that link to other pages. No data access, no `@code` block, no service injection.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["Home.razor (@page slash)"] --> H["Header: TechieRag Demo Application"]
-  P --> G["Card grid (6 cards)"]
-  G --> C1["Card: Document Ingestion -> Button Href /ingestion"]
-  G --> C2["Card: RAG Chat -> Button Href /chat"]
-  G --> C3["Card: LLM Playground -> Button Href /llm-playground"]
-  G --> C4["Card: Tool Calling Demo -> Button Href /tool-demo"]
-  G --> C5["Card: Token Usage -> Button Href /token-usage"]
-  G --> C6["Card: Configuration -> Button Href /settings"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| File Ingestion | Button (Href `/ingestion`) | Navigate to ingestion page | Static markup (Home.razor:21) |
-| Open Chat | Button (Href `/chat`) | Navigate to RAG chat | Static markup (Home.razor:37) |
-| Open Playground | Button (Href `/llm-playground`) | Navigate to LLM playground | Static markup (Home.razor:53) |
-| Tool Demo | Button (Href `/tool-demo`) | Navigate to tool-calling demo | Static markup (Home.razor:69) |
-| View Usage | Button (Href `/token-usage`) | Navigate to token usage | Static markup (Home.razor:85) |
-| Settings | Button (Href `/settings`) | Navigate to Settings | Static markup (Home.razor:101) |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| All 6 cards | Home.razor:12-106 | none (no injected service) | none | none | static-only (unconfirmed). Pure navigation links; no data binding |
-
-**Business rules / calculations on this screen**
-- None. No `@code` block, no conditionals, no service calls.
-
-**Known issues / gotchas**
-- No `@rendermode` directive (only `@page "/"` at line 1), so it renders as static SSR. Acceptable because the page is link-only with no interactivity.
-- Card titles/descriptions are hardcoded English strings; no localization.
-
----
-
-### Anonymous · Settings
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. The form loads the REAL saved config (SqliteVec `techieragex.db`, Embedded BGE-M3). Save / Reset / Initialize write-actions were NOT re-driven (they mutate the live config); the known static issues below stand unchanged (Reset never calls `ReconfigureAsync`; `EnableTelemetry` persisted but unread).
-
-- **Route:** `@page "/settings"` (`apps/TechieDesk/Components/Pages/Settings.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/Settings.razor`
-- **Reached via:** Configuration → Settings; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Edits embedding provider, vector store, document-processing, and telemetry config. Loads from `techierag-config.json` (fallback `appsettings.json` / defaults), saves back to that JSON file, then rebuilds the live `ITechieRag` instance via `ReconfigureAsync`.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["Settings.razor (@page settings)"] --> I["OnInitializedAsync"]
-  I --> L["ConfigService.LoadConfigAsync()"]
-  L --> F["read techierag-config.json -> appsettings -> defaults"]
-  I --> R{"isLoading?"}
-  R -->|"true"| SP["Spinner"]
-  R -->|"false"| FORM["4 config cards + action buttons"]
-  FORM --> EMB["Embedding card (Source/Model/Path/Endpoint/ApiKey)"]
-  FORM --> VEC["Vector Store card (Type/Connection/ApiKey)"]
-  FORM --> PROC["Processing card (ChunkSize/Overlap)"]
-  FORM --> ADV["Advanced card (EnableTelemetry switch)"]
-  FORM --> SAVE["Save Configuration -> SaveConfigAsync"]
-  FORM --> RESET["Reset to Defaults -> ResetToDefaults"]
-  SAVE --> BCS["BuildConnectionString()"]
-  SAVE --> SC["ConfigService.SaveConfigAsync(config)"]
-  SC --> WRITE["write techierag-config.json"]
-  SAVE --> RC["RagManager.ReconfigureAsync()"]
-  RC --> REBUILD["TechieRagBuilder rebuild + InitializeAsync"]
-  RESET --> RD["ConfigService.ResetToDefaults() (delete json)"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Embedding Source | Select (7 items) | Choose embedding provider | `embeddingSourceString` get/set over `config.Embedding.Source` (Settings.razor:35, 220-224) |
-| BGE-M3 info Alert | Alert (Info) | Shows only when Source=Embedded | `config.Embedding.Source == EmbeddingSource.Embedded` (Settings.razor:53) |
-| Model Name | Input | Embedding model name (non-Embedded) | `config.Embedding.Model`; placeholder `GetModelPlaceholder()`, hint `GetModelHint()` (Settings.razor:65-66) |
-| Model Path | Input | ONNX model dir (Source=Onnx only) | `config.Embedding.ModelPath` (Settings.razor:76) |
-| Endpoint URL | Input | Provider endpoint (non-Embedded, non-Onnx) | `config.Embedding.Endpoint`; `GetEndpointPlaceholder()/GetEndpointHint()` (Settings.razor:86-87) |
-| API Key | Input (Password) | Key for Azure/OpenAI embedding | shown when `RequiresApiKey()`; `config.Embedding.ApiKey` (Settings.razor:92-97) |
-| Vector Store Type | Select (3 items) | Choose vector store | `vectorStoreTypeString` get/set over `config.VectorStore.Type` (Settings.razor:115, 226-230) |
-| Connection / Path | Input | Store connection string | `vectorStoreConnectionInput` (Settings.razor:132); label/placeholder/hint helpers |
-| Qdrant API Key | Input (Password) | Qdrant auth (Type=Qdrant only) | `config.VectorStore.ApiKey` (Settings.razor:142) |
-| Chunk Size | Input (Number) | Chunk size in chars | `chunkSizeString` over `config.Processing.DefaultChunkSize` (Settings.razor:161, 232-236) |
-| Chunk Overlap | Input (Number) | Overlap in chars | `chunkOverlapString` over `config.Processing.DefaultChunkOverlap` (Settings.razor:168, 238-242) |
-| Enable Telemetry | Switch | Toggle telemetry flag | `config.EnableTelemetry` (Settings.razor:184) |
-| Reset to Defaults | Button | Delete saved JSON, reload | `ResetToDefaults` (Settings.razor:195, 326-331) |
-| Save Configuration | Button | Persist + apply config | `SaveConfigAsync` (Settings.razor:198, 303-324) |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Initial load | OnInitializedAsync Settings.razor:244-262 | `ConfigService.LoadConfigAsync()` (TechieRagConfigService.cs:54) | `JsonSerializer.Deserialize<TechieRagConfig>` of `techierag-config.json`; fallback `configuration.GetSection("TechieRag")` (TechieRagConfigService.cs:64-120) | File `techierag-config.json` → else `appsettings.json` → else `new TechieRagConfig()` | static-only (unconfirmed). Cached in `cachedConfig` |
-| All form fields | Settings.razor:35-184 | bound to in-memory `config` (field, Settings.razor:215) | none until Save | in-memory | static-only (unconfirmed) |
-| Save Configuration | SaveConfigAsync Settings.razor:303-324 | `ConfigService.SaveConfigAsync(config)` (TechieRagConfigService.cs:148) then `RagManager.ReconfigureAsync()` (TechieRagManager.cs:63) | `File.WriteAllTextAsync(configFilePath, json)` (TechieRagConfigService.cs:160); rebuild via `TechieRagBuilder` (TechieRagManager.cs:94-253) + `InitializeAsync` (TechieRagManager.cs:81) | Writes `techierag-config.json`; rebuilds live `ITechieRag` (embedding/vector/LLM providers) | static-only (unconfirmed). Connection string normalized by `BuildConnectionString` (Settings.razor:280-301) before save |
-| Reset to Defaults | ResetToDefaults Settings.razor:326-331 | `ConfigService.ResetToDefaults()` (TechieRagConfigService.cs:190) then `LoadConfigAsync()` | `File.Delete(configFilePath)` + clear cache (TechieRagConfigService.cs:192-198) | Deletes `techierag-config.json` | **suspected defect** — does NOT call `ReconfigureAsync`, so the live instance keeps old settings until a later Save — static |
-
-**Business rules / calculations on this screen**
-- Conditional fields: Embedded source hides Model/Endpoint/Path and shows an Info alert (Settings.razor:53-90); ONNX shows Model Path; Azure/OpenAI show API Key via `RequiresApiKey()` (line 333); Qdrant shows its own API Key (line 137).
-- SQLite connection input is path-only in the UI; `BuildConnectionString` wraps it as `Data Source=...` and `ExtractConnectionInput` strips that prefix on load (Settings.razor:264-301).
-- Placeholders/hints/labels are computed per selected source/type via the `Get*` helper switch methods (Settings.razor:335-401).
-
-**Known issues / gotchas**
-- **Reset does not re-apply to the running instance** (`Settings.razor:326-331`): it deletes the JSON and reloads the form but never calls `RagManager.ReconfigureAsync()`; the live RAG instance keeps old settings until the next Save. State mismatch. *(logged to REQ-UI-002)*
-- **`EnableTelemetry` is a no-op for the applied instance**: it is saved to JSON but `TechieRagManager.CreateInstanceFromConfigAsync` never reads `savedConfig.EnableTelemetry` (no usage in `TechieRagManager.cs:94-253`) — the toggle is persisted but has no runtime effect. *(logged to REQ-UI-002)*
-- `LoadConfigAsync` caches in `cachedConfig` and Settings + LlmSettings share the same scoped service instance and cached object, so edits on one page's `config` object can leak to the other if not reloaded.
-
----
-
-### Anonymous · LlmSettings
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: "Test LLM Connection" succeeded in **912 ms** against LM Studio (`qwen2.5-coder-32b-instruct` at `192.168.1.13:1234`) — inline success alert + toast + Serilog log entry all observed. Save / Reset were not re-driven.
-
-- **Route:** `@page "/llm-settings"` (`apps/TechieDesk/Components/Pages/LlmSettings.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/LlmSettings.razor`
-- **Reached via:** Configuration → LLM Settings; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Tabbed editor (Provider / Fallback / Usage / Prompts) for LLM provider config plus a live "Test LLM Connection" button. Loads/saves the same `techierag-config.json` and applies via `ReconfigureAsync`; the test calls the configured provider's `CompleteAsync` over HTTP.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["LlmSettings.razor (@page llm-settings)"] --> I["OnInitializedAsync"]
-  I --> L["ConfigService.LoadConfigAsync()"]
-  I --> FBK{"LlmFallback set & not None?"}
-  FBK -->|"yes"| EF["enableFallback=true"]
-  I --> R{"isLoading?"}
-  R -->|"true"| SP["Spinner"]
-  R -->|"false"| TABS["Tabs"]
-  TABS --> T1["Provider tab -> RenderLlmFields(config.Llm)"]
-  TABS --> T2["Fallback tab -> Switch + RenderLlmFields(fallbackConfig)"]
-  TABS --> T3["Usage tab -> tracking/budget fields"]
-  TABS --> T4["Prompts tab -> prompt + resilience fields"]
-  P --> CT["Connection Test card"]
-  CT --> TEST["Test LLM Connection -> TestLlmConnectionAsync"]
-  TEST --> GP["RagManager.GetLlmProvider()"]
-  GP --> CALL["provider.CompleteAsync('Say hello...')"]
-  CALL --> HTTP["HTTP to Ollama/LMStudio/OpenAI/Azure/Gemini/Anthropic"]
-  P --> SAVE["Save -> SaveConfigAsync"]
-  SAVE --> SC["ConfigService.SaveConfigAsync()"]
-  SAVE --> RC["RagManager.ReconfigureAsync()"]
-  P --> RST["Reset -> ResetToDefaultsAsync"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Reset | Button | Reset LLM/usage/resilience/prompt to defaults | `ResetToDefaultsAsync` (LlmSettings.razor:17, 415-425) |
-| Save | Button | Persist + apply config | `SaveConfigAsync` (LlmSettings.razor:18, 392-413) |
-| Tabs (Provider/Fallback/Usage/Prompts) | Tabs | Section switching | static, `DefaultValue="provider"` (LlmSettings.razor:33) |
-| Source (primary/fallback) | Select (7 LlmSource items) | Choose LLM provider | `@bind-Value` to `llmConfig.Source` in `RenderLlmFields` (LlmSettings.razor:300) |
-| Endpoint | Input | Provider URL (when Source≠None) | `llmConfig.Endpoint`; placeholder `GetLlmEndpointPlaceholder` (LlmSettings.razor:322, 370-379) |
-| API Key | Input (Password) | Key for OpenAICompatible/Azure/Gemini/Anthropic | `llmConfig.ApiKey` (LlmSettings.razor:326-334) |
-| Model | Input | Model name | `llmConfig.Model`; placeholder `GetLlmModelPlaceholder` (LlmSettings.razor:339, 381-390) |
-| Temperature | Slider (0-2) | Sampling temperature | `llmConfig.Temperature` via ValueChanged (LlmSettings.razor:347) |
-| Max Tokens | Input (Number) | Max output tokens | `llmConfig.MaxTokens` via ValueChanged (LlmSettings.razor:353) |
-| Enable Fallback Provider | Switch | Toggle fallback section | `enableFallback` (LlmSettings.razor:61) |
-| Enable Token Tracking | Switch | Toggle usage tracking | `config.UsageTracking.Enabled` (LlmSettings.razor:82) |
-| Max Total Tokens | Input (Number) | Token budget | `maxTotalTokensString` over `config.UsageTracking.MaxTotalTokens` (LlmSettings.razor:93, 231-235) |
-| Max Cost (USD) | Input (Number) | Cost budget | `maxCostString` over `config.UsageTracking.MaxCostUsd` (LlmSettings.razor:99, 237-241) |
-| Alert Threshold | Slider (0-100) | Budget alert % | `alertThresholdSlider` over `config.UsageTracking.AlertThreshold` (LlmSettings.razor:107, 225-229) |
-| Block When Exceeded | Switch | Block on budget exceed | `config.UsageTracking.BlockOnExceeded` (LlmSettings.razor:112) |
-| System Prompt | Textarea | RAG system prompt | `config.Prompt.SystemPrompt` (LlmSettings.razor:131) |
-| Context Template | Textarea | Context chunk template | `config.Prompt.ContextChunkTemplate` (LlmSettings.razor:137) |
-| Max Context Chunks / Tokens | Input (Number) | Context limits | `maxContextChunksString` / `maxContextTokensString` (LlmSettings.razor:144,150, 243-253) |
-| Max Retries / Timeout / CB Threshold | Input (Number) | Resilience tuning | `maxRetriesString` / `timeoutString` / `cbThresholdString` (LlmSettings.razor:167,173,184, 255-271) |
-| Handle Rate Limiting | Switch | Resilience toggle | `config.Resilience.HandleRateLimiting` (LlmSettings.razor:178) |
-| Test LLM Connection | Button | Live provider ping | `TestLlmConnectionAsync` (LlmSettings.razor:200, 427-459) |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Initial load | OnInitializedAsync LlmSettings.razor:273-293 | `ConfigService.LoadConfigAsync()` (TechieRagConfigService.cs:54) | deserialize `techierag-config.json` / appsettings (TechieRagConfigService.cs:64-120) | File / appsettings / defaults | static-only (unconfirmed). Fallback flag derived from `config.LlmFallback` |
-| All tab fields | LlmSettings.razor:41-189 | bound to in-memory `config` / `fallbackConfig` (LlmSettings.razor:216-217) | none until Save | in-memory | static-only (unconfirmed) |
-| Save | SaveConfigAsync LlmSettings.razor:392-413 | `ConfigService.SaveConfigAsync(config)` (TechieRagConfigService.cs:148); `RagManager.ReconfigureAsync()` (TechieRagManager.cs:63) | `File.WriteAllTextAsync` (TechieRagConfigService.cs:160); rebuild via `builder.UseLlm/WithFallbackLlm/WithUsageTracking/WithResilience` (TechieRagManager.cs:191-243) | Writes `techierag-config.json`; rebuilds `ITechieRag` LLM provider | static-only (unconfirmed). `config.LlmFallback` set to `fallbackConfig` or null before save (line 399) |
-| Test LLM Connection | TestLlmConnectionAsync LlmSettings.razor:427-459 | `RagManager.GetLlmProvider()` (TechieRagManager.cs:365) | `instance.GetLlmProvider()` then `provider.CompleteAsync("Say 'hello'...")` (ILlmProvider.cs:31; e.g. OllamaLlmProvider/OpenAICompatibleLlmProvider/AnthropicLlmProvider `CompleteAsync`) | Live HTTP call to the configured provider | static-only (unconfirmed). Uses the CURRENTLY BUILT instance; unsaved edits are not reflected until Save — see gotchas |
-| Reset | ResetToDefaultsAsync LlmSettings.razor:415-425 | none (no service call) | none | in-memory only | **suspected defect** — Reset never persists or reconfigures; resets form objects + shows success toast only — static |
-
-**Business rules / calculations on this screen**
-- `RenderLlmFields(llmConfig, prefix)` is reused for both primary and fallback; Endpoint/API Key/Model/Temp/MaxTokens only render when `Source != None`, API Key only for OpenAICompatible/Azure/Gemini/Anthropic (LlmSettings.razor:317-334).
-- Usage and Prompt/Resilience sub-fields only render when their parent toggle is on (`config.UsageTracking.Enabled`, line 86; `enableFallback`, line 65).
-- Slider/numeric string adapters convert between bound primitives and string inputs (LlmSettings.razor:225-271); `alertThresholdSlider` scales 0-1 ↔ 0-100.
-- Default Anthropic model placeholder is `claude-sonnet-4-5-20250929` (LlmSettings.razor:388) and default endpoint `https://api.anthropic.com` (line 377) — placeholders only, not applied values.
-
-**Known issues / gotchas**
-- **Reset is in-memory only and silent to the backend** (`ResetToDefaultsAsync`, `LlmSettings.razor:415-425`): resets the form objects and shows a success toast but never calls `SaveConfigAsync` or `RagManager.ReconfigureAsync()`. The "reset" is lost unless the user also clicks Save (and is inconsistent with Settings.razor's Reset, which at least deletes the JSON). *(logged to REQ-UI-003)*
-- **Test-vs-edit staleness**: `TestLlmConnectionAsync` (line 435) uses `RagManager.GetLlmProvider()` which returns the provider from the last-built instance. Unsaved edits in the form are not reflected; you must Save (→ `ReconfigureAsync`) before Test reflects new settings. Not obvious from the UI. *(logged to REQ-UI-009)*
-- `GetLlmProvider()` calls `GetInstanceAsync().GetAwaiter().GetResult()` (`TechieRagManager.cs:367`) — sync-over-async blocking on the Blazor circuit thread; can stall/deadlock under load.
-- Dead code: `GetMaxTokensString`/`SetMaxTokens` (LlmSettings.razor:360-368) are defined but never referenced (Max Tokens uses inline ValueChanged at line 353). The awaited `CompleteAsync` result (`response`, line 444) is discarded — the success message reports only model name + elapsed ms (cosmetic).
-
----
-
-### Anonymous · Ingestion (File Ingestion)
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE DATA: the Vector Store Statistics card showed correct counts before/after a real ingest (Documents 2 → 3 → 2). Note @390: the DataTable pagination buttons live inside the local `relative overflow-x-auto` wrapper (the accepted TR-004 containment pattern — reachable by scrolling the wrapper, not a defect).
-
-- **Route:** `@page "/ingestion"` (`apps/TechieDesk/Components/Pages/Ingestion.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/Ingestion.razor`
-- **Reached via:** Data → File Ingestion; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Scans a server-side folder for files matching a pattern and ingests each one into the vector store (read → chunk → embed → upsert), showing per-file results, vector-store stats, and the document list.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["Ingestion.razor (/ingestion)"] --> INIT["OnInitializedAsync: subscribe model download, Rag.InitializeAsync, refresh stats and documents"]
-  INIT --> DL{"isDownloadingModel?"}
-  DL -->|"yes"| ALERT["Alert: Downloading BGE-M3 Model with Progress"]
-  DL -->|"no"| FORM["Ingest Documents card: Folder Path, File Pattern inputs"]
-  FORM --> BTN_ING["Button: Ingest Now -> IngestDocumentsAsync"]
-  FORM --> BTN_STOP["Button: Stop Ingestion -> StopIngestion (cancels CTS)"]
-  FORM --> BTN_CLEAR["Button: Clear All Data -> ClearVectorStoreAsync"]
-  BTN_ING --> VAL{"path empty or folder missing?"}
-  VAL -->|"invalid"| TOAST_V["ToastService.Error (Validation)"]
-  VAL -->|"valid"| SCAN["Directory.GetFiles(path, pattern, AllDirectories)"]
-  SCAN --> LOOP["For each file: Rag.IngestAsync(file, token)"]
-  LOOP --> RESULTS["ingestionResults list -> Results DataTable"]
-  LOOP --> REFRESH["RefreshStatsAsync + RefreshDocumentsAsync"]
-  REFRESH --> STATS["Vector Store Statistics card"]
-  REFRESH --> DOCS["Ingested Documents DataTable"]
-  BTN_CLEAR --> CLEARLIB["Rag.ClearAsync -> refresh"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Documents Folder Path | `Input` (`@bind documentsPath`) | Server-side folder to scan | Two-way bind to `documentsPath` (Ingestion.razor:44, 159) |
-| File Pattern | `Input` (`@bind filePattern`) | Glob pattern (`*.*` default) | Two-way bind to `filePattern` (Ingestion.razor:51, 160) |
-| Ingest Now | `Button` | Starts folder ingestion | `IngestDocumentsAsync` (Ingestion.razor:57, 225) |
-| Stop Ingestion | `Button` (while ingesting) | Cancels run | `StopIngestion` → `ingestionCts.Cancel()` (Ingestion.razor:63, 214) |
-| Clear All Data | `Button` (Destructive) | Wipes vector store | `ClearVectorStoreAsync` → `Rag.ClearAsync` (Ingestion.razor:67, 330) |
-| Progress / progressMessage | `Progress` + `TypographyMuted` | Live progress | `progress` / `progressMessage` set in loop (Ingestion.razor:75-76, 280-281) |
-| Model download alert | `Alert` + `Progress` | BGE-M3 download status | `ModelDownloadService.Instance` events (Ingestion.razor:19-33, 176) |
-| Ingestion Results | `DataTable<IngestionResult>` | Per-file success/error | `ingestionResults` local record list (Ingestion.razor:93, 172, 288) |
-| Vector Store Statistics | Card | Doc/chunk count, size, last time | `stats` from `Rag.GetStatsAsync` (Ingestion.razor:106-129, 363) |
-| Ingested Documents | `DataTable<Document>` | Name + chunk count | `documents` from `Rag.ListDocumentsAsync` (Ingestion.razor:146, 368) |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Page init | OnInitializedAsync (Ingestion.razor:174) | none — injects `ITechieRag Rag` directly (Ingestion.razor:5) | `ITechieRag.InitializeAsync` → `TechieRagClient.InitializeAsync` (TechieRagClient.cs:82) → `vectorStore.InitializeAsync` (TechieRagClient.cs:85) | IVectorStore (default SqliteVecStore, `Data Source=techierag.db` — TechieRagConfigService.cs:100-101) | static-only (unconfirmed) |
-| Ingest Now (per file) | IngestDocumentsAsync loop (Ingestion.razor:287) | none (direct `Rag`) | `ITechieRag.IngestAsync` → `TechieRagClient.IngestAsync` (TechieRagClient.cs:104): `processor.ProcessAsync` → `embeddingProvider.EmbedBatchAsync` (TechieRagClient.cs:160) → `vectorStore.UpsertBatchAsync` (TechieRagClient.cs:172) | Embedding provider (HTTP Ollama/LmStudio/Azure, or ONNX `EmbeddedEmbeddingProvider.cs:324`) + IVectorStore upsert | static-only (unconfirmed) |
-| File scan | Directory.GetFiles (Ingestion.razor:254) | n/a (in-component `System.IO`) | n/a | local filesystem (server-side) | static-only (unconfirmed) |
-| Clear All Data | ClearVectorStoreAsync (Ingestion.razor:334) | none (direct `Rag`) | `ITechieRag.ClearAsync` → `TechieRagClient.ClearAsync` (TechieRagClient.cs:405) → `vectorStore.ClearAsync` (TechieRagClient.cs:408) | IVectorStore | static-only (unconfirmed) |
-| Vector Store Statistics | stats card (Ingestion.razor:106) | none (direct `Rag`) | `ITechieRag.GetStatsAsync` → `TechieRagClient.GetStatsAsync` (TechieRagClient.cs:383) → `vectorStore.GetStatsAsync` (TechieRagClient.cs:386) | IVectorStore | static-only (unconfirmed) |
-| Ingested Documents table | documents table (Ingestion.razor:146) | none (direct `Rag`) | `ITechieRag.ListDocumentsAsync` → `TechieRagClient.ListDocumentsAsync` (TechieRagClient.cs:370) → `vectorStore.ListDocumentsAsync` (TechieRagClient.cs:373) | IVectorStore | static-only (unconfirmed) |
-| Delete document | `DeleteDocumentAsync` (Ingestion.razor:346) | none (direct `Rag`) | `ITechieRag.DeleteDocumentAsync` → `TechieRagClient.DeleteDocumentAsync` (TechieRagClient.cs:356) → `vectorStore.DeleteByDocumentAsync` (TechieRagClient.cs:361) | IVectorStore | **unreachable from UI** — no control binds to it on this page — static |
-
-**Business rules / calculations on this screen**
-- Pre-flight validation: empty path or non-existent folder aborts with a validation toast (Ingestion.razor:227-237).
-- Recursive scan: `Directory.GetFiles(..., SearchOption.AllDirectories)` (Ingestion.razor:254); zero matches aborts with toast (256-261).
-- Progress math: `progress = 5 + (int)((i / files.Length) * 90)` during loop, 100 on complete (Ingestion.razor:281, 304).
-- Per-file failures are caught and recorded (truncated to 100 chars) without stopping the batch; cancellation breaks the loop and marks remaining as skipped (Ingestion.razor:291-301, 271-276).
-- Document ID is generated in the library as `Guid.NewGuid()` (TechieRagClient.cs:129), not by the screen. `FormatSize`/`FormatBytes` convert byte counts for display (Ingestion.razor:371-385).
-
-**Known issues / gotchas**
-- `DeleteDocumentAsync` (Ingestion.razor:346) is defined but **no control invokes it** on this page — dead code here (delete exists only on TextIngestion).
-- Server-side path input: ingestion reads folders on the **server** host, not the client machine — the `C:\Documents\RAGData` placeholder (Ingestion.razor:44) is misleading on a remote/Linux deployment.
-- `EnsureDocumentExistsAsync` (TechieRagClient.cs:622) is a documented no-op (`await Task.CompletedTask`, line 632); document records depend on `UpsertBatchAsync` behaviour of the chosen store.
-- Statistics/Results cards are conditionally rendered (`stats != null`, `ingestionResults.Count > 0`); on a fresh store they render-empty by design — static.
-
----
-
-### Anonymous · TextIngestion (Text Ingestion)
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE WRITE PATH: ingested a temp doc `verify-datapath-tmp` → success toast + document id, sidebar Documents count 2 → 3; the per-row trash delete removed it → back to 2. The chunk → BGE-M3 embed → SQLite-vec cycle is proven end-to-end.
-
-- **Route:** `@page "/text-ingestion"` (`apps/TechieDesk/Components/Pages/TextIngestion.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/TextIngestion.razor`
-- **Reached via:** Data → Text Ingestion; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Lets the user paste raw text with a name and optional source, then ingests it directly (chunk → embed → upsert) into the vector store; sidebar shows stats and a deletable document list.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["TextIngestion.razor (/text-ingestion)"] --> INIT["OnInitializedAsync: subscribe model download, Rag.InitializeAsync, refresh stats and documents"]
-  INIT --> DL{"isDownloadingModel?"}
-  DL -->|"yes"| ALERT["Alert: Downloading BGE-M3 Model"]
-  DL -->|"no"| FORM["Text Content card: Document Name, Textarea, Source Info"]
-  FORM --> COUNT["Live char/word counts from textContent"]
-  FORM --> BTN_ING["Button: Ingest Text -> IngestTextAsync"]
-  FORM --> BTN_CLR["Button: Clear Form -> ClearForm"]
-  FORM --> BTN_WIPE["Button: Clear All Data -> ClearVectorStoreAsync"]
-  BTN_ING --> VAL{"name or content empty?"}
-  VAL -->|"invalid"| TOAST_V["ToastService.Error (Validation)"]
-  VAL -->|"valid"| META["Build metadata dict: ContentType, CharacterCount, WordCount, Source"]
-  META --> LIB["Rag.IngestTextAsync(text, name, metadata)"]
-  LIB --> REFRESH["RefreshStatsAsync + RefreshDocumentsAsync; clear form"]
-  REFRESH --> STATS["Statistics card"]
-  REFRESH --> DOCS["Documents list with delete buttons"]
-  DOCS --> DEL["Button trash-2 -> DeleteDocumentAsync(doc.Id)"]
-  BTN_WIPE --> WIPE["Rag.ClearAsync -> refresh"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Document Name | `Input` (Required) | Friendly name | Two-way bind to `documentName` (TextIngestion.razor:47, 148) |
-| Text Content | `Textarea` | Raw text to ingest | Two-way bind to `textContent` (TextIngestion.razor:55, 149) |
-| Char / word counters | `TypographyMuted` ×2 | Live counts | Computed from `textContent` inline (TextIngestion.razor:57-58) |
-| Source Info | `Input` | Optional source URL/id | Two-way bind to `sourceInfo` (TextIngestion.razor:66, 150) |
-| Ingest Text | `Button` | Ingests the text | `IngestTextAsync` (TextIngestion.razor:72, 204) |
-| Clear Form | `Button` (Outline) | Resets the 3 fields | `ClearForm` (TextIngestion.razor:76, 197) |
-| Clear All Data | `Button` (Destructive) | Wipes vector store | `ClearVectorStoreAsync` → `Rag.ClearAsync` (TextIngestion.razor:77, 267) |
-| Progress / message | `Progress` + `TypographyMuted` | Ingest progress | `progress`/`progressMessage` (TextIngestion.razor:83-84, 224-246) |
-| Statistics | Card | Doc/chunk count, storage | `stats` from `Rag.GetStatsAsync` (TextIngestion.razor:93-113, 299) |
-| Documents list | `@foreach` rows | Names + delete button | `documents` from `Rag.ListDocumentsAsync` (TextIngestion.razor:130, 304) |
-| Delete (trash-2) | `Button` (Ghost icon) | Deletes one document | `DeleteDocumentAsync(doc.Id)` (TextIngestion.razor:134, 282) |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Page init | OnInitializedAsync (TextIngestion.razor:159) | none — injects `ITechieRag Rag` directly (TextIngestion.razor:5) | `ITechieRag.InitializeAsync` → `TechieRagClient.InitializeAsync` (TechieRagClient.cs:82) → `vectorStore.InitializeAsync` (TechieRagClient.cs:85) | IVectorStore (default SqliteVecStore) | static-only (unconfirmed) |
-| Ingest Text | IngestTextAsync (TextIngestion.razor:243) | none (direct `Rag`) | `ITechieRag.IngestTextAsync` → `TechieRagClient.IngestTextAsync` (TechieRagClient.cs:189): `TextChunker.ChunkText` (203) → `embeddingProvider.EmbedBatchAsync` (249) → `vectorStore.UpsertBatchAsync` (261) | Embedding provider (HTTP/ONNX) + IVectorStore upsert | static-only (unconfirmed) |
-| Clear All Data | ClearVectorStoreAsync (TextIngestion.razor:271) | none (direct `Rag`) | `ITechieRag.ClearAsync` → `TechieRagClient.ClearAsync` (TechieRagClient.cs:405) → `vectorStore.ClearAsync` (408) | IVectorStore | static-only (unconfirmed) |
-| Statistics card | stats card (TextIngestion.razor:93) | none (direct `Rag`) | `ITechieRag.GetStatsAsync` → `TechieRagClient.GetStatsAsync` (TechieRagClient.cs:383) → `vectorStore.GetStatsAsync` (386) | IVectorStore | static-only (unconfirmed) |
-| Documents list | foreach (TextIngestion.razor:130) | none (direct `Rag`) | `ITechieRag.ListDocumentsAsync` → `TechieRagClient.ListDocumentsAsync` (TechieRagClient.cs:370) → `vectorStore.ListDocumentsAsync` (373) | IVectorStore | static-only (unconfirmed) |
-| Delete (trash-2) | DeleteDocumentAsync (TextIngestion.razor:282) | none (direct `Rag`) | `ITechieRag.DeleteDocumentAsync` → `TechieRagClient.DeleteDocumentAsync` (TechieRagClient.cs:356) → `vectorStore.DeleteByDocumentAsync` (361) | IVectorStore | static-only (unconfirmed) |
-
-**Business rules / calculations on this screen**
-- Validation: empty `documentName` or empty `textContent` aborts with a validation toast (TextIngestion.razor:206-216).
-- Metadata built client-side: `ContentType="text"`, `CharacterCount`, `WordCount`, and `Source` only when `sourceInfo` is non-blank (TextIngestion.razor:229-236). Word count uses `Split(...).Length` (line 58, 233).
-- On success the form fields are cleared and stats/documents refreshed (TextIngestion.razor:249-253). Document ID generated in library via `Guid.NewGuid()` (TechieRagClient.cs:200); chunking via `TextChunker.ChunkText` using `config.Processing.DefaultChunkSize/Overlap` (TechieRagClient.cs:203-206).
-
-**Known issues / gotchas**
-- **Progress bar is cosmetic/fake**: hardcoded 10/30/100 steps with artificial `Task.Delay(50)` (TextIngestion.razor:227, 241) — it does not reflect actual embedding/upsert progress.
-- `Required="true"` on Document Name (line 47) is decorative — no `EditForm`/validation wraps it; enforcement is the manual null check in `IngestTextAsync` (206).
-- Live char/word counts recompute on every render via inline `Split(...)` (line 58) — O(n) per render for large pastes (minor perf gotcha).
-- Both ingestion pages inject `ITechieRag` directly; neither uses `TechieRagManager`/`TechieRagConfigService` at runtime (those configure/build the DI-registered `ITechieRag`).
-
----
-
-### Anonymous · RAG Chat
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, LM Studio `qwen2.5-coder-32b-instruct`): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: Auto-RAG with streaming ON returned a streamed answer, the "Sources Used (N)" panel rendered with % relevance scores, and the session footer moved off zero. Direct-LLM streaming was also re-confirmed.
-
-- **Route:** `@page "/chat"` (`apps/TechieDesk/Components/Pages/Chat.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/Chat.razor`
-- **Reached via:** AI Features → RAG Chat; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Conversational RAG UI. User asks a question; depending on the selected mode it does retrieval-only search, a direct LLM completion, or full Auto-RAG (retrieve + generate). Shows sources, a token/cost footer, and optional token-by-token streaming.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["Chat.razor"] --> CFG["Config bar: Mode / Top K / Doc Filter / Streaming"]
-  P --> IN["Textarea 'Ask a question...' + Send button"]
-  IN --> SM["SendMessage() handler"]
-  SM --> MODE{"chatMode value"}
-  MODE -->|"search-only"| SO["HandleSearchOnly()"]
-  MODE -->|"direct-llm"| DL["HandleDirectLlm()"]
-  MODE -->|"auto-rag (default)"| AR["HandleAutoRag()"]
-  SO --> SRCH["TechieRag.SearchAsync(query, topK, documentFilter)"]
-  DL --> PROV["TechieRag.GetLlmProvider()"]
-  PROV --> PCALL["provider.CompleteStreamAsync / CompleteAsync"]
-  AR --> SRCH2["TechieRag.SearchAsync (for sources)"]
-  AR --> ASK["TechieRag.AskStreamAsync / AskAsync"]
-  SRCH --> RENDER["messages list + Sources collapsible"]
-  PCALL --> RENDER
-  ASK --> RENDER
-  RENDER --> FOOT["Footer: totalTokens / totalCost / message count"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Clear Chat | Button | Clears messages + token/cost counters | `ClearChat()` Chat.razor:301 |
-| New Conversation | Button | Clears messages + streaming buffer | `NewConversation()` Chat.razor:308 |
-| Chat Configuration | Collapsible | Toggles config bar | `@bind-Open="configOpen"` Chat.razor:31 |
-| Mode | Select | auto-rag / direct-llm / search-only | `@bind chatMode` (default "auto-rag") Chat.razor:46,178 |
-| Top K | Select | Retrieval depth (3/5/10) | `@bind topKString`; `topK` derived prop Chat.razor:61,187 |
-| Doc Filter | Input | Optional documentId filter | `@bind documentFilter` Chat.razor:76 |
-| Streaming | Switch | Toggle token streaming | `@bind useStreaming` (default true) Chat.razor:83,180 |
-| Message list | foreach render | User/assistant bubbles | `messages` list Chat.razor:107 |
-| Sources Used (n) | Collapsible per assistant msg | Source docs + score badge | `msg.Sources` Chat.razor:113-132 |
-| Streaming indicator | conditional block | Live streamed text + cursor, or "Thinking..." | `isProcessing` / `streamingContent` Chat.razor:137-154 |
-| Ask a question | Textarea | Question input | `@bind userInput` Chat.razor:160 |
-| Send | Button | Submits question | `SendMessage()`; disabled while processing/empty Chat.razor:161 |
-| Footer stats | text | Session tokens / cost / msg count | `totalTokens`, `totalCost`, `messages.Count` Chat.razor:167-170 |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Send (search-only) | Chat.razor:240 `HandleSearchOnly` | `TechieRagManager.SearchAsync` (TechieRagManager.cs:281) | `TechieRagClient.SearchAsync` (TechieRagClient.cs:330) → `embeddingProvider.EmbedAsync` (342) + `vectorStore.SearchAsync` (345) | Embedding + vector store | static-only (unconfirmed). Renders raw search results as assistant text |
-| Send (direct-llm, stream) | Chat.razor:261 `HandleDirectLlm` | `TechieRagManager.GetLlmProvider` (TechieRagManager.cs:365) | `ILlmProvider.CompleteStreamAsync` (ILlmProvider.cs:37) | LLM provider HTTP | **suspected defect** — streaming branch never adds to `totalTokens`/`totalCost`; footer stays 0 (Chat.razor:263-264) — static |
-| Send (direct-llm, non-stream) | Chat.razor:270 | same `GetLlmProvider` | `ILlmProvider.CompleteAsync` (ILlmProvider.cs:31) | LLM provider HTTP | static-only. Updates `totalTokens` only (no cost) |
-| Send (auto-rag, stream) | Chat.razor:280-288 `HandleAutoRag` | `TechieRagManager.SearchAsync` + `AskStreamAsync` (TechieRagManager.cs:281,323) | `TechieRagClient.SearchAsync` (330) for sources, then `TechieRagClient.AskStreamAsync` (443) → `promptTemplate.BuildRagPrompt` (455) → `llmProvider.ChatStreamAsync` (457) | Embedding + vector store + LLM provider HTTP | **suspected defects** — (1) search runs TWICE (sources + inside AskStreamAsync); (2) streaming branch never updates tokens/cost — static |
-| Send (auto-rag, non-stream) | Chat.razor:292 | `TechieRagManager.AskAsync` (TechieRagManager.cs:311) | `TechieRagClient.AskAsync` (TechieRagClient.cs:415) | Embedding + vector store + LLM provider HTTP | static-only. Updates `totalTokens` + `totalCost` from `response.Usage` |
-| Sources badge | Chat.razor:125 | n/a | `SearchResult.Score` / `Chunk.DocumentId` (from SearchAsync) | vector store | static-only. Score shown as %; DocumentName = DocumentId |
-
-**Business rules / calculations on this screen**
-- `topK` parsed from `topKString`, default 5 on failure (Chat.razor:187). Mode routing: "search-only" → search only; "direct-llm" → LLM, no retrieval; else → Auto-RAG (Chat.razor:212-223).
-- Footer cost/tokens accumulate only in non-streaming branches; `totalCost` only ever incremented in auto-rag non-stream (Chat.razor:294). Send disabled while `isProcessing` or empty (line 161).
-
-**Known issues / gotchas**
-- **Streaming token/cost never counted (default path)**: both `HandleDirectLlm` (Chat.razor:259-266) and `HandleAutoRag` (278-288) streaming branches never add to `totalTokens`/`totalCost`. Since Streaming is **on by default**, the footer reads "0 tokens / $0.0000" regardless of usage. *(logged to REQ-UI-005)*
-- **Double retrieval in streamed Auto-RAG**: `SearchAsync` is called once for sources (Chat.razor:280) and again internally by `AskStreamAsync` (TechieRagClient.cs:454) — duplicate embedding + vector query cost per question. *(logged to REQ-UI-005)*
-- `HandleAutoRag` streaming passes null systemPrompt and no history — no conversation memory is used even though the library supports it; each question is stateless.
-- Source label shows `DocumentId` (often a GUID/path) as the `DocumentName` (Chat.razor:246,281,296) — cosmetic.
-
----
-
-### Anonymous · LLM Playground
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, LM Studio `qwen2.5-coder-32b-instruct`): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE: a completion returned text plus real token counts; Structured Output deserialized to the typed object (SentimentAnalysis fields rendered).
-
-- **Route:** `@page "/llm-playground"` (`apps/TechieDesk/Components/Pages/LlmPlayground.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/LlmPlayground.razor`
-- **Reached via:** AI Features → LLM Playground; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Direct LLM testbench with three tabs — Completion (single prompt, optional streaming), Structured Output (JSON-mode responses), and Chat (multi-turn direct LLM chat). Bypasses retrieval entirely; talks straight to the configured LLM provider.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["LlmPlayground.razor"] --> TABS{"Tabs: Completion / Structured / Chat"}
-  TABS -->|"Completion"| C1["GenerateCompletion()"]
-  TABS -->|"Structured Output"| C2["GenerateStructured()"]
-  TABS -->|"Chat"| C3["SendDirectChat()"]
-  C1 --> GP["GetProvider() -> TechieRag.GetLlmProvider()"]
-  C2 --> GP
-  C3 --> GP
-  GP --> COMP["provider.CompleteStreamAsync / CompleteAsync"]
-  C1 --> COMP
-  C2 --> JSON["provider.CompleteAsync(prompt, JsonMode=true)"]
-  GP --> JSON
-  C3 --> CHAT["provider.ChatStreamAsync / ChatAsync"]
-  COMP --> R1["completionResponse + completionStats"]
-  JSON --> R2["structuredResponse (raw JSON)"]
-  CHAT --> R3["directChatMessages list"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Tabs (Completion/Structured/Chat) | Tabs | Switch test mode (default "completion") | `DefaultValue="completion"` LlmPlayground.razor:16 |
-| System Prompt | Textarea | System role text | `@bind systemPrompt` (default "You are a helpful assistant.") :34,180 |
-| User Prompt | Textarea | User message | `@bind userPrompt` :40 |
-| Temperature | Number Input | Temperature | `@bind temperatureString` (default "0.7") :47,193 |
-| Max Tokens | Number Input | Max tokens | `@bind maxTokensString` (default "2048") :53,194 |
-| Streaming | Switch | Toggle streaming (completion+chat) | `@bind useStreaming` (default true) :60,185 |
-| Generate | Button | Run completion | `GenerateCompletion()` :66 |
-| Completion Response card | conditional | Answer + stats | `completionResponse`/`completionStats` :73-87 |
-| Structured Prompt | Textarea | Prompt for typed test | `@bind structuredPrompt` :102 |
-| Response Type | Select | sentiment/weather/book | `@bind structuredType` (default "sentiment") :108,183 |
-| Generate Typed Response | Button | Run JSON-mode call | `GenerateStructured()` :120 |
-| Parsed Result card | conditional | Raw JSON string output | `structuredResponse` :127-137 |
-| Direct chat messages | foreach render | Chat bubbles | `directChatMessages` :151 |
-| Chat input + Send | Textarea + Button | Send chat turn | `SendDirectChat()` :169-170 |
-| Clear (chat) | Button | Clears chat history | `ClearDirectChat()` :147,326 |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Generate (stream) | LlmPlayground.razor:221 `GenerateCompletion` | `TechieRagManager.GetLlmProvider` (TechieRagManager.cs:365) | `ILlmProvider.CompleteStreamAsync` (ILlmProvider.cs:37) | LLM provider HTTP | static-only. Stats = elapsed ms only (streaming yields strings, not usage) |
-| Generate (non-stream) | LlmPlayground.razor:232 | same `GetLlmProvider` | `ILlmProvider.CompleteAsync` (ILlmProvider.cs:31) | LLM provider HTTP | static-only. Stats include input/output tokens from `response.Usage` |
-| Generate Typed Response | LlmPlayground.razor:268 `GenerateStructured` | same `GetLlmProvider` | `ILlmProvider.CompleteAsync` with `LlmCompletionOptions{JsonMode=true}` (ILlmProvider.cs:31) | LLM provider HTTP | **suspected defect** — output rendered as raw JSON string, never deserialized into the named types — static |
-| Chat Send (stream) | LlmPlayground.razor:302 `SendDirectChat` | same `GetLlmProvider` | `ILlmProvider.ChatStreamAsync(IReadOnlyList<ChatMessage>)` (ILlmProvider.cs:49) | LLM provider HTTP | static-only. Sends full `directChatMessages` history each turn |
-| Chat Send (non-stream) | LlmPlayground.razor:311 | same `GetLlmProvider` | `ILlmProvider.ChatAsync` (ILlmProvider.cs:43) | LLM provider HTTP | static-only |
-
-**Business rules / calculations on this screen**
-- Provider gate: `GetProvider()` shows a toast error and returns null if no LLM configured (LlmPlayground.razor:196-202); all actions early-return.
-- Completion concatenates system + user prompt as `"{system}\n\n{user}"` when system is non-empty (:220,231). Structured mode wraps the prompt with a hardcoded JSON-shape instruction per `structuredType` (:259-265). Chat sends the entire local message history each turn (no server-side memory).
-
-**Known issues / gotchas**
-- **Temperature and Max Tokens are collected but never used**: `temperatureString`/`maxTokensString` are never parsed into `LlmCompletionOptions` for any call (LlmPlayground.razor:47,53 vs 221/232/268). No-op inputs. *(logged to REQ-UI-006)*
-- **Structured "Parsed Result" is not parsed**: it renders the raw model JSON string; the SentimentAnalysis/WeatherForecast/BookSummary types implied by the labels are never used for deserialization (:269,134). Misleading label. *(logged to REQ-UI-006)*
-- System Prompt in Completion is folded into the user-prompt string rather than passed as `options.SystemPrompt`; Structured and Chat tabs ignore the System Prompt field entirely.
-
----
-
-### Anonymous · Tool Calling Demo
-
-> **Runtime-verified 2026-07-02** (verifier `*verify REQ-UI-007`; **re-confirmed same day by `*verify all`**, live boot :5099, LM Studio qwen2.5-coder-32b): the live agent loop made REAL `get_weather` **and** `calculate_math` tool calls end-to-end and the **Execution Trace rendered each live step** (requested → executed + result → final answer). All controls render ✓; looks-right ✓ @1280 **and** @390 (the earlier mobile overflow was fixed same day — `main{min-width:0}` TR-003 workaround + `relative overflow-x-auto` DataTable wrapper TR-004 + wrapping rows; `document.scrollWidth=390` at 390px).
-
-- **Route:** `@page "/tool-demo"` (`apps/TechieDesk/Components/Pages/ToolDemo.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/ToolDemo.razor`
-- **Reached via:** AI Features → Tool Demo; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Demonstrates the agent tool-calling loop. Registers four demo tools (weather, math, document search, current time) plus user-defined mock tools, then runs a multi-iteration agent loop where the LLM decides which tools to call.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["ToolDemo.razor"] --> INIT["OnInitialized -> RegisterDemoTools + RefreshToolList"]
-  INIT --> REG["toolRegistry.Register(get_weather / calculate_math / search_documents / get_current_time)"]
-  P --> TABLE["Available Tools DataTable"]
-  P --> SHEET["Add Custom Tool sheet -> AddCustomTool()"]
-  SHEET --> REG2["toolRegistry.Register(custom mock tool)"]
-  P --> INPUT["Agent input Textarea + Run Agent Loop"]
-  INPUT --> RUN["RunAgentLoop()"]
-  RUN --> GP["TechieRag.GetLlmProvider()"]
-  GP --> RUNNER["new AgentLoopRunner(provider, toolRegistry, maxIterations: 5)"]
-  RUN --> PROG["new Progress(AgentStep) -> ToExecutionStep + InvokeAsync(StateHasChanged)"]
-  RUNNER --> EXEC["runner.RunAsync(messages, progress)"]
-  EXEC --> LOOP["loop: llmProvider.ChatAsync -> toolHandler.ExecuteToolAsync"]
-  LOOP --> RPT["progress.Report(AgentStep) per tool request / execution / final answer"]
-  RPT --> TRACE["Execution Trace (live, one row per step)"]
-  EXEC --> ANS["finalAnswer + agentStats"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Available Tools table | DataTable | Registered tools (Name/Description/Status) | `toolRows` from `RefreshToolList()` ToolDemo.razor:69,212 |
-| Add Custom Tool | Sheet + Button | Register a mock tool | `AddCustomTool()` :62,219 |
-| Tool Name/Description/Schema/Mock Response | Inputs/Textareas | Custom tool fields | `@bind` customTool* :39,45,51,57 |
-| Agent input | Textarea | Prompt for the agent | `@bind agentInput` :86 |
-| Run Agent Loop | Button | Executes the agent loop | `RunAgentLoop()` :87 |
-| Execution Trace | conditional | Per-step description/result | `executionSteps` :93-111 |
-| Final Answer | conditional | Agent final text | `finalAnswer` :113-119 |
-| Agent stats | text | Elapsed ms + total tokens | `agentStats` :121-124 |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| OnInitialized registers tools | ToolDemo.razor:161 `RegisterDemoTools` | n/a (local) | `ToolRegistry.Register` (ToolRegistry.cs:37,61) | in-memory tool registry | static-only. Four tools into local `toolRegistry` |
-| search_documents tool body | ToolDemo.razor:200 | none — injects `ITechieRag TechieRag` directly (ToolDemo.razor:7) | `ITechieRag.SearchAsync` (ITechieRag.cs) → `TechieRagClient.SearchAsync` (TechieRagClient.cs:330) → embed + vector search | Embedding + vector store | static-only. Only invoked if the LLM chooses this tool |
-| Add Tool | ToolDemo.razor:219 `AddCustomTool` | n/a | `ToolRegistry.Register` (ToolRegistry.cs:61) with constant mock response | in-memory registry | static-only. Schema passed verbatim, no validation |
-| Run Agent Loop | ToolDemo.razor:242 `RunAgentLoop` | none — `ITechieRag.GetLlmProvider()` (ITechieRag.cs:186) → `TechieRagClient.GetLlmProvider()` (TechieRagClient.cs:540) | `new AgentLoopRunner(provider, toolRegistry, maxIterations: 5)` (ToolDemo.razor:261) → `AgentLoopRunner.RunAsync(messages, progress)` (AgentLoopRunner.cs:66) → loop of `ILlmProvider.ChatAsync` (AgentLoopRunner.cs:94,155) + `ToolRegistry.ExecuteToolAsync` (ToolRegistry.cs:70) | LLM provider HTTP + tool handlers | static-only. Final `LlmResponse.Content` → `finalAnswer` (ToolDemo.razor:279); stats = ms + input+output tokens (ToolDemo.razor:280) |
-| Execution Trace render | ToolDemo.razor:93-111 (markup) ← `Progress<AgentStep>` (ToolDemo.razor:269) | `ToExecutionStep` (ToolDemo.razor:297) | `AgentLoopRunner.RunAsync` `progress.Report(new AgentStep{…})` per tool-call request (AgentLoopRunner.cs:108), each tool execution (cs:132), final answer (cs:99) and max-iterations (cs:156) | n/a (in-memory step list) | **renders ✓ (runtime-confirmed 2026-07-02)** — live agent loop rendered "Step 1: LLM requested tool(s): get_weather" → "Step 2: Executed get_weather({"city":"Tokyo"})" + result `32°C, Partly Cloudy…` → final-answer step; fallback branch (ToolDemo.razor:283) not hit. Runner reports `IProgress<AgentStep>` (AgentLoopRunner.cs:69); page appends live via `InvokeAsync(StateHasChanged)` (ToolDemo.razor:272) |
-
-**Business rules / calculations on this screen**
-- Demo tools registered once in `OnInitialized` (ToolDemo.razor:145-149). `AddCustomTool` requires non-empty name + description (221-231). Math tool evaluates via `System.Data.DataTable().Compute` (184).
-- Provider gate: missing LLM → toast error, abort (244-249). Agent loop capped at `maxIterations: 5` (named arg, correctly skipping the optional `logger` — AgentLoopRunner.cs:39-43).
-
-**Known issues / gotchas**
-- ✅ **FIXED 2026-06-25 — Execution Trace now shows real steps.** `AgentLoopRunner.RunAsync` gained an optional `IProgress<AgentStep>` parameter (new `src/TechieRag/Models/AgentStep.cs` + `AgentStepKind`) and reports a step for each tool-call request, each individual tool execution (name/args/result/success), and the final answer. `ToolDemo.razor:269` passes a `Progress<AgentStep>` that maps each `AgentStep.Kind` (`ToolCallRequested`/`ToolExecuted`/`FinalAnswer`/`MaxIterationsReached`, AgentStep.cs:4-17) via `ToExecutionStep` (ToolDemo.razor:297) and re-renders live (`InvokeAsync(StateHasChanged)`, ToolDemo.razor:272). The old hardcoded single-step fallback (ToolDemo.razor:282-285) remains only as a safety net. Core library **re-built clean (0 errors, 2026-06-30)**. ⚠ **RUNTIME 2026-07-01 (verifier, live LM Studio) — the trace does NOT show real tool steps:** the agent loop made no tool call (the model answered/hallucinated), so `IProgress<AgentStep>` fired **0 times** and the page fell through to its `executionSteps.Count == 0` fallback (`ToolDemo.razor:283`) → the trace showed only "Step 1: LLM generated final answer". The endpoint DOES tool-call when tools are sent directly (raw `finish_reason:tool_calls`), so the gap is in the agent-loop/provider path — logged **TR-RAG-006**. ✅✅ **RESOLVED AT RUNTIME 2026-07-02 (verifier):** after the TR-RAG-006 fix (`LmStudioLlmProvider` tools/tool_calls) the live UI trace shows the real steps — requested tool(s) → `Executed get_weather({"city":"Tokyo"})` with result block → final answer using the tool result; two consecutive runs consistent (test `tests/verify/req-ui-007.spec.ts`, screenshot `test-results/screens/req-ui-007-trace-desktop.png`). *(REQ-UI-007 / REQ-RAG-009)*
-- ✅ **RESOLVED 2026-07-02 — mobile (390px) overflow fixed same day.** Three compounding causes: TrBlazeUI `SidebarInset` `<main>` lacks `min-width:0` (**TR-003** — app workaround `main{min-width:0}` in `wwwroot/styles/base.css`); the DataTable pagination's `sr-only` absolutely-positioned spans escape scroll containers to the `relative` `<main>` and widen the document (**TR-004** — fixed by wrapping DataTables in `relative overflow-x-auto`, shadcn pattern); non-wrapping header/input rows (ToolDemo.razor:20 `flex-wrap`, :84 `flex-col sm:flex-row`). Verified: `/tool-demo` and `/ingestion` both measure `scrollWidth == 390` at a 390px viewport; visual gate PASS @1280 + @390 (screenshots `req-ui-007-trace-{desktop,mobile}.png`, `ingestion-fixed-{desktop,mobile}.png`). *(REQ-UI-007; REQ-UI-004)*
-- The custom-tool JSON Schema textarea accepts arbitrary text passed verbatim to `Register` with no validation (ToolDemo.razor:231).
-- `agentStats` token count comes from the final response only; intermediate tool-call round-trip tokens are not summed.
-
----
-
-### Anonymous · Token Usage
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099): renders ✓ + looks-right ✓ @1280 **and** @390. LIVE DATA (upgrades the earlier zeros-only observation): after this run's live LLM operations the dashboard showed **non-zero Total Tokens / Operations** and a populated Usage-by-Model row for `qwen2.5-coder-32b-instruct`. Known issue stands: Estimated Cost reads $0.0000 for models absent from the hard-coded pricing table; the budget alert was not exercised (no budget configured).
-
-- **Route:** `@page "/token-usage"` (`apps/TechieDesk/Components/Pages/TokenUsage.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/TokenUsage.razor`
-- **Reached via:** Monitoring → Token Usage; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Read-only dashboard that polls the library's in-memory token tracker every 5s and shows session totals, cost, budget utilization, and a per-model usage grid; one action resets the session.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["TokenUsage.razor"] --> INIT["OnInitialized() (file:140)"]
-  INIT --> GTT["TechieRag.GetTokenTracker() (file:142)"]
-  GTT --> TR["ITokenTracker (TokenUsageTracker)"]
-  INIT --> RD["RefreshData() (file:147)"]
-  INIT --> TMR["Timer every 5000ms -> RefreshData + StateHasChanged (file:144)"]
-  RD --> GSU["tracker.GetSessionUsage() (file:149)"]
-  RD --> GBS["tracker.GetBudgetStatus() (file:150)"]
-  RD --> GUM["tracker.GetUsageByModel() (file:152)"]
-  GSU --> CARDS["Summary Cards: Total / Input-Output / Cost / Operations"]
-  GBS --> BUD["Budget Status card (null-guarded) (file:60)"]
-  GUM --> GRID["DataTable 'Usage by Model' (file:119)"]
-  P --> RST["Reset Session button -> ResetSession() (file:17,170)"]
-  RST --> RESET["tracker.Reset() (file:172)"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Reset Session | Button (file:17) | Clears in-memory usage records | `ResetSession()` → `tracker.Reset()` (file:170,172) |
-| Total Tokens | Card value (file:30) | Session total tokens | `sessionUsage.TotalTokens` (= `TotalInputTokens+TotalOutputTokens`, TokenUsage.cs:38) |
-| Input / Output | Card value (file:38) | Input vs output counts | `sessionUsage.TotalInputTokens / TotalOutputTokens` |
-| Estimated Cost | Card value (file:46) | Session cost USD | `sessionUsage.TotalEstimatedCostUsd` (`F4`) |
-| Operations | Card value (file:54) | Recorded operation count | `sessionUsage.OperationCount` |
-| Token Budget bar | Progress (file:74) | Token utilization % | `budgetStatus.TokenUtilization*100`; class via `GetBudgetClass` (file:163) |
-| Cost Budget bar | Progress (file:85) | Cost utilization % | `budgetStatus.CostUtilization*100` |
-| Budget Exceeded / Alert | Alert (file:91,98) | Conditional warning banners | `budgetStatus.IsExceeded` / `IsAlertTriggered` |
-| Usage by Model grid | DataTable (file:119) | Per-model breakdown | `modelUsage` from `GetUsageByModel()` |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Tracker handle | OnInitialized (TokenUsage.razor:142) | `ITechieRag.GetTokenTracker()` (ITechieRag.cs:192) → `TechieRagClient.GetTokenTracker()` (TechieRagClient.cs:543) | `TokenUsageTracker : ITokenTracker` (Services/TokenUsageTracker.cs:17) | In-memory `ConcurrentBag<TokenUsage>` (TokenUsageTracker.cs:19) — NO DB | static-only (unconfirmed) |
-| Summary cards | RefreshData (TokenUsage.razor:149) | n/a (direct lib call) | `TokenUsageTracker.GetSessionUsage()` aggregates `usageRecords` (TokenUsageTracker.cs:67) | In-memory aggregation | static-only; empty if no LLM calls recorded |
-| Budget Status card | RefreshData (TokenUsage.razor:150) | n/a | `TokenUsageTracker.GetBudgetStatus()` (returns null when no budget set, TokenUsageTracker.cs:127-139) | In-memory `currentBudget` (from `UsageTrackingConfig`, ctor TokenUsageTracker.cs:34-48) | renders-empty (expected — `@if (budgetStatus != null)` file:60; hidden unless a budget configured at build) — static |
-| Usage by Model grid | RefreshData (TokenUsage.razor:152) | n/a | `TokenUsageTracker.GetUsageByModel()` groups by `ModelName` (TokenUsageTracker.cs:87) | In-memory aggregation | static-only; `@if (modelUsage.Count==0)` shows "No usage data yet." (file:113) |
-| Reset Session | ResetSession (TokenUsage.razor:170) | n/a | `TokenUsageTracker.Reset()` drains the bag (TokenUsageTracker.cs:142) | In-memory clear | static-only |
-
-**Business rules / calculations on this screen**
-- `GetBudgetClass(utilization)` (file:163): ≥0.8 → red bar; ≥0.6 → yellow; else default. `TotalTokens = TotalInputTokens + TotalOutputTokens` (TokenUsage.cs:38).
-- Cost computed at record time via `CalculateCost` using a built-in per-million pricing table (TokenUsageTracker.cs:158, 207-217); only models in that table get non-zero cost.
-- `IsExceeded` when tokens ≥ MaxTotalTokens OR cost ≥ MaxCostUsd (TokenUsage.cs:89); `IsAlertTriggered` when either utilization ≥ AlertThreshold (TokenUsage.cs:94). 5s timer re-pulls all three queries (file:144); disposed in `Dispose()` (file:179).
-
-**Known issues / gotchas**
-- **"Estimated Cost" reads $0.0000 for any model not in the hard-coded pricing table** (TokenUsageTracker.cs:207-217) even though its tokens are counted — silent under-reporting for unlisted models. *(logged to REQ-UI-008)*
-- Cards bind to `sessionUsage` while the budget bars use `budgetStatus` (whose `CurrentUsage` is a separate `GetSessionUsage()` call, TokenUsageTracker.cs:136); the 5s `RefreshData` fetches both together, but momentary skew is possible under concurrent recording.
-- Usage is process-memory only (`ConcurrentBag`); an app restart loses all data — by design (no DB).
-
----
-
-### Anonymous · Qdrant Admin
-
-> **Runtime-verified 2026-07-02** (verifier `*verify all`, live boot :5099, Qdrant 1.15.5 in Docker): renders ✓ @1280 **and** @390; looks-right ✓ @1280 BUT **visual-broken @390 (DEFECT 2026-07-02)** — with a RUNNING container, the Container-Management row's Stop + logs icon buttons sit off-canvas (x ≈ 666–765 vs the 390px page), reachable only by panning the whole shell `<main>`; TR-003 class, needs flex-wrap/local containment; only manifests when a container is running. LIVE otherwise: Connect with API key → Docker Available, Qdrant Connected, **Version 1.15.5 (real server)**; collections table populated; created + deleted collection `verify_crud_tmp` via the UI; browsed `techierag_chunks` (1,043 points) with working pager Next/Previous; the vector detail dialog opened non-empty. Bulk delete + container lifecycle buttons were not exercised (real owner data/infrastructure).
-
-- **Route:** `@page "/qdrant-admin"` (`apps/TechieDesk/Components/Pages/QdrantAdmin.razor:1`)
-- **Razor file:** `apps/TechieDesk/Components/Pages/QdrantAdmin.razor`
-- **Reached via:** Admin → Qdrant Admin; **Log in as:** no auth (single anonymous user)
-- **What this screen does:** Operator console for the Qdrant vector DB — detects Docker, lists/creates/starts/stops Qdrant containers via the Docker API, tests the gRPC connection, and performs CRUD on collections and individual vectors via `Qdrant.Client`.
-
-**Screen flowchart**
-```mermaid
-flowchart TD
-  P["QdrantAdmin.razor"] --> INIT["OnInitializedAsync() (file:496)"]
-  INIT --> RS["RefreshStatusAsync() (file:503)"]
-  RS --> DAVAIL["DockerService.IsDockerAvailableAsync() (file:507)"]
-  DAVAIL --> DK["DockerContainerService -> Docker daemon ping (DockerContainerService.cs:163)"]
-  RS --> LIST["DockerService.ListQdrantContainersAsync() (file:510)"]
-  LIST --> DKL["client.Containers.ListContainersAsync (DockerContainerService.cs:187)"]
-  RS --> TEST["QdrantService.TestConnectionAsync() (file:524)"]
-  TEST --> QC["QdrantClient.ListCollectionsAsync (QdrantAdminService.cs:261)"]
-  RS --> CLU["QdrantService.GetClusterInfoAsync() (file:529)"]
-  RS --> COLS["QdrantService.ListCollectionsAsync() (file:530)"]
-  COLS --> GRIDC["Collections DataTable (file:272)"]
-  P --> CONNBTN["Connect -> ApplyEndpointAsync() (file:49,545)"]
-  CONNBTN --> CFG["QdrantService.ConfigureEndpoint(host,port,apiKey) (file:547)"]
-  P --> CREATEC["Create Container -> CreateContainerAsync() (file:152,589)"]
-  CREATEC --> DKCR["DockerService.CreateQdrantContainerAsync (DockerContainerService.cs:299)"]
-  P --> STARTSTOP["Start / Stop -> Start/StopContainerAsync (file:188,192)"]
-  STARTSTOP --> DKSS["DockerService.Start/StopContainerAsync (DockerContainerService.cs:351,365)"]
-  P --> NEWCOL["New Collection -> CreateCollectionAsync() (file:255,650)"]
-  NEWCOL --> QCRC["QdrantClient.CreateCollectionAsync (QdrantAdminService.cs:402)"]
-  P --> DELCOL["Delete -> DeleteCollectionAsync() (file:281,665)"]
-  P --> BROWSE["Browse -> SelectCollection() (file:280,684)"]
-  BROWSE --> CINFO["QdrantService.GetCollectionInfoAsync (QdrantAdminService.cs:359)"]
-  BROWSE --> BV["QdrantService.BrowseVectorsAsync (QdrantAdminService.cs:428)"]
-  BV --> SCROLL["QdrantClient.ScrollAsync (QdrantAdminService.cs:438)"]
-  BROWSE --> VGRID["Vectors DataTable (file:345)"]
-  VGRID --> PREVNEXT["Previous / Next -> Browse offset (file:367,370)"]
-  VGRID --> VIEWV["View -> ViewVectorAsync() (file:353,719)"]
-  VIEWV --> GETV["QdrantService.GetVectorByIdAsync (QdrantAdminService.cs:456)"]
-  VGRID --> DELV["Delete -> DeleteVectorAsync() (file:354,728)"]
-```
-
-**Controls on this screen**
-
-| Control | Type | Purpose | Populated / calculated by |
-|---------|------|---------|---------------------------|
-| Refresh | Button (file:18) | Re-run full status refresh | `RefreshStatusAsync()` (file:503) |
-| Host / gRPC Port / API Key | Input (file:34,40,46) | Endpoint config | `configHost`, `configPortString`, `configApiKey` (seeded from `QdrantService.Host/Port`, file:498) |
-| Connect | Button (file:49) | Apply endpoint + reconnect | `ApplyEndpointAsync()` → `ConfigureEndpoint` (file:545,547) |
-| Docker/Qdrant/Version/Collections status cards | Card values (file:62,72,82,90) | Live status | `isDockerAvailable`, `qdrantStatus`, `clusterInfo?.Version`, `clusterInfo?.TotalCollections` |
-| Connection String + Copy | code + Button (file:100,101) | Show/copy gRPC conn string | `QdrantService.ConnectionString` (QdrantAdminService.cs:202); JS clipboard (file:576) |
-| Create Container (dialog) | Dialog/Button (file:123,152) | Create new Qdrant container | `CreateContainerAsync()` (file:596) |
-| Containers grid | DataTable (file:176) | List containers + Start/Stop/Use | `qdrantContainers` (file:510) |
-| New Collection (dialog) | Dialog/Button (file:211,255) | Create vector collection | `CreateCollectionAsync()` (file:654) |
-| Collections grid | DataTable (file:272) | List collections + Browse/Delete | `collections` (file:530) |
-| Collection detail stats | Cards (file:303-338) | Points/Vector size/Distance/Status | `selectedCollectionDetail` (file:689) |
-| Vectors grid | DataTable (file:345) | Page through vectors + View/Delete | `currentVectorPage.Vectors` (file:690) |
-| Previous / Next | Button (file:367,370) | Custom pagination | `PreviousPage()`/`NextPage()` (file:698,707) |
-| Vector Detail dialog | Dialog (file:388) | Full vector + payload | `selectedVector` (file:723) |
-
-**Data lineage**
-
-| Control / Action | Razor component (file:line) | Service method (file) | Library / data-access call (file) | Provider / persistence target | Notes / render status |
-|------------------|----------------------------|-----------------------|-----------------------------------|-------------------------------|------------------------|
-| Docker availability | RefreshStatusAsync (QdrantAdmin.razor:507) | `DockerContainerService.IsDockerAvailableAsync()` (DockerContainerService.cs:156) | `DockerClient.System.PingAsync()` (DockerContainerService.cs:163) | Docker daemon (npipe/unix socket, cs:140-142) | static-only; false if daemon not running |
-| Containers grid | RefreshStatusAsync (QdrantAdmin.razor:510) | `DockerContainerService.ListQdrantContainersAsync()` (DockerContainerService.cs:181) | `client.Containers.ListContainersAsync(All=true)` filtered by image "qdrant" (cs:187-202) | Docker daemon | static-only; ports via `GetHostPort` 6333/6334 (cs:228) |
-| Auto-connect to running container | RefreshStatusAsync (QdrantAdmin.razor:512-521) | `QdrantAdminService.ConfigureEndpoint` (QdrantAdminService.cs:230) | sets host=localhost, port=container.GrpcPort | In-memory endpoint | static-only; only when not Connected and a Running container has a gRPC port |
-| Connection test / status | RefreshStatusAsync (QdrantAdmin.razor:524) | `QdrantAdminService.TestConnectionAsync()` (QdrantAdminService.cs:254) | `QdrantClient.ListCollectionsAsync()` (cs:261) | Qdrant via gRPC (`new QdrantClient(host,port,https:false,apiKey)`, cs:243) — **gRPC port 6334**, not HTTP 6333 | static-only; `LastError` on RpcException (cs:267) |
-| Version / Collections-count cards | RefreshStatusAsync (QdrantAdmin.razor:529) | `QdrantAdminService.GetClusterInfoAsync()` (QdrantAdminService.cs:310) | `QdrantClient.ListCollectionsAsync()` (cs:315) | Qdrant gRPC | **suspected defect** — Version is **hard-coded `"1.12.x"`** (cs:318), not read from the server — static |
-| Collections grid | RefreshStatusAsync (QdrantAdmin.razor:530) | `QdrantAdminService.ListCollectionsAsync()` (QdrantAdminService.cs:331) | `ListCollectionsAsync()` + per-collection `GetCollectionInfoAsync` (cs:334,341) | Qdrant gRPC | **suspected defect** — `VectorCount` and `PointCount` both set to the same `PointsCount` (cs:344-345); the "Vectors" column duplicates "Points" — static |
-| Connection String / Copy | code (QdrantAdmin.razor:100) / CopyConnectionString (file:572) | `QdrantAdminService.ConnectionString` getter (cs:202) | string build + JS `navigator.clipboard.writeText` (file:576) | n/a | static-only; conn string embeds **masked** API key (cs:204) |
-| Create Container | CreateContainerAsync (QdrantAdmin.razor:596) | `DockerContainerService.CreateQdrantContainerAsync` (DockerContainerService.cs:299) | `PullQdrantImageAsync` + `CreateContainerAsync` + `StartContainerAsync` (cs:307,340,344) | Docker daemon; `qdrant/qdrant:latest`, binds 6333/6334 | static-only |
-| Start / Stop container | Start/StopContainerAsync (QdrantAdmin.razor:613,628) | `DockerContainerService.Start/StopContainerAsync` (cs:351,365) | `client.Containers.Start/StopContainerAsync` (cs:360,374) | Docker daemon | static-only |
-| Use container | UseContainer (QdrantAdmin.razor:562) | `QdrantAdminService.ConfigureEndpoint` via `ApplyEndpointAsync` (file:568,547) | sets endpoint to container GrpcPort | In-memory + reconnect | static-only; **fire-and-forget** `_ = ApplyEndpointAsync()` (file:568) swallows exceptions |
-| Create Collection | CreateCollectionAsync (QdrantAdmin.razor:654) | `QdrantAdminService.CreateCollectionAsync` (cs:390) | `QdrantClient.CreateCollectionAsync(VectorParams{Size,Distance})` (cs:402) | Qdrant gRPC | static-only; distance Cosine/Euclid/Dot (cs:394) |
-| Delete Collection | DeleteCollectionAsync (QdrantAdmin.razor:669) | `QdrantAdminService.DeleteCollectionAsync` (cs:413) | `QdrantClient.DeleteCollectionAsync` (cs:416) | Qdrant gRPC | static-only; no confirm dialog |
-| Browse (detail + vectors) | SelectCollection (QdrantAdmin.razor:684) | `GetCollectionInfoAsync` (cs:359) + `BrowseVectorsAsync` (cs:428) | `GetCollectionInfoAsync` + `ScrollAsync` (cs:362,438) | Qdrant gRPC | **suspected defect** — pagination offset built as `new PointId{Num=(ulong)offset}` (cs:437); Scroll `offset` is a point-ID cursor, not a numeric skip, so Next/Previous past page 1 misbehaves for UUID/non-sequential IDs — static |
-| Vectors grid + Prev/Next | DataTable (QdrantAdmin.razor:345) / PreviousPage/NextPage (file:698,707) | `QdrantAdminService.BrowseVectorsAsync` (cs:428) | `QdrantClient.ScrollAsync` (cs:438) | Qdrant gRPC | grid uses `ShowPagination="false"`; pagination is custom Prev/Next (file:366) — static |
-| View vector | ViewVectorAsync (QdrantAdmin.razor:719) | `QdrantAdminService.GetVectorByIdAsync` (cs:456) | `QdrantClient.RetrieveAsync(withPayload,withVectors)` (cs:465) | Qdrant gRPC | static-only; preview = first 10 values (cs:439) |
-| Delete vector | DeleteVectorAsync (QdrantAdmin.razor:728) | `QdrantAdminService.DeleteVectorAsync` (cs:499) | `QdrantClient.DeleteAsync` by id or HasId filter (cs:507,514) | Qdrant gRPC | static-only |
-
-**Business rules / calculations on this screen**
-- gRPC vs HTTP: the admin talks to Qdrant over **gRPC** (default 6334), not the 6333 HTTP API; container HTTP port 6333 is shown only as info (cs:243).
-- Endpoint precedence on refresh: if not already Connected and a Running container exposes a gRPC port, the page auto-overrides host/port to `localhost:<grpcPort>` before testing (file:512-521).
-- New-collection defaults: 1024 dims (BGE-M3), Cosine distance (file:482-483); distance string mapped to `Distance` enum (cs:394-400). Vector page size fixed at 20; Prev/Next compute offset as `±Limit` bounded by `TotalCount` (file:702,711).
-- Payload field extraction tries multiple key aliases (`Text/ChunkText/text`, `DocumentName/DocumentId/SourceFile`) (cs:447-448). "New Collection" disabled unless Connected (file:213); "Create Container" hidden unless Docker available (file:121).
-
-**Known issues / gotchas**
-- ✅ **Mobile (390px) overflow when a container is RUNNING — RESOLVED 2026-07-02** (flow-master `*build-phase`, REQ-UI-011): the Container-Management row's Stop + logs icon buttons rendered off-canvas (x ≈ 666–765 vs the 390px page). Root cause ran deeper than "add a scroll wrapper": the `.overflow-x-auto` Tailwind utility is **purged from the shipped TrBlazeUI CSS**, so the existing `<div class="relative overflow-x-auto">` DataTable wrappers were INERT (computed `overflow-x: visible`) and the 6-column containers table (~488px) escaped its 374px wrapper → `document.scrollWidth=496` @390. A `base.css` revival of the utility also failed to deliver (`MapStaticAssets` served 0-byte CSS to `br/gzip` clients). **Fix:** inline `style="overflow-x:auto;max-width:100%"` on the three QdrantAdmin DataTable wrappers (QdrantAdmin.razor:175/273/348) — immune to Tailwind purge + the static-asset pipeline. Live-verified with a running container: `document.scrollWidth` 496→**390** @390, table scrolls inside its local wrapper, desktop 1280 no regression (`tests/verify/req-ui-011-mobile-fix.spec.ts`, both cases PASS). Correction logged to TrBlazeUI feedback **TR-004** (the `overflow-x-auto` wrapper pattern noted elsewhere in this guide is inert in this app — inline style is the reliable mechanism).
-- ✅ **Hard-coded version — RESOLVED 2026-07-01** (REQ-UI-012 Verified): `GetClusterInfoAsync` now reads `client.HealthAsync().Version` (falls back to "Unknown", never a fabricated number); live-verified showing real "1.15.5". *(the "1.12.x" description below is historical.)*
-- ✅ **Collections grid "Vectors" column — RESOLVED 2026-07-01** (REQ-UI-012 Verified): `ListCollectionsAsync` now binds Vectors→`IndexedVectorsCount` (distinct from Points→`PointsCount`); no longer duplicated. *(SDK note TR-RAG-003.)*
-- ✅ **Scroll pagination — RESOLVED 2026-07-01** (REQ-UI-013 Verified): `BrowseVectorsAsync` now threads Qdrant's opaque `ScrollResponse.NextPageOffset` cursor (not a numeric `PointId.Num`); page1/page2 non-overlapping + Previous replay live-verified. *(SDK note TR-RAG-004.)*
-- Dead/unused helper `ShowCreateCollectionModal()` (file:642) never runs (the dialog uses a `DialogTrigger`), so re-opening retains prior field values. Destructive Delete actions have no confirmation. `UseContainer` fire-and-forget swallows errors (file:568).
-- `{unresolved — TODO}`: whether TrBlazeUI `DataTable` *requires* a `Pagination` object could not be confirmed (component source is PAT-gated); given `ShowPagination="false"` it is almost certainly opt-in, so likely not a defect.
-
----
+### Ingestion pipeline (IngestAsync / IngestDirectoryAsync)
+
+![Ingestion](screenshots/TechieRag/ingestion.png)
+
+Static-only (unconfirmed): the sample's Ingestion screen let a user pick files or a folder and showed the chunk count per document; it called `ITechieRag.IngestAsync` (`src/TechieRag/ITechieRag.cs:28`) or `IngestDirectoryAsync` (`:47`).
+
+**Call chain:** `TechieRagClient.IngestAsync` (`src/TechieRag/TechieRagClient.cs:138`) → `TechieRagClient.FindProcessor` (`:778`) → `IDocumentProcessor.ProcessAsync` (`src/TechieRag/Abstractions/IDocumentProcessor.cs:36`, with `DocumentProcessingOptions.Chunker` = the configured `IChunker`) → `TechieRagClient.EmbedAndStampAsync` (`:845`) → `IEmbeddingProvider.EmbedBatchAsync` (`src/TechieRag/Abstractions/IEmbeddingProvider.cs:72`) → `IVectorStore.UpsertBatchAsync` (`src/TechieRag/Abstractions/IVectorStore.cs:43`, e.g. `src/TechieRag/VectorStores/SqliteVecStore.cs:206`) → `TechieRagTelemetry.RecordIngestion` (`:211`).
+
+`IngestAsync` checks the file exists (`:142`), lower-cases the extension (`:147`) and asks `FindProcessor` for the first processor whose `SupportedExtensions` contains it (`:781`). An unknown extension falls back to `GenericTextProcessor` (`:796`) unless `GenericTextProcessor.IsBinaryExtension` (`src/TechieRag/Processors/GenericTextProcessor.cs:159`) says it is binary, in which case `IngestAsync` throws `NotSupportedException` (`:152-158`). The processor list is fixed in `TechieRagBuilder.CreateProcessors` (`src/TechieRag/TechieRagBuilder.cs:976-1004`): eleven typed processors, an optional `AudioTranscriptionProcessor` when `UseSpeechToText` was called (`:995-998`), and `GenericTextProcessor` last (`:1001`). The file size is read before the stream is consumed (`:171`) and stamped on every chunk with `DocumentName`, `SourcePath` and `FileName` (`:189-197`). Chunk size and overlap come from `config.Processing` (`src/TechieRag/TechieRagConfig.cs:245` default 500, `:255` default 50); the chunker is the one `Build()` chose (`TechieRagBuilder.cs:666`, `CreateChunkerFromStrategy` at `:742`) or `RecursiveChunker.Instance` (`TechieRagClient.cs:86`).
+
+`EmbedAndStampAsync` embeds all chunk texts in one batch and writes both the vector and `EmbeddingSignature` metadata onto each chunk (`:848-855`) so stale corpora can be detected later (`DetectStaleEmbeddingsAsync`, `:501`). `EnsureDocumentExistsAsync` (`:858`) is a no-op that only logs; the store creates the document row during upsert (`SqliteVecStore.cs:237`). `IngestDirectoryAsync` (`:318`) enumerates recursively, filters by `GetSupportedExtensions` (`:808`), and calls `IngestAsync` per file inside a try/catch that logs and continues (`:345-354`).
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/TechieRagClient.cs:148` | `IngestAsync` | `processor` | the processor whose `SupportedExtensions` holds the extension; `GenericTextProcessor` for unknown text types |
+| `src/TechieRag/TechieRagClient.cs:181` | `IngestAsync` | `chunks.Count` | greater than zero; zero returns the id without storing anything |
+| `src/TechieRag/TechieRagClient.cs:848` | `EmbedAndStampAsync` | `vectors.Count` | equals `chunkList.Count`; each vector has the provider's `Dimensions` |
+| `src/TechieRag/TechieRagClient.cs:854` | `EmbedAndStampAsync` | `signature` | the provider's `EmbeddingSignature`, e.g. `Embedded-ONNX/bge-m3/r2` |
+| `src/TechieRag/VectorStores/SqliteVecStore.cs:257` | `UpsertBatchAsync` | `vectorBytes.Length` | `Dimensions * 4` bytes per chunk |
+| `src/TechieRag/TechieRagClient.cs:347` | `IngestDirectoryAsync` | `documentIds.Count` | rises by one per file that did not throw |
+
+**Calculations on this screen:** `fileSizeBytes = stream.Length` (`:171`); chunking arithmetic lives in the chosen `IChunker`.
+
+### Raw text ingestion (IngestTextAsync)
+
+![Text ingestion](screenshots/TechieRag/text-ingestion.png)
+
+Static-only (unconfirmed): the sample's Text Ingestion screen took pasted text plus a document name and called `ITechieRag.IngestTextAsync` (`src/TechieRag/ITechieRag.cs:38`). The same method is the sink for every non-file source: web pages (`src/TechieRag/Web/WebIngestionExtensions.cs:165`), YouTube transcripts (`:102`), connector items (`src/TechieRag/Connectors/ConnectorIngestionExtensions.cs:57`) and workspace text (`src/TechieRag/Services/WorkspaceManager.cs:170`).
+
+**Call chain:** `TechieRagClient.IngestTextAsync` (`src/TechieRag/TechieRagClient.cs:226`) → `TextChunker.ChunkText` (`src/TechieRag/Processors/TextChunker.cs:34`) → `IChunker.Chunk` (`src/TechieRag/Processors/Chunking/RecursiveChunker.cs:22` for the default) → `TechieRagClient.EmbedAndStampAsync` (`:845`) → `IEmbeddingProvider.EmbedBatchAsync` → `IVectorStore.UpsertBatchAsync` (`SqliteVecStore.cs:206`) → `TechieRagTelemetry.RecordIngestion(count, "text")` (`:303`).
+
+The method rejects empty text or name (`:232-233`), mints a GUID document id (`:237`) and computes the UTF-8 byte count as the document size (`:243`). `TextChunker.ChunkText` with a chunker argument (`TextChunker.cs:34`) short-circuits to the built-in recursive splitter when the chunker is null or `RecursiveChunker` (`:36-38`) and otherwise delegates to `chunker.Chunk` (`:41`). Each chunk becomes a `TextChunk` with `DocumentId`, incrementing `ChunkIndex`, and metadata `DocumentName`, `SourcePath = "text-input"`, `FileName` and `FileSize` (`:259-271`). Caller metadata is merged afterwards and overwrites those defaults key by key (`:274-280`), which is how web ingestion replaces `SourcePath` with the final URL and connectors add `SourceType`, `SourceUrl` and `Version`.
+
+If chunking produced nothing the method logs a warning and returns the id without touching the store (`:285-289`). Otherwise it embeds and stamps (`:293`), calls the no-op `EnsureDocumentExistsAsync` (`:296`) and upserts (`:300`). In `SqliteVecStore.UpsertBatchAsync` the whole batch runs in one transaction (`:221`): the `Documents` row is inserted with `INSERT OR IGNORE` using the first chunk's `DocumentName` and `SourcePath` (`:231-249`), chunks are written with `INSERT OR REPLACE` (`:252-274`), the document's `ChunkCount` is recomputed (`:277-280`) and the transaction commits (`:282`). Note the document `Metadata` column is `SerializeDocumentMetadata(firstChunk)` (`:246`, `:586`), so listing documents later does not return chunk-level metadata; `WebIngestionExtensions.WebSourceUrl` (`WebIngestionExtensions.cs:134`) exists because of that.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/TechieRagClient.cs:243` | `IngestTextAsync` | `textSizeBytes` | UTF-8 byte count of the pasted text |
+| `src/TechieRag/Processors/TextChunker.cs:36` | `ChunkText` | `chunker` | null or `RecursiveChunker` takes the built-in path; any other strategy calls `chunker.Chunk` |
+| `src/TechieRag/TechieRagClient.cs:278` | `IngestTextAsync` | `chunk.Metadata[kvp.Key]` | caller keys overwrite defaults, e.g. `SourcePath` becomes a URL for web ingestion |
+| `src/TechieRag/TechieRagClient.cs:285` | `IngestTextAsync` | `chunkList.Count` | at least one; zero means whitespace-only input |
+| `src/TechieRag/VectorStores/SqliteVecStore.cs:234` | `UpsertBatchAsync` | `docName` | the `documentName` argument, not "Unknown" |
+| `src/TechieRag/VectorStores/SqliteVecStore.cs:282` | `UpsertBatchAsync` | `transaction` | commits once; a throw at `:286` rolls back the whole batch |
+
+**Calculations on this screen:** `Encoding.UTF8.GetByteCount(text)` (`:243`); `chunkIndex++` per chunk (`:263`).
+
+### Configuration and build (TechieRagBuilder.Build and AddTechieRag)
+
+![Settings](screenshots/TechieRag/settings.png)
+
+Static-only (unconfirmed): the sample's Settings screen edited embedding source, vector store and chunking, then rebuilt the client. In library terms that is `TechieRagBuilder` plus one of the three `AddTechieRag` overloads in `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs`.
+
+**Call chain:** `ServiceCollectionExtensions.AddTechieRag(IConfiguration)` (`src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:133`) → `configuration.Get<TechieRagConfig>()` (`:141`) → `AddTechieRag(Action<TechieRagBuilder>)` (`:57`) → `builder.WithLogging` inside the lazy singleton factory (`:72-81`) → `TechieRagBuilder.Build` (`src/TechieRag/TechieRagBuilder.cs:604`) → `CreateVectorStore` (`:850`) / `CreateEmbeddingProvider` (`:868`) / `CreateProcessors` (`:976`) / `CreateLlmProvider` (`:774`) / `CreateReranker` (`:687`) → `new TechieRagClient(...)` (`:668`).
+
+The builder overload registers `builder.GetConfig()` as a singleton (`:68`) and defers `Build()` until `ITechieRag` is first resolved, so the host's `ILoggerFactory` can be injected (`:75-78`). The `IConfiguration` overload re-applies the bound config through builder calls (`:147-247`): embedding (`:150-155`), vector store (`:158-160`), chunking (`:163-166`), telemetry flag (`:169`), Cohere or Jina rerank when an API key exists (`:174-185`), persistence (`:188-194`), LLM (`:197-206`), fallback LLM (`:209-220`), usage tracking (`:223-233`) and resilience (`:236-246`). The `TechieRagConfig` overload (`:272`) applies only embedding, vector store, chunk size and telemetry (`:281-296`). See Known issues for the fields both overloads drop.
+
+`Build()` constructs in a fixed order. The vector store switch (`:852-858`) passes only the connection string (and, for Qdrant, the API key), so every store takes its constructor default of 1024 dimensions. When an LLM is configured it is wrapped in `RetryHandler` (`:619`) and, if `LlmFallback` is set, `FallbackLlmHandler` (`:626`). Usage tracking creates `TokenUsageTracker` and subscribes it to `OnCompletionCompleted` (`:633-646`). Conversation and workspace stores come from `config.Persistence.Provider` (`:751`, `:759`); memory is `DbConversationMemory` when a store exists, else `InMemoryConversationMemory` (`:653-657`). `EmbeddingSource.Embedded` throws unless `TechieRag.Embedded`'s `UseEmbedded` (`src/TechieRag.Embedded/TechieRagBuilderExtensions.cs:25`) installed a custom factory (`:877-879`, `:37`).
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:141` | `AddTechieRag(IConfiguration)` | `config.VectorStore.Type` | the bound enum, e.g. `SqliteVec`; null config throws `InvalidOperationException` |
+| `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:75` | `AddTechieRag` factory | `loggerFactory` | non-null in a host with logging; null leaves `NullLogger` |
+| `src/TechieRag/TechieRagBuilder.cs:606` | `Build` | `vectorStore.Name` | `SQLite-vec`, `PGVector` or the Qdrant store name |
+| `src/TechieRag/TechieRagBuilder.cs:614` | `Build` | `config.Llm.Source` | `None` skips the whole LLM block; anything else must resolve at `:808` |
+| `src/TechieRag/TechieRagBuilder.cs:663` | `Build` | `reranker` | null unless a source with credentials or a custom factory was set |
+| `src/TechieRag/TechieRagBuilder.cs:854` | `CreateVectorStore` | `config.VectorStore.ConnectionString` | `Data Source=techierag.db` by default from `UseSqliteVec` (`:233`) |
+
+**Calculations on this screen:** none; `Build()` only composes objects.
+
+### LLM provider selection and factory
+
+![LLM settings](screenshots/TechieRag/llm-settings.png)
+
+Static-only (unconfirmed): the sample's LLM Settings screen chose a provider, model, API key and fallback. The library offers three routes to the same `ILlmProvider`: an explicit source (`UseLlm`), a named connector (`UseConnectorLlm`) or a bare model name (`UseLlmForModel`).
+
+**Call chain:** `TechieRagBuilder.UseLlmForModel` (`src/TechieRag/TechieRagBuilder.cs:366`) → `ModelRouter.Require` (`src/TechieRag/Llm/ModelRouter.cs:74`) → `ModelRouter.Resolve` (`:31`) → `LlmConnectorCatalog.Find` (`src/TechieRag/Llm/LlmConnectorCatalog.cs:156`) → `TechieRagBuilder.ApplyRoute` (`:369`) → `Build` → `CreateLlmProviderFromConfig` (`:785`) → provider constructor (`:808-847`) → `new RetryHandler` (`src/TechieRag/Services/RetryHandler.cs:60`) → `new FallbackLlmHandler` (`src/TechieRag/Services/FallbackLlmHandler.cs:58`).
+
+`ModelRouter.Resolve` first splits `connector/model` on the first slash (`ModelRouter.cs:37-47`), then tries the longest matching prefix across `LlmConnectorCatalog.All` (`:52-62`); an ambiguous open-weight name returns null and `Require` throws with the connector list (`:76-79`). The catalog is a static array of `LlmConnectorDescriptor` (`LlmConnectorCatalog.cs:19-146`); multi-vendor hosts such as `groq` carry no prefixes (`:93-129`) and local runtimes set `RequiresApiKey = false` (`:130-145`). `LlmProviderFactory.Create` (`src/TechieRag/Llm/LlmProviderFactory.cs:32`) is the standalone equivalent for hosts that build a provider without the builder: it refuses a missing key when the connector needs one (`:41-44`) and switches on `connector.Source` (`:46-78`).
+
+Inside the builder, `CreateLlmProviderFromConfig` consults the catalog when `Connector` is set and `Endpoint` is empty (`:790-806`), then switches on `Source` (`:808-847`); Ollama and LM Studio default their endpoints, the others throw when endpoint or key is missing. `RetryHandler.ExecuteWithRetryAsync` (`RetryHandler.cs:111`) checks the circuit (`:113`, `:177`), retries `HttpRequestException` up to `MaxRetries` (`:125`), honours `Retry-After` from `LlmRateLimitException` capped at `MaxRetryDelayMs` (`:131-135`), waits through the `DelayAsync` seam (`:151`) and multiplies the delay (`:152`); the circuit opens at `CircuitBreakerThreshold` consecutive failures (`:199-206`). Streaming methods only check the circuit (`:77`, `:94`). `FallbackLlmHandler.ChatAsync` (`FallbackLlmHandler.cs:95`) tries the primary (already retry-wrapped) and on any non-cancellation exception switches to the fallback (`:102-107`); streams are bridged through a `Channel` (`:143-180`). The fallback provider itself is built raw at `TechieRagBuilder.cs:625` and gets no retry wrapper.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/ModelRouter.cs:64` | `Resolve` | `best` | a connector for `claude-*`, `gpt-*`, `gemini-*`; null for `llama-3.3-70b` |
+| `src/TechieRag/TechieRagBuilder.cs:790` | `CreateLlmProviderFromConfig` | `connector` | non-null only when `llmConfig.Connector` names a catalog row |
+| `src/TechieRag/TechieRagBuilder.cs:808` | `CreateLlmProviderFromConfig` | `llmConfig.Source` | one of the six handled sources; `None` throws at `:846` |
+| `src/TechieRag/Services/RetryHandler.cs:125` | `ExecuteWithRetryAsync` | `attempt`, `delay` | `delay` doubles per attempt up to `MaxRetryDelayMs` |
+| `src/TechieRag/Services/RetryHandler.cs:179` | `EnsureCircuitNotOpen` | `consecutiveFailures` | below `CircuitBreakerThreshold`, else throws until recovery elapses |
+| `src/TechieRag/Services/FallbackLlmHandler.cs:106` | `ChatAsync` | `usingFallback` | flips to true only after the primary threw |
+
+**Calculations on this screen:** exponential backoff `delay = min(delay * BackoffMultiplier, MaxRetryDelayMs)` (`RetryHandler.cs:152`).
+
+### RAG question answering (AskAsync, AskStreamAsync, ChatWithRagAsync)
+
+![Chat](screenshots/TechieRag/chat.png)
+
+Static-only (unconfirmed): the sample's RAG Chat screen streamed an answer with source citations; it used `AskStreamWithSourcesAsync` or `ChatWithRagStreamWithSourcesAsync` and displayed the `Sources` event before the tokens.
+
+**Call chain:** `TechieRagClient.AskAsync` (`src/TechieRag/TechieRagClient.cs:552`) → `TechieRagClient.SearchAsync(query, topK, filter)` (`:370`) → `SearchAsync(query, SearchOptions)` (`:391`) → `IEmbeddingProvider.EmbedAsync` (`:416`) → `IVectorStore.SearchAsync` (`:418`) → `TechieRagClient.ApplyRerankAsync` (`:459`) → `IReranker.RerankAsync` (`src/TechieRag/Abstractions/IReranker.cs:35`) → `PromptTemplateEngine.BuildRagPrompt` (`src/TechieRag/Services/PromptTemplateEngine.cs:28`) → `ILlmProvider.ChatAsync` (`:567`) → `RagResponse` (`:569`).
+
+`EnsureLlmConfigured` (`:759`) throws when no provider was built. `SearchAsync` resolves whether to rerank from `SearchOptions.Rerank` or `config.Rerank.Enabled` (`ResolveRerank`, `:444`), logging and returning false when no `IReranker` exists (`:449-454`). It opens a `TechieRag.Search` activity (`:409`), embeds the query (`:416`), fetches `max(topK, Rerank.CandidateCount)` candidates when reranking (`:417`; `CandidateCount` defaults to 20 at `src/TechieRag/TechieRagConfig.cs:615`), reranks to `TopN` or `topK` (`:465-468`) and records the search histogram (`:429`).
+
+`PromptTemplateEngine.BuildRagPrompt` formats the first `MaxContextChunks` results (`PromptTemplateEngine.cs:82`, default 5 at `TechieRagConfig.cs:572`) through `ContextChunkTemplate`, replacing `{index}`, `{text}`, `{source}`, `{score:P0}` and `{score}` (`:94-99`), then appends the block to the system prompt between `--- Retrieved Context ---` markers (`:107-113`). The result is two messages: system and user (`:39-43`). `BuildRagChatPrompt` (`:47`) inserts prior history, skipping system messages (`:62-71`).
+
+`AskStreamAsync` (`:580`) is the same search followed by `ChatStreamAsync` (`:594`). `ChatWithRagAsync` (`:601`) pulls history from `IConversationMemory` when the caller passed none (`:613-616`), searches without a document filter (`:618`), and after the reply appends both turns to memory (`:624-628`). `AskStreamWithSourcesAsync` (`:677`) yields `RagStreamEvent.FromSources` first (`:689`), then one `FromToken` per token and finally `FromCompleted` with the whole answer (`:700`); the chat variant (`:704`) adds the memory writes before completing (`:732-736`).
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/TechieRagClient.cs:402` | `SearchAsync` | `useReranker` | true only when requested and `reranker` is not null |
+| `src/TechieRag/TechieRagClient.cs:416` | `SearchAsync` | `queryVector.Length` | the provider's dimension; must match what the store holds |
+| `src/TechieRag/TechieRagClient.cs:418` | `SearchAsync` | `results.Count` | up to `fetchCount`; zero means an empty or mismatched store |
+| `src/TechieRag/Services/PromptTemplateEngine.cs:82` | `FormatContext` | `chunks.Count` | at most `MaxContextChunks` (5) |
+| `src/TechieRag/Services/PromptTemplateEngine.cs:112` | `BuildSystemPromptWithContext` | return value | system prompt plus the context block, or the prompt alone when nothing was retrieved |
+| `src/TechieRag/TechieRagClient.cs:567` | `AskAsync` | `response.Usage` | non-null `TokenUsage` with `ModelName` and `ProviderName` |
+
+**Calculations on this screen:** `fetchCount = useReranker ? max(topK, CandidateCount) : topK` (`:417`); `topN = TopN > 0 ? min(TopN, topK) : topK` (`:465`).
+
+### Direct completion, structured output and chat (OpenAICompatibleLlmProvider)
+
+![LLM playground](screenshots/TechieRag/llm-playground.png)
+
+Static-only (unconfirmed): the sample's LLM Playground sent a prompt straight to `ILlmProvider.CompleteAsync`, `ChatStreamAsync` or `CompleteAsync<T>` without retrieval. The provider shown here is `OpenAICompatibleLlmProvider`; Anthropic, Gemini, Azure AI Foundry, Ollama and LM Studio implement the same `ILlmProvider` (`src/TechieRag/Abstractions/ILlmProvider.cs:16`).
+
+**Call chain:** `OpenAICompatibleLlmProvider.CompleteAsync` (`src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:109`) → `OpenAICompatibleLlmProvider.ChatAsync` (`:134`) → `BuildRequest` (`:263`) → `HttpClient.PostAsync("chat/completions")` (`:141`) → `LlmHttpGuard.EnsureSuccess` (`src/TechieRag/Llm/LlmHttpGuard.cs:27`) → `JsonSerializer.Deserialize<OpenAIChatResponse>` (`:145`) → `ParseToolCalls` (`:333`) → `RaiseCompletionEvent` (`:345`).
+
+The constructor keeps the whole endpoint as `BaseAddress` and posts to the relative path `chat/completions` (`:70-77`) so base paths such as `/openai/v1` survive; a bearer header is added when a key exists (`:79-82`). `CompleteAsync` turns a prompt plus optional `SystemPrompt` into messages and delegates to `ChatAsync` (`:111-116`). `BuildRequest` maps roles, content parts, `tool_call_id` and `tool_calls` (`:265-283`), sets `model` from `options.Model` or `ModelName` (`:287`), asks for a final usage chunk when streaming (`:295`), applies prompt-cache routing (`:300`), copies sampling options (`:302-308`), sets `response_format = json_object` for `JsonMode` (`:310-311`) and serialises `Tools` and `ToolChoice` (`:313-328`).
+
+`ChatAsync` reads `prompt_tokens`, `completion_tokens` and cached tokens (`:151-153`), builds `LlmResponse` with `ToolCalls`, `FinishReason` and the server's model name (`:156-170`) and raises the completion event (`:172`). `ChatStreamAsync` (`:177`) sends with `ResponseHeadersRead` (`:185`), reads server-sent events line by line, skipping anything not prefixed `data: ` (`:198`), stopping at `[DONE]` (`:201`), capturing usage when a chunk carries it (`:205-209`) and yielding each `delta.content` (`:211-216`). When no usage arrived it estimates tokens at four characters each (`:222-226`, `EstimateTokenCount` at `:257`). `CompleteAsync<T>` (`:232`) appends "Respond with valid JSON only." (`:234`), forces `JsonMode` and a JSON system prompt (`:235-241`), strips a Markdown fence (`:244-250`) and deserialises case-insensitively (`:252`). `LlmHttpGuard.EnsureSuccess` throws `LlmRateLimitException` for 429, or 503 with `Retry-After` (`LlmHttpGuard.cs:31-42`), which is what `RetryHandler` honours.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:106` | `EffectiveCompletionsUri` | value | `{endpoint}/chat/completions`, base path preserved |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:138` | `ChatAsync` | `json` | request body with `model`, `messages`, `stream: false` |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:142` | `ChatAsync` | `response.StatusCode` | 200; 429 becomes `LlmRateLimitException` |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:211` | `ChatStreamAsync` | `delta` | the next text fragment; null on role or usage-only chunks |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:222` | `ChatStreamAsync` | `totalInputTokens` | server count, or the estimate when both totals are zero |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:252` | `CompleteAsync<T>` | `content` | bare JSON with any code fence removed |
+
+**Calculations on this screen:** `EstimateTokenCount = ceil(text.Length / 4)` (`:260`).
+
+### Tool calling and the agent loop (ToolRegistry, AgentLoopRunner, IToolHandler plug-ins)
+
+![Tool demo](screenshots/TechieRag/tool-demo.png)
+
+Static-only (unconfirmed): the sample's Tool Calling Demo registered a few delegate tools, ran a question through the agent loop and rendered each `AgentStep`. The library does not run the loop inside `TechieRagClient`; a host builds `AgentLoopRunner` with `rag.GetLlmProvider()` (`src/TechieRag/TechieRagClient.cs:742`) and an `IToolHandler`.
+
+**Call chain:** `TechieRagBuilder.WithTools` (`src/TechieRag/TechieRagBuilder.cs:463`) → `ToolRegistry.Register` (`src/TechieRag/Services/ToolRegistry.cs:37`) → `AgentLoopRunner.RunAsync` (`src/TechieRag/Services/AgentLoopRunner.cs:66`) → `ILlmProvider.ChatAsync` with `Tools` (`:94`) → `IToolHandler.ExecuteToolAsync` (`src/TechieRag/Abstractions/IToolHandler.cs:14`, e.g. `ToolRegistry.ExecuteToolAsync` at `ToolRegistry.cs:70`) → `ChatMessage.Tool(result)` appended (`:125`) → loop until `response.HasToolCalls` is false (`:96`).
+
+`IToolHandler` has two members: `ToolDefinitions` (`IToolHandler.cs:11`) and `ExecuteToolAsync` (`:14`). `ToolRegistry` stores a `ToolDefinition` and a delegate per name (`:45-51`); an unknown name or a throwing delegate returns an unsuccessful `ToolResult` rather than an exception (`:74-83`, `:90-99`). `AgentLoopRunner.RunAsync` copies the caller's options and adds `Tools = toolHandler.ToolDefinitions` with `ToolChoice = "auto"` (`:75-87`), then iterates up to `maxIterations` (default 10, `:43`): call the model (`:94`), return on a plain answer (`:96-106`), otherwise append the assistant message with its tool calls (`:116`), execute each call (`:119-145`) and report `ToolExecuted` steps with `IsSuccess` and the coded `FailureMessage` (`:132-144`). When the budget is spent it forces one final call without tools (`:149-165`).
+
+Three handlers plug in through the same interface. `CompositeToolHandler` (`src/TechieRag/Services/CompositeToolHandler.cs:20`) merges several handlers. `AgentToolHandler.ForAgent` (`src/TechieRag/Orchestration/AgentToolHandler.cs:115`) wraps a `FlowAgent` as one tool with a single `input` string (`BuildSchema`, `:80`) and runs a nested `AgentLoopRunner` (`:144-154`); `ForFlow` (`:179`) runs a nested `FlowRunner` (`:203`) and maps a blocked or exhausted run to an unsuccessful result (`:209-237`). `ExecuteToolAsync` (`:242`) enforces `MaxInvocations` (default 8, `:44`) at `:257`. `McpToolHandler.CreateAsync` (`src/TechieRag/Mcp/McpToolHandler.cs:86`) lists each server's tools, names them `{server}-{tool}` (`QualifyToolName`, `:207`), and `ExecuteToolAsync` (`:136`) forwards to `McpClient.CallToolAsync` (`:153`) and truncates results to `McpTrustPolicy.MaxToolResultCharacters` (`:157`, `:244`). `GuardedToolHandler` (`src/TechieRag/Orchestration/GuardedToolHandler.cs:82`) runs guardrails before delegating.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Services/AgentLoopRunner.cs:85` | `RunAsync` | `toolOptions.Tools.Count` | the number of registered tools sent to the model |
+| `src/TechieRag/Services/AgentLoopRunner.cs:96` | `RunAsync` | `response.HasToolCalls` | true continues the loop; false returns the answer |
+| `src/TechieRag/Services/ToolRegistry.cs:74` | `ExecuteToolAsync` | `toolCall.Name` | a registered name; unknown returns `IsSuccess = false` |
+| `src/TechieRag/Services/AgentLoopRunner.cs:124` | `RunAsync` | `result.Content` | the tool's string, or an `Error: ...` message |
+| `src/TechieRag/Orchestration/AgentToolHandler.cs:257` | `ExecuteToolAsync` | `invocations` | at most `MaxInvocations`; above it the model gets an `unavailable:` refusal |
+| `src/TechieRag/Mcp/McpToolHandler.cs:157` | `ExecuteToolAsync` | `content.Length` | at most `MaxToolResultCharacters` (100000) plus the truncation marker |
+
+**Calculations on this screen:** iteration counter versus `maxIterations` (`AgentLoopRunner.cs:89`); `QualifyToolName` hash suffix when a name exceeds 64 characters (`McpToolHandler.cs:215-217`).
+
+### Token tracking and budgets (TokenUsageTracker)
+
+![Token usage](screenshots/TechieRag/token-usage.png)
+
+Static-only (unconfirmed): the sample's Token Usage screen listed per-model totals and estimated cost from `ITokenTracker.GetSessionUsage` and `GetUsageByModel`, and showed a budget bar. It obtained the tracker from `ITechieRag.GetTokenTracker` (`src/TechieRag/TechieRagClient.cs:745`).
+
+**Call chain:** `TechieRagBuilder.WithUsageTracking` (`src/TechieRag/TechieRagBuilder.cs:405`) → `Build` creates `new TokenUsageTracker(config.UsageTracking)` (`:635`) and subscribes `llmProvider.OnCompletionCompleted` (`:638`) → provider `RaiseCompletionEvent` (`src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:345`, `OnCompletionCompleted?.Invoke` at `:350`) → `TokenUsageTracker.RecordUsage` (`src/TechieRag/Services/TokenUsageTracker.cs:61`) → `CalculateCost` (`:168`) → `OnUsageRecorded` (`:71`) → `CheckBudget` (`:194`) → `OnBudgetAlert` (`:208`, `:212`).
+
+The event is declared on `ILlmProvider` (`src/TechieRag/Abstractions/ILlmProvider.cs:64`). Because the builder subscribes on the outermost wrapper, the decorators forward it: `RetryHandler` re-targets `add`/`remove` to its inner provider (`src/TechieRag/Services/RetryHandler.cs:48-52`) and `FallbackLlmHandler` subscribes both primary and fallback (`src/TechieRag/Services/FallbackLlmHandler.cs:38-50`), so a completion served by the fallback is still counted. Every concrete provider raises the event after a completion: OpenAI-compatible at `:350`, Anthropic at `src/TechieRag/Llm/AnthropicLlmProvider.cs:515`, Azure AI Foundry `:325`, Gemini `:381`, LM Studio `:316`, Ollama `:362`. The same helper also records `TechieRagTelemetry.RecordLlmCompletion` (`OpenAICompatibleLlmProvider.cs:347`).
+
+`TokenUsageTracker`'s constructor seeds default pricing (`InitializeDefaultPricing`, `:221-231`), lets `UsageTrackingConfig.Pricing` override or add rows (`:42-45`) and sets a budget when `MaxTotalTokens` or `MaxCostUsd` is positive (`:48-57`). `RecordUsage` fills `EstimatedCostUsd` when zero (`:65-68`) using `FindPricing`, which matches exactly, then by substring, case-insensitively (`:180-192`), appends to a `ConcurrentBag` (`:70`) and evaluates the budget under a lock (`:196-214`): `BudgetStatus.IsExceeded` (`src/TechieRag/Models/TokenUsage.cs:100`) raises an exceeded alert, `IsAlertTriggered` (`:105`) a threshold alert. `GetSessionUsage` (`:77`) and `GetUsageByModel` (`:97`) aggregate the bag on demand; `Reset` drains it (`:152`). When usage tracking is off, `TechieRagClient` still creates a bare tracker (`TechieRagClient.cs:82`) but nothing feeds it. `BlockOnExceeded` is copied onto the budget (`:55`) and exposed, but no code in the library refuses a call because of it.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/TechieRagBuilder.cs:638` | `Build` | `args.InputTokens`, `args.ModelName` | the provider's counts; model name as the provider reports it |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:350` | `RaiseCompletionEvent` | `OnCompletionCompleted` | non-null when tracking is on; null means nothing subscribed |
+| `src/TechieRag/Services/TokenUsageTracker.cs:67` | `RecordUsage` | `usage.EstimatedCostUsd` | positive when the model matches a pricing row; 0 for unknown models |
+| `src/TechieRag/Services/TokenUsageTracker.cs:187` | `FindPricing` | `kvp.Key` | the substring that matched, e.g. `gpt-4o` for `gpt-4o-2024-08-06` |
+| `src/TechieRag/Services/TokenUsageTracker.cs:206` | `CheckBudget` | `status.IsExceeded` | true once tokens or cost pass the budget |
+| `src/TechieRag/Services/TokenUsageTracker.cs:87` | `GetSessionUsage` | `records.Length` | one record per completion since the last `Reset` |
+
+**Calculations on this screen:** `cost = input / 1,000,000 * inputPrice + output / 1,000,000 * outputPrice` (`:175-177`).
+
+### Vector stores (SqliteVecStore, PgVectorStore, QdrantStore)
+
+![Qdrant admin](screenshots/TechieRag/qdrant-admin.png)
+
+Static-only (unconfirmed): the sample's Qdrant Admin screen listed collections and point counts through `IVectorStore.ListDocumentsAsync` and `GetStatsAsync`. All three stores implement `IVectorStore` (`src/TechieRag/Abstractions/IVectorStore.cs:15`); `SearchAsync` is declared at `:53`.
+
+**Call chain:** `TechieRagClient.SearchAsync` (`src/TechieRag/TechieRagClient.cs:418`) → `SqliteVecStore.SearchAsync` (`src/TechieRag/VectorStores/SqliteVecStore.cs:310`) → `SqliteVecStore.InitializeAsync` (`:317`, `:68`) → `TryLoadSqliteVecExtension` (`:76`, `:118`) → `ComputeSimilarityFallbackAsync` (`:325`, `:340`) → `ComputeCosineSimilarity` (`:363`, `:381`) → ordered `SearchResult` list (`:368-372`).
+
+`SqliteVecStore` never loads sqlite-vec. `TryLoadSqliteVecExtension` (`:118-131`) contains only a commented `connection.LoadExtension("vec0")` (`:124`) and returns false (`:125`), so `sqliteVecAvailable` is always false, `SearchAsync` always takes the managed path at `:322-325`, and the `Array.Empty` return at `:329` is unreachable. The managed scan selects every chunk with a vector, optionally filtered by `DocumentId` (`:349-353`), deserialises each BLOB (`DeserializeVector`, `:614`), computes cosine similarity (`:381-403`; mismatched lengths score 0 at `:383`), sorts descending and takes `topK` (`:368-372`). It is exact but O(chunks). The `dimensions` field (`:32`, constructor default 1024 at `:47`) is stored and never used in SQL.
+
+`PgVectorStore` (`src/TechieRag/VectorStores/PgVectorStore.cs:42`, default dimension 1024) creates the `Chunks` table with a `vector({vectorDimension})` column (`:108`) in `InitializeAsync` (`:61`), so the dimension must match the embedding provider or inserts fail. `SearchAsync` (`:347`) requires prior initialisation (`:354`, `:657`), runs `1 - (Embedding <=> @QueryVector) AS Score ... ORDER BY Embedding <=> @QueryVector LIMIT @TopK` (`:365-385`) with a `Pgvector.Vector` parameter (`:387`) and maps rows to `SearchResult` (`:393-416`).
+
+`QdrantStore` (`src/TechieRag/VectorStores/QdrantStore.cs:71`, `apiKey` named argument, default dimension 1024) creates the chunks collection with `Size = dimensions` and `Distance.Cosine` (`:140-147`) plus a one-dimensional documents collection (`:151-160`). `SearchAsync` (`:257`) initialises lazily (`:263`, `:502`), builds a `DocumentId` keyword filter when requested (`:270-287`), calls `client.SearchAsync(collectionName, queryVector, filter, limit: topK, payloadSelector: true)` (`:289-295`) and rebuilds chunks from payload (`:301`, `CreateChunkFromPayload` at `:596`).
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/VectorStores/SqliteVecStore.cs:76` | `InitializeAsync` | `sqliteVecAvailable` | always false |
+| `src/TechieRag/VectorStores/SqliteVecStore.cs:353` | `ComputeSimilarityFallbackAsync` | `rows` | every stored chunk (or the filtered document's chunks) |
+| `src/TechieRag/VectorStores/SqliteVecStore.cs:383` | `ComputeCosineSimilarity` | `vectorA.Length == vectorB.Length` | true; false silently scores 0 after a provider change |
+| `src/TechieRag/VectorStores/PgVectorStore.cs:387` | `SearchAsync` | `queryVector.Length` | equals `vectorDimension` used at `:108` |
+| `src/TechieRag/VectorStores/QdrantStore.cs:144` | `InitializeAsync` | `dimensions` | 1024 unless a host constructed the store itself |
+| `src/TechieRag/VectorStores/QdrantStore.cs:289` | `SearchAsync` | `searchResult.Count` | up to `topK` scored points |
+
+**Calculations on this screen:** cosine `dot / (|a| * |b|)` (`SqliteVecStore.cs:386-403`); Qdrant size estimate `chunks * (dimensions * 4 + 500)` (`QdrantStore.cs:453`).
+
+### Embedded ONNX embedding and reranking (TechieRag.Embedded)
+
+![Home](screenshots/TechieRag/home.png)
+
+Static-only (unconfirmed): the sample's landing page showed the configured embedding provider ("Embedded-ONNX", bge-m3) and the reranker, with a model download progress bar fed by `ModelDownloadService.ProgressChanged`.
+
+**Call chain:** `TechieRagBuilderExtensions.UseEmbedded` (`src/TechieRag.Embedded/TechieRagBuilderExtensions.cs:25`) → `builder.UseCustomEmbeddingProvider(() => EmbeddedEmbeddingProvider.CreateDefault())` (`:37`) → `EmbeddedEmbeddingProvider.EmbedBatchAsync` (`src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:373`) → `EnsureInitializedAsync` (`:229`) → `InitializeAsync` (`:180`) → `EnsureModelDownloadedAsync` (`:237`) → `DownloadFileWithProgressAsync` (`:325`) → `InitializeFromDirectory` (`:210`) → `GenerateEmbedding` (`:435`) → `InferenceSession.Run` (`:472`) → `Normalize` (`:509`).
+
+`GetModelDirectory` (`:145-150`) places the cache at `<assembly folder>/models/bge-m3`. `IsModelDownloaded` (`:129`) treats a `model.onnx_data` above 2 GB as complete (`:139`). The download loop (`:273-312`) walks the five `ModelFiles` (`:59-66`), skips complete files, updates the `ModelDownloadService` singleton (`src/TechieRag.Embedded/ModelDownloadService.cs:80`, `UpdateProgress` at `:106`, `ProgressChanged` at `:101`) and fetches from `ModelBaseUrl` (`:43`), overridable through `TECHIERAG_MODEL_BASE_URL` (`:36`). Progress is also written with `Console.WriteLine` (`:305`, `:311`, `:315`). `InitializeFromDirectory` opens an `InferenceSession` with `ORT_ENABLE_ALL` (`:218-224`) and loads the tokenizer (`LoadTokenizer`, `:520`), preferring `sentencepiece.bpe.model` for a `tokenizer.json` model directory (`:527-534`).
+
+`GenerateEmbedding` encodes with two slots reserved (`:442`), wraps ids in `<s>`/`</s>` and shifts each piece id with `ToModelId` (`:432`, `:451-457`), runs the session and prefers a `sentence_embedding` output, else `last_hidden_state` with mean pooling (`:474-489`), then L2-normalises. The encoding revision (`:91`) feeds `EmbeddingSignature` (`:94`). `OnnxNativeLibraryResolver.Install` (`src/TechieRag.Embedded/OnnxNativeLibraryResolver.cs:54`) is a module initializer that, on macOS and Linux only (`:62`), registers a `DllImport` resolver (`:69`) mapping `onnxruntime.dll` to `libonnxruntime.dylib` or `.so` (`:92`) in three candidate paths (`:112-125`).
+
+`UseEmbeddedReranker` (`TechieRagBuilderExtensions.cs:127`) sets `RerankSource.LocalOnnx` and installs a factory (`:139-144`). `OnnxCrossEncoderReranker.RerankAsync` (`src/TechieRag.Embedded/OnnxCrossEncoderReranker.cs:247`) initialises (`:209`; download at `:330`, session `:233`, tokenizer `:236`), scores every candidate with `ScorePair` (`:287`; pair encoding `:294-305`, sigmoid `:327`) and returns the top `topN` (`:268-271`).
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:239` | `EnsureModelDownloadedAsync` | `modelDir` | `<assembly folder>/models/bge-m3` |
+| `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:243` | `EnsureModelDownloadedAsync` | `IsModelDownloaded()` | true skips the download; false enters the semaphore at `:254` |
+| `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:307` | `EnsureModelDownloadedAsync` | `url` | `https://huggingface.co/BAAI/bge-m3/resolve/main/onnx/<file>` or the mirror |
+| `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:447` | `GenerateEmbedding` | `seqLength` | token count plus 2, at most `maxSequenceLength` (8192) |
+| `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:480` | `GenerateEmbedding` | `outputTensor.Dimensions` | `[1, 1024]` for `sentence_embedding`; 3-D triggers mean pooling |
+| `src/TechieRag.Embedded/OnnxCrossEncoderReranker.cs:327` | `ScorePair` | return value | a 0 to 1 relevance score |
+
+**Calculations on this screen:** `ToModelId = id == 0 ? 3 : id + 1` (`EmbeddedEmbeddingProvider.cs:432`); mean pooling (`:492-507`); sigmoid `1 / (1 + e^-logit)` (`OnnxCrossEncoderReranker.cs:327`).
 
 ## Cross-cutting flows
 
-### Configuration load / save / apply
-Both config pages (`Settings`, `LlmSettings`) share `TechieRagConfigService` (JSON persistence) and `TechieRagManager` (live-instance rebuild).
+### Data connectors
 
-```mermaid
-flowchart TD
-  UI["Settings / LlmSettings page"] --> LOAD["ConfigService.LoadConfigAsync()"]
-  LOAD --> SRC{"techierag-config.json exists?"}
-  SRC -->|"yes"| JSON["Deserialize TechieRagConfig"]
-  SRC -->|"no"| APP["appsettings 'TechieRag' section -> else defaults"]
-  UI --> SAVE["ConfigService.SaveConfigAsync(config)"]
-  SAVE --> WRITE["File.WriteAllTextAsync(techierag-config.json)"]
-  UI --> RC["RagManager.ReconfigureAsync()"]
-  RC --> BUILD["TechieRagBuilder: UseEmbedding/UseVectorStore/UseLlm/WithFallbackLlm/WithUsageTracking/WithResilience"]
-  BUILD --> INIT["client.InitializeAsync() -> vectorStore.InitializeAsync()"]
-```
-Lineage: `TechieRagConfigService.cs:54` (load) / `:148` (save) / `:190` (reset); `TechieRagManager.cs:63` (reconfigure) / `:94-253` (builder). **Gotcha:** both Reset buttons skip `ReconfigureAsync` (see Settings/LlmSettings known issues).
+`ITechieRag.IngestConnectorAsync` (`src/TechieRag/Connectors/ConnectorIngestionExtensions.cs:23`) creates a `ConnectorRunner` and calls `RunAsync` (`:33`), skips items with no text (`:47`) and ingests the rest through `IngestTextAsync` with `BuildMetadata` (`:57`, `:67`). `ConnectorRunner.RunAsync` (`src/TechieRag/Connectors/ConnectorRunner.cs:45`) pages through `IDataConnector.ListAsync` (`:90`) up to `MaxPages` (`:82`), skips unchanged items via `previousSync.IsUnchanged` (`:116`), rejects oversized items from the listing (`:131`), waits `RequestDelay` between fetches (`:142`), calls `FetchAsync` (`:150`), records one failure per bad item and throws after `MaxConsecutiveFailures` (`:162-177`), stops at `MaxTotalBytes` (`:195`) and prunes stale versions only after a complete walk (`:216-222`). The three connectors implement `IDataConnector` (`src/TechieRag/Connectors/IDataConnector.cs:29`).
 
-### Ingestion pipeline (file + text)
-```mermaid
-flowchart TD
-  ING["Ingestion / TextIngestion page"] --> CALL["Rag.IngestAsync / IngestTextAsync"]
-  CALL --> PROC["IDocumentProcessor.ProcessAsync (files) or TextChunker.ChunkText (text)"]
-  PROC --> EMB["embeddingProvider.EmbedBatchAsync"]
-  EMB --> UP["vectorStore.UpsertBatchAsync"]
-  UP --> STORE[("Vector store: SqliteVec / PgVector / Qdrant")]
-```
-Lineage: `TechieRagClient.cs:104` (IngestAsync) / `:189` (IngestTextAsync) → `:160/:249` embed → `:172/:261` upsert.
+| Connector | Class | List / Fetch |
+|---|---|---|
+| Confluence | `src/TechieRag/Connectors/Confluence/ConfluenceConnector.cs:42` | `:85` / `:132` |
+| Repository | `src/TechieRag/Connectors/Repository/RepositoryConnector.cs:29` | `:67` / `:81` |
+| Email | `src/TechieRag/Connectors/Email/EmailConnector.cs:36` (`ListsEntireSource = false`, `:74`) | `:77` / `:120` |
 
-### Query / Auto-RAG (used by Chat, Tool Demo search tool)
-```mermaid
-flowchart TD
-  Q["Chat / search_documents tool"] --> S["Rag.SearchAsync"]
-  S --> QE["embeddingProvider.EmbedAsync"]
-  QE --> VS["vectorStore.SearchAsync (topK)"]
-  Q --> ASK["Rag.AskAsync / AskStreamAsync"]
-  ASK --> S2["SearchAsync (again)"]
-  S2 --> BP["promptTemplate.BuildRagPrompt"]
-  BP --> LLM["llmProvider.Chat / ChatStream"]
-  LLM --> HTTP["HTTP to configured LLM provider"]
-```
-Lineage: `TechieRagClient.cs:330` (SearchAsync) / `:415` (AskAsync) / `:443` (AskStreamAsync). **Gotcha:** streamed Auto-RAG searches twice (sources + inside Ask) — see Chat known issues.
+Break at `ConnectorRunner.cs:150` and watch `item.Id` and `item.Version`; a version recorded at `:190` means the item will be skipped next run.
 
-### Resilience + token tracking (automatic on LLM calls)
-`RetryHandler` + `FallbackLlmHandler` decorate `ILlmProvider` (exponential backoff, HTTP-429, circuit breaker, primary→fallback). `TokenUsageTracker` subscribes to `ILlmProvider.OnCompletionCompleted` and aggregates per-model usage/cost in memory; the Token Usage page reads it via `GetTokenTracker()`. See `docs/TechieRag-Architecture.md` §Resilience.
+### MCP client
 
-## How to fix a bug with this guide
+`McpClient.Create` (`src/TechieRag/Mcp/McpClient.cs:82`) picks `StdioMcpTransport` or `HttpMcpTransport` (`:87-92`); both constructors call `McpServerConfig.Validate(policy)` (`src/TechieRag/Mcp/StdioMcpTransport.cs:60`, `src/TechieRag/Mcp/HttpMcpTransport.cs:53`; `FindProblems` at `src/TechieRag/Mcp/McpServerConfig.cs:104`). `InitializeAsync` (`McpClient.cs:103`) starts the transport (`:107`), sends `initialize` (`:120`) and `notifications/initialized` (`:129`). `ListToolsAsync` (`:145`) pages with `nextCursor` (`:179`) and drops tools outside `AllowedTools` (`:167`); `CallToolAsync` (`:194`) refuses a tool not in the allow-list before any I/O (`:201`) and flattens `content` to text (`:220`, `:260`). `McpTrustPolicy` (`src/TechieRag/Mcp/McpTrustPolicy.cs:22`) defaults closed: `Strict` (`:29`), `AllowLocalProcessLaunch = false` (`:40`), `AllowPlaintextHttp = false` (`:62`), `MaxToolResultCharacters = 100000` (`:72`). `StdioMcpTransport.StartAsync` re-checks the launch permission at the moment of `Process.Start` (`:75`, `:117`). `McpAgentExtensions.BuildWorkspaceToolsAsync` (`src/TechieRag/Mcp/McpAgentExtensions.cs:124`) assembles a handler that tolerates one failing server. Break at `McpClient.cs:214` and watch `parameters["name"]`.
 
-1. Reproduce the bug and note **which screen** and **which control** shows it.
-2. Open §4, find that screen, find the control in the **Data lineage** table.
-3. Walk the lineage **top-down**: Razor handler → sample service method → library API (`TechieRagClient`) → provider / JSON file. The bug is in one of those hops.
-4. If the visible value is *calculated*, the lineage/business-rules name the method — check it (e.g. token totals only accumulate in non-streaming Chat branches).
-5. Several known defects are already flagged inline (⚠ in Known issues) and logged to the checklists — check there first.
-6. After fixing, re-run the screen's walkthrough in `docs/TechieRag-UsageGuide.md`, then re-generate this guide (`*devguide TechieRag`) if the code path changed — and run `*verify` with the app booted to upgrade the render-status from static to runtime-confirmed.
+### Flow orchestration
 
----
-_Generated 2026-06-25 · refreshed 2026-06-30 (`--update`: Tool Calling Demo re-mapped) · **runtime-verified 2026-07-01 (verifier `*verify ui` — all 11 screens render+visual-confirmed as Anonymous; LLM/Qdrant data-paths not exercised — no provider/no Qdrant this run)** · **Tool Demo data-path runtime-verified 2026-07-02 as Anonymous (verifier `*verify REQ-UI-007` — live agent-loop tool call + Execution Trace confirmed; 390px overflow found AND fixed same day on /tool-demo + /ingestion, TR-003/TR-004 workarounds)** · **Runtime-verified 2026-07-02 as Anonymous (verifier `*verify all` — all 10 screens exercised live: LLM, ingest write-path, Auto-RAG streaming, token dashboard, Qdrant CRUD; one new @390 defect on /qdrant-admin)** · reflects code as built. Regenerate with `*devguide TechieRag` after code changes._
+`FlowRunner.RunAsync` (`src/TechieRag/Orchestration/FlowRunner.cs:92`) validates the definition (`:101`), resolves the start node (`:118`) and loops (`:123`) until a terminal node (`:192`), a block (`:162`), the `MaxSteps` budget (`:127`) or no satisfied edge (`:228`). `ExecuteNodeAsync` (`:238`) builds the guardrail chain (`:256`, `FlowGuardrailChain.BuildAsync` at `src/TechieRag/Orchestration/FlowGuardrailChain.cs:68`, host guardrails first at `:74`, unresolvable ids deny at `:84`), evaluates the `Input` stage (`:259`), dispatches on node kind (`:271-277`), then evaluates `Output` (`:281`). `RunAgentNodeAsync` (`:301`) resolves the agent through `FlowRuntime.Agents` (`:305`), wraps its tools in `GuardedToolHandler` (`:324`; `ToolCall` stage at `src/TechieRag/Orchestration/GuardedToolHandler.cs:89`) and runs `AgentLoopRunner` (`:328-344`). `FlowRuntime` (`src/TechieRag/Orchestration/FlowRuntime.cs:66`) carries `Agents`, `Guardrails`, `Tools`, `HostGuardrails` and `SystemPreamble` (`:80-105`). Every person-facing sentence is a `FlowMessage` (`src/TechieRag/Orchestration/FlowMessage.cs:35`, `Create` at `:72`) with a stable code. `FlowGuardrailChain.EvaluateAsync` (`FlowGuardrailChain.cs:98`) treats a faulting guardrail as a block (`:121-129`). Break at `FlowRunner.cs:159` and watch `step.Blocked` and `step.Output`.
+
+### Web ingestion
+
+`IngestUrlAsync` (`src/TechieRag/Web/WebIngestionExtensions.cs:24`) fetches one page through `IWebContentFetcher.FetchAsync` (`:34`; `HttpWebContentFetcher.FetchAsync` at `src/TechieRag/Web/HttpWebContentFetcher.cs:40`, capped at `MaxContentBytes` 8 MB, `:19`) and calls `IngestPageAsync` (`:153`), which writes `SourceUrl` and `SourcePath` both as the final URL (`:172-177`). `IngestSiteAsync` (`:45`) runs `SiteCrawler.CrawlAsync` (`src/TechieRag/Web/SiteCrawler.cs:43`), which refuses non-http seeds (`:51`) and private-network hosts (`:57`), bounds pages (`:71`) and depth (`:103`) and delays between requests (`:78`). `IngestYouTubeAsync` (`:88`) reads captions via `YouTubeTranscriptReader.ReadAsync` (`src/TechieRag/Web/YouTubeTranscriptReader.cs:46`). `HttpWebContentFetcher.CreateGuardedHandler` (`:291`) blocks private addresses at connect time (`:310`). Break at `WebIngestionExtensions.cs:158` and watch `page.Text`.
+
+### Workspaces and persistent memory
+
+`TechieRagClient` builds a `WorkspaceManager` only when a workspace store exists (`src/TechieRag/TechieRagClient.cs:88-90`) and exposes it via `GetWorkspaceManager` (`:757`); `WithPersistence` (`src/TechieRag/TechieRagBuilder.cs:574`) selects `Sqlite*` or `Postgres*` stores (`:751`, `:759`). `WorkspaceManager.AskAsync` (`src/TechieRag/Services/WorkspaceManager.cs:425`) loads the workspace (`:437`), composes context (`:438`, `ComposeContextAsync` at `:649`: scope `:655`, search `:656`, pinned chunks `:658`, budget `:665`, truncation event `:666`), returns the fixed "not covered" answer in Query mode with no context (`:441-451`) and otherwise prompts the LLM (`:455-456`). `ApplyContextBudget` (`:711`) evicts retrieved before pinned chunks. `DbConversationMemory` (`src/TechieRag/Services/DbConversationMemory.cs:31`) creates a thread lazily (`EnsureThreadAsync`, `:101`) and delegates to `IConversationStore` (`:49`, `:56`); `RelationalConversationStore` creates tables in `InitializeAsync` (`src/TechieRag/Persistence/RelationalConversationStore.cs:38`) and stores messages at `:226`. `RelationalWorkspaceStore` (`src/TechieRag/Persistence/RelationalWorkspaceStore.cs:31`) handles documents (`:155`), hashes (`:207`) and pins (`:219`). Break at `WorkspaceManager.cs:665` and watch `pinnedUnique.Count` and `retrievedUnique.Count`.
+
+### Speech
+
+`UseSpeechToText` (`src/TechieRag/TechieRagBuilder.cs:30`) stores the provider; `CreateProcessors` adds `AudioTranscriptionProcessor` before the generic fallback (`:995-998`). `AudioTranscriptionProcessor.ProcessAsync` (`src/TechieRag/Processors/AudioTranscriptionProcessor.cs:82`) calls `ISpeechToText.TranscribeAsync` with segments requested (`:93-101`) and chunks by segment or by text (`:110-112`). `OpenAICompatibleSpeechToText.TranscribeAsync` (`src/TechieRag/Speech/OpenAICompatibleSpeechToText.cs:108`) rejects non-audio extensions (`:117-122`), posts a multipart form (`:126-128`) through `LlmHttpGuard.EnsureSuccess` (`:131`) and parses the transcript (`:134`). `OpenAICompatibleTextToSpeech.SynthesizeAsync` (`src/TechieRag/Speech/OpenAICompatibleTextToSpeech.cs:124`) is the reverse path. Break at `AudioTranscriptionProcessor.cs:103` and watch `transcript.Segments.Count`.
+
+### Telemetry
+
+`TechieRagTelemetry` (`src/TechieRag/Diagnostics/TechieRagTelemetry.cs:61`) owns one `ActivitySource` and one `Meter` named `TechieRag` (`:80-99`); `Enabled` defaults to false (`:109`), so `StartActivity` (`:121`), `RecordLlmCompletion` (`:133`), `RecordIngestion` (`:161`) and `RecordSearch` (`:174`) are no-ops until a host flips it. Callers: `TechieRagClient.cs:409`, `:429`, `:211`, `:303` and every provider's completion helper (`OpenAICompatibleLlmProvider.cs:347`). The `TechieRag.Telemetry` package adds exporters: `TechieRagTelemetryPipeline.Create` (`src/TechieRag.Telemetry/TechieRagTelemetryPipeline.cs:66`) returns an inert pipeline when neither flag is set (`:70-73`), validates a non-loopback OTLP endpoint (`:77`; `TechieRagTelemetryOptions.ValidateEndpoint` at `src/TechieRag.Telemetry/TechieRagTelemetryOptions.cs:76`, default `http://localhost:4318` at `:21`), builds tracer and meter providers (`:80-81`) and sets `TechieRagTelemetry.Enabled = true` (`:84`), restoring it on `Dispose` (`:109-112`). `AddTechieRagTelemetry` (`src/TechieRag.Telemetry/TechieRagTelemetryServiceCollectionExtensions.cs:27`) registers it lazily (`:33`). Break at `TechieRagTelemetry.cs:143` and watch `Enabled`.
+
+### Resilience
+
+LLM calls: `WithResilience` (`src/TechieRag/TechieRagBuilder.cs:444`) fills `ResilienceConfig` (`src/TechieRag/TechieRagConfig.cs:646`), consumed by `RetryHandler` (`src/TechieRag/Services/RetryHandler.cs:111-175`) with `LlmHttpGuard.EnsureSuccess` (`src/TechieRag/Llm/LlmHttpGuard.cs:27`) turning 429 and 503-with-Retry-After into `LlmRateLimitException`. Connectors: consecutive-failure circuit at `ConnectorRunner.cs:168`. MCP: result truncation at `McpToolHandler.cs:244` and per-request timeout from `McpServerConfig.TimeoutSeconds` (`HttpMcpTransport.cs:63`). Web: response cap at `HttpWebContentFetcher.cs:19` and private-network refusal at `:310`. Agent loop: `maxIterations` (`AgentLoopRunner.cs:89`) and `AgentToolHandler.MaxInvocations` (`AgentToolHandler.cs:257`). Flows: `MaxSteps` (`FlowRunner.cs:127`). Break at `RetryHandler.cs:127` to see a failure counted.
+
+## Known issues
+
+- sqlite-vec is never loaded: `src/TechieRag/VectorStores/SqliteVecStore.cs:118-131` returns false with the `LoadExtension` call commented out at `:124`, so every search runs the managed O(n) cosine scan at `:340-373` and the branch at `:328-329` is dead code. REQ-RAG vector-store performance.
+- Every vector store is built with the 1024 default dimension: `src/TechieRag/TechieRagBuilder.cs:854`, `:856` and `:865` pass no dimension, so `SqliteVecStore.cs:47`, `QdrantStore.cs:71` and `PgVectorStore.cs:42` default to 1024 and `config.Embedding.Dimensions` (`TechieRagConfig.cs:173`) is ignored; a 384- or 1536-dimension provider breaks PgVector inserts and Qdrant collections.
+- `AddTechieRag(IConfiguration)` drops settings: `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:158-160` omits `VectorStore.ApiKey`; `:150-155` calls `UseEmbedding`, which rebuilds `EmbeddingConfig` (`TechieRagBuilder.cs:51-58`) without `Dimensions`, `ApiFormat`, `ApiPath` or `RequestDelayMs`; the `Prompt` section (`TechieRagConfig.cs:64`) is never applied. The `TechieRagConfig` overload (`:272-298`) additionally drops LLM, rerank, persistence, usage and resilience.
+- `TechieRagConfig.EnableTelemetry` (`TechieRagConfig.cs:52`, default true) is written by `WithTelemetry` (`TechieRagBuilder.cs:263`) but read by nothing; the real gate is `TechieRagTelemetry.Enabled` (`src/TechieRag/Diagnostics/TechieRagTelemetry.cs:109`, default false).
+- `UsageTrackingConfig.BlockOnExceeded` (`TechieRagConfig.cs:545`) is copied to the budget (`TokenUsageTracker.cs:55`) but no code blocks a completion; only `OnBudgetAlert` fires (`:208`).
+- Download progress is written with `Console.WriteLine` in `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:305`, `:311` and `:315`, beside the `ModelDownloadService` progress the same method already reports.
+- Model cache location: `EmbeddedEmbeddingProvider.GetModelDirectory` (`:145-150`) and `OnnxCrossEncoderReranker.GetModelDirectory` (`src/TechieRag.Embedded/OnnxCrossEncoderReranker.cs:172-177`) resolve under the executing assembly's folder, while the live tests stage weights under `~/.cache/techierag-models` (`tests/TechieRag.Tests/Reranking/Live/LiveRerankerFactAttribute.cs:38-42`, `LiveEmbeddedTokenizerDiagnosticTests.cs:47-49`), so a developer's cached download is not found by the library unless copied.
+- `src/TechieRag/Telemetry/` is an empty folder holding only `.gitkeep`; the telemetry code lives in `src/TechieRag/Diagnostics/` and `src/TechieRag.Telemetry/`.
+- `ConfigureAwait(false)` is inconsistent: `TechieRagClient.cs` applies it on 30 of 44 awaits (missing at `:173`, `:201`, `:208`, `:481`, `:510` among others), `SqliteVecStore.cs` on 0 of 46 and `EmbeddedEmbeddingProvider.cs` on 0 of 13, while `WorkspaceManager.cs` applies it everywhere.
+- `TechieRag.Telemetry` is never packed: `.github/workflows/publish-nuget.yml:113-114` and `.github/workflows/publish-github-packages.yml:86-87` pack only `TechieRag` and `TechieRag.Embedded`, although `src/TechieRag.Telemetry/TechieRag.Telemetry.csproj:16` declares `PackageId` `TechieRag.Telemetry`.
+- `.github/workflows/publish-github-packages.yml:140-165` (`publish-nuget-org` job) pushes to nuget.org on every `v*` tag when the `NUGET_API_KEY` secret exists, with `--skip-duplicate`; this contradicts the header of `publish-nuget.yml` (lines 1-31), which states nothing publishes to nuget.org automatically and that the version comes from the tag through `determine-version.sh`.

@@ -1,0 +1,930 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Business Requirements — Phase 2: Agents, platforms, local model, and the harvested v3 library</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieRag — Business Requirements — Phase 2: Agents, platforms, local model, and the harvested v3 library</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-P2-BRD.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#summary">1. Summary</a></li>
+        <li><a href="#screens-and-flow">2. Screens and flow</a></li>
+        <li><a href="#requirements">3. Requirements</a></li>
+        <li class="h3"><a href="#agents-package">Agents package</a></li>
+        <li class="h3"><a href="#packaging-and-quality-follow-ups">Packaging and quality follow-ups</a></li>
+        <li class="h3"><a href="#repository-separation">Repository separation</a></li>
+        <li class="h3"><a href="#platform-groundwork">Platform groundwork</a></li>
+        <li class="h3"><a href="#local-model">Local model</a></li>
+        <li class="h3"><a href="#typed-streaming">Typed streaming</a></li>
+        <li class="h3"><a href="#subscription-sign-in">Subscription sign-in</a></li>
+        <li class="h3"><a href="#ingestion-breadth">Ingestion breadth</a></li>
+        <li class="h3"><a href="#data-connectors">Data connectors</a></li>
+        <li class="h3"><a href="#mcp-tools">MCP tools</a></li>
+        <li class="h3"><a href="#flow-orchestration">Flow orchestration</a></li>
+        <li class="h3"><a href="#workspaces-and-memory">Workspaces and memory</a></li>
+        <li class="h3"><a href="#reranking">Reranking</a></li>
+        <li class="h3"><a href="#provider-breadth">Provider breadth</a></li>
+        <li><a href="#non-functional-requirements">4. Non-functional requirements</a></li>
+        <li><a href="#development-status">5. Development status</a></li>
+        <li><a href="#where-the-rest-lives">6. Where the rest lives</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Kind</td><td>library</td></tr>
+<tr><td>Size</td><td>Medium</td></tr>
+<tr><td>Phase</td><td>2 of 2</td></tr>
+<tr><td>Status</td><td>Approved</td></tr>
+<tr><td>Date</td><td>2026-09-24</td></tr>
+</tbody>
+</table>
+<h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-163.</p>
+<h2 id="screens-and-flow">2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
+<p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
+<table>
+<thead><tr><th>Screen</th><th>Route</th><th>Role</th><th>Mockup</th><th>Fields</th></tr></thead>
+<tbody>
+<tr><td>Agents package</td><td><code>TechieRag.Agentic</code>, <code>TechieRag.Agents</code>: <code>TechieRagAgentBuilder</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>search_knowledge_base, list_documents, seam adapters</td></tr>
+<tr><td>Packaging and quality follow-ups</td><td><code>TechieRag.Telemetry</code>, <code>publish-*.yml</code>, <code>TechieRagBuilder.Build()</code></td><td>Maintainer</td><td>— (library, no mockup)</td><td>Telemetry package, dimensions, config mapping, one publish path</td></tr>
+<tr><td>Repository separation</td><td><code>TechieRag.slnx</code>, Sevak repository</td><td>Maintainer</td><td>— (library, no mockup)</td><td>src/, tests/, packages 1.0.7</td></tr>
+<tr><td>Platform groundwork</td><td><code>ModelPaths</code>, <code>TechieRag.Embedded.targets</code>, <code>samples/TechieRag.Probe</code></td><td>MAUI app developer</td><td>— (library, no mockup)</td><td>app-data root, native wiring, 384-dim default, matrix</td></tr>
+<tr><td>Local model</td><td><code>TechieRag.Local</code>: <code>UseLocalLlm()</code></td><td>App developer</td><td>— (library, no mockup)</td><td>model id, folder, memory gate, terms, download</td></tr>
+<tr><td>Typed streaming</td><td><code>ILlmProvider</code> typed streaming method, <code>AgentLoopRunner</code> streaming run</td><td>Developer</td><td>— (library, no mockup)</td><td>LlmTextDelta, LlmToolCallEvent, LlmStreamCompleted</td></tr>
+<tr><td>Subscription sign-in</td><td><code>UseChatGptSubscriptionLlm(callback)</code>, <code>LlmConnectorCatalog</code></td><td>App developer</td><td>— (library, no mockup)</td><td>URL, user code, session store, VendorTerms</td></tr>
+<tr><td>Ingestion breadth</td><td><code>IChunker</code>, <code>Processors/</code>, <code>Web/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>chunking strategy, XLSX/PPTX/CSV/audio, URL, crawl, YouTube</td></tr>
+<tr><td>Data connectors</td><td><code>IDataConnector</code>, <code>ConnectorRunner</code>, <code>Connectors/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>repository, Confluence, email, sync state, transport guards</td></tr>
+<tr><td>MCP tools</td><td><code>McpClient</code>, <code>McpToolHandler</code>, <code>IMcpServerRegistry</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>stdio, HTTP, trust policy</td></tr>
+<tr><td>Flow orchestration</td><td><code>FlowRunner</code>, <code>FlowRuntime</code>, <code>IFlowGuardrail</code>, <code>AgentToolHandler</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>nodes, conditions, MaxSteps, guardrails, FlowMessage</td></tr>
+<tr><td>Workspaces and memory</td><td><code>WorkspaceManager</code>, <code>IWorkspaceStore</code>, <code>IConversationStore</code>, <code>DbConversationMemory</code></td><td>Developer</td><td>— (library, no mockup)</td><td>threads, pinning, threshold, chat mode, dedupe</td></tr>
+<tr><td>Reranking</td><td><code>WithReranker</code>, <code>IReranker</code>, <code>SearchOptions.Rerank</code></td><td>Developer</td><td>— (library, no mockup)</td><td>TopN, CandidateCount, source</td></tr>
+<tr><td>Provider breadth</td><td><code>ModelRouter</code>, <code>LlmConnectorCatalog</code>, <code>Embedding/</code>, <code>IMultimodalLlmProvider</code>, <code>Speech/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>model-name routing, embedders, images, prompt caching, speech</td></tr>
+</tbody>
+</table>
+<p><strong>Primary journey:</strong></p>
+<ol>
+<li>An app developer references the packages inside a MAUI app; the native wiring and writable model folders arrive from the packages, and the probe app proves all four heads.
+</li>
+<li>The developer calls <code>UseLocalLlm()</code>; the model downloads once after the user accepts its terms, and answers with no network.
+</li>
+<li>A tool-using chat turn streams its text while tool calls run through the guards; a user with a permitting vendor subscription signs in once through the browser.
+</li>
+</ol>
+<h2 id="requirements">3. Requirements<a class="anchor-link" href="#requirements">#</a></h2>
+<p>One item per thing the verifier will test, grouped by surface. Same rules as the phase-1 BRD. Items 83 to 114 are carried verbatim from the previous BRD; items 115 to 163 were harvested on 2026-09-24 and are attributed in their text.</p>
+<h3 id="agents-package">Agents package<a class="anchor-link" href="#agents-package">#</a></h3>
+<p>Agents on Microsoft Agent Framework over TechieRag, with the retrieval contract in core.</p>
+<ul>
+<li><strong>BRD-83</strong> — The library shall provide, in core with no new package dependencies, an agentic retrieval contract (<code>TechieRag.Agentic</code>): <code>search_knowledge_base</code> and <code>list_documents</code> tools with a stable model-facing description and JSON schema; a structured tool result carrying citation refs, source document, page, relevance score, a <code>strong</code> / <code>weak</code> / <code>none</code> / <code>limit_reached</code> status and a next-step hint; a per-turn search budget; and default retrieve-first, re-search-on-weak, cite-by-ref instructions — bindable to <code>ToolRegistry</code> / <code>IToolHandler</code> and to <code>TechieRag.Agents</code>, over an <code>IRetrievalSource</code> that may be an <code>ITechieRag</code> or a delegate <em>(F-AGENT; added 2026-09-03)</em> <em>Screen:</em> Agents package
+<ul>
+<li><em>Acceptance:</em> When a developer registers the knowledge-base tools from <code>TechieRag.Agentic</code> on the agent loop, then <code>search_knowledge_base</code> returns refs, scores and a strong/weak/none status.
+</li>
+</ul>
+</li>
+<li><strong>BRD-84</strong> — A developer can add a Microsoft Agent Framework 1.20 agent over TechieRag by referencing <code>TechieRag.Agents</code> and using <code>TechieRagAgentBuilder</code> in the existing fluent style — <code>UseLmStudio(endpoint, model)</code> as the primary local target, <code>UseOllama</code>, <code>UseOpenAI</code>, <code>UseOpenAICompatible</code>, <code>UseConfiguredLlm()</code>, <code>UseCustomChatClient(...)</code> — obtaining an <code>ITechieRagAgent</code> that exposes the MAF <code>AIAgent</code>, creates <code>AgentSession</code>s, answers with typed <code>SearchResult</code> sources and retrieval traces, streams <code>RagStreamEvent</code>s, and registers through <code>AddTechieRagAgent(...)</code>; the package targets <code>net10.0;net8.0</code>, ships no MSBuild targets, never uses <code>HarnessAgent</code> or MAF hosted tools, and keeps model-facing strings invariant English <em>(F-AGENTS)</em> <em>Screen:</em> Agents package
+<ul>
+<li><em>Acceptance:</em> When a developer builds an agent with <code>TechieRagAgentBuilder</code> over a TechieRag instance, then the agent answers from the documents through Microsoft Agent Framework.
+</li>
+</ul>
+</li>
+<li><strong>BRD-85</strong> — <code>TechieRag.Agents</code> shall expose public interop adapters at the library's seams so a package consumer keeps one provider configuration, one tool catalogue, one egress gate and one trace: <code>ILlmProvider</code> → <code>IChatClient</code> (all providers, routing, retry, fallback and token events preserved); <code>IToolHandler</code> → <code>AITool</code> (raw JSON schema, <code>RequiresConfirmation</code> → approval-required) and <code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code> (so a MAF agent can be a flow node); MAF middleware → <code>IProgress&lt;AgentStep&gt;</code> emitting only the existing four <code>AgentStepKind</code>s; <code>IConversationMemory</code> → <code>ChatHistoryProvider</code> <em>(F-AGENTS)</em> <em>Screen:</em> Agents package
+<ul>
+<li><em>Acceptance:</em> When a developer adapts an <code>ILlmProvider</code>, <code>IToolHandler</code> or <code>IConversationMemory</code> through the public seam adapters, then the agent uses them unchanged.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="packaging-and-quality-follow-ups">Packaging and quality follow-ups<a class="anchor-link" href="#packaging-and-quality-follow-ups">#</a></h3>
+<p>Closes the packaging, configuration and store gaps the 2026-09-24 code scan found.</p>
+<ul>
+<li><strong>BRD-86</strong> — <code>TechieRag.Agents</code> shall be packed and published alongside the other two packages on both feeds at the same version, with the same SourceLink, symbol and README metadata <em>(F-PKG; added 2026-09-03)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a maintainer runs either publishing workflow on GitHub Actions, then <code>TechieRag.Agents</code> is packed and pushed at the same version with the same metadata.
+</li>
+</ul>
+</li>
+<li><strong>BRD-156</strong> — Both publishing workflows shall pack and publish <code>TechieRag.Telemetry</code> with the same SourceLink, symbol and README settings as the other packages; today no workflow packs it <em>(from the 2026-09-24 code scan, Architecture open question 4)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a maintainer runs either publishing workflow on GitHub Actions, then a <code>TechieRag.Telemetry</code> package is packed and pushed at the same version.
+</li>
+</ul>
+</li>
+<li><strong>BRD-157</strong> — The shipped <code>IVectorStore</code> set is SQLite, pgvector and Qdrant; <code>PgVectorStore</code> shall be proven against a real PostgreSQL through <code>LivePgVectorStoreTests</code> (<code>TechieRagTestPostgres</code>) before it counts as delivered <em>(TechieRag checklist REQ-RAG-044, migrated 2026-09-03 from TechieDesk BRD-125; Implemented 85%)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When <code>LivePgVectorStoreTests</code> run against a real PostgreSQL, then upsert, search and delete pass.
+</li>
+</ul>
+</li>
+<li><strong>BRD-158</strong> — <code>TechieRagBuilder.Build()</code> shall pass the embedding provider's <code>Dimensions</code> into every vector store instead of the 1024 default, so Cohere, OpenAI and Gemini embedders work with pgvector and Qdrant <em>(from the 2026-09-24 code scan, Architecture open question 2)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a developer builds with a 1536-dimension embedder and pgvector, then the <code>Embedding</code> column is <code>vector(1536)</code>.
+</li>
+</ul>
+</li>
+<li><strong>BRD-159</strong> — <code>AddTechieRag(IConfiguration)</code> and <code>AddTechieRag(TechieRagConfig)</code> shall map every configuration field the builder accepts, including <code>VectorStore.ApiKey</code>, embedding <code>Dimensions</code>, <code>ApiFormat</code>, <code>ApiPath</code>, <code>RequestDelayMs</code> and the <code>Prompt</code> section <em>(from the 2026-09-24 code scan, Architecture open question 5)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a developer sets <code>VectorStore.ApiKey</code> and <code>Prompt.SystemPrompt</code> in appsettings, then the built instance uses both.
+</li>
+</ul>
+</li>
+<li><strong>BRD-160</strong> — Exactly one path shall publish to nuget.org: the manual dispatch of <code>publish-nuget.yml</code>; the automatic <code>publish-nuget-org</code> job in <code>publish-github-packages.yml</code> is removed <em>(from the 2026-09-24 code scan, Architecture open question 3; DECISIONS.md 2026-09-03)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a maintainer pushes a <code>v*</code> tag on GitHub, then GitHub Packages receives the packages and nuget.org receives nothing until the manual dispatch.
+</li>
+</ul>
+</li>
+<li><strong>BRD-161</strong> — Image generation, realtime audio, batch, fine-tuning, moderation and OCR endpoints are deferred and re-scoped on demand <em>(TechieRag checklist REQ-RAG-046, migrated 2026-09-03 from TechieDesk BRD-127; Not Started)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a reader checks the deferred endpoints, then the BRD says deferred and no code claims them.
+</li>
+</ul>
+</li>
+<li><strong>BRD-162</strong> — Unit tests shall cover processors, providers, the agent loop, memory and cost math; live tests are gated by attributes that skip with a reason <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-111, library part; TechieDesk checklist REQ-RAG-030 Verified; 634 test methods on 2026-09-24)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When <code>dotnet test tests/TechieRag.Tests</code> runs on a host without live credentials, then every non-live test passes and live tests skip with a reason.
+</li>
+</ul>
+</li>
+<li><strong>BRD-163</strong> — Consumer-facing install documentation shall lead with the public feed (<code>dotnet add package TechieRag</code> / <code>TechieRag.Embedded</code>, no authentication, no PAT, no <code>nuget.config</code> edit); GitHub Packages survives only as a labelled internal-builds section <em>(TechieRag checklist REQ-FN-004, Verified 2026-09-03; had no BRD item)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a reader opens the README installation section, then the first path is <code>dotnet add package TechieRag</code> from nuget.org with no token.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="repository-separation">Repository separation<a class="anchor-link" href="#repository-separation">#</a></h3>
+<p>This repository holds the library only; the application consumes the packages.</p>
+<ul>
+<li><strong>BRD-87</strong> — TechieDesk shall move to its own repository: <code>apps/*</code>, <code>tests/TechieDesk.Tests</code>, <code>tests/appium</code>, <code>tests/verify</code>, <code>playwright.config.ts</code>, <code>publish-desktop.yml</code>, the TechieDesk docs, mockups, screenshots, <code>uiIssues/</code> and an app-configured <code>.tfcore/</code> leave this repository; the solution keeps <code>src/*</code> and <code>tests/TechieRag.Tests</code> only; the README's sample-application section links to the TechieDesk repository; TechieDesk consumes the three packages from NuGet at pinned versions; and library requirements are ledgered in this BRD and checklist from 2026-09-03 <em>(F-REPO)</em> — <strong>amended 2026-09-24:</strong> the new repository is <strong>Sevak</strong> (TechieDesk renamed in full at the split: repository, projects, namespaces, bundle id, artefacts, documents; requirement ids keep their numbers); the app paths were copied there on 2026-09-24 and its package-consumption goal <code>Sevak#REQ-FN-054</code> started; the deletion here waits for Sevak to build and test green from the published 1.0.7 packages; the README links to the Sevak repository, which is private until Sevak v0.1; cross-repository references carry the repository name (<code>Sevak#REQ-FN-054</code>, <code>TechieRag#REQ-RAG-054</code>) <em>Screen:</em> Repository separation
+<ul>
+<li><em>Acceptance:</em> When a maintainer opens the repository after the split, then only <code>src/</code>, <code>tests/TechieRag.Tests</code> and library docs remain and Sevak consumes the 1.0.7 packages.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="platform-groundwork">Platform groundwork<a class="anchor-link" href="#platform-groundwork">#</a></h3>
+<p>Makes the packages work inside .NET MAUI apps on Windows, macOS, Android and iOS.</p>
+<ul>
+<li><strong>BRD-88</strong> — The BRD and the UsageGuide shall carry a platform support matrix stating, per package (<code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Agents</code>, <code>TechieRag.Local</code>) and per platform (Windows, macOS / Mac Catalyst, Android, iOS), whether it is supported, tested on a named device, or not supported; a cell is never "supported" without a recorded run <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a reader opens the UsageGuide's platform matrix, then every package × platform cell reads supported, tested (device and date) or not supported.
+</li>
+</ul>
+</li>
+<li><strong>BRD-89</strong> — Model and cache folders shall no longer default to <code>AppContext.BaseDirectory</code>; the default root is the per-user application data folder (<code>Environment.SpecialFolder.LocalApplicationData</code>), writable on all four platforms, the host can override it, and the embedding model, the reranker and the local language model share that root <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseEmbedded()</code> in a MAUI app with no override, then model files land under the per-user application data folder on every platform.
+</li>
+</ul>
+</li>
+<li><strong>BRD-90</strong> — <code>TechieRag.Embedded</code> shall ship <code>buildTransitive</code> MSBuild targets that give a consuming app the correct native ONNX Runtime wiring on Mac Catalyst and iOS (the static xcframework <code>NativeReference</code>, <code>ForceLoad</code>, the CoreML weak framework, the Debug custom-ops stub and the interpreter setting hand-written today in the app csproj) and on Android (arm64-v8a and x86_64), so no consuming app writes native wiring by hand; Sevak's csproj then removes its copy <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a developer builds the probe app for Mac Catalyst, iOS or Android with no native wiring in its csproj, then ONNX Runtime loads and embeds.
+</li>
+</ul>
+</li>
+<li><strong>BRD-91</strong> — On Android and iOS, <code>UseEmbedded()</code> with no explicit model shall use a small 384-dimension model (<code>UseMiniLM</code> / <code>UseBgeSmall</code> class) and shall refuse bge-m3 with a clear message naming its 2.3 GB size; desktop defaults are unchanged <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseEmbedded()</code> on Android or iOS, then the 384-dimension model is selected and asking for bge-m3 throws a message naming 2.3 GB.
+</li>
+</ul>
+</li>
+<li><strong>BRD-92</strong> — Every model download shall report its total size before starting so the host can ask for Wi-Fi or decline, and shall expose progress through the existing <code>ModelDownloadService</code> event shape <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a model download starts in any consuming app, then a size-known event fires before the first byte and progress events follow.
+</li>
+</ul>
+</li>
+<li><strong>BRD-93</strong> — <code>SqliteVecStore</code>'s managed similarity search shall be made efficient (vectorised cosine similarity) and documented as the supported path on all platforms; the dead sqlite-vec loading code is removed or marked not implemented; search time for 1,000, 10,000 and 50,000 chunks is measured and recorded in the UsageGuide <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a developer runs the search benchmark on 1,000, 10,000 and 50,000 chunks, then the recorded timings and identical ranking to the old path appear in the UsageGuide.
+</li>
+</ul>
+</li>
+<li><strong>BRD-94</strong> — A sample app <code>samples/TechieRag.Probe</code> (.NET MAUI; Windows, Mac Catalyst, Android and iOS heads) shall have one screen and one button that embeds three texts, stores them, searches, and shows the top result with timings; it is the four-platform proof for every package <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a user presses the probe app's button on Windows, Mac Catalyst, Android or iOS, then the top result and embed, store and search timings appear on screen.
+</li>
+</ul>
+</li>
+<li><strong>BRD-95</strong> — CI shall build the probe for all four heads on every push (macOS runner for Catalyst and iOS) and run the probe's button on an Android emulator where CI allows; a head that cannot be built in CI is reported as such, never skipped silently <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<ul>
+<li><em>Acceptance:</em> When a developer opens the workflow run on the CI run page after a push, then all four probe heads show built, failed or not run.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="local-model">Local model<a class="anchor-link" href="#local-model">#</a></h3>
+<p>Runs a language model inside the app process, no server, no network after one download.</p>
+<ul>
+<li><strong>BRD-96</strong> — A developer can add an in-process local language model by referencing <code>TechieRag.Local</code> and calling <code>.UseLocalLlm()</code>, registered through <code>UseCustomLlmProvider</code>, with a platform-appropriate default model (small on Android and iOS, larger allowed on desktop) and overloads for a model id or a local folder; nothing of it enters the core package <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer references <code>TechieRag.Local</code> and calls <code>UseLocalLlm()</code> in a MAUI app, then a provider with the platform default model answers a prompt.
+</li>
+</ul>
+</li>
+<li><strong>BRD-97</strong> — The package shall have one public provider and an internal runtime interface with one implementation per platform, chosen per the recorded comparison in <code>DECISIONS.md</code>; the provider's behaviour is identical on every platform and the consuming app never sees which runtime is used <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When the conformance suite runs on each platform that has a runtime, then every test passes and the app cannot observe which runtime is in use.
+</li>
+</ul>
+</li>
+<li><strong>BRD-98</strong> — The provider shall fully implement <code>ILlmProvider</code> including the typed streaming method of BRD-110, apply the model's chat template, honour <code>Temperature</code>, <code>MaxTokens</code>, <code>TopP</code>, <code>StopSequences</code>, <code>Seed</code> and cancellation, and refuse a prompt longer than the model context with a clear error <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When the conformance suite exercises every <code>ILlmProvider</code> member and option on the local provider, then each is honoured and an over-long prompt throws before inference.
+</li>
+</ul>
+</li>
+<li><strong>BRD-99</strong> — Before loading, the provider shall check available memory against the model's needs and refuse with a clear message rather than let the operating system kill the app <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer loads a model on a device with less free memory than it needs, then load throws a message naming the shortfall and the app keeps running.
+</li>
+</ul>
+</li>
+<li><strong>BRD-100</strong> — Weights shall be downloaded once to the application data root of BRD-89, resumable, honouring <code>TECHIERAG_MODEL_BASE_URL</code>, SHA-256 verified, size reported before starting, progress events in the <code>ModelDownloadService</code> shape <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer interrupts and restarts a model download in the probe app, then it resumes, verifies SHA-256 and reports size before starting.
+</li>
+</ul>
+</li>
+<li><strong>BRD-101</strong> — Download shall require explicit acceptance of the model's terms of use, surfaced to the host so it can show a dialog; weights are never inside the package or the app bundle <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer starts a model download without signalling terms acceptance, then nothing downloads and the terms URL is exposed to the host.
+</li>
+</ul>
+</li>
+<li><strong>BRD-102</strong> — The package shall ship <code>buildTransitive</code> targets so a consuming MAUI app gets the right native runtime libraries on all four platforms with no hand-written csproj changes <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer builds the probe app for all four heads with no native wiring in its csproj, then <code>TechieRag.Local</code> loads its runtime on each.
+</li>
+</ul>
+</li>
+<li><strong>BRD-103</strong> — <code>CompleteAsync&lt;T&gt;</code> and JSON mode shall return valid JSON for the requested schema (grammar- or schema-constrained where the runtime allows); <code>SupportsToolCalling</code> reports false until a test proves otherwise <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>CompleteAsync&lt;T&gt;</code> with the three test schemas on the local provider, then each response parses into T.
+</li>
+</ul>
+</li>
+<li><strong>BRD-104</strong> — <code>LlmSource</code> shall gain a <code>Local</code> member, <code>LlmProviderFactory</code> an arm and <code>LlmConnectorCatalog</code> a row so <code>ModelRouter</code> resolves <code>local/&lt;model&gt;</code>; configuration needs no endpoint and no key <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer configures <code>LlmSource.Local</code> with no endpoint or key, then the factory builds the provider and <code>ModelRouter</code> resolves <code>local/&lt;model&gt;</code>.
+</li>
+</ul>
+</li>
+<li><strong>BRD-105</strong> — <code>EstimateTokenCount</code> shall use the model's real tokenizer <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>EstimateTokenCount</code> on the fixed test strings, then the count equals the runtime tokenizer's count.
+</li>
+</ul>
+</li>
+<li><strong>BRD-106</strong> — The probe app of BRD-94 shall gain a second button that generates one sentence from the local model and shows time to first token and tokens per second <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a user presses the second button on the probe app's screen, then one generated sentence, time to first token and tokens per second appear.
+</li>
+</ul>
+</li>
+<li><strong>BRD-107</strong> — Live tests shall be gated by a <code>LiveLocalLlmFactAttribute</code> in a non-parallel collection and skip with a reason when no model is present <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When the test suite runs on a host with no local model, then every live local test skips with a printed reason and nothing fails.
+</li>
+</ul>
+</li>
+<li><strong>BRD-108</strong> — Tokens per second, time to first token and peak memory shall be measured and recorded per platform on named devices in the support matrix of BRD-88 <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a reader opens the support matrix, then tokens per second, time to first token and peak memory are recorded per platform with device and date.
+</li>
+</ul>
+</li>
+<li><strong>BRD-109</strong> — The UsageGuide shall gain a <code>TechieRag.Local</code> section, the platform matrix is updated, and every "offline" or "air-gapped" claim across the docs is corrected to "downloads once, then works offline" <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a reader opens the UsageGuide, then a <code>TechieRag.Local</code> section exists and no page claims offline without saying downloads once first.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="typed-streaming">Typed streaming<a class="anchor-link" href="#typed-streaming">#</a></h3>
+<p>Streams a reply as typed events so a tool-using turn can stream.</p>
+<ul>
+<li><strong>BRD-110</strong> — <code>ILlmProvider</code> shall gain an additive streaming method that yields typed events — a text delta, a decided tool call (name, arguments, id), and a final record with usage and finish reason — so one turn can stream assistant text and still surface tool calls; <code>ChatStreamAsync</code> and <code>CompleteStreamAsync</code> stay unchanged and are implemented over it; all six shipped providers implement it (providers whose vendor streams tool-call deltas assemble them; the others emit the tool call as one event after the text); <code>SupportsStreaming</code> keeps its meaning; closes Chatur feedback TR-RAG-002 <em>(F-LLM; added 2026-09-24)</em> <em>Screen:</em> Typed streaming
+<ul>
+<li><em>Acceptance:</em> When a developer streams a tool-using turn through the new method on any of the six providers, then text deltas, a tool-call event and a completed event arrive in order.
+</li>
+</ul>
+</li>
+<li><strong>BRD-111</strong> — <code>AgentLoopRunner</code> shall offer a streaming run over the typed events of BRD-110 that yields assistant text as it arrives and executes every tool call through <code>ToolRegistry</code> exactly as the non-streaming loop does; <code>TechieRag.Agents</code>' <code>IChatClient</code> adapter exposes the same through its streaming method <em>(F-AGENT; added 2026-09-24; closes Chatur TR-RAG-002 for agent turns)</em> <em>Screen:</em> Typed streaming
+<ul>
+<li><em>Acceptance:</em> When a developer runs <code>AgentLoopRunner</code>'s streaming run on a tool-using prompt, then text streams as it arrives and the tool executes through <code>ToolRegistry</code>.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="subscription-sign-in">Subscription sign-in<a class="anchor-link" href="#subscription-sign-in">#</a></h3>
+<p>Lets a user bring a vendor subscription through a browser sign-in the host app drives.</p>
+<ul>
+<li><strong>BRD-112</strong> — A developer can add a subscription-billed hosted LLM through a browser or device-code sign-in, one builder method per vendor whose terms permit it (first: OpenAI, <code>.UseChatGptSubscriptionLlm(signInCallback)</code>), where the library returns the sign-in URL and user code to the callback, the host app opens the browser, the library waits for completion and yields an <code>ILlmProvider</code>; the resulting session can be persisted and restored by the host through a documented seam so a user signs in once <em>(F-LLM; added 2026-09-24; closes Chatur TR-RAG-001)</em> <em>Screen:</em> Subscription sign-in
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseChatGptSubscriptionLlm(callback)</code> in a test host, then the callback receives URL and code and a working provider is yielded after authorisation.
+</li>
+</ul>
+</li>
+<li><strong>BRD-113</strong> — <code>LlmSource</code> shall gain a subscription member, <code>LlmProviderFactory</code> an arm, and <code>LlmConnectorCatalog</code> one row per subscription vendor carrying the vendor's stated terms as text ("personal use only", "not permitted for third-party tools", or the vendor's own words) and the date checked, so <code>ModelRouter</code> resolves a subscription model name and a host can show the terms before sign-in; a vendor with no permitted flow has no method and a catalog row saying so <em>(F-LLM; added 2026-09-24)</em> <em>Screen:</em> Subscription sign-in
+<ul>
+<li><em>Acceptance:</em> When a developer reads the connector catalog, then each subscription vendor row carries its terms text and check date, and Anthropic's row reads not permitted.
+</li>
+</ul>
+</li>
+<li><strong>BRD-114</strong> — Before BRD-112 is built, the current sign-in policy and flow of each vendor (OpenAI, Anthropic, Google, Groq, xAI, Meta) shall be checked against the vendor's live documentation and recorded in <code>DECISIONS.md</code> with the date; known at 2026-09-24: OpenAI permits its sign-in in external tools for personal use, Anthropic prohibits subscription tokens outside its own clients <em>(F-LLM; added 2026-09-24)</em> <em>Screen:</em> Subscription sign-in
+<ul>
+<li><em>Acceptance:</em> When a reader opens <code>DECISIONS.md</code>, then one dated entry per vendor records its sign-in policy, source URL and what the flow returns.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="ingestion-breadth">Ingestion breadth<a class="anchor-link" href="#ingestion-breadth">#</a></h3>
+<p>Adds chunking strategies, more document formats and web ingestion to the core ingestion path.</p>
+<ul>
+<li><strong>BRD-115</strong> — The system shall offer pluggable chunking through <code>IChunker</code> with recursive, token, markdown/code-aware and sentence strategies (<code>WithChunking</code>, <code>WithCustomChunker</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-107, library part; TechieDesk checklist REQ-RAG-026 Verified)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer sets <code>WithChunking(ChunkingStrategy.Markdown)</code> and ingests a markdown file, then chunks follow heading boundaries; each strategy has a test.
+</li>
+</ul>
+</li>
+<li><strong>BRD-116</strong> — The system shall extract text from XLSX, PPTX and CSV files through dedicated processors <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-114, library part; TechieDesk checklist REQ-RAG-033 Verified)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer ingests an XLSX, a PPTX and a CSV file, then text from cells, slides and rows is extracted by the dedicated processor.
+</li>
+</ul>
+</li>
+<li><strong>BRD-117</strong> — The system shall ingest audio files through an <code>AudioTranscriptionProcessor</code> that transcribes via an OpenAI-compatible speech endpoint; a local Whisper ONNX path is not implemented <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-121, library part; TechieDesk checklist REQ-RAG-040 Verified 90%)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer ingests an audio file with a speech endpoint configured, then its transcript is chunked and embedded.
+</li>
+</ul>
+</li>
+<li><strong>BRD-118</strong> — A developer can ingest a single web page by URL: fetch, clean to text, chunk and embed (<code>WebIngestionExtensions</code>, <code>WebPageReader</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-112/60, library part; TechieDesk checklist REQ-RAG-016 Verified)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer ingests a URL, then the page's readable text is fetched, cleaned, chunked and embedded as one document.
+</li>
+</ul>
+</li>
+<li><strong>BRD-119</strong> — A developer can crawl a site with depth and maximum-link limits (<code>SiteCrawler</code>, <code>WebCrawlOptions</code>) and ingest every page reached <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-61, library part; TechieDesk checklist REQ-RAG-017 Verified)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer crawls a site with depth 2 and a link cap, then pages within the limits are ingested and none beyond.
+</li>
+</ul>
+</li>
+<li><strong>BRD-120</strong> — A developer can ingest a YouTube video's transcript by URL (<code>YouTubeTranscriptReader</code>); blocked today because YouTube's timed-text endpoint returns empty bodies, an owner decision on the approach is pending <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-62, library part; TechieDesk checklist REQ-RAG-018 Blocked 40%)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a developer ingests a YouTube URL, then the transcript is chunked and embedded, or a clear coded error explains why not.
+</li>
+</ul>
+</li>
+<li><strong>BRD-121</strong> — Every outbound web fetch shall pass a connect-time SSRF guard (<code>HttpWebContentFetcher.CreateGuardedHandler</code>) that refuses private, loopback and link-local targets after redirects and DNS rebinding <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-112, library part; TechieDesk checklist REQ-RAG-031 remarks)</em> <em>Screen:</em> Ingestion breadth
+<ul>
+<li><em>Acceptance:</em> When a fetch redirects to a private or loopback address, then the guarded handler refuses the connection and the error names the guard.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="data-connectors">Data connectors<a class="anchor-link" href="#data-connectors">#</a></h3>
+<p>Pulls documents from repositories, Confluence and mailboxes through one connector framework.</p>
+<ul>
+<li><strong>BRD-122</strong> — The system shall provide an <code>IDataConnector</code> framework with a <code>ConnectorRunner</code> that returns per-item results and per-item failure reasons and keeps incremental <code>ConnectorSyncState</code> <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-113/65, library part; TechieDesk checklist REQ-RAG-032 Verified, REQ-FN-020 Implemented 90%)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a developer runs a connector through <code>ConnectorRunner</code>, then per-item results and failures return and sync state advances.
+</li>
+</ul>
+</li>
+<li><strong>BRD-123</strong> — A developer can connect a GitHub or GitLab repository and ingest its files with branch and glob filters (<code>RepositoryConnector</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-63, library part; TechieDesk checklist REQ-RAG-019 Verified)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a developer connects a repository with a branch and a glob, then only matching files on that branch are ingested.
+</li>
+</ul>
+</li>
+<li><strong>BRD-124</strong> — A developer can connect a Confluence space and ingest its pages, with scheme, host and port pinned on cursors and links so the token never reaches a host named in a response body (<code>ConfluenceConnector</code>, TR-RAG-018) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-64, library part; TechieDesk checklist REQ-RAG-020 Verified 95%)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a developer connects a Confluence space, then its pages are ingested and no request leaves the configured host.
+</li>
+</ul>
+</li>
+<li><strong>BRD-125</strong> — A developer can ingest a mailbox over IMAP (generic, Gmail, Microsoft 365) or a local mbox file with folder, date, sender and subject filters, optional PDF/DOCX/XLSX/PPTX attachments, quoted-reply and signature stripping and incremental sync; TLS is required and plaintext IMAP refused (<code>EmailConnector</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-135, library part; TechieDesk checklist REQ-RAG-049 Implemented 90%: only the mbox path exercised)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a developer connects an IMAP mailbox or an mbox file with filters, then matching messages and allowed attachments are ingested incrementally.
+</li>
+</ul>
+</li>
+<li><strong>BRD-126</strong> — Connector transports shall reuse the SSRF-guarded connect-time handler, cap a run at <code>MaxTotalBytes</code> (64 MB), and the IMAP client shall refuse command injection, cap literals by <code>MaxMessageBytes</code>, apply real asynchronous timeouts and cap line length and count (TR-RAG-017, 019, 027…030) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-113/135, library part; TechieDesk checklist REQ-RAG-032/049 remarks, fixed)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a connector run exceeds <code>MaxTotalBytes</code> or an IMAP server sends an oversized literal, then the run stops with a coded error.
+</li>
+</ul>
+</li>
+<li><strong>BRD-127</strong> — <code>ConnectorRunner</code> shall hand each fetched document to ingestion as it arrives instead of collecting every document before ingesting, so a run stopped part-way keeps what it fetched; <code>IConnectorTransport</code> shall support methods beyond GET where a connector needs them (TR-RAG-020…022) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-113, library part; TechieDesk checklist open feedback)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a connector run is cancelled after some documents were fetched, then those documents are already ingested.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="mcp-tools">MCP tools<a class="anchor-link" href="#mcp-tools">#</a></h3>
+<p>Consumes Model Context Protocol tool servers inside the agent loop.</p>
+<ul>
+<li><strong>BRD-128</strong> — The system shall consume Model Context Protocol tool servers in the agent loop through <code>McpClient</code> with stdio and HTTP transports and <code>McpToolHandler</code> <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-119, library part; TechieDesk checklist REQ-RAG-038 Verified)</em> <em>Screen:</em> MCP tools
+<ul>
+<li><em>Acceptance:</em> When a developer registers an MCP server over stdio or HTTP, then its tools appear in the agent loop and execute through <code>McpToolHandler</code>.
+</li>
+</ul>
+</li>
+<li><strong>BRD-129</strong> — The system shall expose an <code>IMcpServerRegistry</code> with an in-memory implementation, a <code>McpTrustPolicy</code>, and the tool-to-server mapping (<code>McpToolHandler.ServerNameFor</code>, <code>McpWorkspaceTools.ToolsByServer</code>) so a host's egress guard knows which server each tool comes from (TR-RAG-041) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-86, library part; TechieDesk checklist REQ-RAG-023 Implemented 90%)</em> <em>Screen:</em> MCP tools
+<ul>
+<li><em>Acceptance:</em> When a host asks which server a tool belongs to, then <code>ServerNameFor</code> answers and an untrusted server's tools are refused by the trust policy.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="flow-orchestration">Flow orchestration<a class="anchor-link" href="#flow-orchestration">#</a></h3>
+<p>Runs declarative multi-step agent flows with guardrails, handoffs and agent-as-tool.</p>
+<ul>
+<li><strong>BRD-130</strong> — The system shall run declarative agent flows: five node kinds (Agent, Tool, Condition, Handoff, Terminal), <code>FlowCondition</code> routing as data with 11 operators, cycles refused unless <code>AllowCycles</code>, every run capped by <code>MaxSteps</code>, handoffs passing only <code>HandoffContextMode</code> text plus <code>CarryVariables</code>, agent-as-tool with bounded recursion, and <code>FlowStep : AgentStep</code> on the same trace channel <em>(TechieRag checklist REQ-RAG-042, migrated 2026-09-03 from TechieDesk BRD-123; Implemented 95%)</em> <em>Screen:</em> Flow orchestration
+<ul>
+<li><em>Acceptance:</em> When a developer runs a five-node flow with a condition and a handoff, then routing follows the data and the run stops at <code>MaxSteps</code>.
+</li>
+</ul>
+</li>
+<li><strong>BRD-131</strong> — <code>IFlowGuardrail</code> shall run at Input, Output and ToolCall, deny by default, and <code>FlowRuntime.HostGuardrails</code> shall be set only by the host so a flow definition cannot name or bypass it; a host's egress confirmation plugs in as a <code>DelegateFlowGuardrail</code> <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-123, library part; TechieDesk checklist REQ-NFR-013 Implemented 95%)</em> <em>Screen:</em> Flow orchestration
+<ul>
+<li><em>Acceptance:</em> When a host guardrail denies a tool call, then the flow reports the denial and the flow definition cannot bypass the host guardrail.
+</li>
+</ul>
+</li>
+<li><strong>BRD-132</strong> — Every user-visible message the flow engine produces (refusals, budget exhaustion, validation) shall be a <code>FlowMessage</code> carrying a <code>FlowMessageCodes</code> code with arguments and an English fallback, never a bare English sentence, so the host renders it in the user's language <em>(TechieRag checklist REQ-RAG-050, migrated 2026-09-03 from TechieDesk BRD-91; Implemented 80%)</em> <em>Screen:</em> Flow orchestration
+<ul>
+<li><em>Acceptance:</em> When the engine refuses a step, then the message reaching the host carries a <code>FlowMessageCodes</code> code with arguments.
+</li>
+</ul>
+</li>
+<li><strong>BRD-133</strong> — <code>AgentToolHandler.ForFlow</code> shall report a blocked or budget-exhausted inner run as an unsuccessful <code>ToolResult</code> (<code>IsSuccess = false</code>), never as a success, so a renderer shows it blocked <em>(TechieRag checklist REQ-RAG-051, migrated 2026-09-03 from TechieDesk BRD-123; Implemented 95%)</em> <em>Screen:</em> Flow orchestration
+<ul>
+<li><em>Acceptance:</em> When an inner agent run is blocked or exhausts its budget, then <code>AgentToolHandler.ForFlow</code> returns a <code>ToolResult</code> with <code>IsSuccess</code> false.
+</li>
+</ul>
+</li>
+<li><strong>BRD-134</strong> — A flow definition shall round-trip through <code>FlowSerializer</code> and <code>FlowValidator</code> shall refuse an invalid graph (unreachable nodes, cycles without <code>AllowCycles</code>, unknown agents or tools) with coded validation messages before it runs <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-92/123, library part; TechieDesk checklist REQ-UI-040 PARTIAL 70%, engine part)</em> <em>Screen:</em> Flow orchestration
+<ul>
+<li><em>Acceptance:</em> When a developer serialises a flow and validates a graph with a cycle, then the round-trip is identical and validation refuses the cycle with a code.
+</li>
+</ul>
+</li>
+<li><strong>BRD-135</strong> — A flow run shall complete or fail within a configurable time limit; a Tool-node flow that waits on a host confirmation shall end with a coded timeout message instead of hanging <em>(harvested 2026-09-24 from the TechieDesk BRD REQ-FN-053, library part; TechieDesk checklist In Progress 40%)</em> <em>Screen:</em> Flow orchestration
+<ul>
+<li><em>Acceptance:</em> When a Tool-node flow waits longer than the time limit for a confirmation, then the run ends with a coded timeout message.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="workspaces-and-memory">Workspaces and memory<a class="anchor-link" href="#workspaces-and-memory">#</a></h3>
+<p>Isolates documents and settings per workspace and persists conversations in a database.</p>
+<ul>
+<li><strong>BRD-136</strong> — The system shall provide database-backed conversation memory with threads (<code>DbConversationMemory</code>, <code>IConversationStore</code>) on SQLite and PostgreSQL <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-108, library part; TechieDesk checklist REQ-RAG-027 Verified; PostgreSQL untested)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When a developer configures <code>WithPersistence(StoreProvider.Sqlite, ...)</code> and chats in a thread, then messages persist and reload after restart.
+</li>
+</ul>
+</li>
+<li><strong>BRD-137</strong> — <code>IConversationStore</code> shall persist every message of a thread (user, assistant, sources as JSON, content parts) per workspace and user <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-33, library part; TechieDesk checklist REQ-RAG-008 Verified)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When a message with sources is stored through <code>IConversationStore</code>, then it reloads with role, content parts and sources intact.
+</li>
+</ul>
+</li>
+<li><strong>BRD-138</strong> — The system shall build the model context from persisted history with token-aware trimming that keeps the system message and the most recent turns <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-37, library part; TechieDesk checklist REQ-RAG-009 Verified)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When persisted history exceeds the token budget, then the context keeps the system message and the latest turns.
+</li>
+</ul>
+</li>
+<li><strong>BRD-139</strong> — The system shall provide workspace primitives (<code>IWorkspaceStore</code>, <code>WorkspaceManager</code>, <code>Workspace</code>): isolated documents and settings, document pinning, a per-workspace similarity threshold and top-K, a rerank toggle, and query mode versus chat mode with an honest "not in my documents" answer <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-109/32/44/47/48, library part; TechieDesk checklist REQ-RAG-028/007/013/014/015 Verified)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When a developer creates two workspaces with different documents and settings, then retrieval in one never returns the other's chunks.
+</li>
+</ul>
+</li>
+<li><strong>BRD-140</strong> — Ingestion shall deduplicate by content hash so a document embedded once is reused across workspaces (<code>IWorkspaceStore.FindDocumentIdByHashAsync</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-43, library part; TechieDesk checklist REQ-RAG-012 Verified)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When the same file is added to two workspaces, then it is embedded once and both workspaces reference the same document id.
+</li>
+</ul>
+</li>
+<li><strong>BRD-141</strong> — Context assembly shall signal truncation (<code>WorkspaceContext.WasTruncated</code>, the <code>ContextTruncated</code> event) and evict retrieved chunks before pinned ones <em>(harvested 2026-09-24 from the TechieDesk BRD REQ-RAG-048, library part; TechieDesk checklist Verified)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When retrieved context exceeds the budget with pinned chunks present, then retrieved chunks are evicted first and <code>WasTruncated</code> is true.
+</li>
+</ul>
+</li>
+<li><strong>BRD-142</strong> — Deleting a document shall remove its vectors and its membership from every workspace; <code>IWorkspaceStore.RemoveDocumentAsync</code> deletes only the membership row today (TR-RAG-004) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-45, library part; TechieDesk checklist REQ-FN-012 Needs re-verify 60%)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When a developer deletes a document, then its vectors and every workspace membership are gone.
+</li>
+</ul>
+</li>
+<li><strong>BRD-143</strong> — <code>PromptTemplateEngine.FormatContext</code> shall signal truncation the same way <code>WorkspaceManager</code> does instead of cutting context silently (TR-RAG-009) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-108, library part; TechieDesk checklist open feedback)</em> <em>Screen:</em> Workspaces and memory
+<ul>
+<li><em>Acceptance:</em> When <code>PromptTemplateEngine.FormatContext</code> drops chunks to fit, then the caller is told that truncation happened.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="reranking">Reranking<a class="anchor-link" href="#reranking">#</a></h3>
+<p>Reorders search candidates with a cross-encoder or an API reranker.</p>
+<ul>
+<li><strong>BRD-144</strong> — The system shall provide an <code>IReranker</code> stage with a local ONNX cross-encoder (<code>OnnxCrossEncoderReranker</code>, bge-reranker-v2-m3, in <code>TechieRag.Embedded</code>) and API rerankers (<code>CohereReranker</code>, <code>JinaReranker</code>), configured by <code>WithReranker</code> <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-106, library part; TechieDesk checklist REQ-RAG-025 Verified)</em> <em>Screen:</em> Reranking
+<ul>
+<li><em>Acceptance:</em> When a developer enables the ONNX cross-encoder or Cohere reranker and searches, then the top results are reordered by reranker score.
+</li>
+</ul>
+</li>
+<li><strong>BRD-145</strong> — A developer can switch reranking per call through <code>SearchOptions.Rerank</code> and set the default with <code>WithRerankEnabledByDefault</code>; the workspace flag is authoritative when a workspace is active <em>(harvested 2026-09-24 from the TechieDesk BRD REQ-RAG-047, library part; TechieDesk checklist Verified)</em> <em>Screen:</em> Reranking
+<ul>
+<li><em>Acceptance:</em> When a developer passes <code>SearchOptions.Rerank = false</code> on a rerank-by-default instance, then that search skips the reranker.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="provider-breadth">Provider breadth<a class="anchor-link" href="#provider-breadth">#</a></h3>
+<p>Widens the provider set: model-name routing, more embedders, images, prompt caching, speech.</p>
+<ul>
+<li><strong>BRD-146</strong> — A developer can pick a hosted model by name alone: <code>ModelRouter</code> resolves the longest unambiguous prefix in <code>LlmConnectorCatalog</code> (OpenAI, Anthropic, Gemini, Groq, Mistral, Cohere, DeepSeek, xAI, OpenRouter, Together, Perplexity, Bedrock, Ollama, LM Studio) and <code>UseLlmForModel</code> / <code>UseConnectorLlm</code> build the provider <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-115, library part; TechieDesk checklist REQ-RAG-034 Verified 95%)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseLlmForModel("gpt-4o")</code>, then the router resolves the OpenAI connector and the provider is built without naming it.
+</li>
+</ul>
+</li>
+<li><strong>BRD-147</strong> — A developer can use Cohere, Voyage, Mistral and Google Gemini embedding providers (<code>UseCohereEmbedding</code>, <code>UseVoyageEmbedding</code>, <code>UseMistralEmbedding</code>, <code>UseGeminiEmbedding</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-116, library part; TechieDesk checklist REQ-RAG-035 Verified 95%, wire contract only)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseCohereEmbedding</code>, <code>UseVoyageEmbedding</code>, <code>UseMistralEmbedding</code> or <code>UseGeminiEmbedding</code>, then embeddings reach that vendor's endpoint.
+</li>
+</ul>
+</li>
+<li><strong>BRD-148</strong> — <code>EmbeddedEmbeddingProvider</code> shall encode text as XLM-RoBERTa expects (SentencePiece ids shifted by the fairseq offset, wrapped in <code>&lt;s&gt;</code> … <code>&lt;/s&gt;</code>), every stored vector shall carry an <code>EmbeddingSignature</code>, and <code>DetectStaleEmbeddingsAsync</code> shall report a corpus embedded by another model or an older revision <em>(TechieRag checklist REQ-RAG-052, migrated 2026-09-03 from TechieDesk BRD-116/BRD-8; Implemented 95%)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a Hindi query is embedded by <code>EmbeddedEmbeddingProvider</code>, then it ranks a relevant English passage above an irrelevant one and stale vectors are detected.
+</li>
+</ul>
+</li>
+<li><strong>BRD-149</strong> — A developer can send images with a chat message through <code>IMultimodalLlmProvider</code>, <code>ChatImage</code> and <code>ChatContentPart</code>, mapped to each vendor's wire shape; audio and document attachments are a later phase <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-120, library part; TechieDesk checklist REQ-RAG-039 Verified 90%)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer sends a chat message with an image to a multimodal provider, then the image reaches the vendor in its wire shape.
+</li>
+</ul>
+</li>
+<li><strong>BRD-150</strong> — The system shall pass prompt-caching hints through to Anthropic and Gemini (<code>PromptCacheOptions</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-124, library part; TechieDesk checklist REQ-RAG-043 Verified)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer sets <code>PromptCacheOptions</code> on an Anthropic or Gemini call, then the caching hint is present in the request.
+</li>
+</ul>
+</li>
+<li><strong>BRD-151</strong> — Streaming RAG shall return source citations alongside the text (<code>RagStreamEvent</code>, <code>AskStreamWithSourcesAsync</code>, <code>ChatWithRagStreamWithSourcesAsync</code>) and honour <code>PromptTemplateEngine</code> <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-105, library part; TechieDesk checklist REQ-RAG-024 Verified)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer iterates <code>AskStreamWithSourcesAsync</code>, then source events arrive with the text events.
+</li>
+</ul>
+</li>
+<li><strong>BRD-152</strong> — Cost shall come from a configurable pricing table (<code>WithModelPricing</code>, <code>ModelPricing</code>) and streamed-token usage shall be reported correctly on every provider <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-110, library part; TechieDesk checklist REQ-RAG-029 Verified)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer streams a completion with a pricing table set, then usage and cost for the streamed tokens are recorded correctly.
+</li>
+</ul>
+</li>
+<li><strong>BRD-153</strong> — The system shall provide <code>ISpeechToText</code> and <code>ITextToSpeech</code> abstractions with OpenAI-compatible providers (<code>UseSpeechToText</code>) <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-122, library part; TechieDesk checklist REQ-RAG-041 Verified 90%, no live endpoint)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseSpeechToText</code> with an OpenAI-compatible endpoint and transcribes audio, then text returns.
+</li>
+</ul>
+</li>
+<li><strong>BRD-154</strong> — <code>TechieRag</code> and <code>TechieRag.Telemetry</code> shall target <code>net10.0</code> and <code>net8.0</code>; <code>TechieRag.Embedded</code> targets <code>net10.0</code> because ONNX Runtime requires it <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-118, library part; TechieDesk checklist REQ-RAG-037 Verified)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a consumer on <code>net8.0</code> references <code>TechieRag</code> and <code>TechieRag.Telemetry</code>, then restore and build succeed.
+</li>
+</ul>
+</li>
+<li><strong>BRD-155</strong> — <code>TechieRag.Telemetry</code> shall be a separate opt-in package: OTLP or console exporters, tracing and metrics off by default, a loopback endpoint by default and a non-loopback endpoint refused unless <code>AllowRemoteEndpoint</code>; the core package links no exporter <em>(harvested 2026-09-24 from the TechieDesk BRD BRD-117/99, library part; TechieDesk checklist REQ-RAG-036, REQ-NFR-008 Verified)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer adds <code>TechieRag.Telemetry</code> with defaults on a host app, then nothing is exported; with <code>EnableTracing</code> and a loopback endpoint, spans reach it.
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="non-functional-requirements">4. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
+<p>Only what this phase adds. The ones that apply to the whole library are in the phase-1 BRD.</p>
+<table>
+<thead><tr><th>Id</th><th>Area</th><th>Requirement</th><th>Measure</th></tr></thead>
+<tbody>
+<tr><td>(none)</td><td>—</td><td>This phase adds no library-wide non-functional item; performance of the local model is recorded per device under BRD-108, never as a budget the owner has not stated</td><td>—</td></tr>
+</tbody>
+</table>
+<h2 id="development-status">5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
+<p>Written by the status gate after every build, verify and handoff; not by hand.</p>
+<p><strong>Snapshot as of 2026-09-24.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
+<table>
+<thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Surface: Agents package</td><td>3</td><td>0</td><td>3</td><td>Planned</td></tr>
+<tr><td>Surface: Packaging and quality follow-ups</td><td>9</td><td>2</td><td>7</td><td>Partial</td></tr>
+<tr><td>Surface: Repository separation</td><td>1</td><td>0</td><td>1</td><td>In progress</td></tr>
+<tr><td>Surface: Flow orchestration</td><td>6</td><td>0</td><td>6</td><td>In progress</td></tr>
+<tr><td>Surface: Provider breadth</td><td>10</td><td>9</td><td>1</td><td>Partial</td></tr>
+<tr><td>Surface: Platform groundwork</td><td>8</td><td>0</td><td>8</td><td>Planned</td></tr>
+<tr><td>Surface: Local model</td><td>14</td><td>0</td><td>14</td><td>Planned</td></tr>
+<tr><td>Surface: Typed streaming</td><td>2</td><td>0</td><td>2</td><td>Planned</td></tr>
+<tr><td>Surface: Subscription sign-in</td><td>3</td><td>0</td><td>3</td><td>Planned</td></tr>
+<tr><td>Surface: Ingestion breadth</td><td>7</td><td>5</td><td>2</td><td>Partial</td></tr>
+<tr><td>Surface: Data connectors</td><td>6</td><td>4</td><td>2</td><td>Partial</td></tr>
+<tr><td>Surface: MCP tools</td><td>2</td><td>1</td><td>1</td><td>Partial</td></tr>
+<tr><td>Surface: Workspaces and memory</td><td>8</td><td>6</td><td>2</td><td>Partial</td></tr>
+<tr><td>Surface: Reranking</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+</tbody>
+</table>
+<h2 id="where-the-rest-lives">6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>
+<table>
+<thead><tr><th>What</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Scope, users and roles, the context diagram</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
+<tr><td>Non-functional requirements for the whole library</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
+<tr><td>Constraints, assumptions and risks</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
+<tr><td>Every phase, its surfaces and its BRD range</td><td><a href="TechieRag-Phases.md">TechieRag-Phases.md</a></td></tr>
+<tr><td>This phase's work list</td><td><a href="TechieRag-P2-Checklist.md">TechieRag-P2-Checklist.md</a></td></tr>
+<tr><td>The decisions behind the 2026-09-24 items</td><td><a href="TechieRag-Update-Brief.md">TechieRag-Update-Brief.md</a>, <code>DECISIONS.md</code>, Architecture §6</td></tr>
+</tbody>
+</table>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

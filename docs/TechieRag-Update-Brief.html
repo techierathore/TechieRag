@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag Update Brief</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieRag Update Brief</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-Update-Brief.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#executive-summary">Executive Summary</a></li>
+        <li class="h3"><a href="#key-themes-identified">Key Themes Identified:</a></li>
+        <li><a href="#technique-sessions">Technique Sessions</a></li>
+        <li class="h3"><a href="#assumption-reversal">Assumption Reversal</a></li>
+        <li class="h3"><a href="#question-storming">Question Storming</a></li>
+        <li class="h3"><a href="#forced-ranking">Forced Ranking</a></li>
+        <li><a href="#idea-categorization">Idea Categorization</a></li>
+        <li class="h3"><a href="#immediate-opportunities">Immediate Opportunities</a></li>
+        <li class="h3"><a href="#future-innovations">Future Innovations</a></li>
+        <li class="h3"><a href="#moonshots">Moonshots</a></li>
+        <li class="h3"><a href="#insights-learnings">Insights &amp;amp; Learnings</a></li>
+        <li><a href="#action-planning">Action Planning</a></li>
+        <li class="h3"><a href="#top-3-priority-ideas">Top 3 Priority Ideas</a></li>
+        <li class="h3"><a href="#research-item">Research item</a></li>
+        <li class="h3"><a href="#owner-decision">Owner decision</a></li>
+        <li><a href="#reflection-follow-up">Reflection &amp;amp; Follow-up</a></li>
+        <li class="h3"><a href="#what-worked-well">What Worked Well</a></li>
+        <li class="h3"><a href="#areas-for-further-exploration">Areas for Further Exploration</a></li>
+        <li class="h3"><a href="#recommended-follow-up-techniques">Recommended Follow-up Techniques</a></li>
+        <li class="h3"><a href="#questions-that-emerged">Questions That Emerged</a></li>
+        <li class="h3"><a href="#next-session-planning">Next Session Planning</a></li>
+      </ol>
+    </div>
+<p><strong>Session Date:</strong> 2026-09-24
+<strong>Facilitator:</strong> Business Analyst Chanakya
+<strong>Participant:</strong> Owner (TechieRag)
+<strong>Purpose:</strong> The one page that tells <code>*amend-docs</code> (both repositories) what changed and why. Dates and sequencing are the owner's and are not in this document.</p>
+<h2 id="executive-summary">Executive Summary<a class="anchor-link" href="#executive-summary">#</a></h2>
+<p><strong>Topic:</strong> How TechieRag absorbs four incoming demands: plan 08 (on-device local model, four platforms), plan 09 (TechieDesk repository split, Windows head, offline v0.1), Chatur feedback (subscription sign-in, streaming with tool calls), MyDiary feedback (on-device completion provider). What to build, what to say no to, and which documents change.</p>
+<p><strong>Session Goals:</strong> Focused ideation. Settle the decisions the two plans left open.</p>
+<p><strong>Constraints taken as fixed:</strong> solo developer; TechieFlow agents do the building; owner runs real devices; no cloud fallback for MyDiary; repository split before anything else. Added in session: <strong>TechieDesk is renamed Sevak</strong>.</p>
+<p><strong>Inputs read:</strong></p>
+<ul>
+<li><code>/mnt/c/1MyCode/MyAiChats/ClaudeDocs/plans/08-techierag-local-model.md</code>
+</li>
+<li><code>/mnt/c/1MyCode/MyAiChats/ClaudeDocs/plans/09-techiedesk-offline-v01.md</code>
+</li>
+<li><code>docs/Chatur-TechieRag-Feedback.md</code> (TR-RAG-001 sign-in blocker, TR-RAG-002 streaming tool calls)
+</li>
+<li><code>docs/MyDiary-TechieRag-Feedback.md</code> (TR-RAG-001 on-device completion blocker)
+</li>
+<li><code>docs/TechieRag-BRD.md</code> (highest ID today: BRD-126; feature areas F-LLM, F-AGENT, F-REPO, F-WEB)
+</li>
+</ul>
+<p><strong>Techniques Used:</strong> Assumption Reversal (seven claims, ten decisions); Question Storming (thirteen questions, answered from the sources); Forced Ranking (document changes, by dependency).</p>
+<p><strong>Total Ideas Generated:</strong> 10 decisions, 13 answered questions, 9 document-change items, 1 research item, 1 owner decision.</p>
+<h3 id="key-themes-identified">Key Themes Identified:<a class="anchor-link" href="#key-themes-identified">#</a></h3>
+<ul>
+<li><strong>One product, one name.</strong> Sevak is TechieDesk renamed at the moment of the split. There is no second product to grow later.
+</li>
+<li><strong>Showcase, not gatekeeper.</strong> Sevak exists to show every TechieRag capability. Freemium with limits, never locks.
+</li>
+<li><strong>The library says yes to both worlds.</strong> Local model with no network, and subscription sign-in to hosted vendors. Same <code>ILlmProvider</code> contract for both.
+</li>
+<li><strong>Fix the contract before the seventh provider.</strong> Streaming that carries tool calls goes in before <code>TechieRag.Local</code> exists.
+</li>
+<li><strong>Plans answer more than they seemed to.</strong> Most "open" questions were already settled in plans 08 and 09; the brief points at the answer rather than reopening it.
+</li>
+</ul>
+<h2 id="technique-sessions">Technique Sessions<a class="anchor-link" href="#technique-sessions">#</a></h2>
+<h3 id="assumption-reversal">Assumption Reversal<a class="anchor-link" href="#assumption-reversal">#</a></h3>
+<p><strong>Description:</strong> Take the load-bearing claims in the two plans, state the opposite, and see what each reversal teaches.</p>
+<h4 id="decisions-taken">Decisions taken:<a class="anchor-link" href="#decisions-taken">#</a></h4>
+<ol>
+<li><strong>Sevak is TechieDesk, renamed. There is no separate future product.</strong> Reverses plan 09's "a future Sevak grows out of TechieDesk". The rename happens when the new repository is created (plan 09 part A step 2), the cheapest moment it will ever have.
+</li>
+<li><strong>Rename everything, not just the outside.</strong> Repository, solution, project and namespace names, bundle ID, display name, DMG/zip names, workflow and tag prefix, all <code>TechieDesk-*</code> docs, mockups, devguides, screenshots folder. Requirement IDs keep their numbers; the repository prefix in cross-repo references becomes <code>Sevak#REQ-FN-054</code>.
+</li>
+<li><strong>Sevak is "the application showing the full capabilities of TechieRag".</strong> It stays the library's test bed. Every TechieRag capability is expected to have a visible home in Sevak.
+</li>
+<li><strong>Sevak is freemium: features are limited, not gated.</strong> Corrects plan 09 part B3, which lists six feature flags an offline install still gates. Every capability is present and usable in the free tier, with limits rather than locks. Exact limits are a later decision.
+</li>
+<li><strong>Sevak is the first desktop consumer of <code>TechieRag.Local</code>; MyDiary is the first mobile consumer.</strong> Confirms plan 08's build order (Mac and Windows first, then Android, then iOS).
+</li>
+<li><strong>The repository split comes first.</strong> Plan 09 part A stands, new repository named Sevak.
+</li>
+<li><strong>Local model: one public interface, platform-specific implementations underneath.</strong> <code>UseLocalLlm()</code> is the single contract; the runtime behind it is chosen per platform. Plan 08 step 4 item (2) stands as written.
+</li>
+<li><strong>Subscription sign-in is in scope for TechieRag.</strong> Closes Chatur TR-RAG-001. The library is flexible enough for personal and team use; which applies is decided by who signs in and what licence they hold, not by the library. Vendor policy is a fact to research (R1), not a reason to refuse the feature.
+</li>
+<li><strong>Change the streaming contract now, before <code>TechieRag.Local</code> exists.</strong> Streaming yields typed events (text delta, tool call). Six existing providers updated; <code>TechieRag.Local</code> implements the new contract from day one. Closes Chatur TR-RAG-002.
+</li>
+<li><strong>Dates and sequencing are the owner's.</strong> This document records decisions and document changes; the owner re-plans from it.
+</li>
+</ol>
+<h4 id="insights-discovered">Insights Discovered:<a class="anchor-link" href="#insights-discovered">#</a></h4>
+<ul>
+<li>The rename and the split are the same event. Doing them together costs one name in one command.
+</li>
+<li>"Showcase" is a stronger governance rule than "test bed": it creates a standing expectation that library features get Sevak screens (plan 09 already has the mechanism: a library requirement plus a matching app requirement that references it by repository and id).
+</li>
+<li>Two of the three upstream blockers (MyDiary on-device, Chatur sign-in) are the same shape: a new <code>LlmSource</code>, a new builder method, a new <code>LlmProviderFactory</code> arm, a new <code>LlmConnectorCatalog</code> row. They can share one amendment pattern.
+</li>
+</ul>
+<h4 id="notable-connections">Notable Connections:<a class="anchor-link" href="#notable-connections">#</a></h4>
+<ul>
+<li>Decision 9 (streaming contract) is a prerequisite for decision 7 (<code>TechieRag.Local</code>): the new provider must implement the final contract, not a contract about to change.
+</li>
+<li>Decision 3 (showcase) means the local model (plan 09 B3) and subscription sign-in both need Sevak screens, so both produce paired requirements in both repositories.
+</li>
+</ul>
+<h3 id="question-storming">Question Storming<a class="anchor-link" href="#question-storming">#</a></h3>
+<p><strong>Description:</strong> List every question the documents must answer once the ten decisions are folded in, then answer each from the sources rather than reopening it.</p>
+<table>
+<thead><tr><th>#</th><th>Question</th><th>Answer</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Is the Sevak repository public on day one or private until v0.1?</td><td><strong>Decided: private until v0.1.</strong> Goes public with the first app tag, after secret rotation and the handoff test (plan 09 part C). Recorded in <code>docs/OldDocs/Sevak-Decision-Request.md</code> D1.</td><td>Owner, 2026-09-24</td></tr>
+<tr><td>2</td><td>Which docs are Sevak's source of truth after the split?</td><td>The existing <code>TechieDesk-BRD</code>, <code>-Checklist</code>, <code>-Architecture</code>, <code>-UIDesign</code>, <code>-UsageGuide</code> renamed in place to <code>Sevak-*</code>, then amended for the freemium model. Rows marked "Moved 2026-09-03" stay as pointers.</td><td>Plan 09 part A, "Ending the two-checklist confusion"</td></tr>
+<tr><td>3</td><td>What are the free-tier limits?</td><td>Later decision. The BRD states "limited, not gated; limits set in a later revision".</td><td>Decision 4</td></tr>
+<tr><td>4</td><td>Where does <code>UseLocalLlm()</code> live and which platform ships first?</td><td>In the new package <code>TechieRag.Local</code>, never in core, registered via <code>UseCustomLlmProvider</code>, with an internal runtime interface and one backend per platform. Mac and Windows first.</td><td>Plan 08 step 4 items (1), (2) and "Order inside the build"</td></tr>
+<tr><td>5</td><td>When does Sevak's "Built-in local model" screen become a requirement?</td><td>After <code>TechieRag.Local</code> is published; plan 09 B3 is written to run at that point. The requirement can be authored earlier and sit Blocked on the package.</td><td>Plan 09 B3</td></tr>
+<tr><td>6</td><td>Where do weights download to, and who owns terms acceptance?</td><td>Per-user application data folder (<code>LocalApplicationData</code>), host-overridable, same root for embeddings and reranker. Library requires explicit acceptance before download; the app shows the dialog. Weights never ship inside package or app bundle.</td><td>Plan 08 step 1 item (2), step 4 items (5), (6); plan 09 B3 item (4)</td></tr>
+<tr><td>7</td><td>Builder method shape for subscription sign-in?</td><td>One method per vendor that supports it, sharing one callback shape, e.g. <code>UseChatGptSubscriptionLlm(deviceCodeCallback)</code> as Chatur suggested. Architect confirms the shape against each vendor's live documentation before code (R1).</td><td>Chatur TR-RAG-001 "Suggested fix"</td></tr>
+<tr><td>8</td><td>Who drives the browser step?</td><td>The host app. The library returns the sign-in URL and code, waits for completion, and yields an <code>ILlmProvider</code>.</td><td>Chatur TR-RAG-001 "Suggested fix"</td></tr>
+<tr><td>9</td><td>What does the library do when a vendor forbids subscription use (Anthropic today)?</td><td>It does not police policy. The connector catalog row carries the vendor's stated terms ("personal use only", "not permitted for third-party tools"). Where a vendor offers no flow, no method exists. The app decides what to show.</td><td>Decision 8</td></tr>
+<tr><td>10</td><td>Streaming: new method or breaking change?</td><td>Additive. A new streaming method returning typed events, with the existing text-only <code>ChatStreamAsync</code> kept and implemented on top of it. Avoids a major-version bump for consumers. Architect confirms.</td><td>Decision 9; package version is 1.0.x</td></tr>
+<tr><td>11</td><td>Does TechieRag's own agent loop (F-AGENT) move to the streaming path?</td><td>Yes, once the method exists, so that F-AGENT and <code>TechieRag.Agents</code> (F-AGENTS) can stream a tool-using turn the same way Chatur wants to.</td><td>Decision 9; BRD F-AGENT, F-AGENTS</td></tr>
+<tr><td>12</td><td>Which items are TechieRag BRD IDs, which are Sevak requirements?</td><td>TechieRag: platform groundwork (plan 08 step 1), <code>TechieRag.Local</code> (plan 08 step 4), streaming contract, subscription sign-in, and the F-REPO/F-WEB wording change for the rename. Sevak: rename, Windows parity (plan 09 B1), built-in local model (B3), offline mode (B3), subscription sign-in screen, freemium wording.</td><td>Plans 08, 09; decisions 2, 3, 4, 8, 9</td></tr>
+<tr><td>13</td><td>Do the feedback files get replies now?</td><td>Yes. Each entry gets a "Replies from TechieRag" block once <code>*amend-docs</code> has assigned BRD IDs: "Accepted, tracked as BRD-N". Both Chatur entries and the MyDiary entry.</td><td>Owner-language rule: a reported defect always gets an answer</td></tr>
+</tbody>
+</table>
+<h3 id="forced-ranking">Forced Ranking<a class="anchor-link" href="#forced-ranking">#</a></h3>
+<p><strong>Description:</strong> Rank the document changes by what depends on what, not by date.</p>
+<ol>
+<li><strong>Rename + split</strong> (Sevak repository). Everything downstream references the new name.
+</li>
+<li><strong>Streaming contract</strong> in TechieRag BRD/Architecture. <code>TechieRag.Local</code> must be written against it.
+</li>
+<li><strong>Platform groundwork</strong> (plan 08 step 1, F-PLATFORM). <code>TechieRag.Local</code> inherits every one of its problems.
+</li>
+<li><strong><code>TechieRag.Local</code></strong> (plan 08 step 4, F-LOCAL-LLM).
+</li>
+<li><strong>Subscription sign-in</strong> in TechieRag. Independent of 2 to 4; can run alongside.
+</li>
+<li><strong>Sevak Windows parity</strong> (plan 09 B1). Independent of the library items.
+</li>
+<li><strong>Sevak built-in local model + offline mode</strong> (plan 09 B3). Depends on 4.
+</li>
+<li><strong>Sevak subscription sign-in screen.</strong> Depends on 5.
+</li>
+<li><strong>Feedback replies</strong> in both feedback files. Depends on IDs from 2, 4, 5.
+</li>
+</ol>
+<h2 id="idea-categorization">Idea Categorization<a class="anchor-link" href="#idea-categorization">#</a></h2>
+<h3 id="immediate-opportunities">Immediate Opportunities<a class="anchor-link" href="#immediate-opportunities">#</a></h3>
+<p><em>Ready to fold into the documents now</em></p>
+<ol>
+<li><strong>Sevak rename inside the split</strong>
+<ul>
+<li>Description: Plan 09 part A executed under the name Sevak; full rename per decision 2.
+</li>
+<li>Why immediate: the new repository does not exist yet; the rename is free only now.
+</li>
+<li>Resources needed: owner runs the git steps (plan 09 part A table); agents do the rest via <code>*amend-docs</code> on both sides.
+</li>
+</ul>
+</li>
+<li><strong>Streaming contract amendment</strong>
+<ul>
+<li>Description: TechieRag BRD F-LLM and F-AGENT gain a requirement for typed streaming events; Architecture gains the event shape.
+</li>
+<li>Why immediate: blocks nothing yet, and must land before <code>TechieRag.Local</code> is written.
+</li>
+<li>Resources needed: <code>*amend-docs TechieRag</code>; architect confirms additive vs breaking.
+</li>
+</ul>
+</li>
+<li><strong>Freemium wording in Sevak docs</strong>
+<ul>
+<li>Description: replace any "gate", "locked", "unlock" language with "limited"; the six-flag list in plan 09 B3 is dropped.
+</li>
+<li>Why immediate: one sentence of principle, applies to every Sevak requirement written after it.
+</li>
+<li>Resources needed: part of the same <code>*amend-docs Sevak</code> run as the rename.
+</li>
+</ul>
+</li>
+</ol>
+<h3 id="future-innovations">Future Innovations<a class="anchor-link" href="#future-innovations">#</a></h3>
+<p><em>Need development or research first</em></p>
+<ol>
+<li><strong>Subscription sign-in (TechieRag)</strong>
+<ul>
+<li>Description: per-vendor builder methods with a shared device-code callback; new <code>LlmSource</code>, factory arm, catalog row with vendor terms.
+</li>
+<li>Development needed: R1 research on each vendor's current policy and flow (OpenAI known permitted for personal use; Anthropic known prohibited; Google, Groq, xAI, Meta to check); architect confirms method shape.
+</li>
+<li>Timeline estimate: owner's call.
+</li>
+</ul>
+</li>
+<li><strong><code>TechieRag.Local</code> and platform groundwork</strong>
+<ul>
+<li>Description: as plan 08 steps 1 and 4, unchanged by this session except that the streaming contract (above) is now a stated prerequisite.
+</li>
+<li>Development needed: as plan 08.
+</li>
+<li>Timeline estimate: owner's call.
+</li>
+</ul>
+</li>
+<li><strong>Sevak local model and offline mode</strong>
+<ul>
+<li>Description: plan 09 B3, two amendments, renamed to Sevak, with "Built-in local model" also visible as a showcase feature per decision 3.
+</li>
+<li>Development needed: waits on <code>TechieRag.Local</code>.
+</li>
+<li>Timeline estimate: owner's call.
+</li>
+</ul>
+</li>
+</ol>
+<h3 id="moonshots">Moonshots<a class="anchor-link" href="#moonshots">#</a></h3>
+<p><em>Ambitious concepts noted, not adopted</em></p>
+<ol>
+<li><strong>Operating-system built-in models as a backend</strong>
+<ul>
+<li>Description: Apple's on-device foundation model and Android's Gemini Nano behind the same <code>UseLocalLlm()</code> interface, no download at all.
+</li>
+<li>Transformative potential: zero-download offline AI on phones.
+</li>
+<li>Challenges to overcome: plan 08 found no verified .NET bindings; stays a later backend behind the interface decision 7 already provides for.
+</li>
+</ul>
+</li>
+</ol>
+<h3 id="insights-learnings">Insights &amp; Learnings<a class="anchor-link" href="#insights-learnings">#</a></h3>
+<ul>
+<li><strong>The interface decision already covers the unknowns</strong>: because <code>UseLocalLlm()</code> hides the runtime, the runtime comparison, a late platform, and OS-native models are all implementation choices, not requirement changes.
+</li>
+<li><strong>Vendor policy belongs in the catalog, not in the code</strong>: the library records what each vendor permits and lets the app decide how to present it.
+</li>
+<li><strong>A showcase app creates paired requirements</strong>: each library feature that needs UI proof gets a Sevak requirement that names it by repository and id, which plan 09 already prescribes.
+</li>
+</ul>
+<h2 id="action-planning">Action Planning<a class="anchor-link" href="#action-planning">#</a></h2>
+<h3 id="top-3-priority-ideas">Top 3 Priority Ideas<a class="anchor-link" href="#top-3-priority-ideas">#</a></h3>
+<h4 id="priority-sevak-rename-and-split">#1 Priority: Sevak rename and split<a class="anchor-link" href="#priority-sevak-rename-and-split">#</a></h4>
+<ul>
+<li>Rationale: everything else lands in one of two repositories that do not both exist yet.
+</li>
+<li>Next steps: owner cuts baseline release and creates the Sevak repository (plan 09 part A steps 1, 2). Then <code>*amend-docs Sevak</code> (rename, freemium wording, cross-repo reference rule) and <code>*amend-docs TechieRag</code> (F-REPO and F-WEB wording: TechieDesk becomes Sevak; F-WEB rows already "Moved" stay as pointers).
+</li>
+<li>Resources needed: owner, about an hour; agents for the rest.
+</li>
+<li>Timeline: owner's call.
+</li>
+</ul>
+<h4 id="priority-streaming-contract">#2 Priority: Streaming contract<a class="anchor-link" href="#priority-streaming-contract">#</a></h4>
+<ul>
+<li>Rationale: prerequisite for <code>TechieRag.Local</code>; cheapest before the seventh provider exists.
+</li>
+<li>Next steps: <code>*amend-docs TechieRag "F-LLM and F-AGENT: streaming that yields typed events (text delta, tool call); additive method, existing ChatStreamAsync preserved; all six providers implement it; F-AGENT loop and F-AGENTS consume it; closes Chatur TR-RAG-002"</code>. Then reply in <code>docs/Chatur-TechieRag-Feedback.md</code>.
+</li>
+<li>Resources needed: architect confirmation of additive shape.
+</li>
+<li>Timeline: owner's call.
+</li>
+</ul>
+<h4 id="priority-subscription-sign-in">#3 Priority: Subscription sign-in<a class="anchor-link" href="#priority-subscription-sign-in">#</a></h4>
+<ul>
+<li>Rationale: unblocks Chatur REQ-FN-016; independent of the local-model track so it can run alongside.
+</li>
+<li>Next steps: R1 research first (<code>*research-prompt</code> on vendor subscription-auth policies and flows). Then <code>*amend-docs TechieRag "F-LLM: subscription sign-in providers, host-driven device-code flow, new LlmSource, factory arm, catalog row carrying vendor terms; closes Chatur TR-RAG-001"</code>. Then a paired Sevak requirement for the sign-in screen (the mockup <code>settings-providers.html</code>, <code>data-testid="signin-browser"</code>, already exists in Chatur's design and can be mirrored).
+</li>
+<li>Resources needed: R1 research; architect for method shape.
+</li>
+<li>Timeline: owner's call.
+</li>
+</ul>
+<h3 id="research-item">Research item<a class="anchor-link" href="#research-item">#</a></h3>
+<ul>
+<li><strong>R1. Vendor subscription sign-in policy and flow</strong>, per vendor: OpenAI (known: permitted in external tools for personal use; production expected to use the platform API), Anthropic (known: prohibited for Free/Pro/Max since April 2026), Google, Groq, xAI (Grok), Meta. For each: is there an official sign-in flow usable outside the vendor's own client, what does the token permit, personal vs team terms, and what the flow returns. Output feeds question 7 and 9 above.
+</li>
+</ul>
+<h3 id="owner-decision">Owner decision<a class="anchor-link" href="#owner-decision">#</a></h3>
+<ul>
+<li><strong>Sevak repository visibility:</strong> decided 2026-09-24, private until v0.1. <code>docs/OldDocs/Sevak-Decision-Request.md</code> D1.
+</li>
+</ul>
+<h2 id="reflection-follow-up">Reflection &amp; Follow-up<a class="anchor-link" href="#reflection-follow-up">#</a></h2>
+<h3 id="what-worked-well">What Worked Well<a class="anchor-link" href="#what-worked-well">#</a></h3>
+<ul>
+<li>Assumption Reversal on the plans' unstated claims produced ten decisions in one round.
+</li>
+<li>Answering the question list from the sources instead of asking it back.
+</li>
+</ul>
+<h3 id="areas-for-further-exploration">Areas for Further Exploration<a class="anchor-link" href="#areas-for-further-exploration">#</a></h3>
+<ul>
+<li>Free-tier limit list for Sevak: deferred by the owner; needed before the Sevak BRD can be fully verified.
+</li>
+<li>Whether <code>TechieRag.Agents</code> (F-AGENTS) should adopt the streaming events at the same time as F-AGENT or in a later revision.
+</li>
+</ul>
+<h3 id="recommended-follow-up-techniques">Recommended Follow-up Techniques<a class="anchor-link" href="#recommended-follow-up-techniques">#</a></h3>
+<ul>
+<li>None needed for this topic. Next step is execution: <code>*amend-docs</code> in both repositories in the ranked order above.
+</li>
+</ul>
+<h3 id="questions-that-emerged">Questions That Emerged<a class="anchor-link" href="#questions-that-emerged">#</a></h3>
+<ul>
+<li>Does the rename change the <code>.techierag/TechieRag-AI-Reference.md</code> text that downstream apps (Chatur, MyDiary) read, or only the app-side docs? (Likely only where TechieDesk is named as an example; check during <code>*amend-docs TechieRag</code>.)
+</li>
+</ul>
+<h3 id="next-session-planning">Next Session Planning<a class="anchor-link" href="#next-session-planning">#</a></h3>
+<ul>
+<li><strong>Suggested topics:</strong> Sevak free-tier limits, once v0.1 scope is known.
+</li>
+<li><strong>Recommended timeframe:</strong> owner's call.
+</li>
+<li><strong>Preparation needed:</strong> the 101 open Sevak rows reviewed once against the finish-line sentence (plan 09 part C).
+</li>
+</ul>
+<hr>
+<p><em>Session facilitated using the TechieFlow™ brainstorming framework</em></p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

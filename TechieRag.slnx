@@ -1,4 +1,3 @@
-
 <Solution>
   <Configurations>
     <Platform Name="Any CPU" />
@@ -6,6 +5,8 @@
     <Platform Name="x86" />
   </Configurations>
 
+  <!-- Library repository since 2026-09-24 (BRD-87, REQ-FN-006): the application (Sevak, formerly
+       TechieDesk) lives in its own repository and consumes these packages from NuGet. -->
   <Folder Name="/src/">
     <Project Path="src/TechieRag.Embedded/TechieRag.Embedded.csproj" />
     <!-- REQ-RAG-036 / BRD-117: the opt-in OpenTelemetry exporters, kept out of the core package so
@@ -15,31 +16,24 @@
   </Folder>
   <Folder Name="/docs/">
     <File Path="docs/TechieRag-BRD.md" />
+    <File Path="docs/TechieRag-P2-BRD.md" />
+    <File Path="docs/TechieRag-Phases.md" />
     <File Path="docs/TechieRag-Architecture.md" />
     <File Path="docs/TechieRag-Coding-Standards.md" />
     <File Path="docs/TechieRag-UsageGuide.md" />
+    <File Path="docs/TechieRag-DevGuide.md" />
     <File Path="docs/ai-agent-autodistribution-guide.md" />
-    <File Path="docs/brainstorming-session-results.md" />
     <File Path="docs/EMBEDDED-PACKAGE-GUIDE.md" />
     <File Path="docs/integration-testing-guide.md" />
     <File Path="docs/NUGET-PUBLISHING-GUIDE.md" />
     <File Path="docs/SETUP-AND-TESTING-GUIDE.md" />
     <File Path="docs/TechieRag-UserGuide.md" />
     <File Path="docs/TechieRag.Embedded-UserGuide.md" />
-    <File Path="docs/TrBlazeUI-AI-Reference.md" />
+    <File Path="DECISIONS.md" />
+    <File Path="NUGET-PUBLISHING.md" />
+    <File Path="README.md" />
   </Folder>
-
-  <Folder Name="/apps/">
-    <Project Path="apps/TechieDesk/TechieDesk.csproj" />
-    <Project Path="apps/TechieDesk.Core/TechieDesk.Core.csproj" />
-    <Project Path="apps/TechieDeskDb/TechieDeskDb.csproj" />
-    <Project Path="apps/TechieDeskDb.Cli/TechieDeskDb.Cli.csproj" />
-    <!-- REQ-FN-042 / BRD-139: the background scheduler helper (ADR-009). -->
-    <Project Path="apps/TechieDeskScheduler/TechieDeskScheduler.csproj" />
-  </Folder>
-
   <Folder Name="/tests/">
     <Project Path="tests/TechieRag.Tests/TechieRag.Tests.csproj" />
-    <Project Path="tests/TechieDesk.Tests/TechieDesk.Tests.csproj" />
   </Folder>
 </Solution>

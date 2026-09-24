@@ -5,6 +5,45 @@ what was decided and, where it is not obvious, why — so that a future reader d
 
 ---
 
+## 2026-09-24 — Sevak, a fourth package, and two contract additions (brainstorm on plans 08/09)
+
+Source: `docs/TechieRag-Update-Brief.md` (ten decisions), `docs/OldDocs/Sevak-Decision-Request.md` D1. BRD-87 and
+BRD-81 amended; BRD-88…114 added; Architecture ADR-012…016.
+
+**1. TechieDesk is renamed Sevak, in full, at the split.** The application repository created today is
+`Sevak` (`/mnt/c/1MyCode/Sevak`); projects, namespaces, bundle id, artefacts and documents follow;
+requirement ids keep their numbers. There is no separate future product. Sevak is *the application showing
+the full capabilities of TechieRag* and stays the library's test bed. It is **freemium: features limited,
+never gated** (limits set later). Its repository is **private until Sevak v0.1**. Cross-repository
+references carry the repository name: `Sevak#REQ-FN-054`, `TechieRag#REQ-RAG-054`.
+
+**2. The split executed today on the app side.** App paths copied into Sevak (build output excluded), goal
+`Sevak/docs/Sevak-Split-Goal.md` running: full rename, `PackageReference` to `TechieRag` /
+`TechieRag.Embedded` 1.0.7 (the published baseline), central pins, three-source `NuGet.config`, `Sevak.slnx`,
+app-only release workflow. The deletion here (`REQ-FN-006`, `docs/TechieRag-Split-Goal.md`) runs only after
+Sevak builds and tests green from packages.
+
+**3. Local model: one public interface, platform implementations underneath** (`TechieRag.Local`, F-LOCAL-LLM).
+`UseLocalLlm()` is the only thing a consumer sees; the runtime behind it is chosen per platform after a
+measured comparison (LLamaSharp vs ONNX Runtime GenAI) that will be recorded here with numbers before the
+provider is built. Weights download once, never packed. Sevak is the first desktop consumer, MyDiary the
+first mobile one. Closes MyDiary feedback TR-RAG-001.
+
+**4. Streaming contract changes now, additively, before `TechieRag.Local` exists** (BRD-110/111). A new
+method yields typed events (text delta, tool call, completed); `ChatStreamAsync` stays. Six providers once
+instead of seven twice. Closes Chatur feedback TR-RAG-002.
+
+**5. Subscription sign-in is in scope** (BRD-112…114). Host app drives the browser; library yields an
+`ILlmProvider`; the library is flexible for personal and team use and who signs in decides which applies.
+Vendor terms are dated facts in the connector catalog, never rules in code. Known today: OpenAI permits
+external-tool use for personal use; Anthropic prohibits it for Free/Pro/Max. Google, Groq, xAI, Meta:
+research before build. Closes Chatur feedback TR-RAG-001.
+
+**6. Dates and sequencing are the owner's.** The documents record decisions and the work they imply; the
+owner re-plans from them.
+
+---
+
 ## 2026-09-03 (later) — Public feed stays manual dispatch, same ceremony as the other libraries
 
 The entry below added a `v*` tag trigger to `publish-nuget.yml` so that a tag push publishes to nuget.org.

@@ -75,7 +75,7 @@ jobs:
         id: version
         # Pure bash on purpose - no `${{ }}` inside the script - so the exact same logic can be
         # replayed locally: `GITHUB_REF=refs/tags/v1.0.7 GITHUB_REF_NAME=v1.0.7 bash <this script>`.
-        # tests/verify/publish-nuget-version.sh does exactly that.
+        # (The replay script moved to the Sevak repository with the app-side verify harness on 2026-09-24.)
         env:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
@@ -103,8 +103,9 @@ jobs:
 
       - name: Test
         # Blocking gate: no green tests, no public release.
-        # Only the library test project is built/tested - the sample (apps/TechieDesk) cannot
-        # restore in CI (private TrBlazeUI feed), so never test the .slnx or a glob.
+        # Only the library test project is built/tested. Since 2026-09-24 this repository holds the
+        # library alone (the application, Sevak, has its own repository); keep testing the project,
+        # not the .slnx or a glob, so a future sample or probe app never becomes a release gate.
         run: dotnet test "$TEST_PROJECT" --configuration Release --verbosity normal -p:Version=${{ steps.version.outputs.version }}
 
       - name: Pack

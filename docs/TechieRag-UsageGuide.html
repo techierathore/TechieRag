@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TechieRag — Usage Guide (Test Users · Test Plan · Setup) — TechieRag</title>
+<title>TechieRag — Usage Guide</title>
 <script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
 (function(){
   try{
     var t = localStorage.getItem('tf-theme');
@@ -13,7 +15,8 @@
   }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
 })();
 </script>
-<style>/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
 :root{
   --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
   --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
@@ -85,9 +88,6 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 .toc-inline li{font-size:13px;margin:1px 0}
 .toc-inline a{color:var(--h3)}
 
-/* call-to-action box (PROJECT-STATUS next command) */
-.cta{background:var(--cta-bg);border:1px solid var(--accent);border-radius:8px;padding:12px 16px;margin:14px 0}
-
 /* mermaid diagram wrapper + toolbar */
 .diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
 .diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
@@ -98,68 +98,293 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 .diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
 .diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
 
-@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}</style>
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
 </head>
 <body>
-<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
 <div class="layout">
-<nav class="side"><h1>TechieRag — Usage Guide (Test Users · Test Plan · Setup)</h1><div class="sub">Last rendered: 2026-06-25</div><div class="group">Contents</div><ol><li><a href="#test-users-canonical-use-these-for-all-smoke-verify-uat">Test users (canonical — use THESE for all smoke / verify / UAT)</a></li><li class="h3"><a href="#provider-configuration-the-test-plan-uses-supply-your-own-never-invent-keys">Provider configuration the test plan uses (supply your own — never invent keys)</a></li><li><a href="#how-to-test-screen-by-screen-menu-by-menu">How to test — screen by screen / menu by menu</a></li><li class="h3"><a href="#home">Home (`/`)</a></li><li class="h3"><a href="#settings-settings">Settings (`/settings`)</a></li><li class="h3"><a href="#llm-settings-llm-settings">LLM Settings (`/llm-settings`)</a></li><li class="h3"><a href="#ingestion-ingestion-text-ingestion-text-ingestion">Ingestion (`/ingestion`) + Text Ingestion (`/text-ingestion`)</a></li><li class="h3"><a href="#chat-chat">Chat (`/chat`)</a></li><li class="h3"><a href="#llm-playground-llm-playground">LLM Playground (`/llm-playground`)</a></li><li class="h3"><a href="#tool-demo-tool-demo">Tool Demo (`/tool-demo`)</a></li><li class="h3"><a href="#token-usage-token-usage">Token Usage (`/token-usage`)</a></li><li class="h3"><a href="#qdrant-admin-qdrant-admin">Qdrant Admin (`/qdrant-admin`)</a></li><li><a href="#prerequisites">Prerequisites</a></li><li><a href="#setup-deployment-steps-runbook-one-command-per-line-in-order">Setup / Deployment steps (runbook — one command per line, in order)</a></li><li><a href="#test-automated">Test (automated)</a></li><li><a href="#smoke-checklist-quick-capability-pass">Smoke checklist (quick capability pass)</a></li><li><a href="#known-limitations">Known limitations</a></li></ol></nav>
-<main>
-<h1>TechieRag — Usage Guide (Test Users · Test Plan · Setup)</h1>
+  <nav class="side">
+    <h1>TechieRag — Usage Guide</h1>
+    <div class="sub">Last rendered: 2026-09-24</div>
+    <div class="group">Contents</div>
+    <ol>
+        <li><a href="#test-users">Test users</a></li>
+        <li><a href="#execution-guide">Execution guide</a></li>
+        <li><a href="#how-to-test-screen-by-screen">How to test, screen by screen</a></li>
+        <li class="h3"><a href="#ingestion">Ingestion</a></li>
+        <li class="h3"><a href="#embedding-providers-and-vector-stores">Embedding providers and vector stores</a></li>
+        <li class="h3"><a href="#semantic-search">Semantic search</a></li>
+        <li class="h3"><a href="#configuration-and-di">Configuration and DI</a></li>
+        <li class="h3"><a href="#embedded-package">Embedded package</a></li>
+        <li class="h3"><a href="#llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output</a></li>
+        <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
+        <li class="h3"><a href="#workspaces-memory-and-token-tracking">Workspaces, memory and token tracking</a></li>
+        <li class="h3"><a href="#resilience-and-fallback">Resilience and fallback</a></li>
+        <li class="h3"><a href="#data-connectors-and-web-ingestion">Data connectors and web ingestion</a></li>
+        <li class="h3"><a href="#packaging-and-publishing">Packaging and publishing</a></li>
+        <li><a href="#automated-tests">Automated tests</a></li>
+        <li><a href="#known-limitations">Known limitations</a></li>
+        <li><a href="#platform-notes">Platform notes</a></li>
+        <li><a href="#how-to-call-it">How to call it</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieRag — Usage Guide</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-UsageGuide.md</code></div>
 
-<div class="toc-inline"><div>Contents</div><ol><li><a href="#test-users-canonical-use-these-for-all-smoke-verify-uat">Test users (canonical — use THESE for all smoke / verify / UAT)</a></li><li class="h3"><a href="#provider-configuration-the-test-plan-uses-supply-your-own-never-invent-keys">Provider configuration the test plan uses (supply your own — never invent keys)</a></li><li><a href="#how-to-test-screen-by-screen-menu-by-menu">How to test — screen by screen / menu by menu</a></li><li class="h3"><a href="#home">Home (`/`)</a></li><li class="h3"><a href="#settings-settings">Settings (`/settings`)</a></li><li class="h3"><a href="#llm-settings-llm-settings">LLM Settings (`/llm-settings`)</a></li><li class="h3"><a href="#ingestion-ingestion-text-ingestion-text-ingestion">Ingestion (`/ingestion`) + Text Ingestion (`/text-ingestion`)</a></li><li class="h3"><a href="#chat-chat">Chat (`/chat`)</a></li><li class="h3"><a href="#llm-playground-llm-playground">LLM Playground (`/llm-playground`)</a></li><li class="h3"><a href="#tool-demo-tool-demo">Tool Demo (`/tool-demo`)</a></li><li class="h3"><a href="#token-usage-token-usage">Token Usage (`/token-usage`)</a></li><li class="h3"><a href="#qdrant-admin-qdrant-admin">Qdrant Admin (`/qdrant-admin`)</a></li><li><a href="#prerequisites">Prerequisites</a></li><li><a href="#setup-deployment-steps-runbook-one-command-per-line-in-order">Setup / Deployment steps (runbook — one command per line, in order)</a></li><li><a href="#test-automated">Test (automated)</a></li><li><a href="#smoke-checklist-quick-capability-pass">Smoke checklist (quick capability pass)</a></li><li><a href="#known-limitations">Known limitations</a></li></ol></div>
-<blockquote>The single source for <strong>how to test and run</strong> this project. Every agent (flow-master self-smoke, the verifier) and the human UAT use the SAME setup and the SAME walkthrough listed here.</blockquote>
-<h2 id="test-users-canonical-use-these-for-all-smoke-verify-uat">Test users (canonical — use THESE for all smoke / verify / UAT)<a class="anchor-link" href="#test-users-canonical-use-these-for-all-smoke-verify-uat">#</a></h2>
-<p><strong>TechieRag is a library, and the TechieDesk app (formerly <code>TechieRagWeb</code>) has NO authentication / user accounts</strong> — it is a single-user, config-driven demo with no login. There are therefore no user credentials to seed. What the test plan <em>does</em> require is <strong>provider configuration</strong> (local services + cloud API keys), captured below. No accounts are created in day-1.</p>
-<table><thead><tr><th>#</th><th>"Account"</th><th>Secret</th><th>Role / Purpose</th><th>Created?</th><th>Notes</th></tr></thead><tbody><tr><td>1</td><td>(none — no auth)</td><td>—</td><td>TechieDesk has no login</td><td>✅</td><td>Single-user demo; nothing to create</td></tr></tbody></table>
-<h3 id="provider-configuration-the-test-plan-uses-supply-your-own-never-invent-keys">Provider configuration the test plan uses (supply your own — never invent keys)<a class="anchor-link" href="#provider-configuration-the-test-plan-uses-supply-your-own-never-invent-keys">#</a></h3>
-<table><thead><tr><th>Provider / service</th><th>Secret / endpoint</th><th>Needed for</th><th>Status</th></tr></thead><tbody><tr><td>Ollama (local)</td><td><code>http://localhost:11434</code>, model <code>bge-m3</code></td><td>Embedding (Priority 1)</td><td>local — no auth</td></tr><tr><td>LM Studio (local)</td><td><code>http://localhost:1234</code></td><td>Local LLM (Priority 1)</td><td>local — no auth</td></tr><tr><td>OpenAI / compatible</td><td>API key</td><td>Cloud LLM testing</td><td>{supply at /llm-settings}</td></tr><tr><td>Azure AI Foundry</td><td>endpoint + API key + api-version</td><td>Cloud LLM testing</td><td>{supply at /llm-settings}</td></tr><tr><td>Google Gemini</td><td><code>GOOGLE_API_KEY</code></td><td>LLM (Priority 3)</td><td>{supply at /llm-settings}</td></tr><tr><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td><td>LLM (Priority 3)</td><td>{supply at /llm-settings}</td></tr><tr><td>Qdrant (optional)</td><td><code>http://localhost:6333</code> (Docker)</td><td>Qdrant vector store + admin page</td><td>local — managed via /qdrant-admin</td></tr><tr><td>TrBlazeUI packages</td><td>GitHub PAT (<code>read:packages</code>) in <code>nuget.config</code></td><td>Restoring/running the sample app</td><td>{required to build TechieDesk}</td></tr></tbody></table>
-<ul><li>Provider settings are entered at runtime on <code>/settings</code> and <code>/llm-settings</code>, and persisted to <code>techierag-config.json</code>. No secrets are hardcoded; supply them at the UI.</li></ul>
-<h2 id="how-to-test-screen-by-screen-menu-by-menu">How to test — screen by screen / menu by menu<a class="anchor-link" href="#how-to-test-screen-by-screen-menu-by-menu">#</a></h2>
-<p>The sample (<code>apps/TechieDesk</code>) exposes ten pages. Walk them in this order; each names the config to use, the steps, the expected result, and the BRD/REQ it covers. (Reference: <code>docs/integration-testing-guide.md</code>, 21 scenarios S1–S21.)</p>
-<div class="diagram"><div class="dt"><button data-zout title="Zoom out">−</button><span class="zlabel">100%</span><button data-zin title="Zoom in">+</button><button data-fit title="Fit to width">Fit</button><button data-one title="Actual size">1:1</button><button data-fs title="Fullscreen">⛶</button><button data-pop title="Open in new tab">↗</button></div><pre class="mermaid">flowchart LR
-  S["Settings (embedding + vector store)"] --&gt; L["LLM Settings"]
-  L --&gt; I["Ingestion / Text Ingestion"]
-  I --&gt; C["Chat (RAG)"]
-  C --&gt; P["LLM Playground"]
-  P --&gt; T["Tool Demo"]
-  T --&gt; U["Token Usage"]
-  U --&gt; Q["Qdrant Admin"]</pre></div>
-<h3 id="home">Home (<code>/</code>)<a class="anchor-link" href="#home">#</a></h3>
-<ul><li><strong>Config:</strong> none</li><li><strong>Steps:</strong> 1) open <code>/</code> → 2) confirm navigation to every feature page.</li><li><strong>Expected:</strong> landing page renders; all nav links resolve.</li><li><strong>Covers:</strong> BRD-62 (entry), REQ-UI-001</li></ul>
-<h3 id="settings-settings">Settings (<code>/settings</code>)<a class="anchor-link" href="#settings-settings">#</a></h3>
-<ul><li><strong>Config:</strong> Embedding = Ollama, endpoint <code>http://localhost:11434</code>, model <code>bge-m3</code>; Vector store = SqliteVec.</li><li><strong>Steps:</strong> 1) set the fields → 2) Save → 3) Initialize.</li><li><strong>Expected:</strong> success toast; client initializes; config persisted to <code>techierag-config.json</code>.</li><li><strong>Covers:</strong> BRD-62, REQ-UI-002, REQ-RAG-002/003</li></ul>
-<h3 id="llm-settings-llm-settings">LLM Settings (<code>/llm-settings</code>)<a class="anchor-link" href="#llm-settings-llm-settings">#</a></h3>
-<ul><li><strong>Config:</strong> a reachable LLM (LM Studio on 1234, or OpenAI/Azure key).</li><li><strong>Steps:</strong> 1) Primary tab — set provider/endpoint/model → 2) Test connection → 3) optionally set Fallback / Usage budget / Resilience / Prompts → 4) Save.</li><li><strong>Expected:</strong> connection test passes; each tab's config saves and reloads.</li><li><strong>Covers:</strong> BRD-63, BRD-69, REQ-UI-003/009, REQ-RAG-006/011/012/013/014</li></ul>
-<h3 id="ingestion-ingestion-text-ingestion-text-ingestion">Ingestion (<code>/ingestion</code>) + Text Ingestion (<code>/text-ingestion</code>)<a class="anchor-link" href="#ingestion-ingestion-text-ingestion-text-ingestion">#</a></h3>
-<ul><li><strong>Config:</strong> embedding configured (above).</li><li><strong>Steps:</strong> 1) upload <code>dotnet-basics.pdf</code>, <code>cooking-recipes.md</code>, <code>company-policy.txt</code>, <code>techierag-readme.md</code> → 2) enter a space-exploration paragraph via Text Ingestion.</li><li><strong>Expected:</strong> each ingest returns a doc id; document/chunk counts increase.</li><li><strong>Covers:</strong> BRD-64, REQ-UI-004, REQ-RAG-001</li></ul>
-<h3 id="chat-chat">Chat (<code>/chat</code>)<a class="anchor-link" href="#chat-chat">#</a></h3>
-<ul><li><strong>Config:</strong> embedding + LLM configured; docs ingested.</li><li><strong>Steps:</strong> 1) ask "What is .NET?" → 2) ask "Give me a pasta recipe" → 3) ask "What is quantum computing?" (not ingested).</li><li><strong>Expected:</strong> first two answer from the ingested docs with a sources panel + relevance scores (streaming); the third returns a "no relevant context" style answer.</li><li><strong>Covers:</strong> BRD-65, REQ-UI-005, REQ-RAG-004/007</li></ul>
-<h3 id="llm-playground-llm-playground">LLM Playground (<code>/llm-playground</code>)<a class="anchor-link" href="#llm-playground-llm-playground">#</a></h3>
-<ul><li><strong>Config:</strong> LLM configured.</li><li><strong>Steps:</strong> 1) Completion tab — run a prompt → 2) Structured Output tab — request a typed object (e.g. SentimentAnalysis) → 3) Chat tab — multi-turn.</li><li><strong>Expected:</strong> completion returns text + token counts; structured output parses into the typed object.</li><li><strong>Covers:</strong> BRD-66, REQ-UI-006, REQ-RAG-006/008</li></ul>
-<h3 id="tool-demo-tool-demo">Tool Demo (<code>/tool-demo</code>)<a class="anchor-link" href="#tool-demo-tool-demo">#</a></h3>
-<ul><li><strong>Config:</strong> an LLM that supports tool calling (Llama 3.2 / Mistral / cloud).</li><li><strong>Steps:</strong> 1) ask a question that needs a tool (e.g. weather + doc search) → 2) inspect the execution trace.</li><li><strong>Expected:</strong> the LLM calls tools (get_weather, calculate_math, search_documents); the trace shows each step; final answer uses tool results.</li><li><strong>Covers:</strong> BRD-67, REQ-UI-007, REQ-RAG-009</li></ul>
-<h3 id="token-usage-token-usage">Token Usage (<code>/token-usage</code>)<a class="anchor-link" href="#token-usage-token-usage">#</a></h3>
-<ul><li><strong>Config:</strong> run a few LLM operations first.</li><li><strong>Steps:</strong> 1) open the dashboard → 2) review totals, per-model breakdown, budget status.</li><li><strong>Expected:</strong> counts/costs reflect the session; budget alert appears at threshold if a budget is set.</li><li><strong>Covers:</strong> BRD-68, REQ-UI-008, REQ-RAG-011</li></ul>
-<h3 id="qdrant-admin-qdrant-admin">Qdrant Admin (<code>/qdrant-admin</code>)<a class="anchor-link" href="#qdrant-admin-qdrant-admin">#</a></h3>
-<ul><li><strong>Config:</strong> Docker available.</li><li><strong>Steps:</strong> 1) check Docker status → 2) create/start a Qdrant container → 3) create an <code>astrology-kb</code> collection → 4) ingest 3 docs into it → 5) browse + search vectors → 6) open a vector detail → 7) switch the Chat doc filter to <code>astrology-kb</code> and confirm isolation.</li><li><strong>Expected:</strong> container lifecycle works; collection CRUD works; vectors page/search/detail; cross-collection queries don't leak.</li><li><strong>Covers:</strong> BRD-71, BRD-72, BRD-73, REQ-UI-011/012/013</li></ul>
-<h2 id="prerequisites">Prerequisites<a class="anchor-link" href="#prerequisites">#</a></h2>
-<ul><li>.NET 10 SDK</li><li>Ollama with the <code>bge-m3</code> embedding model (local embedding) — <code>ollama pull bge-m3</code></li><li>LM Studio (optional, local LLM) and/or a cloud LLM API key</li><li>Docker (optional — only for the Qdrant vector store + admin page)</li><li>A GitHub PAT (<code>read:packages</code>) in <code>nuget.config</code> to restore the sample's TrBlazeUI dependency</li></ul>
-<h2 id="setup-deployment-steps-runbook-one-command-per-line-in-order">Setup / Deployment steps (runbook — one command per line, in order)<a class="anchor-link" href="#setup-deployment-steps-runbook-one-command-per-line-in-order">#</a></h2>
-<ol><li><code>git clone &lt;repo&gt; &amp;&amp; cd TechieRag</code></li><li><code>ollama serve</code> (then <code>ollama pull bge-m3</code>)</li><li><code>dotnet restore src/TechieRag/TechieRag.csproj</code> (libraries restore from nuget.org)</li><li><code>dotnet build src/TechieRag/TechieRag.csproj</code> (WSL rung #2 — see build-invocation-ladder.md)</li><li>(sample) ensure <code>nuget.config</code> has a GitHub PAT, then <code>dotnet run --project apps/TechieDesk/TechieDesk.csproj</code></li><li>Open the URL shown in the console (e.g. <code>http://localhost:5000</code>); configure <code>/settings</code> then <code>/llm-settings</code>.</li></ol>
-<h2 id="test-automated">Test (automated)<a class="anchor-link" href="#test-automated">#</a></h2>
-<pre><code class="language-bash">dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj
-npx playwright test</code></pre>
-<p>xUnit: 11 tests (RetryHandler resilience + <code>Retry-After</code>, LmStudio provider tool-calling). Playwright: the <code>tests/verify/</code> UI/RAG specs (need the sample booted on <code>:5099</code>). Broader coverage is deferred — see PROJECT-STATUS "Deferred / future".</p>
-<h2 id="smoke-checklist-quick-capability-pass">Smoke checklist (quick capability pass)<a class="anchor-link" href="#smoke-checklist-quick-capability-pass">#</a></h2>
-<ul><li>[ ] Configure Ollama embedding + SqliteVec at <code>/settings</code>; Initialize succeeds.</li><li>[ ] Configure + test an LLM connection at <code>/llm-settings</code>.</li><li>[ ] Ingest a document at <code>/ingestion</code>; doc/chunk count increases.</li><li>[ ] Ask a question at <code>/chat</code>; answer cites ingested sources (streaming).</li><li>[ ] Run a completion at <code>/llm-playground</code>; token counts show.</li><li>[ ] Trigger a tool call at <code>/tool-demo</code>; execution trace shows steps.</li><li>[ ] View usage at <code>/token-usage</code>.</li><li>[ ] Create a Qdrant collection at <code>/qdrant-admin</code>; ingest + search isolated.</li></ul>
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#test-users">Test users</a></li>
+        <li><a href="#execution-guide">Execution guide</a></li>
+        <li><a href="#how-to-test-screen-by-screen">How to test, screen by screen</a></li>
+        <li class="h3"><a href="#ingestion">Ingestion</a></li>
+        <li class="h3"><a href="#embedding-providers-and-vector-stores">Embedding providers and vector stores</a></li>
+        <li class="h3"><a href="#semantic-search">Semantic search</a></li>
+        <li class="h3"><a href="#configuration-and-di">Configuration and DI</a></li>
+        <li class="h3"><a href="#embedded-package">Embedded package</a></li>
+        <li class="h3"><a href="#llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output</a></li>
+        <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
+        <li class="h3"><a href="#workspaces-memory-and-token-tracking">Workspaces, memory and token tracking</a></li>
+        <li class="h3"><a href="#resilience-and-fallback">Resilience and fallback</a></li>
+        <li class="h3"><a href="#data-connectors-and-web-ingestion">Data connectors and web ingestion</a></li>
+        <li class="h3"><a href="#packaging-and-publishing">Packaging and publishing</a></li>
+        <li><a href="#automated-tests">Automated tests</a></li>
+        <li><a href="#known-limitations">Known limitations</a></li>
+        <li><a href="#platform-notes">Platform notes</a></li>
+        <li><a href="#how-to-call-it">How to call it</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Kind</td><td>library</td></tr>
+<tr><td>Size</td><td>Large</td></tr>
+<tr><td>Date</td><td>2026-09-24</td></tr>
+</tbody>
+</table>
+<h2 id="test-users">Test users<a class="anchor-link" href="#test-users">#</a></h2>
+<p>The library has no users of its own. Tests and smoke runs use credentials from the environment, never accounts.</p>
+<table>
+<thead><tr><th>#</th><th>User</th><th>Password source</th><th>Role</th><th>Exists</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>none (library; no sign-in)</td><td>—</td><td>Developer running the test project</td><td>n/a</td></tr>
+<tr><td>2</td><td><code>TechieRagLiveNetworkTests=1</code></td><td>environment variable, enables the live web tests</td><td>Maintainer</td><td>set per machine</td></tr>
+<tr><td>3</td><td><code>TechieRagTestPostgres</code></td><td>environment variable holding a PostgreSQL connection string; enables <code>LivePgVectorStoreTests</code></td><td>Maintainer</td><td>set per machine</td></tr>
+<tr><td>4</td><td>staged weights under <code>~/.cache/techierag-models/bge-reranker-v2-m3</code> and <code>bge-m3</code></td><td>files on disk; enable the live reranker and embedder tests</td><td>Maintainer</td><td>ask owner</td></tr>
+</tbody>
+</table>
+<h2 id="execution-guide">Execution guide<a class="anchor-link" href="#execution-guide">#</a></h2>
+<p>Prerequisites: .NET 10 SDK (the harness bridges to the Windows SDK from WSL through <code>bash .tfcore/utils/tf-build.sh</code>); Ollama with <code>bge-m3</code> pulled for the Ollama examples; nothing else.</p>
+<pre><code>dotnet restore TechieRag.slnx
+dotnet build TechieRag.slnx --configuration Release
+dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release
+bash .tfcore/utils/tf-build.sh test tests/TechieRag.Tests/TechieRag.Tests.csproj
+dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-local.1</code></pre>
+<p>There is no URL to open: the library is exercised through its tests and through a consuming app (Sevak, MyDiary, or the planned <code>samples/TechieRag.Probe</code>).</p>
+<h2 id="how-to-test-screen-by-screen">How to test, screen by screen<a class="anchor-link" href="#how-to-test-screen-by-screen">#</a></h2>
+<h3 id="ingestion">Ingestion<a class="anchor-link" href="#ingestion">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1 (no sign-in)
+</li>
+<li><strong>Steps:</strong> 1) Build a <code>TechieRagBuilder().UseOllama("http://localhost:11434", "bge-m3").UseSqliteVec("t.db")</code> instance and call <code>InitializeAsync()</code> 2) call <code>IngestTextAsync</code> twice with two short texts 3) call <code>IngestAsync</code> with a PDF and <code>IngestDirectoryAsync("./docs", "*.md")</code> 4) call <code>ListDocumentsAsync</code> and <code>GetStatsAsync</code>
+</li>
+<li><strong>Expected:</strong> four or more documents listed with chunk counts above zero; a PDF yields page-numbered chunks; the statistics match the list.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-001
+</li>
+</ul>
+<h3 id="embedding-providers-and-vector-stores">Embedding providers and vector stores<a class="anchor-link" href="#embedding-providers-and-vector-stores">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) switch the builder to <code>UsePgVector(conn)</code> with <code>TechieRagTestPostgres</code> set, then to <code>UseQdrant()</code> against a local Qdrant 2) repeat the ingestion steps 3) run <code>dotnet test --filter VectorStores</code>
+</li>
+<li><strong>Expected:</strong> each store creates its tables or collections on initialise; upsert, filtered search, delete and stats behave identically; the hermetic store tests pass and the live PostgreSQL tests run when the variable is set.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-002, REQ-RAG-003, REQ-RAG-044
+</li>
+</ul>
+<h3 id="semantic-search">Semantic search<a class="anchor-link" href="#semantic-search">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) call <code>SearchAsync("What is TechieRag?", topK: 2)</code> after the ingestion steps 2) call it again with a <code>documentFilter</code> naming one document 3) pass <code>new SearchOptions { Rerank = true }</code> with a reranker configured
+</li>
+<li><strong>Expected:</strong> two results in descending score between 0 and 1 with chunk text and metadata; the filtered call returns only that document's chunks; the reranked call reorders the candidates.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-004, REQ-RAG-097, REQ-RAG-098
+</li>
+</ul>
+<h3 id="configuration-and-di">Configuration and DI<a class="anchor-link" href="#configuration-and-di">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) put a <code>TechieRag</code> section in an <code>appsettings.json</code> with embedding, vector store and LLM values 2) call <code>services.AddTechieRag(configuration.GetSection("TechieRag"))</code> and resolve <code>ITechieRag</code> 3) change only the vector store type in the file and resolve again
+</li>
+<li><strong>Expected:</strong> the instance uses the configured providers; the second resolution uses the new store with no code change. Known gap: <code>VectorStore.ApiKey</code> and the <code>Prompt</code> section are not mapped yet (REQ-FN-066).
+</li>
+<li><strong>Covers:</strong> REQ-FN-001, REQ-FN-066
+</li>
+</ul>
+<h3 id="embedded-package">Embedded package<a class="anchor-link" href="#embedded-package">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) reference <code>TechieRag.Embedded</code> and build with <code>.UseEmbedded().UseSqliteVec()</code> 2) subscribe to <code>ModelDownloadService.Instance.ProgressChanged</code> 3) call <code>InitializeAsync()</code> once online, then again with the network off 4) call <code>EmbedAsync("hello")</code>
+</li>
+<li><strong>Expected:</strong> the first initialise downloads about 2.3 GB with progress events; the second makes no network call; a 1024-dimension vector returns. On a phone this default is replaced by a 384-dimension model in phase 2 (REQ-RAG-054).
+</li>
+<li><strong>Covers:</strong> REQ-RAG-005, REQ-RAG-053, REQ-RAG-054, REQ-RAG-055
+</li>
+</ul>
+<h3 id="llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output<a class="anchor-link" href="#llm-providers-rag-generation-and-structured-output">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1, with one provider key in the environment
+</li>
+<li><strong>Steps:</strong> 1) add <code>.UseOpenAICompatibleLlm(endpoint, key, "gpt-4o")</code> or <code>.UseOllamaLlm()</code> 2) call <code>AskAsync("What does TechieRag do?")</code> 3) iterate <code>AskStreamAsync</code> and <code>AskStreamWithSourcesAsync</code> 4) call <code>CompleteAsync&lt;MyDto&gt;("Return JSON with fields a and b")</code> 5) call <code>UseLlmForModel("claude-sonnet-4-5")</code> and check the resolved provider name
+</li>
+<li><strong>Expected:</strong> an answer with sources and usage; text arrives in pieces, sources arrive as events; the DTO is populated; the router picks Anthropic from the model name alone.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-006, REQ-RAG-007, REQ-RAG-008, REQ-RAG-099, REQ-RAG-103
+</li>
+</ul>
+<h3 id="agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows<a class="anchor-link" href="#agent-loop-mcp-tools-and-flows">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1, with a provider that supports tool calling
+</li>
+<li><strong>Steps:</strong> 1) register a <code>get_weather</code> delegate on <code>ToolRegistry</code> and run <code>AgentLoopRunner</code> on "What is the weather in Pune?" 2) register an MCP server over stdio and repeat with one of its tools 3) run a five-node flow from the orchestration tests with a <code>MaxSteps</code> of 3
+</li>
+<li><strong>Expected:</strong> the tool executes and the final answer uses its result; the MCP tool appears and executes through <code>McpToolHandler</code>; the flow stops at three steps with a coded <code>FlowMessage</code>.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-009, REQ-RAG-042, REQ-RAG-050, REQ-RAG-051, REQ-RAG-084, REQ-RAG-086, REQ-RAG-087
+</li>
+</ul>
+<h3 id="workspaces-memory-and-token-tracking">Workspaces, memory and token tracking<a class="anchor-link" href="#workspaces-memory-and-token-tracking">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) add <code>.WithPersistence(StoreProvider.Sqlite, "Data Source=ws.db").WithConversationMemory().WithUsageTracking(u =&gt; u.MaxCostUsd = 0.10m)</code> 2) create two workspaces with different documents through <code>WorkspaceManager</code> 3) chat twice in a thread, restart, reload the thread 4) read <code>GetTokenTracker().GetBudgetStatus()</code>
+</li>
+<li><strong>Expected:</strong> retrieval in one workspace never returns the other's chunks; the thread reloads with both turns; usage and cost are recorded and the alert fires when the budget nears its ceiling.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-010, REQ-RAG-011, REQ-RAG-089, REQ-RAG-092
+</li>
+</ul>
+<h3 id="resilience-and-fallback">Resilience and fallback<a class="anchor-link" href="#resilience-and-fallback">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) point the primary provider at an endpoint that returns 429 with <code>Retry-After: 2</code> 2) configure <code>.WithFallbackLlm(f =&gt; f.Source = LlmSource.Ollama)</code> 3) call <code>AskAsync</code> 4) run <code>dotnet test --filter RetryHandler</code>
+</li>
+<li><strong>Expected:</strong> the call waits the stated delay, retries, then fails over to the fallback and answers; the retry tests pass including the <code>Retry-After</code> parsing cases.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-012, REQ-RAG-013, REQ-NFR-002
+</li>
+</ul>
+<h3 id="data-connectors-and-web-ingestion">Data connectors and web ingestion<a class="anchor-link" href="#data-connectors-and-web-ingestion">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 2 (<code>TechieRagLiveNetworkTests=1</code>) for the live cases
+</li>
+<li><strong>Steps:</strong> 1) run <code>ConnectorRunner</code> with a <code>RepositoryConnector</code> against a public GitHub repository, branch <code>main</code>, glob <code>*.md</code> 2) run an <code>EmailConnector</code> against an <code>.mbox</code> file 3) ingest one URL and crawl one site with depth 1 4) attempt a fetch to <code>http://127.0.0.1/</code> through the guarded handler
+</li>
+<li><strong>Expected:</strong> per-item results and sync state for the repository run; messages ingested from the mbox with replies trimmed; the page and the crawled pages become documents; the loopback fetch is refused by the SSRF guard.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-074 to REQ-RAG-083
+</li>
+</ul>
+<h3 id="packaging-and-publishing">Packaging and publishing<a class="anchor-link" href="#packaging-and-publishing">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1 (maintainer)
+</li>
+<li><strong>Steps:</strong> 1) <code>dotnet pack</code> the three packages with <code>-p:Version=1.0.8-local.1</code> into <code>./local-feed</code> 2) <code>unzip -l</code> each <code>.nupkg</code> 3) dispatch <code>publish-nuget.yml</code> with <code>dry_run</code> true against <code>main</code>
+</li>
+<li><strong>Expected:</strong> <code>TechieRag</code>, <code>TechieRag.Embedded</code> and (once REQ-FN-065 lands) <code>TechieRag.Telemetry</code> pack with README, <code>buildTransitive</code> targets and symbols; the dry run derives a version and stops before pushing.
+</li>
+<li><strong>Covers:</strong> REQ-FN-003, REQ-FN-004, REQ-FN-005, REQ-FN-065, REQ-FN-067
+</li>
+</ul>
+<h2 id="automated-tests">Automated tests<a class="anchor-link" href="#automated-tests">#</a></h2>
+<pre><code>bash .tfcore/utils/tf-build.sh test tests/TechieRag.Tests/TechieRag.Tests.csproj
+TechieRagLiveNetworkTests=1 dotnet test tests/TechieRag.Tests --filter "Category=LiveNetwork"
+TechieRagTestPostgres="Host=localhost;Database=techierag;Username=postgres;Password=..." dotnet test tests/TechieRag.Tests --filter LivePgVector</code></pre>
+<p>About 634 xUnit test methods across processors, providers, stores, agent loop, orchestration, MCP, connectors, web, persistence, reranking, telemetry and packaging; 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-24 through the build ladder.</p>
 <h2 id="known-limitations">Known limitations<a class="anchor-link" href="#known-limitations">#</a></h2>
-<ul><li>Sample requires a TrBlazeUI GitHub Packages PAT (<code>read:packages</code>) in <code>nuget.config</code> to restore/build (see Prerequisites). Note: the committed PAT should be untracked + revoked before publishing the repo.</li><li>Streaming RAG chat can't return sources via the library API and bypasses the configured prompt engine — the sample works around it (TR-RAG-001, open for the TechieRag team).</li><li>Some providers report 0 token usage on streamed completions; the sample estimates to compensate (TR-RAG-002).</li><li>Estimated Cost reads $0.0000 for any model absent from the hard-coded pricing table (tokens are still counted).</li><li>Qdrant Admin: DataTable action buttons rely on a wrapper scroll on narrow (390px) viewports (TR-003/TR-004 — app-side inline workaround applied).</li><li>Tool calling / structured output reliability depends on the loaded model (cloud most reliable).</li><li>SQLite database locking with multiple processes — use single-instance or a server-backed store.</li><li>Token counts are ±10% estimates for providers that don't expose tokenizer detail.</li><li>Large PDFs (&gt;50 pages) may be slow to process.</li></ul>
-</main>
+<ul>
+<li>Every vector store is constructed with 1024 dimensions; Cohere, OpenAI and Gemini embedders need REQ-RAG-106 before pgvector or Qdrant can hold their vectors.
+</li>
+<li>SQLite search is a managed full scan; sqlite-vec is never loaded (REQ-RAG-056 makes the managed path fast and documented).
+</li>
+<li><code>AddTechieRag(IConfiguration)</code> drops <code>VectorStore.ApiKey</code>, embedding <code>Dimensions</code>, <code>ApiFormat</code>, <code>ApiPath</code>, <code>RequestDelayMs</code> and the <code>Prompt</code> section (REQ-FN-066).
+</li>
+<li><code>TechieRag.Telemetry</code> is not published by any workflow yet (REQ-FN-065).
+</li>
+<li>YouTube transcript ingestion is blocked: the timed-text endpoint returns empty bodies (REQ-RAG-076, TR-RAG-015 in <code>docs/Sevak-TechieRag-Feedback.md</code>).
+</li>
+<li>The email connector has only been exercised against mbox files, not a live IMAP server (REQ-RAG-081).
+</li>
+<li><code>PgVectorStore</code> has never run against a real PostgreSQL (REQ-RAG-044).
+</li>
+<li>Model files live under the <code>TechieRag.Embedded.dll</code> folder, which is read-only on phones; phase 2 moves them to the per-user application data root (REQ-RAG-053).
+</li>
+<li>No in-process language model, no typed streaming, no subscription sign-in yet: phase 2 (REQ-RAG-057 to REQ-RAG-070).
+</li>
+</ul>
+<h2 id="platform-notes">Platform notes<a class="anchor-link" href="#platform-notes">#</a></h2>
+<p>Today the packages are plain <code>net10.0</code> / <code>net8.0</code> and are proven on Windows and macOS (console hosts and the Sevak desktop app; the macOS native ONNX load was fixed in <code>OnnxNativeLibraryResolver</code>). Android and iOS load the assemblies but nothing yet makes the native ONNX library arrive or the model folder writable; the phase-2 platform support matrix (REQ-FN-054) will record, per package and platform, supported, tested on a named device, or not supported. Until it exists, treat Android and iOS as untested.</p>
+<h2 id="how-to-call-it">How to call it<a class="anchor-link" href="#how-to-call-it">#</a></h2>
+<p>Install from nuget.org (no token, no <code>nuget.config</code> edit):</p>
+<pre><code>dotnet add package TechieRag
+dotnet add package TechieRag.Embedded
+dotnet add package TechieRag.Telemetry   # once REQ-FN-065 publishes it</code></pre>
+<p>Register through the builder or DI:</p>
+<pre><code class="language-csharp">using TechieRag;
+using TechieRag.Embedded;
+
+var rag = new TechieRagBuilder()
+    .UseEmbedded()                       // offline embeddings, downloaded once
+    .UseSqliteVec("app.db")              // zero-config local vector store
+    .UseOllamaLlm(model: "llama3.2")     // optional: any of six providers, or UseLlmForModel("gpt-4o")
+    .WithConversationMemory()
+    .WithUsageTracking(u =&gt; u.MaxCostUsd = 1.00m)
+    .WithLogging(loggerFactory)
+    .Build();
+
+services.AddTechieRag(configuration.GetSection("TechieRag"));   // or the appsettings path</code></pre>
+<p>One call per public service:</p>
+<table>
+<thead><tr><th>Service</th><th>Call</th></tr></thead>
+<tbody>
+<tr><td>Ingestion</td><td><code>await rag.InitializeAsync(); await rag.IngestAsync("file.pdf"); await rag.IngestDirectoryAsync("./docs", "*.md"); await rag.IngestTextAsync(text, "name", metadata);</code></td></tr>
+<tr><td>Search</td><td><code>var hits = await rag.SearchAsync("query", topK: 5, documentFilter: null);</code></td></tr>
+<tr><td>RAG answer</td><td><code>var r = await rag.AskAsync("question"); await foreach (var piece in rag.AskStreamAsync("question")) …</code></td></tr>
+<tr><td>Multi-turn RAG</td><td><code>await rag.ChatWithRagAsync("message", history);</code></td></tr>
+<tr><td>Streaming with sources</td><td><code>await foreach (var ev in rag.AskStreamWithSourcesAsync("question")) …</code></td></tr>
+<tr><td>Structured output</td><td><code>var dto = await rag.GetLlmProvider()!.CompleteAsync&lt;MyDto&gt;("Return JSON …");</code></td></tr>
+<tr><td>Tools and agent loop</td><td><code>new ToolRegistry().Register("get_weather", schema, args =&gt; …); await new AgentLoopRunner(provider, registry).RunAsync(prompt);</code></td></tr>
+<tr><td>MCP tool servers</td><td><code>builder.WithTools(t =&gt; t.AddMcpServer(new McpServerConfig { Command = "npx", Args = … }));</code></td></tr>
+<tr><td>Flows</td><td><code>var flow = FlowSerializer.Deserialize(json); await new FlowRunner(runtime).RunAsync(flow, input);</code></td></tr>
+<tr><td>Workspaces and threads</td><td><code>builder.WithPersistence(StoreProvider.Sqlite, "Data Source=ws.db"); var ws = rag.GetWorkspaceManager()!;</code></td></tr>
+<tr><td>Reranking</td><td><code>builder.WithReranker(RerankSource.LocalOnnx); await rag.SearchAsync("q", new SearchOptions { Rerank = true });</code></td></tr>
+<tr><td>Connectors</td><td><code>await ConnectorRunner.RunAsync(new RepositoryConnector(options), rag, runOptions);</code></td></tr>
+<tr><td>Web ingestion</td><td><code>await rag.IngestUrlAsync("https://…"); await rag.CrawlAsync("https://…", new WebCrawlOptions { MaxDepth = 1 });</code></td></tr>
+<tr><td>Token tracking</td><td><code>var status = rag.GetTokenTracker().GetBudgetStatus();</code></td></tr>
+<tr><td>Telemetry</td><td><code>services.AddTechieRagTelemetry(o =&gt; { o.EnableTracing = true; o.Endpoint = "http://localhost:4318"; });</code></td></tr>
+</tbody>
+</table>
+<p>Exact signatures are in <code>docs/TechieRag-AI-Reference.md</code> (also installed into a consumer's repository as <code>.techierag/TechieRag-AI-Reference.md</code> on build); the maintainer's map of each service is <code>docs/TechieRag-DevGuide.md</code>.</p>
+  </main>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
-<script>(function(){
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
   var btn = document.getElementById('themeToggle');
   if(!btn) return;
   var relabel = function(){
@@ -174,6 +399,11 @@ npx playwright test</code></pre>
   });
 })();
 
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
 document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
   const btn = document.createElement('button');
   btn.className = 'copy';
@@ -188,11 +418,13 @@ document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
   pre.appendChild(btn);
 });
 
+// Mermaid init — theme follows the resolved light/dark theme
 if (window.mermaid) {
   var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
   mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
 }
 
+// Mermaid toolbar wiring — run after mermaid renders
 function wireMermaidToolbars() {
   document.querySelectorAll('.diagram').forEach(dia => {
     if (dia.dataset.wired) return;
@@ -236,6 +468,7 @@ function wireMermaidToolbars() {
     };
     function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
     dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
     merm.addEventListener('wheel', (e) => {
       if (!e.ctrlKey) return;
       e.preventDefault();
@@ -300,9 +533,11 @@ function openInNewTab(svg) {
   w.document.close();
 }
 
+// Run wiring after mermaid finishes (it renders async)
 if (window.mermaid) {
   setTimeout(wireMermaidToolbars, 400);
-  setTimeout(wireMermaidToolbars, 1200);
-}</script>
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
 </body>
 </html>

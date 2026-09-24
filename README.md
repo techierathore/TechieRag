@@ -365,18 +365,9 @@ Use cases:
 
 ## Sample Application
 
-The repository includes a Blazor Server application (**TechieDesk**, formerly `TechieRagWeb`) demonstrating:
-- **File Ingestion UI** - Upload and process documents from local directories
-- **Text Ingestion UI** - Paste and ingest raw text content directly
-- Search interface
-- Configuration management
-- Qdrant database administration
+**Sevak** (TechieDesk until 2026-09-24) is the application that shows the full capabilities of TechieRag: document library, workspaces and chat with sources, LLM settings for every provider, agents and flows, connectors, token usage, Qdrant administration. Since 2026-09-24 it lives in its own repository and consumes `TechieRag` and `TechieRag.Embedded` from NuGet exactly as any other application does. The repository is private until Sevak v0.1; the link will appear here with the first release.
 
-Run it with:
-```bash
-cd apps/TechieDesk
-dotnet run
-```
+A small four-platform probe app (`samples/TechieRag.Probe`, .NET MAUI for Windows, macOS, Android and iOS) is planned in this repository; see `docs/TechieRag-P2-BRD.md`.
 
 ## Documentation
 

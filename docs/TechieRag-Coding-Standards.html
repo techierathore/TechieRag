@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TechieRag — Status</title>
+<title>TechieRag — Coding Standards</title>
 <script>
 /* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
    pick by time of day — light 07:00–19:00 local, softened dark at night. */
@@ -103,137 +103,85 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </head>
 <body>
 <button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
-<div class="layout">
-  <nav class="side">
-    <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-09-24</div>
-    <div class="group">Contents</div>
-    <ol>
-        <li><a href="#where-i-am">Where I am</a></li>
-        <li><a href="#next-command-to-run">Next command to run</a></li>
-        <li><a href="#open-requirements">Open requirements</a></li>
-        <li><a href="#known-blockers">Known blockers</a></li>
-        <li><a href="#verification-log">Verification log</a></li>
-        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-        <li><a href="#standards-compliance">Standards compliance</a></li>
-        <li><a href="#deferred-future">Deferred / future</a></li>
-    </ol>
-  </nav>
+<div class="layout no-toc">
   <main>
-    <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>PROJECT-STATUS.md</code></div>
-    <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
-      <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *build-phase TechieRag</div>
-    </div>
-<table>
-<tbody>
-<tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-09-24</td></tr>
-<tr><th>current_phase</th><td>Phase 2 of 2 · Build — 39 not built, 29 of 81 verified</td></tr>
-<tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-09-03</td></tr>
-</tbody>
-</table>
+    <h1>TechieRag — Coding Standards</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-Coding-Standards.md</code></div>
+
     <div class="toc-inline">
       <div>Contents</div>
       <ol>
-        <li><a href="#where-i-am">Where I am</a></li>
-        <li><a href="#next-command-to-run">Next command to run</a></li>
-        <li><a href="#open-requirements">Open requirements</a></li>
-        <li><a href="#known-blockers">Known blockers</a></li>
-        <li><a href="#verification-log">Verification log</a></li>
-        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-        <li><a href="#standards-compliance">Standards compliance</a></li>
-        <li><a href="#deferred-future">Deferred / future</a></li>
+        <li><a href="#standards-applied">Standards applied</a></li>
+        <li><a href="#project-rules">Project rules</a></li>
+        <li><a href="#enforcement">Enforcement</a></li>
       </ol>
     </div>
-<h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Day-1 brownfield rewrite done 2026-09-24: the library is a Large, two-phase project (<code>docs/TechieRag-Phases.md</code>). Phase 1 (BRD-1…82) is the shipped core, all rows Done or N/A. Phase 2 (BRD-83…163) holds the agents package, the executed repository separation, four-platform groundwork, <code>TechieRag.Local</code>, typed streaming, subscription sign-in and 49 harvested v3 items. The application (Sevak) left this repository today; <code>apps/</code> is deleted and the library tests pass through the build ladder.</p>
-<h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<p>Claude Code:</p>
-<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag</code></pre>
-<p>OpenCode:</p>
-<pre><code>/flow-master *build-phase TechieRag</code></pre>
-<p>Start with <code>REQ-FN-006</code> verify, then <code>REQ-RAG-067</code> (typed streaming) before <code>REQ-RAG-057…066</code>; <code>REQ-RAG-106</code>, <code>REQ-FN-065…067</code> are small scan-found fixes.</p>
-<h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
-<thead><tr><th>Status</th><th>Count</th></tr></thead>
+<thead><tr><th></th><th></th></tr></thead>
 <tbody>
-<tr><td>Not Started</td><td>38</td></tr>
-<tr><td>In Progress</td><td>1</td></tr>
-<tr><td>Implemented</td><td>11</td></tr>
-<tr><td>Needs re-verify</td><td>1</td></tr>
-<tr><td>Blocked</td><td>1</td></tr>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Stack answer set</td><td>dotnet</td></tr>
+<tr><td>Date</td><td>2026-09-24</td></tr>
 </tbody>
 </table>
-<ul>
-<li>[ ] REQ-FN-006 — repository separation, library side (Implemented; deletion done today, awaiting verify)
-</li>
-<li>[ ] REQ-RAG-067 — typed streaming events on <code>ILlmProvider</code> (prerequisite for <code>TechieRag.Local</code>)
-</li>
-<li>[ ] REQ-RAG-106 — pass the embedder's dimensions into every vector store (scan finding)
-</li>
-<li>[ ] REQ-FN-065 — pack and publish <code>TechieRag.Telemetry</code> (scan finding)
-</li>
-<li>[ ] REQ-FN-067 — one nuget.org publish path (scan finding)
-</li>
-<li>[ ] REQ-FN-066 — <code>AddTechieRag(IConfiguration)</code> maps every field (scan finding)
-</li>
-<li>[ ] REQ-RAG-015 / 016 / 017 — agentic contract and <code>TechieRag.Agents</code>
-</li>
-<li>[ ] REQ-RAG-057 — <code>TechieRag.Local</code>, <code>UseLocalLlm()</code> (after the runtime decision)
-</li>
-<li>[ ] REQ-RAG-076 — YouTube transcripts (Blocked, owner decision)
-</li>
-<li>[ ] REQ-RAG-088 — flow run time limit (In Progress)
-</li>
-</ul>
-<h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
-<ul>
-<li>🔶 <strong>Owner git:</strong> the 2026-09-24 deletions and rewrites are uncommitted; <code>tests/TechieDesk.Tests/TestResults/res.trx</code> is still tracked (<code>git rm -r --cached 'tests/TechieDesk.Tests/TestResults'</code>).
-</li>
-<li>🔶 <strong>Runtime decision for <code>TechieRag.Local</code></strong> (owner, plan 08 step 3): LLamaSharp vs ONNX Runtime GenAI per platform, recorded in <code>DECISIONS.md</code> before <code>REQ-RAG-057…059</code> start.
-</li>
-<li>🔶 <strong>Real devices</strong> (owner): a Mac, an Android phone and an iPhone for <code>REQ-FN-056/059/060</code>.
-</li>
-<li>🔶 <strong><code>REQ-RAG-076</code> YouTube</strong> (owner): timed-text endpoint returns empty bodies; choose an approach or drop it.
-</li>
-<li>🔶 <strong><code>REQ-RAG-044</code> PostgreSQL</strong> (owner): <code>TechieRagTestPostgres</code> needs a real server for the live tests.
-</li>
-</ul>
-<h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
+<h2 id="standards-applied">Standards applied<a class="anchor-link" href="#standards-applied">#</a></h2>
 <table>
-<thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
+<thead><tr><th>File</th><th>Applies</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>2026-09-24</td><td><code>*day1-brownfield</code> TechieRag (Large, 2 phases; BRD-115…163 harvested; apps/ deleted)</td><td>📝 docs rewritten; library tests PASS via build ladder (rung 2); no verify run</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">P1</a> · <a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-<tr><td>2026-09-24</td><td><code>*amend-docs</code> TechieRag (BRD-81/87 amended; BRD-88…114 added)</td><td>📝 docs only</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-<tr><td>2026-09-03</td><td><code>*amend-docs</code> TechieRag + TechieDesk (BRD-83…87; governance reversal)</td><td>📝 docs only</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
-<tr><td>2026-09-03</td><td><code>*triage-issues</code> → <code>*fix-issues</code> → verify (REQ-FN-003, REQ-FN-004)</td><td>✅ 2/2 Verified; 723 lib tests pass; version rules 9/9</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">P1</a></td></tr>
-<tr><td>2026-08-04</td><td><code>*verify</code> ×6 (library rows migrated from the app ledger)</td><td>✅ 2,306 pass; REQ-RAG-052 demoted</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
+<tr><td><code>.tfcore/standards/coding-standards-core.md</code></td><td>yes</td><td>every project</td></tr>
+<tr><td><code>.tfcore/standards/coding-standards-dotnet.md</code></td><td>yes</td><td>from the Stack answer set <code>dotnet</code>; where it assumes an application (Serilog, AppManager, a UI library) the Architecture's Stack decisions record the library override</td></tr>
 </tbody>
 </table>
-<h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
+<p>Per-project choices the stack file leaves open, taken from the drift scan of 2026-09-24 (256 of 256 private instance fields, 208 of 208 files) and the June 2026 standards this file replaces (<code>docs/OldDocs/TechieRag-Coding-Standards.md</code>):</p>
+<table>
+<thead><tr><th>Choice</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td>Instance-field prefix</td><td><strong>None.</strong> Bare camelCase, no underscore, no <code>obj</code>/<code>a</code>/<code>v</code> (<code>private readonly ILlmProvider llmProvider;</code>). 100 percent of the codebase; constructor assignment uses <code>this.field = field</code>.</td></tr>
+<tr><td>Static and const fields</td><td>PascalCase, no prefix (<code>private const string CachePrefix</code>).</td></tr>
+<tr><td>Locals and parameters</td><td>camelCase; <code>var</code> for locals (about 88 percent today; new code always).</td></tr>
+<tr><td>Namespaces</td><td>File-scoped, one class per file, file name equals type name.</td></tr>
+<tr><td>Nullable and implicit usings</td><td>Enabled in every project; no <code>#nullable</code> directives, no <code>global using</code> files.</td></tr>
+<tr><td>Async</td><td>Every async method ends in <code>Async</code>; library code awaits with <code>ConfigureAwait(false)</code> (about 55 percent today; new and touched code always, Architecture open question 9).</td></tr>
+<tr><td>Test names</td><td>Short PascalCase, no underscores (<code>LoginRejectsBadPassword</code>); the full scenario in the XML <code>&lt;summary&gt;</code>.</td></tr>
+<tr><td>Public API documentation</td><td>XML <code>&lt;summary&gt;</code>, <code>&lt;param&gt;</code>, <code>&lt;returns&gt;</code>, <code>&lt;exception&gt;</code> on every public type and member; <code>GenerateDocumentationFile</code> is on in every package project.</td></tr>
+<tr><td>Environment variables the library reads</td><td><code>TECHIERAG_</code> prefix, upper snake case (<code>TECHIERAG_MODEL_BASE_URL</code>, <code>TECHIERAG_RERANKER_BASE_URL</code>): these are the shipped public names and stay. Consumers configure everything else through <code>IConfiguration</code>.</td></tr>
+<tr><td>Database object names</td><td>PascalCase, singular, no underscores (<code>Documents</code>, <code>Chunks</code>, <code>TrThread</code>, <code>IdxChunksDocument</code>, <code>IxTrThreadUserId</code>); library-owned tables created in a consumer's database carry the <code>Tr</code> prefix from the persistence stores onward.</td></tr>
+</tbody>
+</table>
+<h2 id="project-rules">Project rules<a class="anchor-link" href="#project-rules">#</a></h2>
+<p>Rules that hold in this project only.</p>
+<table>
+<thead><tr><th>Rule</th><th>Why</th><th>Since</th></tr></thead>
+<tbody>
+<tr><td>LLM and embedding providers use raw <code>HttpClient</code> + <code>System.Text.Json</code>; no vendor AI SDK enters <code>TechieRag</code></td><td>Keeps the core package light and uniform across vendors (ADR-003)</td><td>2026-06-25</td></tr>
+<tr><td>A heavy or fast-moving dependency (ONNX Runtime, OpenTelemetry exporters, Microsoft Agent Framework, a local inference runtime) lives in a sibling package, never in core</td><td>Consumers of the core never inherit a monthly-churning dependency (ADR-008, ADR-014)</td><td>2026-09-03</td></tr>
+<tr><td>Every change to <code>ILlmProvider</code>, <code>IEmbeddingProvider</code>, <code>IVectorStore</code> or <code>ITechieRag</code> is additive with a default interface implementation until a major version is decided</td><td><code>LlmSource.None</code> keeps v1 behaviour; external implementers keep compiling (ADR-005, ADR-013)</td><td>2026-06-25</td></tr>
+<tr><td>Model-facing text (tool descriptions, agent instructions) is invariant English; user-visible library messages are codes with arguments (<code>FlowMessage</code>, <code>FlowValidationCodes</code>), never English sentences</td><td>The library has no localisation; the host renders in the user's language (REQ-RAG-050)</td><td>2026-08-02</td></tr>
+<tr><td>A read against an unreachable store throws; it never returns an empty list</td><td>A down database must not masquerade as an empty one (REQ-RAG-044)</td><td>2026-08-04</td></tr>
+<tr><td>Every outbound HTTP the library makes on a consumer's behalf goes through the connect-time SSRF guard (<code>HttpWebContentFetcher.CreateGuardedHandler</code>)</td><td>Redirects and DNS rebinding cannot reach private addresses (BRD-121, BRD-126)</td><td>2026-08</td></tr>
+<tr><td>Model weights are downloaded once to the model root and never packed into a NuGet package or an app bundle</td><td>Package size and licence terms (ADR-004, BRD-101)</td><td>2026-06-25</td></tr>
+<tr><td>A live test is gated by a <code>FactAttribute</code> subclass that sets <code>Skip</code> with a reason when its credential, server or model is absent; it never fails for a missing environment</td><td>The suite stays green on any machine; <code>TechieRagLiveNetworkTests</code>, <code>TechieRagTestPostgres</code>, staged weights</td><td>2026-07</td></tr>
+<tr><td>Download progress goes through <code>ModelDownloadService</code> events, never <code>Console.WriteLine</code></td><td>A package must not write to a host's console (BRD-92; three legacy calls remain, Architecture open question 10)</td><td>2026-09-24</td></tr>
+<tr><td>No <code>git</code> or <code>gh</code> from an agent; the owner commits</td><td>Framework rule, enforced by hook</td><td>2026-06-25</td></tr>
+</tbody>
+</table>
+<h2 id="enforcement">Enforcement<a class="anchor-link" href="#enforcement">#</a></h2>
 <ul>
-<li>Sevak (the former app) to TechieRag: 36 open · 7 closed, 0 blocking — <code>docs/Sevak-TechieRag-Feedback.md</code> (renamed 2026-09-24; its 43 legacy entries still fail the feedback template's per-entry rules)
+<li><strong>Editor configuration:</strong> <code>.editorconfig</code> at the repository root carries the machine-checkable subset: file-scoped namespaces (warning), <code>Async</code> suffix (warning), <code>var</code> for locals (warning), nullable on, no <code>_</code> prefix on private fields (warning through the naming rule).
 </li>
-<li>Downstream: Chatur TR-RAG-001/002 and MyDiary TR-RAG-001 accepted 2026-09-24 → BRD-96…114.
+<li><strong>Analyzers:</strong> none beyond the SDK's; <code>GenerateDocumentationFile</code> makes a missing XML comment a CS1591 warning in every package project.
+</li>
+<li><strong>Verifier checks:</strong> the standards check runs the greps listed in the stack file's Enforcement section, plus:
 </li>
 </ul>
-<h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
-<ul>
-<li>Build ladder 2026-09-24: <code>PASS test on wsl via ~/.dotnet/dotnet (rung 2)</code> for <code>tests/TechieRag.Tests</code>; 41 warnings. Drift scan: 256/256 fields bare camelCase, 208/208 file-scoped namespaces. Doc checker: 0 FAIL on the eight rewritten documents.
-</li>
-</ul>
-<h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
-<ul>
-<li>OS built-in models (Apple, Android Gemini Nano) as a later <code>ILocalLlmRuntime</code>.
-</li>
-<li><code>REQ-RAG-046</code> deferred endpoints; <code>TechieRag.Agents</code> phase D items (proposal §7).
-</li>
-<li>Sevak free-tier limits (Sevak repository); agent skills as library tools (built app-side today).
-</li>
-</ul>
+<pre><code class="language-bash"># forbidden underscore-prefix fields
+grep -rE "private(\s+readonly)?\s+\w+\s+_[a-z]" src/ tests/
+# forbidden test-method underscores
+grep -rE "public\s+(async\s+)?Task\s+\w+_\w+\s*\(" tests/
+# a vendor AI SDK in the core project
+grep -E "OpenAI|Anthropic|Azure\.AI|Google\.|Microsoft\.Agents|OnnxRuntime|OpenTelemetry" src/TechieRag/TechieRag.csproj | grep -v "Azure.AI.OpenAI"
+# console output in a package
+grep -rn "Console\.Write" src/</code></pre>
   </main>
 </div>
 
