@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Product Guide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieRag — Product Guide</h1>
+    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-ProductGuide.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#welcome">Welcome</a></li>
+        <li><a href="#getting-started">Getting started</a></li>
+        <li><a href="#using-techierag">Using TechieRag</a></li>
+        <li class="h3"><a href="#ingest-documents-and-folders">Ingest documents and folders</a></li>
+        <li class="h3"><a href="#search-your-documents">Search your documents</a></li>
+        <li class="h3"><a href="#ask-a-question-and-get-an-answer-with-sources">Ask a question and get an answer with sources</a></li>
+        <li class="h3"><a href="#get-a-typed-answer">Get a typed answer</a></li>
+        <li class="h3"><a href="#choose-or-switch-a-language-model">Choose or switch a language model</a></li>
+        <li class="h3"><a href="#connect-a-repository-a-mailbox-or-a-website">Connect a repository, a mailbox or a website</a></li>
+        <li class="h3"><a href="#keep-separate-workspaces-and-remember-conversations">Keep separate workspaces and remember conversations</a></li>
+        <li class="h3"><a href="#give-the-model-tools-and-let-it-act">Give the model tools and let it act</a></li>
+        <li class="h3"><a href="#use-the-microsoft-agent-framework-with-your-documents">Use the Microsoft Agent Framework with your documents</a></li>
+        <li class="h3"><a href="#run-a-language-model-on-the-device-with-no-server">Run a language model on the device, with no server</a></li>
+        <li class="h3"><a href="#embed-and-search-offline-on-phones-and-desktops">Embed and search offline on phones and desktops</a></li>
+        <li class="h3"><a href="#sign-in-with-a-chatgpt-subscription-instead-of-an-api-key">Sign in with a ChatGPT subscription instead of an API key</a></li>
+        <li class="h3"><a href="#watch-usage-and-set-a-budget">Watch usage and set a budget</a></li>
+        <li class="h3"><a href="#try-it-on-your-own-devices-with-the-probe-app">Try it on your own devices with the probe app</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Size</td><td>Large</td></tr>
+<tr><td>Date</td><td>2026-09-25</td></tr>
+</tbody>
+</table>
+<h2 id="welcome">Welcome<a class="anchor-link" href="#welcome">#</a></h2>
+<p>TechieRag adds document search and question answering to your own .NET application. You point it at files, folders, raw text, a code repository, a mailbox or a website; it splits the content into passages, turns each passage into a vector, stores it, and finds the passages that best match a question. Add a language model and it writes an answer from those passages, names the sources it used, and counts the tokens spent.</p>
+<p>Everything is chosen with a few builder calls or a settings section: which embedding model, which store (SQLite, PostgreSQL or Qdrant), which of six model providers, and whether any data leaves the machine at all. With the Embedded package the embedding model downloads once and then runs offline, so private documents stay private.</p>
+<p>It is for .NET developers who want retrieval and answers inside their own app, on desktop and mobile, without rebuilding the plumbing every time.</p>
+<h2 id="getting-started">Getting started<a class="anchor-link" href="#getting-started">#</a></h2>
+<ol>
+<li>Add the packages to your project. <code>dotnet add package TechieRag</code> brings the core; <code>dotnet add package TechieRag.Embedded</code> adds the offline embedding model. Optionally add <code>TechieRag.Local</code> for a small language model that runs inside your app, <code>TechieRag.Agents</code> for agents built on the Microsoft Agent Framework, and <code>TechieRag.Telemetry</code> if you export traces and metrics. All of them come from nuget.org with no token and no feed change.
+</li>
+<li>Build one instance. Either chain the builder, <code>new TechieRagBuilder().UseEmbedded().UseSqliteVec()</code>, add <code>UseOllamaLlm()</code> or <code>UseLlmForModel("gpt-4o")</code> if you want written answers, and finish with <code>Build()</code>; or register it through dependency injection with <code>services.AddTechieRag(configuration.GetSection("TechieRag"))</code> and keep the embedding, store and model choices in a <code>TechieRag</code> section of your app's settings. Ask for <code>ITechieRag</code> wherever you need it. <code>UseSqliteVec()</code> with no argument creates a database file next to your app; nothing else to install.
+</li>
+<li>Call <code>InitializeAsync()</code> once at start-up. It creates the tables or collections in your store and makes sure the embedding model is ready.
+</li>
+<li>What happens first: on the very first run the embedding model downloads once, about 2.3 GB on desktops and 91 MB on Android and iOS, where a smaller model is used. Subscribe to <code>ModelDownloadService.Instance.DownloadSizeKnown</code> to learn the size before a single byte moves (set <code>Decline</code> there to stop it and tell the user), and to <code>ProgressChanged</code> to drive a progress bar. Every later start makes no network call, and embedding runs fully offline.
+</li>
+<li>Ingest one file with <code>IngestAsync</code>, then ask with <code>AskAsync</code>. You are done with the setup.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/home.png" alt="Getting started" style="max-width:100%"></p>
+<h2 id="using-techierag">Using TechieRag<a class="anchor-link" href="#using-techierag">#</a></h2>
+<h3 id="ingest-documents-and-folders">Ingest documents and folders<a class="anchor-link" href="#ingest-documents-and-folders">#</a></h3>
+<ol>
+<li>Make sure <code>InitializeAsync()</code> has run once for this instance.
+</li>
+<li>Call <code>IngestAsync</code> with the path of one file. The format is picked from the extension: PDF, Word, Markdown, HTML, JSON, TOML, plain text and about seventy code file types are read natively, and anything else falls back to a generic text reader. You get the new document's id back. For a PDF, every passage remembers its page number, so a later answer can point at the page it came from.
+</li>
+<li>Call <code>IngestDirectoryAsync</code> with a folder and a pattern such as <code>*.md</code> or <code>*.*</code>. Every matching file is ingested and you receive the list of ids.
+</li>
+<li>Call <code>IngestTextAsync</code> with a piece of text, a name and, if you like, metadata such as author, team or date. No file is needed. The metadata is copied onto every passage of that document, so you can filter on it later and show it next to an answer.
+</li>
+<li>Call <code>ListDocumentsAsync</code> to see what is stored: each document with its name, chunk count and metadata. Call <code>GetStatsAsync</code> for the totals: number of documents, number of passages, storage size and the time of the last ingestion. <code>DeleteDocumentAsync</code> removes one document; <code>ClearAsync</code> empties the store.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/ingestion.png" alt="Ingest documents and folders" style="max-width:100%"></p>
+<p>Tips: Passages are 500 characters long and overlap by 50 unless you change that with <code>WithChunkSize(size, overlap)</code>; longer passages give the model more context per hit, shorter ones give sharper matches. A large PDF takes a while the first time because every passage is embedded, so run big folders in the background and watch the statistics. The SQLite store searches exactly and is comfortable up to a few hundred thousand passages; past that, switch to <code>UsePgVector</code> or <code>UseQdrant</code> and nothing else in your code changes.</p>
+<h3 id="search-your-documents">Search your documents<a class="anchor-link" href="#search-your-documents">#</a></h3>
+<ol>
+<li>Call <code>SearchAsync("your question", topK: 5)</code>. You get a list of results, best first. Each result carries a <code>Score</code> between 0 and 1 and a <code>Chunk</code> with the passage text, the document it came from and that document's metadata, including the page number for PDFs.
+</li>
+<li>To look inside one document only, pass <code>documentFilter:</code> with that document's id. Only passages of that document come back, still ranked by score.
+</li>
+<li>To improve the order for hard questions, turn on reranking. At build time add <code>WithReranker(RerankSource.LocalOnnx)</code>; the reranker model comes with the Embedded package and downloads once like the embedding model. Then call <code>SearchAsync("your question", new SearchOptions { Rerank = true })</code>. The best twenty candidates are read again by a model that sees the question and the passage together, and the list is reordered by that reading. <code>WithRerankEnabledByDefault</code> makes it the default for every search.
+</li>
+<li>Search needs no language model at all. With no model configured the library behaves as a pure retrieval engine and <code>GetLlmProvider()</code> returns null, which is a perfectly good way to run it.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/qdrant-admin.png" alt="Search your documents" style="max-width:100%"></p>
+<p>Tips: Scores compare results to each other within one search, not across searches, so pick a threshold by trying a few questions rather than by a fixed rule. Keep <code>topK</code> small; five to ten good passages beat fifty mediocre ones once a model has to read them. Reranking adds a moment per search, so use it where answer quality matters more than speed. If a search returns nothing useful, check <code>ListDocumentsAsync</code> first: an empty store is the most common cause.</p>
+<h3 id="ask-a-question-and-get-an-answer-with-sources">Ask a question and get an answer with sources<a class="anchor-link" href="#ask-a-question-and-get-an-answer-with-sources">#</a></h3>
+<ol>
+<li>Configure a model provider at build time (see "Choose or switch a language model" below).
+</li>
+<li>Call <code>AskAsync("What does the refund policy say?")</code>. The library searches your documents, builds a prompt from the best passages and asks the model. You get back <code>Answer</code> (the text), <code>Sources</code> (the passages it was given, with their scores and metadata) and <code>Usage</code> (input and output tokens plus the estimated cost).
+</li>
+<li>To show text as it is written, loop over <code>AskStreamAsync</code> with <code>await foreach</code>. Each item is a piece of the answer; append it to the screen and the user sees the reply grow instead of waiting for the whole thing.
+</li>
+<li>To show sources before the answer, loop over <code>AskStreamWithSourcesAsync</code> instead. The first event carries the sources, then token events carry each piece of text, and a final Completed event carries the full answer and the usage. Your screen can list the sources while the model is still writing.
+</li>
+<li>For a conversation, call <code>ChatWithRagAsync("your message", history)</code> with the earlier messages. The reply uses both the retrieved passages and what was said before. <code>ChatWithRagStreamAsync</code> streams it. Add <code>WithConversationMemory()</code> at build time and the library keeps the history for you, trimming it to a token budget while keeping the system message and the most recent turns.
+</li>
+<li>To change how the model is addressed, use <code>WithPromptTemplate</code> to set the system prompt, the way passages are laid out and how much context is allowed.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/chat.png" alt="Ask a question and get an answer with sources" style="max-width:100%"></p>
+<p>Tips: Show the sources every time; a page number next to an answer is what makes users trust it. Ask one thing per question; two questions in one message split the retrieval between them. If a question is outside your documents the model may still answer from general knowledge, so for a strict "only from my documents" behaviour use a workspace in query mode (last section), which returns an honest "not covered" reply instead.</p>
+<h3 id="get-a-typed-answer">Get a typed answer<a class="anchor-link" href="#get-a-typed-answer">#</a></h3>
+<ol>
+<li>Write a plain class with the properties you want back, for example a title, a one-line summary, a list of tags and a confidence number.
+</li>
+<li>Take the model with <code>rag.GetLlmProvider()</code> and call <code>CompleteAsync&lt;YourClass&gt;("Return JSON with fields title, summary, tags and confidence for this text: …")</code>. The library asks the model for JSON and turns it into an instance of your class. What you get back is your object, ready to use, not a string to parse.
+</li>
+<li>To extract facts from your own documents, run <code>SearchAsync</code> first and put the returned passages into the prompt text, then ask for the fields you need. This turns a folder of contracts or tickets into rows you can store or display.
+</li>
+<li>It works with every provider, including the in-app local model, as long as the model can write JSON.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/llm-playground.png" alt="Get a typed answer" style="max-width:100%"></p>
+<p>Tips: Name the fields in your prompt exactly as they are named in the class, and keep the types simple (strings, numbers, booleans, lists). Tell the model to return only JSON and nothing else. If the reply cannot be turned into your class you get an exception rather than a half-filled object, so catch it and retry with a clearer prompt or a lower temperature. Smaller local models manage short, flat objects well; deeply nested ones are safer on a larger model.</p>
+<h3 id="choose-or-switch-a-language-model">Choose or switch a language model<a class="anchor-link" href="#choose-or-switch-a-language-model">#</a></h3>
+<ol>
+<li>Pick one of six providers at build time: <code>UseOllamaLlm(endpoint, model)</code> or <code>UseLmStudioLlm(endpoint, model)</code> for a server on your own machine; <code>UseOpenAICompatibleLlm(endpoint, key, model)</code> for OpenAI, vLLM, Groq, Together or LocalAI; <code>UseAzureAIFoundryLlm</code> for an Azure deployment; <code>UseGeminiLlm(key)</code> for Google; <code>UseAnthropicLlm(key)</code> for Claude. <code>UseCustomLlmProvider</code> accepts your own.
+</li>
+<li>Or pick by model name alone: <code>UseLlmForModel("claude-sonnet-4-5")</code> or <code>UseLlmForModel("gpt-4o")</code> looks the name up in the built-in catalogue and builds the right provider; hand it the key as the second argument or through an environment variable.
+</li>
+<li>Run a model inside your app with <code>UseLocalLlm()</code> from the Local package. Give it <code>ConfirmTermsAsync</code> so your app can show the model's licence before anything downloads; the download states its size first, resumes if the app is closed halfway, and is checked file by file. No endpoint, no key, and it works offline. Names such as <code>local/qwen2.5-0.5b-instruct</code> route to it once <code>LocalLlm.Register()</code> has run.
+</li>
+<li>Add a fallback with <code>WithFallbackLlm(f =&gt; f.Source = LlmSource.Ollama)</code>. When the primary provider fails after its retries, the same request is answered by the fallback and your code never notices.
+</li>
+<li>Handle rate limits with <code>WithResilience</code>. Transient failures are retried with growing delays; a "too many requests" reply that names a wait time is honoured exactly; after five failures in a row the provider is paused for a recovery window so your app fails fast instead of hanging.
+</li>
+<li>Switch without a code change: alter the model settings in your configuration section and rebuild.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Choose or switch a language model" style="max-width:100%"></p>
+<p>Tips: Start with Ollama or LM Studio on your own machine while you shape prompts; it costs nothing and nothing leaves the room. Then keep the local server as the fallback when you move to a hosted model. A ChatGPT subscription can be used through <code>UseChatGptSubscriptionLlm</code> with a device-code sign-in; other vendors' subscription terms do not allow it, and the catalogue records each vendor's terms and the date they were checked so you can show them before sign-in.</p>
+<h3 id="connect-a-repository-a-mailbox-or-a-website">Connect a repository, a mailbox or a website<a class="anchor-link" href="#connect-a-repository-a-mailbox-or-a-website">#</a></h3>
+<ol>
+<li>Repository: fill <code>RepositoryConnectorOptions</code> with <code>Host</code> (GitHub or GitLab), <code>ProjectPath</code> such as owner/project, <code>Branch</code>, <code>IncludeGlobs</code> such as <code>*.md</code>, and an <code>AccessToken</code> for a private project. Build a <code>RepositoryConnector</code> over an <code>HttpConnectorTransport</code> and hand it to <code>rag.IngestConnectorAsync</code> with <code>ConnectorRunOptions</code>. Back comes a result per file, a reason for each failure, and a sync state.
+</li>
+<li>Mailbox: fill <code>EmailConnectorOptions</code> with the folders, <code>SinceUtc</code>, sender or subject filters and, if wanted, <code>IncludeAttachments</code> for PDF, Word, Excel and PowerPoint attachments. Quoted replies and signatures are stripped by default. Use <code>ImapMailTransport</code> with <code>ImapMailboxOptions</code> (host, port 993, user name, password or OAuth token; encryption is required) for a live mailbox, or <code>MboxMailTransport</code> for an exported mbox file. Build an <code>EmailConnector</code> and run it the same way.
+</li>
+<li>Website: <code>IngestUrlAsync(url)</code> fetches one page, cleans it to text and stores it. <code>IngestSiteAsync(seedUrl, fetcher, new WebCrawlOptions { MaxDepth = 1 })</code> follows links one step from the seed, stays on the same host, stops at 25 pages and pauses between requests.
+</li>
+<li>What stops a run early: <code>ConnectorRunOptions</code> caps a run at 500 items, 200 listing pages, 2 MB per item and 64 MB in total. When a cap is hit the result has <code>ReachedLimit</code> set and a <code>LimitCode</code> (<code>RunItemLimitReached</code>, <code>RunPageLimitReached</code> or <code>RunByteBudgetReached</code>). Everything fetched so far is already stored, because each item is ingested as it arrives, and the sync state is saved, so the next run skips unchanged items and carries on from there. A run that fails outright throws <code>ConnectorException</code> with an <code>ErrorCode</code>; act on the code, never on the message text.
+</li>
+<li>Private addresses are refused. Every outbound fetch, whether connector, page or crawl, refuses loopback, private-network and link-local targets, even after a redirect.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/text-ingestion.png" alt="Connect a repository, a mailbox or a website" style="max-width:100%"></p>
+<p>Tips: Start with a small <code>MaxItems</code> and a narrow glob or folder, then widen once the results look right. Keep tokens and passwords in your app's secret store, never in the options you commit. Raise <code>RequestDelay</code> for a server that is not yours. The mailbox connector has so far been exercised against mbox exports rather than a live IMAP server, so test your mailbox on a copy before pointing it at the real one.</p>
+<h3 id="keep-separate-workspaces-and-remember-conversations">Keep separate workspaces and remember conversations<a class="anchor-link" href="#keep-separate-workspaces-and-remember-conversations">#</a></h3>
+<ol>
+<li>Add <code>WithPersistence(StoreProvider.Sqlite, connectionString)</code> (or <code>StoreProvider.Postgres</code>) at build time, together with <code>WithConversationMemory()</code> and <code>WithUsageTracking(u =&gt; u.MaxCostUsd = 0.10m)</code>. Then take <code>rag.GetWorkspaceManager()</code>.
+</li>
+<li>Call <code>CreateWorkspaceAsync</code> once per team, project or customer. Add content with the manager's <code>IngestFileAsync</code> or <code>IngestTextAsync</code>, naming the workspace, or attach a document that is already stored with <code>AddExistingDocumentAsync</code>. A document is embedded only once and shared by content hash, so the same manual in three workspaces costs one ingestion. A search or question in one workspace never sees another workspace's passages.
+</li>
+<li>Tune each workspace on its own: a similarity threshold, a top-K, a reranking switch, and pinned documents through <code>SetPinnedAsync</code>. Pinned passages stay in the prompt when space runs short; retrieved ones are dropped first. Choose query mode for an honest "that is not in my documents" reply, or chat mode for a freer conversation.
+</li>
+<li>Ask through the manager's <code>AskAsync</code> with the workspace, the question and a thread. Every message of the thread, yours, the model's and the sources it used, is saved per workspace and user. Close the app, open it again, load the thread, and the whole conversation is there; the model's context is rebuilt from that history with the most recent turns kept.
+</li>
+<li>Watch the money: <code>GetTokenTracker().GetBudgetStatus()</code> reports tokens and cost against your ceilings. Set <code>MaxTotalTokens</code>, <code>MaxCostUsd</code> and an <code>AlertThreshold</code> (80 percent by default); <code>OnBudgetAlert</code> fires when usage nears the ceiling, and <code>BlockOnExceeded</code> refuses the next call once it is passed. <code>WithModelPricing</code> gives a per-model breakdown.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/token-usage.png" alt="Keep separate workspaces and remember conversations" style="max-width:100%"></p>
+<p>Tips: One workspace per customer is the simplest way to keep their documents apart. Pin the two or three documents every answer should respect, such as a policy or a glossary, and let retrieval fill the rest. Set a small cost budget while you develop; the alert tells you about a runaway loop long before the bill does. Reset the session counters when you want a fresh reading, and read the per-model breakdown before choosing which model to keep.</p>
+<h3 id="give-the-model-tools-and-let-it-act">Give the model tools and let it act<a class="anchor-link" href="#give-the-model-tools-and-let-it-act">#</a></h3>
+<p>A tool is a small function you own that the model may call on its own initiative: look up the weather, run a calculation, search your documents. TechieRag passes the list to the model, runs whatever it asks for, and feeds the result back until there is a final answer.</p>
+<ol>
+<li>Create a <code>ToolRegistry</code> and call <code>Register("get_weather", schema, args =&gt; ...)</code>, passing the tool name, a short JSON description of its arguments, and the function that does the work.
+</li>
+<li>Take the model you configured (<code>rag.GetLlmProvider()</code>) and create <code>new AgentLoopRunner(provider, registry)</code>.
+</li>
+<li>Call <code>RunAsync("What is the weather in Pune?")</code>. The model decides it needs <code>get_weather</code>, TechieRag runs your function, and you get back an answer that uses the result.
+</li>
+<li>To watch it happen, call <code>RunStreamAsync(messages)</code> and loop over the events: text as it is written, then <code>ToolCallRequested</code> and <code>ToolExecuted</code> (carrying your function's result), then the answer, then <code>Completed</code> with the tokens used across the whole run.
+</li>
+<li>To use a tool server that speaks MCP, call <code>builder.WithTools(t =&gt; t.AddMcpServer(...))</code> with the command that starts the server. Its tools appear next to your own and run in the same loop.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/tool-demo.png" alt="Give the model tools and let it act" style="max-width:100%"></p>
+<p><strong>Tips.</strong> Pick a model that supports tool calling; one that does not will answer in prose and never call anything. Keep tool names short and descriptions honest, because the model chooses from the description alone.</p>
+<h3 id="use-the-microsoft-agent-framework-with-your-documents">Use the Microsoft Agent Framework with your documents<a class="anchor-link" href="#use-the-microsoft-agent-framework-with-your-documents">#</a></h3>
+<p>The <code>TechieRag.Agents</code> package builds a ready-made agent on Microsoft's Agent Framework that knows how to search your documents, decide whether the results are strong enough, and cite what it used.</p>
+<ol>
+<li>Add the <code>TechieRag.Agents</code> package and ingest at least one document containing a fact you can ask about.
+</li>
+<li>Create <code>new TechieRagAgentBuilder(rag)</code>, pointing it at your TechieRag instance. Choose the model with <code>UseLmStudio("http://localhost:1234", "qwen3-8b")</code>, or call <code>UseConfiguredLlm()</code> to reuse whatever model your TechieRag instance already has. Call <code>Build()</code>.
+</li>
+<li>Call <code>agent.AskAsync("your question")</code>. The result has three parts: <code>Answer</code>, with references like [S1] and [S2] inside the text; <code>Sources</code>, the passages those references point at, with document name, page and score; and <code>Searches</code>, a record of each search the agent ran and whether it judged the result strong, weak or empty.
+</li>
+<li>To show the answer as it is written, loop over <code>AskStreamAsync</code>. You receive the sources first, then the text piece by piece, then a final event with token usage.
+</li>
+<li>Give the agent your own tools with <code>WithToolHandler(registry)</code>, and see each step with <code>WithTrace(progress)</code>: a tool requested, a tool run, a final answer.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/chat.png" alt="Use the Microsoft Agent Framework with your documents" style="max-width:100%"></p>
+<p><strong>Tips.</strong> Ask one question at a time on a traced agent. The [S1] numbering lives with the agent session in memory, so a session you save and restore starts again at [S1]. If the agent asks for approval before an action, the request is surfaced to you but you resume it yourself.</p>
+<h3 id="run-a-language-model-on-the-device-with-no-server">Run a language model on the device, with no server<a class="anchor-link" href="#run-a-language-model-on-the-device-with-no-server">#</a></h3>
+<p>The <code>TechieRag.Local</code> package runs a small language model inside your app. There is no server to host, no key to manage, and after a single download it works with the network off.</p>
+<ol>
+<li>Add the <code>TechieRag.Local</code> package and call <code>UseLocalLlm()</code> on the builder, next to <code>UseEmbedded()</code> and <code>UseSqliteVec("app.db")</code>.
+</li>
+<li>Let the user accept the model's licence: pass <code>UseLocalLlm(o =&gt; o.ConfirmTermsAsync = (terms, ct) =&gt; ShowTermsDialogAsync(terms))</code>. The dialog receives the licence name, its web address and the download size before a single byte is fetched. If nobody accepts, nothing downloads.
+</li>
+<li>Call <code>AskAsync("What does TechieRag do?")</code>. On a phone the default is Qwen2.5 0.5B, a 333 MB download; on a desktop it is Phi-3 mini, 2.7 GB. Each file is checked against its fingerprint as it lands.
+</li>
+<li>Ask again with the network off: the answer comes from the device. Stream it with <code>ChatStreamEventsAsync</code>, or ask for a typed answer with <code>CompleteAsync&lt;MyDto&gt;</code>.
+</li>
+<li>Want a different model? Call <code>UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))</code> with any public ONNX Runtime GenAI model's name. Its licence and size reach your dialog the same way.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="Run a language model on the device, with no server" style="max-width:100%"></p>
+<p><strong>Tips.</strong> Before loading, TechieRag compares free memory with what the model needs and refuses politely with <code>LocalModelMemoryException</code>, naming the shortfall, rather than letting the system kill your app. A prompt longer than the model's window is refused up front too. Expect about 100 tokens a second for the phone model on a recent phone and 7 to 70 for Phi-3 mini on desktops.</p>
+<h3 id="embed-and-search-offline-on-phones-and-desktops">Embed and search offline on phones and desktops<a class="anchor-link" href="#embed-and-search-offline-on-phones-and-desktops">#</a></h3>
+<p>The <code>TechieRag.Embedded</code> package turns text into vectors on the device, so search works without any embedding service.</p>
+<ol>
+<li>Add the package and build with <code>UseEmbedded().UseSqliteVec("app.db")</code>. On Windows, macOS and Mac Catalyst you get bge-m3 (1024 dimensions, 2.3 GB, many languages); on Android and iOS you get all-MiniLM-L6-v2 (384 dimensions, 91 MB, English).
+</li>
+<li>Before the first <code>InitializeAsync()</code>, subscribe to <code>ModelDownloadService.Instance.DownloadSizeKnown</code>. It fires once, with the bytes still to fetch, before the download starts. If the device is on mobile data, set <code>e.Decline = true</code> and the call stops with <code>ModelDownloadDeclinedException</code>; ask again later on Wi-Fi.
+</li>
+<li>Subscribe to <code>ProgressChanged</code> to show a bar: it reports bytes downloaded of the total.
+</li>
+<li>Call <code>InitializeAsync()</code>, then <code>EmbedAsync("hello")</code> to confirm a vector comes back. Ingest and <code>SearchAsync</code> as usual.
+</li>
+<li>Turn the network off and initialise again: no request goes out, because the files are on disk.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/probe-ios-simulator-embed.png" alt="Embed and search offline on phones and desktops" style="max-width:100%"></p>
+<p><strong>Tips.</strong> Models live in the app's own data area on every platform (never in the user's Documents); move them with <code>UseModelRoot(path)</code> before the first load. A download interrupted half way resumes from where it stopped on the next initialise. Asking for bge-m3 on a phone is refused, naming the 2.3 GB it would cost. Vectors from the two models are not comparable, so a store built with one model is re-embedded if you switch.</p>
+<h3 id="sign-in-with-a-chatgpt-subscription-instead-of-an-api-key">Sign in with a ChatGPT subscription instead of an API key<a class="anchor-link" href="#sign-in-with-a-chatgpt-subscription-instead-of-an-api-key">#</a></h3>
+<p>If your users already pay for ChatGPT, they can use that plan with your app. Your app opens the browser and shows a short code; the user approves, and calls are billed to their subscription.</p>
+<ol>
+<li>Check the subscription can be used this way: in ChatGPT, under Settings and Security, device-code sign-in must be on. Business and Enterprise accounts need their admin's consent.
+</li>
+<li>Build with <code>UseChatGptSubscriptionLlm((prompt, ct) =&gt; { OpenBrowser(prompt.VerificationUri); ShowCode(prompt.UserCode); return Task.CompletedTask; })</code>. Your app opens the browser and displays the code; TechieRag never opens anything itself.
+</li>
+<li>Call <code>AskAsync("What does TechieRag do?")</code>. The callback fires with the sign-in page and a one-time code. The user types the code in the browser and approves. The answer then arrives as normal.
+</li>
+<li>To avoid asking every launch, pass <code>new ChatGptSubscriptionOptions { SessionStore = mySecureStore }</code> so the session is kept somewhere safe on the device. On restart nothing is asked.
+</li>
+<li>Pick a model with <code>ChatGptSubscriptionOptions.Model</code>, or route by name with <code>chatgpt-subscription/&lt;model&gt;</code>.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sign in with a ChatGPT subscription instead of an API key" style="max-width:100%"></p>
+<p><strong>Tips.</strong> Only ChatGPT permits this today. The catalogue lists six subscription vendors (ChatGPT, Claude, Gemini, Grok, Groq and Meta) with each vendor's terms and the date they were checked; asking for a vendor that forbids it, for example a Claude subscription, fails immediately with <code>SubscriptionNotPermitted</code> and the vendor's own wording. Keep the session store encrypted; it holds a credential.</p>
+<h3 id="watch-usage-and-set-a-budget">Watch usage and set a budget<a class="anchor-link" href="#watch-usage-and-set-a-budget">#</a></h3>
+<p>Every call to a language model costs tokens, and paid providers charge for them. TechieRag counts them for you and can warn before a bill grows.</p>
+<ol>
+<li>Add <code>WithUsageTracking(u =&gt; u.MaxCostUsd = 0.10m)</code> to the builder, choosing the ceiling you are comfortable with for a session.
+</li>
+<li>Ask a few questions, or run an agent loop. Each answer carries its own usage: input tokens, output tokens and an estimated cost for the model that served it.
+</li>
+<li>Call <code>rag.GetTokenTracker().GetBudgetStatus()</code> whenever you like. It returns tokens used so far, cost so far, the ceiling, and how close you are to it. Show it on a dashboard or a status bar.
+</li>
+<li>As the total nears the ceiling an alert fires; handle it by warning the user, switching to a cheaper model, or stopping.
+</li>
+<li>To see the same numbers in your monitoring stack, add the <code>TechieRag.Telemetry</code> package and call <code>services.AddTechieRagTelemetry(o =&gt; { o.EnableTracing = true; o.Endpoint = "http://localhost:4318"; })</code>. Traces and counters flow to any collector that accepts the standard format.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/token-usage.png" alt="Watch usage and set a budget" style="max-width:100%"></p>
+<p><strong>Tips.</strong> Local models and self-hosted servers cost nothing, so their usage shows tokens with a zero price. Streaming agent runs report usage summed over every step, not just the last answer. Reset the session counter when a new user signs in so one person's questions do not count against another's budget.</p>
+<h3 id="try-it-on-your-own-devices-with-the-probe-app">Try it on your own devices with the probe app<a class="anchor-link" href="#try-it-on-your-own-devices-with-the-probe-app">#</a></h3>
+<p>The probe is a tiny sample app with four heads: Windows, Mac Catalyst, Android and iOS. One screen proves the packages work on the hardware in your hand.</p>
+<ol>
+<li>Build and start the head you want. The screen shows the platform, the embedding model chosen for it, and where models are stored.
+</li>
+<li>Press <strong>Embed, store, search</strong>. The first press downloads the embedding model (2.3 GB on a desktop, 91 MB on a phone), so use Wi-Fi. It embeds three sentences, stores them, searches "What is the capital of France?" and shows the winner.
+</li>
+<li>A pass reads <strong>Done</strong> with the top result "Paris is the capital city of France." and four timings: load, embed, store and search. Press again for warm timings without the download.
+</li>
+<li>Press <strong>Generate one sentence</strong>. Accept the licence in the dialog; the local model downloads once (333 MB on a phone, 2.7 GB on a desktop), writes a sentence about the sea and shows load time, time to first token, tokens per second and peak memory.
+</li>
+<li>The result line at the bottom is also written to the console and to a text file in the app's data folder.
+</li>
+</ol>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-embed.png" alt="Try it on your own devices with the probe app" style="max-width:100%"></p>
+<p><strong>Tips.</strong> A Galaxy S23 answered at about 112 tokens a second on the phone model; an M4 Mac reached about 70 on Phi-3 mini. The iPhone needs one-time Apple steps (an Apple ID in Xcode, Developer Mode, a signing profile) described in the iPhone setup guide; the simulator needs none.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="anchor-link" href="#troubleshooting">#</a></h2>
+<ul>
+<li><strong>The first call takes minutes and shows no answer.</strong> A model is downloading: 2.3 GB for desktop embeddings, 91 MB on a phone, 333 MB or 2.7 GB for the local language model. Subscribe to the download events to show progress; the second call is fast.
+</li>
+<li><strong>A phone refuses the big embedding model.</strong> bge-m3 is 2.3 GB and is only offered on Windows and Mac. Phones get all-MiniLM-L6-v2; asking for the big one on a phone fails on purpose with a message naming the size.
+</li>
+<li><strong>The local model will not load and mentions memory.</strong> TechieRag measured free memory and found less than the model needs. Close other apps, or choose the smaller Qwen2.5 0.5B model; your app keeps running either way.
+</li>
+<li><strong>Nothing downloads and the message mentions terms.</strong> Nobody accepted the model's licence. Provide the terms dialog or set the terms as accepted in your options.
+</li>
+<li><strong>A download stopped half way.</strong> Start again; it resumes from the partial file rather than from zero. A file whose fingerprint does not match is fetched again.
+</li>
+<li><strong>On an Intel Mac the local model reports the platform is not supported.</strong> The on-device engine ships no Intel Mac build. Use an Apple Silicon Mac, or point the app at a server model instead.
+</li>
+<li><strong>Off Wi-Fi the download was declined and now nothing works.</strong> Your own handler set the decline flag. Ask again once on Wi-Fi; the size event fires each time until the files are present.
+</li>
+<li><strong>Subscription sign-in fails with "not permitted".</strong> Only ChatGPT allows subscription use through an app; Claude, Gemini, Grok, Groq and Meta forbid it in their terms, and the error carries the vendor's wording. Use an API key for those.
+</li>
+<li><strong>The browser code page never appears.</strong> Your callback must open the browser and show the code itself; TechieRag only hands you the address and the code. Also check device-code sign-in is on in the ChatGPT security settings.
+</li>
+<li><strong>A connector run stopped early.</strong> It reached a limit you set (bytes, items or pages). The result carries a limit code and the sync state is kept, so the next run continues where it stopped.
+</li>
+<li><strong>Search is slow on a very large store.</strong> SQLite search is an exact scan: about a quarter of a second at 50,000 chunks on a desktop. Past a few hundred thousand chunks move to pgvector or Qdrant.
+</li>
+<li><strong>Tool calls misbehave on Ollama or Gemini over several turns.</strong> Those two servers receive tool results in a slightly different shape and usually tolerate it; if a multi-turn tool chat fails there, try another provider for that feature.
+</li>
+<li><strong>Citation numbers restart at [S1] after restoring a session.</strong> Reference numbering lives in memory with the agent session; a reloaded session starts fresh. Keep the sources you already displayed.
+</li>
+<li><strong>The Android store rejects the app on Android 15 or newer.</strong> One of the local engine's libraries is not yet aligned for 16 KB pages; a store release waits on the engine's fix. Sideloaded and test builds run normally.
+</li>
+<li><strong>The iPhone build will not sign.</strong> The one-time Apple steps have not been done; follow the iPhone setup guide, then build again.
+</li>
+<li><strong>Models landed somewhere you did not expect.</strong> Every model goes to the app's own data area, never the user's Documents. Set the model root before the first load if you want them elsewhere, and set it once, in the same place, every launch.
+</li>
+<li><strong>The typed answer does not parse.</strong> Small local models sometimes wrap JSON in prose. Ask for the fields by name in the prompt, keep the type small, and retry once before giving up.
+</li>
+<li><strong>Two providers give different answers to the same tool call.</strong> Each model reads the tool description its own way. Tighten the description and the argument names until every provider you support picks the tool you meant.
+</li>
+</ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

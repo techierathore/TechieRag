@@ -3,16 +3,17 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 13 logged: 5 open, 8 fixed, 0 will not fix |
+| Count | 14 logged: 6 open, 8 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
 | Updated | 2026-09-25 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
-## Open (5)
+## Open (6)
 
 | Miss | Found | Whose gap | What went wrong |
 |---|---|---|---|
+| MISS-TechieRag-20260925-02 (REQ-FN-070) | 2026-09-25 by owner | the app's spec | The /techierag persona and the AI reference the package installs into a consumer's repository still describe v2 only; nothing about the local model, the agents package, typed streaming, subscription sign-in, Hugging Face models or the platform work. |
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 | MISS-TechieRag-20260924-05 (REQ-FN-062) | 2026-09-24 by agent-review | not sorted | The acceptance line for the vendor sign-in research row is a copy of the ChatGPT sign-in row, so it does not test that the research was recorded. |
 | MISS-TechieRag-20260924-04 (REQ-FN-055) | 2026-09-24 by agent-review | not sorted | BRD-90 lists the Sevak interpreter setting as ONNX Runtime wiring, but that setting belongs to Docker.DotNet, not ONNX Runtime. |

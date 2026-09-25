@@ -312,6 +312,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: MCP tools | 2 | 2 | 0 | Done |
 | Surface: Workspaces and memory | 8 | 8 | 0 | Done |
 | Surface: Reranking | 2 | 2 | 0 | Done |
+| Autodistribution | 1 | 0 | 1 | Planned |
 
 ## 6. Where the rest lives
 

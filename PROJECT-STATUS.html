@@ -124,13 +124,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
     <div class="subtitle">Rendered 2026-09-25 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *productguide TechieRag</div>
+      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *build-phase TechieRag</div>
     </div>
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
 <tr><th>last_updated</th><td>2026-09-25</td></tr>
-<tr><th>current_phase</th><td>Phase 2 of 2 · Handoff — 83 of 83 verified, 1 not applicable</td></tr>
+<tr><th>current_phase</th><td>Phase 2 of 2 · Build — 1 not built, 83 of 84 verified, 1 not applicable</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
 <tr><th>last_verified_date</th><td>2026-09-25</td></tr>
 </tbody>
@@ -149,19 +149,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 83 rows Verified; handoff ran on 2026-09-25 and the library is ready for UAT. The UsageGuide, both DevGuides (phase 1 and the new phase 2), the Architecture and the BRDs are current and rendered. The physical iPhone measurement is the one open item and waits on two owner steps.</p>
+<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). Handoff ran on 2026-09-25 with 83 rows Verified; the owner then found one miss: the AI reference and the two persona command files the package installs still describe v2. That is the one open row. Product Guide generated 2026-09-25: docs/TechieRag-ProductGuide.md (+ .html); 14 tasks, 12 screenshots.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<p>Manual UAT: open <code>docs/TechieRag-UsageGuide.md</code> and work through "How to test, screen by screen"; when it passes, set <code>current_phase: Released</code> in this file by hand. Optional afterwards, the end-user manual:</p>
 <p>Claude Code:</p>
-<pre><code>/TechieFlow:agents:flow-master *productguide TechieRag</code></pre>
+<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag</code></pre>
 <p>OpenCode:</p>
-<pre><code>/flow-master *productguide TechieRag</code></pre>
-<p>Why: every row is Verified and handoff has run; what remains is your own test pass per the UsageGuide.</p>
+<pre><code>/flow-master *build-phase TechieRag</code></pre>
+<p>Why: 1 rows are not built yet: REQ-FN-070; working docs/TechieRag-P2-Checklist.md.</p>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
 <thead><tr><th>Status</th><th>Count</th></tr></thead>
 <tbody>
-<tr><td>Not Started</td><td>0</td></tr>
+<tr><td>Not Started</td><td>1</td></tr>
 <tr><td>In Progress</td><td>0</td></tr>
 <tr><td>Implemented</td><td>0</td></tr>
 <tr><td>Needs re-verify</td><td>0</td></tr>
@@ -169,11 +168,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <ul>
-<li>None
+<li>[ ] REQ-FN-070 — F-AUTODIST: the shipped AI reference and the two persona command files describe every phase-2 feature with one call example each (Not Started)
 </li>
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
+<li>🔶 <strong>REQ-FN-070:</strong> new row with no BRD item yet (BRD-pending); the build can start from the checklist row, and the analyst's <code>*amend-docs</code> gives it its BRD item.
+</li>
 <li>🔶 <strong>iPhone run (REQ-FN-060):</strong> the iPhone 17 Pro is connected and its device build passes, but Developer Mode is off on the phone and no Apple ID is signed in to Xcode. Steps: <code>docs/TechieRag-iPhone-Setup.md</code>. Then paste <code>record the iPhone probe run for REQ-FN-060</code>.
 </li>
 <li>🔶 <strong>BRD §9 platform matrix:</strong> the phase-1 BRD's Windows and Mac Catalyst cells for <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Local</code> should say "tested", as the UsageGuide does. Fix with the analyst's <code>*amend-docs</code>.
@@ -188,11 +189,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-09-25</td><td>build-phase</td><td>78/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-09-25</td><td>build-phase</td><td>81/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-09-25</td><td>build-phase</td><td>81/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-09-25</td><td>build-phase</td><td>83/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-09-25</td><td>handoff-phase</td><td>83/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-09-25</td><td>log-miss</td><td>83/84 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>

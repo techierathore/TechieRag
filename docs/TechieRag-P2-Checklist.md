@@ -98,6 +98,7 @@ Deliver phase 2 of `docs/TechieRag-P2-BRD.md`: the agents package and repository
 | REQ-RAG-107 | `YouTubeTranscriptReader`, `YouTubeUrl`, the YouTube entry point in `WebIngestionExtensions` and their tests (including `Web/Live/LiveYouTubeTranscriptTests.cs` | Verified | 100% | 2026-09-25 verify: PASS — test REQ-RAG-107 SourceHasNoYouTubeTypeOrEntryPoint | [view](#d-req-rag-107) |
 | REQ-FN-069 | The UsageGuide's Platform notes shall carry the owner's step-by-step runbook for the probe app: how to build and deploy it to a Mac, an Android phone and an iPh | Verified | 100% | 2026-09-25 verify: PASS — test REQ-FN-069 UsageGuideHasANumberedProbeRunbookPerDevice | [view](#d-req-fn-069) |
 | REQ-RAG-108 | F-LOCAL-LLM: `LocalModel.FromHuggingFace(repository, folder, version)` runs any ONNX Runtime GenAI model on Hugging Face by name, licence first, every file checked; phone default stays our own Qwen on the owner's account | Verified | 100% | 2026-09-25 verify: PASS — test REQ-RAG-108 MessagesForOwnTemplateAlternate | [view](#d-req-rag-108) |
+| REQ-FN-070 | F-AUTODIST: the shipped AI reference and the two persona command files describe every phase-2 feature with one call example each | Not Started | 0% | logged via *log-miss 2026-09-25 | [d](#d-req-fn-070) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`. `Owner-UAT` marks a row only the owner can close, by following the UsageGuide test plan; the verifier cannot reach it from this machine.
 
@@ -465,3 +466,9 @@ Deliver phase 2 of `docs/TechieRag-P2-BRD.md`: the agents package and repository
 - **REQ-RAG-098** — A developer can switch reranking per call through `SearchOptions.Rerank` and set the default with `WithRerankEnabledByDefault`; the workspace flag is authoritat. *BRD:* BRD-145. *Phase 2.*
   - *Acceptance:* When a developer passes `SearchOptions.Rerank = false` on a rerank-by-default instance, then that search skips the reranker.
 
+
+
+## Autodistribution
+
+- <a id="d-req-fn-070"></a> **REQ-FN-070** (BRD-pending) F-AUTODIST: the shipped AI reference and the two persona command files describe every phase-2 feature with one call example each
+  - *Acceptance:* When a consumer builds with the new package and opens the installed AI reference, then every phase-2 package and builder method is described with one call example.

@@ -31,7 +31,7 @@ bash .tfcore/utils/tf-build.sh test tests/TechieRag.Tests/TechieRag.Tests.csproj
 dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-local.1
 ```
 
-There is no URL to open: the library is exercised through its tests, through `samples/TechieRag.Probe` (Platform notes) and through the consuming apps Sevak and MyDiary.
+There is no URL to open: the library is exercised through its tests, `samples/TechieRag.Probe` (Platform notes) and the consuming apps Sevak and MyDiary.
 
 ## How to test, screen by screen
 
@@ -202,7 +202,7 @@ Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Ca
 
 ### Local model: engine comparison on the Windows laptop (2026-09-24)
 
-Both engines directly on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB) before the owner chose one (`DECISIONS.md` 2026-09-25). Same prompt, greedy, 128 tokens, three runs per row on a shared host. Raw JSON: `tests/.artifacts/local-llm-bench/`.
+Both engines on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB) before the owner chose one (`DECISIONS.md` 2026-09-25). Same prompt, greedy, 128 tokens, three runs per row. Raw JSON: `tests/.artifacts/local-llm-bench/`.
 
 | Platform | Model | Engine | Load (s) | First token (s) | Tokens per second | Peak memory |
 |---|---|---|---|---|---|---|
@@ -348,7 +348,7 @@ One call per public service:
 | Workspaces and threads | `builder.WithPersistence(StoreProvider.Sqlite, "Data Source=ws.db"); var ws = rag.GetWorkspaceManager()!;` |
 | Reranking | `builder.WithReranker(RerankSource.LocalOnnx); await rag.SearchAsync("q", new SearchOptions { Rerank = true });` |
 | Connectors | `await ConnectorRunner.RunAsync(new RepositoryConnector(options), rag, runOptions);` |
-| Web ingestion | `await rag.IngestUrlAsync("https://…"); await rag.CrawlAsync("https://…", new WebCrawlOptions { MaxDepth = 1 });` |
+| Web ingestion | `var fetcher = new HttpWebContentFetcher(); await rag.IngestUrlAsync("https://…", fetcher); await rag.IngestSiteAsync("https://…", fetcher, new WebCrawlOptions { MaxDepth = 1 });` |
 | Token tracking | `var status = rag.GetTokenTracker().GetBudgetStatus();` |
 | Telemetry | `services.AddTechieRagTelemetry(o => { o.EnableTracing = true; o.Endpoint = "http://localhost:4318"; });` |
 | Local model | `builder.UseLocalLlm(o => o.ConfirmTermsAsync = (terms, ct) => AskUserAsync(terms.LicenceName, terms.TermsUrl));` or `UseLocalLlm("qwen2.5-0.5b-instruct")` or `UseLocalLlm(new DirectoryInfo(folder), LocalChatTemplate.ChatMl)`; `LocalLlm.Register()` for `LlmSource.Local` and `local/<model>` |

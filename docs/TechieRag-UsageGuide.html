@@ -208,7 +208,7 @@ dotnet build TechieRag.slnx --configuration Release
 dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release
 bash .tfcore/utils/tf-build.sh test tests/TechieRag.Tests/TechieRag.Tests.csproj
 dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-local.1</code></pre>
-<p>There is no URL to open: the library is exercised through its tests, through <code>samples/TechieRag.Probe</code> (Platform notes) and through the consuming apps Sevak and MyDiary.</p>
+<p>There is no URL to open: the library is exercised through its tests, <code>samples/TechieRag.Probe</code> (Platform notes) and the consuming apps Sevak and MyDiary.</p>
 <h2 id="how-to-test-screen-by-screen">How to test, screen by screen<a class="anchor-link" href="#how-to-test-screen-by-screen">#</a></h2>
 <h3 id="ingestion">Ingestion<a class="anchor-link" href="#ingestion">#</a></h3>
 <ul>
@@ -467,7 +467,7 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 </table>
 <p>Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Catalyst and iOS, the probe's peak physical footprint (matches <code>footprint &lt;pid&gt;</code>, what the iOS limit counts). First token includes reading the prompt. Ranges span a run after the download and a fresh launch; the laptop and its emulator share one host, so speeds vary with load. Evidence: <code>tests/.artifacts/probe/</code> (per head) and <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <h3 id="local-model-engine-comparison-on-the-windows-laptop-2026-09-24">Local model: engine comparison on the Windows laptop (2026-09-24)<a class="anchor-link" href="#local-model-engine-comparison-on-the-windows-laptop-2026-09-24">#</a></h3>
-<p>Both engines directly on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB) before the owner chose one (<code>DECISIONS.md</code> 2026-09-25). Same prompt, greedy, 128 tokens, three runs per row on a shared host. Raw JSON: <code>tests/.artifacts/local-llm-bench/</code>.</p>
+<p>Both engines on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB) before the owner chose one (<code>DECISIONS.md</code> 2026-09-25). Same prompt, greedy, 128 tokens, three runs per row. Raw JSON: <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <table>
 <thead><tr><th>Platform</th><th>Model</th><th>Engine</th><th>Load (s)</th><th>First token (s)</th><th>Tokens per second</th><th>Peak memory</th></tr></thead>
 <tbody>
@@ -631,7 +631,7 @@ services.AddTechieRag(configuration.GetSection("TechieRag"));   // or the appset
 <tr><td>Workspaces and threads</td><td><code>builder.WithPersistence(StoreProvider.Sqlite, "Data Source=ws.db"); var ws = rag.GetWorkspaceManager()!;</code></td></tr>
 <tr><td>Reranking</td><td><code>builder.WithReranker(RerankSource.LocalOnnx); await rag.SearchAsync("q", new SearchOptions { Rerank = true });</code></td></tr>
 <tr><td>Connectors</td><td><code>await ConnectorRunner.RunAsync(new RepositoryConnector(options), rag, runOptions);</code></td></tr>
-<tr><td>Web ingestion</td><td><code>await rag.IngestUrlAsync("https://…"); await rag.CrawlAsync("https://…", new WebCrawlOptions { MaxDepth = 1 });</code></td></tr>
+<tr><td>Web ingestion</td><td><code>var fetcher = new HttpWebContentFetcher(); await rag.IngestUrlAsync("https://…", fetcher); await rag.IngestSiteAsync("https://…", fetcher, new WebCrawlOptions { MaxDepth = 1 });</code></td></tr>
 <tr><td>Token tracking</td><td><code>var status = rag.GetTokenTracker().GetBudgetStatus();</code></td></tr>
 <tr><td>Telemetry</td><td><code>services.AddTechieRagTelemetry(o =&gt; { o.EnableTracing = true; o.Endpoint = "http://localhost:4318"; });</code></td></tr>
 <tr><td>Local model</td><td><code>builder.UseLocalLlm(o =&gt; o.ConfirmTermsAsync = (terms, ct) =&gt; AskUserAsync(terms.LicenceName, terms.TermsUrl));</code> or <code>UseLocalLlm("qwen2.5-0.5b-instruct")</code> or <code>UseLocalLlm(new DirectoryInfo(folder), LocalChatTemplate.ChatMl)</code>; <code>LocalLlm.Register()</code> for <code>LlmSource.Local</code> and <code>local/&lt;model&gt;</code></td></tr>
