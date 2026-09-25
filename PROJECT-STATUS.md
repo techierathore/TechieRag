@@ -10,7 +10,7 @@ last_verified_date: 2026-09-25
 
 ## Where I am
 
-Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). 81 of 83 rows Verified. The phone model now downloads by default from the owner's Hugging Face repository, pinned to one commit. `PgVectorStore` is proven against the WinPostgre container. The local model is proven on Windows and the Android emulator. Two rows wait on the owner's next push and on real phones.
+Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). 81 of 83 rows Verified. The phone model now downloads by default from the owner's Hugging Face repository, pinned to one commit. `PgVectorStore` is proven against the WinPostgre container. The local model is proven on Windows and the Android emulator. CI's restore failure is fixed, pending a push; the Galaxy S23 ran the local model; an iPhone remains.
 
 ## Next command to run
 
@@ -40,8 +40,8 @@ Why: 2 rows are not built yet: REQ-FN-057, REQ-FN-060; working docs/TechieRag-P2
 
 ## Known blockers
 
-- 🔶 **REQ-FN-057:** the first CI run after your next push.
-- 🔶 **REQ-FN-060:** an Android phone and a physical iPhone (runbook in the UsageGuide Platform notes); the Android emulator numbers are recorded, but an emulator is not a phone.
+- 🔶 **REQ-FN-057:** the restore failure in CI run 36134404881 is fixed (`ProbeHead`); it needs the run page of your next push.
+- 🔶 **REQ-FN-060:** the Android phone (Galaxy S23) is recorded; only a physical iPhone run on the Mac remains.
 - 🔶 **BRD §9 platform matrix:** the Windows `TechieRag.Local` cell should now say "tested", as the UsageGuide does. Fix with the analyst's `*amend-docs`.
 - 🔶 **Owner git:** commit today's work.
 

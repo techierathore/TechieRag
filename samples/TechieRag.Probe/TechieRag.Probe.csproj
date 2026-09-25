@@ -13,6 +13,13 @@
   <PropertyGroup>
     <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
+    <!--
+      REQ-FN-057: -f picks the head to build, but restore still resolves every framework above, so a
+      Linux runner asks for the iOS SDK and a macOS runner for the Android workload. CI passes
+      -p:ProbeHead=<framework> to restore only that head. Not TargetFrameworks itself: a global
+      property flows into the referenced TechieRag projects and would retarget them too.
+    -->
+    <TargetFrameworks Condition="'$(ProbeHead)' != ''">$(ProbeHead)</TargetFrameworks>
 
     <OutputType>Exe</OutputType>
     <RootNamespace>TechieRag.Probe</RootNamespace>

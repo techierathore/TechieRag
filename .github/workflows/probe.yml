@@ -8,6 +8,9 @@
 # simulator so no signing identity is needed; a device build is the owner's runbook step
 # (UsageGuide, Platform notes).
 #
+# -p:ProbeHead restores only the head being built (TechieRag.Probe.csproj): without it a Linux
+# runner needs the iOS SDK and a macOS runner the Android workload just to restore.
+#
 # Separate from the publish-*.yml workflows on purpose: the probe is a sample, never packed.
 name: Probe (four heads)
 
@@ -36,7 +39,7 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui-windows
       - name: Build Windows head
-        run: dotnet build ${{ env.PROBE }} -f net10.0-windows10.0.19041.0 -c Debug
+        run: dotnet build ${{ env.PROBE }} -f net10.0-windows10.0.19041.0 -p:ProbeHead=net10.0-windows10.0.19041.0 -c Debug
       - name: Press the button (UI Automation bound to the probe's own window)
         shell: pwsh
         run: >
@@ -69,7 +72,7 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui-android
       - name: Build Android head
-        run: dotnet build ${{ env.PROBE }} -f net10.0-android -c Debug
+        run: dotnet build ${{ env.PROBE }} -f net10.0-android -p:ProbeHead=net10.0-android -c Debug
       - name: Locate APK
         id: apk
         run: echo "path=$(find samples/TechieRag.Probe/bin/Debug/net10.0-android -name '*-Signed.apk' | head -1)" >> "$GITHUB_OUTPUT"
@@ -113,7 +116,7 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui-maccatalyst
       - name: Build Mac Catalyst head
-        run: dotnet build ${{ env.PROBE }} -f net10.0-maccatalyst -c Debug
+        run: dotnet build ${{ env.PROBE }} -f net10.0-maccatalyst -p:ProbeHead=net10.0-maccatalyst -c Debug
 
   ios:
     name: iOS head (simulator)
@@ -128,7 +131,7 @@ jobs:
       - name: Install MAUI workload
         run: dotnet workload install maui-ios
       - name: Build iOS head for the simulator
-        run: dotnet build ${{ env.PROBE }} -f net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64
+        run: dotnet build ${{ env.PROBE }} -f net10.0-ios -p:ProbeHead=net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64
 
   report:
     name: Probe heads report

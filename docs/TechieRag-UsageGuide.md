@@ -174,14 +174,13 @@ Each cell reads **supported** (built for it, no recorded run there yet), **teste
 
 | Package | Windows | macOS / Mac Catalyst | Android | iOS |
 |---|---|---|---|---|
-| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | supported | supported ¹ | supported |
-| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | supported | supported ¹ | supported |
+| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | supported | tested (Galaxy S23, probe, 2026-09-25) | supported |
+| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | supported | tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25) | supported |
 | `TechieRag.Agents` | not supported ² | not supported ² | not supported ² | not supported ² |
-| `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | supported ³ | supported ³ |
+| `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³ | supported ³ |
 
-1. Android emulator run on 2026-09-24 (Pixel 5 profile, Android 12, x86_64): all-MiniLM-L6-v2 picked by default, files in the app's data folder, top result correct. An emulator is not a phone, so the cell waits for the owner's phone run.
 2. Being built (REQ-RAG-045).
-3. ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25); `TechieRag.Local.targets` adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native `dotnet test`) and the probe generated (2026-09-25). iOS and Android ran the probe on a **simulator** and an **emulator** only, so those cells wait for the owner's phones; the xUnit suite does not run on Android, so the probe run is its proof. Numbers: "Local model: measured per platform".
+3. ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25); `TechieRag.Local.targets` adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native `dotnet test`) and the probe generated (2026-09-25). Android: the probe generated on the owner's Galaxy S23, downloading from the default Hugging Face address (all six fingerprints matched); the xUnit suite does not run on Android. iOS ran on a **simulator** only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
 
 ### Local model: measured per platform (REQ-FN-060, BRD-108)
 
@@ -196,8 +195,8 @@ One real measurement per row, with device and date; change a row only from a rec
 | Mac Catalyst | owner's Mac (Apple M4 Max, 36 GB, macOS 27) | 2026-09-25 | Phi-3 mini 4k (Catalyst default) | probe app, second button, Debug build, through `TechieRag.Local`; two runs | 0.11–0.52 | 65–73 | 1.96–2.17 GB |
 | iOS (simulator) | iPhone 17 Pro simulator, iOS 26.1, on the owner's Mac (a simulator, not a device) | 2026-09-25 | Qwen2.5 0.5B (phone default, TechieRag's conversion) | probe app, second button, Debug build, through `TechieRag.Local` | 0.10 | 301 | 460 MB |
 | Windows 11 | Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB) | 2026-09-25 | Phi-3 mini 4k (desktop default) | probe app, second button, Debug build, through `TechieRag.Local`; a run just after the 2.7 GB download and a fresh launch | 0.26–0.32 | 7.4–12.9 | 3.41–3.44 GB |
-| Android (emulator) | Android emulator `pixel_5_-_api_32` (Pixel 5 profile, Android 12, x86_64, 2 GB RAM) on the Windows 11 laptop (an emulator, not a phone) | 2026-09-25 | Qwen2.5 0.5B (phone default, TechieRag's conversion) | probe app, second button, Debug build, through `TechieRag.Local`; a run just after the 333 MB download and a fresh launch | 0.41 | 22.5–43.2 | 737–775 MB |
-| Android | owner's Android phone | not yet run | — | — | — | — | — |
+| Android (emulator) | emulator `pixel_5_-_api_32` (Android 12, x86_64, 2 GB) on the Windows 11 laptop | 2026-09-25 | Qwen2.5 0.5B | probe, second button, Debug; after the download and a fresh launch | 0.41 | 22.5–43.2 | 737–775 MB |
+| Android | owner's Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2, 8 GB, Android 16) | 2026-09-25 | Qwen2.5 0.5B (phone default) | probe, second button, Debug; after the 333 MB download and two fresh launches | 0.06–0.10 | 112–114 | 703–763 MB |
 | iOS | owner's iPhone | not yet run | — | — | — | — | — |
 
 Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Catalyst and iOS, the probe's peak physical footprint (matches `footprint <pid>`, what the iOS limit counts). First token includes reading the prompt. Ranges span a run after the download and a fresh launch; the laptop and its emulator share one host, so speeds vary with load. Evidence: `tests/.artifacts/probe/` (per head) and `tests/.artifacts/local-llm-bench/`.
@@ -252,7 +251,7 @@ Recorded runs:
 | Windows | Windows 11 laptop (Mi NoteBook Pro) | 2026-09-24 | bge-m3 | Paris (0.796) | first press 149,242 (incl. 2.3 GB download) / 594 / 326 / 353; second run 21,271 / 1,361 / 330 / 345 | `tests/.artifacts/probe/windows-result*.txt`, `windows-probe*.png` |
 | Android | emulator, Pixel 5 profile, Android 12 x86_64 | 2026-09-24 | all-MiniLM-L6-v2 | Paris (0.824) | first press 113,914 (incl. 91 MB download) / 1,268 / 2,753 / 4,040; second press 0 / 1,334 / 208 / 217 | `tests/.artifacts/probe/android-*` |
 | Mac Catalyst | owner's Mac (Apple M4 Max) | 2026-09-25 | bge-m3 | Paris (0.796) | first press 107,208 (incl. 2.3 GB download) / 64 / 32 / 35; re-run 3,959 / 90 / 45 / 37 | `tests/.artifacts/probe/maccatalyst/` on the Mac |
-| Android | owner's phone | — | — | — | — | not run yet |
+| Android | owner's Galaxy S23 (Android 16) | 2026-09-25 | all-MiniLM-L6-v2 | Paris (0.824) | 8,243 / 53 / 122 / 222 | `tests/.artifacts/probe/android-phone-20260925/` |
 | iOS | owner's iPhone | — | — | — | — | not run yet |
 
 CI (`.github/workflows/probe.yml`, REQ-FN-057) builds all four heads on every push (Mac Catalyst and iOS on the macOS runner, iOS for the simulator), presses the button on the Windows runner through UI Automation and on an Android emulator through the `autorun` intent, and ends with a "Probe heads" table on the run page: each head built, failed or not run.

@@ -438,18 +438,16 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 <table>
 <thead><tr><th>Package</th><th>Windows</th><th>macOS / Mac Catalyst</th><th>Android</th><th>iOS</th></tr></thead>
 <tbody>
-<tr><td><code>TechieRag</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
-<tr><td><code>TechieRag.Embedded</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
+<tr><td><code>TechieRag</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24)</td><td>supported</td><td>tested (Galaxy S23, probe, 2026-09-25)</td><td>supported</td></tr>
+<tr><td><code>TechieRag.Embedded</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24)</td><td>supported</td><td>tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25)</td><td>supported</td></tr>
 <tr><td><code>TechieRag.Agents</code></td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td></tr>
-<tr><td><code>TechieRag.Local</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³</td><td>tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25)</td><td>supported ³</td><td>supported ³</td></tr>
+<tr><td><code>TechieRag.Local</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³</td><td>tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25)</td><td>tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³</td><td>supported ³</td></tr>
 </tbody>
 </table>
 <ol>
-<li>Android emulator run on 2026-09-24 (Pixel 5 profile, Android 12, x86_64): all-MiniLM-L6-v2 picked by default, files in the app's data folder, top result correct. An emulator is not a phone, so the cell waits for the owner's phone run.
-</li>
 <li>Being built (REQ-RAG-045).
 </li>
-<li>ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native <code>dotnet test</code>) and the probe generated (2026-09-25). iOS and Android ran the probe on a <strong>simulator</strong> and an <strong>emulator</strong> only, so those cells wait for the owner's phones; the xUnit suite does not run on Android, so the probe run is its proof. Numbers: "Local model: measured per platform".
+<li>ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native <code>dotnet test</code>) and the probe generated (2026-09-25). Android: the probe generated on the owner's Galaxy S23, downloading from the default Hugging Face address (all six fingerprints matched); the xUnit suite does not run on Android. iOS ran on a <strong>simulator</strong> only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
 </li>
 </ol>
 <h3 id="local-model-measured-per-platform-req-fn-060-brd-108">Local model: measured per platform (REQ-FN-060, BRD-108)<a class="anchor-link" href="#local-model-measured-per-platform-req-fn-060-brd-108">#</a></h3>
@@ -464,8 +462,8 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 <tr><td>Mac Catalyst</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k (Catalyst default)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code>; two runs</td><td>0.11–0.52</td><td>65–73</td><td>1.96–2.17 GB</td></tr>
 <tr><td>iOS (simulator)</td><td>iPhone 17 Pro simulator, iOS 26.1, on the owner's Mac (a simulator, not a device)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default, TechieRag's conversion)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code></td><td>0.10</td><td>301</td><td>460 MB</td></tr>
 <tr><td>Windows 11</td><td>Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB)</td><td>2026-09-25</td><td>Phi-3 mini 4k (desktop default)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code>; a run just after the 2.7 GB download and a fresh launch</td><td>0.26–0.32</td><td>7.4–12.9</td><td>3.41–3.44 GB</td></tr>
-<tr><td>Android (emulator)</td><td>Android emulator <code>pixel_5_-_api_32</code> (Pixel 5 profile, Android 12, x86_64, 2 GB RAM) on the Windows 11 laptop (an emulator, not a phone)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default, TechieRag's conversion)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code>; a run just after the 333 MB download and a fresh launch</td><td>0.41</td><td>22.5–43.2</td><td>737–775 MB</td></tr>
-<tr><td>Android</td><td>owner's Android phone</td><td>not yet run</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>Android (emulator)</td><td>emulator <code>pixel_5_-_api_32</code> (Android 12, x86_64, 2 GB) on the Windows 11 laptop</td><td>2026-09-25</td><td>Qwen2.5 0.5B</td><td>probe, second button, Debug; after the download and a fresh launch</td><td>0.41</td><td>22.5–43.2</td><td>737–775 MB</td></tr>
+<tr><td>Android</td><td>owner's Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2, 8 GB, Android 16)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default)</td><td>probe, second button, Debug; after the 333 MB download and two fresh launches</td><td>0.06–0.10</td><td>112–114</td><td>703–763 MB</td></tr>
 <tr><td>iOS</td><td>owner's iPhone</td><td>not yet run</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
 </tbody>
 </table>
@@ -526,7 +524,7 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 <tr><td>Windows</td><td>Windows 11 laptop (Mi NoteBook Pro)</td><td>2026-09-24</td><td>bge-m3</td><td>Paris (0.796)</td><td>first press 149,242 (incl. 2.3 GB download) / 594 / 326 / 353; second run 21,271 / 1,361 / 330 / 345</td><td><code>tests/.artifacts/probe/windows-result*.txt</code>, <code>windows-probe*.png</code></td></tr>
 <tr><td>Android</td><td>emulator, Pixel 5 profile, Android 12 x86_64</td><td>2026-09-24</td><td>all-MiniLM-L6-v2</td><td>Paris (0.824)</td><td>first press 113,914 (incl. 91 MB download) / 1,268 / 2,753 / 4,040; second press 0 / 1,334 / 208 / 217</td><td><code>tests/.artifacts/probe/android-*</code></td></tr>
 <tr><td>Mac Catalyst</td><td>owner's Mac (Apple M4 Max)</td><td>2026-09-25</td><td>bge-m3</td><td>Paris (0.796)</td><td>first press 107,208 (incl. 2.3 GB download) / 64 / 32 / 35; re-run 3,959 / 90 / 45 / 37</td><td><code>tests/.artifacts/probe/maccatalyst/</code> on the Mac</td></tr>
-<tr><td>Android</td><td>owner's phone</td><td>—</td><td>—</td><td>—</td><td>—</td><td>not run yet</td></tr>
+<tr><td>Android</td><td>owner's Galaxy S23 (Android 16)</td><td>2026-09-25</td><td>all-MiniLM-L6-v2</td><td>Paris (0.824)</td><td>8,243 / 53 / 122 / 222</td><td><code>tests/.artifacts/probe/android-phone-20260925/</code></td></tr>
 <tr><td>iOS</td><td>owner's iPhone</td><td>—</td><td>—</td><td>—</td><td>—</td><td>not run yet</td></tr>
 </tbody>
 </table>

@@ -41,6 +41,19 @@ public class ProbeAppStructureTests
     }
 
     /// <summary>
+    /// REQ-FN-057: <c>ProbeHead</c> narrows the probe to the one head being built, so CI restores
+    /// that head alone and a Linux or macOS runner never needs another platform's workload.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-057 ProbeHeadNarrowsRestoreToOneHead")]
+    public void ProbeHeadNarrowsRestoreToOneHead()
+    {
+        var narrowed = LoadProject().Descendants("TargetFrameworks").Last();
+
+        Assert.Equal("$(ProbeHead)", narrowed.Value);
+        Assert.Equal("'$(ProbeHead)' != ''", (string?)narrowed.Attribute("Condition"));
+    }
+
+    /// <summary>
     /// REQ-FN-055 / REQ-FN-056: the probe writes no ONNX Runtime wiring of its own. No
     /// <c>NativeReference</c>, no <c>AndroidLibrary</c>, no ONNX Runtime package reference; the one
     /// import is <c>TechieRag.Embedded</c>'s own buildTransitive targets, which a NuGet consumer gets

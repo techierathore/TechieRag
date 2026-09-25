@@ -39,7 +39,7 @@ public class ProbeWorkflowTests
         {
             var body = Job(yaml, job);
             Assert.False(string.IsNullOrEmpty(body), $"No '{job}' job in {Workflow}.");
-            Assert.Contains($"dotnet build ${{{{ env.PROBE }}}} -f {framework}", body, StringComparison.Ordinal);
+            Assert.Contains($"dotnet build ${{{{ env.PROBE }}}} -f {framework} -p:ProbeHead={framework}", body, StringComparison.Ordinal);
             Assert.DoesNotMatch(new Regex(@"^    if:", RegexOptions.Multiline), body);
         }
 
