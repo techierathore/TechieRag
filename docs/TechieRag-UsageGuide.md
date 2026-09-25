@@ -21,7 +21,7 @@ The library has no users of its own. Tests and smoke runs use credentials from t
 
 ## Execution guide
 
-Prerequisites: .NET 10 SDK (the harness bridges to the Windows SDK from WSL through `bash .tfcore/utils/tf-build.sh`); Ollama with `bge-m3` pulled for the Ollama examples; nothing else.
+Prerequisites: .NET 10 SDK (`bash .tfcore/utils/tf-build.sh` finds it on any host); Ollama with `bge-m3` pulled for the Ollama examples; the MAUI workloads only for `samples/TechieRag.Probe`.
 
 ```
 dotnet restore TechieRag.slnx
@@ -31,7 +31,7 @@ bash .tfcore/utils/tf-build.sh test tests/TechieRag.Tests/TechieRag.Tests.csproj
 dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-local.1
 ```
 
-There is no URL to open: the library is exercised through its tests and through a consuming app (Sevak, MyDiary, or the planned `samples/TechieRag.Probe`).
+There is no URL to open: the library is exercised through its tests, through `samples/TechieRag.Probe` (Platform notes) and through the consuming apps Sevak and MyDiary.
 
 ## How to test, screen by screen
 
@@ -56,7 +56,7 @@ There is no URL to open: the library is exercised through its tests and through 
 ### Configuration and DI
 - **Sign in as:** user 1
 - **Steps:** 1) put a `TechieRag` section in an `appsettings.json` with embedding, vector store and LLM values 2) call `services.AddTechieRag(configuration.GetSection("TechieRag"))` and resolve `ITechieRag` 3) change only the vector store type in the file and resolve again
-- **Expected:** the instance uses the configured providers; the second resolution uses the new store with no code change. Known gap: `VectorStore.ApiKey` and the `Prompt` section are not mapped yet (REQ-FN-066).
+- **Expected:** the instance uses the configured providers, including `VectorStore.ApiKey` and the `Prompt` section; the second resolution uses the new store with no code change.
 - **Covers:** REQ-FN-001, REQ-FN-066
 
 ### Embedded package
@@ -134,7 +134,7 @@ There is no URL to open: the library is exercised through its tests and through 
 ### Packaging and publishing
 - **Sign in as:** user 1 (maintainer)
 - **Steps:** 1) `dotnet pack` the three packages with `-p:Version=1.0.8-local.1` into `./local-feed` 2) `unzip -l` each `.nupkg` 3) dispatch `publish-nuget.yml` with `dry_run` true against `main`
-- **Expected:** `TechieRag`, `TechieRag.Embedded` and (once REQ-FN-065 lands) `TechieRag.Telemetry` pack with README, `buildTransitive` targets and symbols; the dry run derives a version and stops before pushing.
+- **Expected:** `TechieRag`, `TechieRag.Embedded`, `TechieRag.Telemetry`, `TechieRag.Local` and `TechieRag.Agents` pack with README, `buildTransitive` targets and symbols; the dry run derives a version and stops before pushing.
 - **Covers:** REQ-FN-003, REQ-FN-004, REQ-FN-005, REQ-FN-065, REQ-FN-067
 
 ## Automated tests
@@ -151,14 +151,13 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 ```
 `TechieRag.Local.Tests` runs the runtime-neutral conformance suite (`LocalLlmConformanceTests`) against a scripted runtime, plus the provider, template, stop-sequence, memory, registration and catalog tests, and the download tests against a loopback HTTP server. Its three live tests (`LiveLocalLlmTests`, collection `LiveLocalLlm`, one at a time) skip with a printed reason until the platform has a runtime and the model is downloaded; they never download.
 `TechieRag.Agents.Tests` (28 methods on 2026-09-24) runs the Agent Framework builder and the four seam adapters against a scripted `IChatClient` and a real `TechieRagClient`; its two LM Studio tests skip with a reason unless `TechieRagLiveLmStudioModel` names a loaded tool-capable model.
-About 634 xUnit test methods across processors, providers, stores, agent loop, orchestration, MCP, connectors, web, persistence, reranking, telemetry and packaging; 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-24 through the build ladder.
+1,097 xUnit tests across the three test projects (930 core, 141 local model, 26 agents); 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-25 through the build ladder.
 
 ## Known limitations
 
-- Every vector store is constructed with 1024 dimensions; Cohere, OpenAI and Gemini embedders need REQ-RAG-106 before pgvector or Qdrant can hold their vectors.
 - SQLite search is an exact managed scan by design (no sqlite-vec, no approximate index): about 0.24 s at 50,000 chunks of 1024 dimensions on a desktop (Platform notes). Past a few hundred thousand chunks use pgvector or Qdrant.
-- `AddTechieRag(IConfiguration)` drops `VectorStore.ApiKey`, embedding `Dimensions`, `ApiFormat`, `ApiPath`, `RequestDelayMs` and the `Prompt` section (REQ-FN-066).
-- `TechieRag.Telemetry` is not published by any workflow yet (REQ-FN-065).
+- ONNX Runtime's and ONNX Runtime GenAI's NuGet packages link nothing on Mac Catalyst; TechieRag's own build targets add the link (ORT-001, ORTGENAI-001, `docs/TechieRag-OnnxRuntime-Feedback.md`, `docs/TechieRag-OnnxRuntimeGenAI-Feedback.md`).
+- GenAI's Android library `libmat.so` is not aligned for 16 KB pages; a store release for Android 15+ waits on GenAI's fix (ORTGENAI-002).
 - Web page and site-crawl ingestion are the web routes; transcript ingestion was removed by owner decision on 2026-09-24 (REQ-RAG-076 N/A, code deleted under BRD-164).
 - The email connector has only been exercised against mbox files, not a live IMAP server (REQ-RAG-081).
 - The probe's Mac Catalyst and iOS heads ran on 2026-09-25 on the owner's Mac (Mac Catalyst and the iPhone 17 Pro simulator), and the Android head on the owner's Galaxy S23 the same day; a physical iPhone has not run it yet (runbook step 1 is the owner's).
@@ -174,8 +173,8 @@ Each cell reads **supported** (built for it, no recorded run there yet), **teste
 
 | Package | Windows | macOS / Mac Catalyst | Android | iOS |
 |---|---|---|---|---|
-| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | supported | tested (Galaxy S23, probe, 2026-09-25) | supported |
-| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | supported | tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25) | supported |
+| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, 2026-09-25) | tested (Galaxy S23, probe, 2026-09-25) | supported |
+| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, bge-m3, 2026-09-25) | tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25) | supported |
 | `TechieRag.Agents` | not supported ² | not supported ² | not supported ² | not supported ² |
 | `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³ | supported ³ |
 
@@ -284,9 +283,9 @@ Run every command from the repository root. Each head needs the .NET 10 SDK and 
 
 **iPhone**
 
-1. Once, on the Mac: sign Xcode in to your Apple ID (Xcode, Settings, Accounts); `sudo dotnet workload install maui-ios`; connect the iPhone by USB, trust the Mac, and turn on Developer Mode (Settings, Privacy and Security). In Xcode create any iOS app with bundle identifier `com.techierathore.techierag.probe` and run it once on the phone: that creates the development provisioning profile the probe signs with.
+1. Once, on the Mac: sign Xcode in to your Apple ID (Xcode, Settings, Accounts); `sudo dotnet workload install maui-ios`; connect the iPhone by USB, trust the Mac, and turn on Developer Mode (Settings, Privacy and Security). In Xcode create any iOS app with bundle identifier `com.techierathore.techierag.probe` and run it once on the phone: that creates the provisioning profile the probe signs with. Step by step, with a separate developer Apple ID: `docs/TechieRag-iPhone-Setup.md`.
 2. Build: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64`. When the Mac's Xcode is not the one .NET for iOS asks for (Xcode 27.0 with .NET for iOS 26.5, 2026-09-25) add `-p:ValidateXcodeVersion=false`; `bash samples/TechieRag.Probe/scripts/select-xcode.sh ios` says whether you need it.
-3. Deploy and run: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 -t:Run -p:_DeviceName=<the iPhone's UDID, from Finder or xcrun devicectl list devices>` (same flag as step 2). Signing needs step 1 done; `security find-identity -v -p codesigning` lists the certificate once Xcode has created it. On the phone trust the developer if asked (Settings, General, VPN and Device Management), open **TechieRag Probe**, press **Embed, store, search** (91 MB on the first press), then press it again.
+3. Deploy and run: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 -t:Run -p:_DeviceName=<the iPhone's UDID, from Finder or xcrun devicectl list devices>` (same flag as step 2). Signing needs step 1 done. On the phone trust the developer if asked (Settings, General, VPN and Device Management), open **TechieRag Probe**, press **Embed, store, search** (91 MB on the first press), then press it again.
 4. Record: step "Record".
 
 **Record (every device)**
@@ -304,8 +303,9 @@ Install from nuget.org (no token, no `nuget.config` edit):
 ```
 dotnet add package TechieRag
 dotnet add package TechieRag.Embedded
-dotnet add package TechieRag.Telemetry   # once REQ-FN-065 publishes it
-dotnet add package TechieRag.Local       # in-process model; runs once a runtime is chosen per platform
+dotnet add package TechieRag.Telemetry
+dotnet add package TechieRag.Local       # in-process model, ONNX Runtime GenAI on all four platforms
+dotnet add package TechieRag.Agents      # Microsoft Agent Framework over TechieRag
 ```
 
 Register through the builder or DI:

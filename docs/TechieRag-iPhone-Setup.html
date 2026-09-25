@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>TechieRag — Status</title>
+<title>TechieRag — iPhone testing setup: two Apple IDs, one phone</title>
 <script>
 /* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
    pick by time of day — light 07:00–19:00 local, softened dark at night. */
@@ -105,125 +105,126 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
 <div class="layout">
   <nav class="side">
-    <h1>TechieRag — Status</h1>
+    <h1>TechieRag — iPhone testing setup: two Apple IDs, one phone</h1>
     <div class="sub">Last rendered: 2026-09-25</div>
     <div class="group">Contents</div>
     <ol>
-        <li><a href="#where-i-am">Where I am</a></li>
-        <li><a href="#next-command-to-run">Next command to run</a></li>
-        <li><a href="#open-requirements">Open requirements</a></li>
-        <li><a href="#known-blockers">Known blockers</a></li>
-        <li><a href="#verification-log">Verification log</a></li>
-        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-        <li><a href="#standards-compliance">Standards compliance</a></li>
-        <li><a href="#deferred-future">Deferred / future</a></li>
+        <li><a href="#the-short-answer">The short answer</a></li>
+        <li><a href="#step-1-create-the-developer-apple-id-email-2">Step 1: create the developer Apple ID (email 2)</a></li>
+        <li><a href="#step-2-sign-xcode-in-with-email-2">Step 2: sign Xcode in with email 2</a></li>
+        <li><a href="#step-3-turn-on-developer-mode-on-the-iphone">Step 3: turn on Developer Mode on the iPhone</a></li>
+        <li><a href="#step-4-put-a-first-app-on-the-phone-and-trust-it">Step 4: put a first app on the phone and trust it</a></li>
+        <li><a href="#step-5-the-probe-run">Step 5: the probe run</a></li>
+        <li><a href="#things-to-know">Things to know</a></li>
     </ol>
   </nav>
   <main>
-    <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>PROJECT-STATUS.md</code></div>
-    <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
-      <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *productguide TechieRag</div>
-    </div>
-<table>
-<tbody>
-<tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-09-25</td></tr>
-<tr><th>current_phase</th><td>Phase 2 of 2 · Handoff — 83 of 83 verified, 1 not applicable</td></tr>
-<tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-09-25</td></tr>
-</tbody>
-</table>
+    <h1>TechieRag — iPhone testing setup: two Apple IDs, one phone</h1>
+    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-iPhone-Setup.md</code></div>
+
     <div class="toc-inline">
       <div>Contents</div>
       <ol>
-        <li><a href="#where-i-am">Where I am</a></li>
-        <li><a href="#next-command-to-run">Next command to run</a></li>
-        <li><a href="#open-requirements">Open requirements</a></li>
-        <li><a href="#known-blockers">Known blockers</a></li>
-        <li><a href="#verification-log">Verification log</a></li>
-        <li><a href="#library-feedback-summary">Library feedback summary</a></li>
-        <li><a href="#standards-compliance">Standards compliance</a></li>
-        <li><a href="#deferred-future">Deferred / future</a></li>
+        <li><a href="#the-short-answer">The short answer</a></li>
+        <li><a href="#step-1-create-the-developer-apple-id-email-2">Step 1: create the developer Apple ID (email 2)</a></li>
+        <li><a href="#step-2-sign-xcode-in-with-email-2">Step 2: sign Xcode in with email 2</a></li>
+        <li><a href="#step-3-turn-on-developer-mode-on-the-iphone">Step 3: turn on Developer Mode on the iPhone</a></li>
+        <li><a href="#step-4-put-a-first-app-on-the-phone-and-trust-it">Step 4: put a first app on the phone and trust it</a></li>
+        <li><a href="#step-5-the-probe-run">Step 5: the probe run</a></li>
+        <li><a href="#things-to-know">Things to know</a></li>
       </ol>
     </div>
-<h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 83 rows Verified; handoff ran on 2026-09-25 and the library is ready for UAT. The UsageGuide, both DevGuides (phase 1 and the new phase 2), the Architecture and the BRDs are current and rendered. The physical iPhone measurement is the one open item and waits on two owner steps.</p>
-<h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<p>Manual UAT: open <code>docs/TechieRag-UsageGuide.md</code> and work through "How to test, screen by screen"; when it passes, set <code>current_phase: Released</code> in this file by hand. Optional afterwards, the end-user manual:</p>
-<p>Claude Code:</p>
-<pre><code>/TechieFlow:agents:flow-master *productguide TechieRag</code></pre>
-<p>OpenCode:</p>
-<pre><code>/flow-master *productguide TechieRag</code></pre>
-<p>Why: every row is Verified and handoff has run; what remains is your own test pass per the UsageGuide.</p>
-<h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
-<thead><tr><th>Status</th><th>Count</th></tr></thead>
+<thead><tr><th></th><th></th></tr></thead>
 <tbody>
-<tr><td>Not Started</td><td>0</td></tr>
-<tr><td>In Progress</td><td>0</td></tr>
-<tr><td>Implemented</td><td>0</td></tr>
-<tr><td>Needs re-verify</td><td>0</td></tr>
-<tr><td>Blocked</td><td>0</td></tr>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>For</td><td>the owner, before the first probe run on the iPhone (REQ-FN-060, UsageGuide runbook step 1)</td></tr>
+<tr><td>Written</td><td>2026-09-25</td></tr>
 </tbody>
 </table>
+<p>Throughout: <strong>email 1</strong> is your regular personal Apple ID (the one the phone is signed in to today). <strong>email 2</strong> is the new developer Apple ID you will create.</p>
+<h2 id="the-short-answer">The short answer<a class="anchor-link" href="#the-short-answer">#</a></h2>
+<p>Yes, one phone works with both. The phone stays signed in to email 1 for iCloud, the App Store, photos and everything else. Email 2 is used only inside Xcode on the Mac, to sign the test app. The phone never signs in to email 2. When Xcode installs the app, the phone asks you once to trust "the developer" (that is email 2); after that the app runs like any other. Nothing about email 1 changes.</p>
+<p>You do not need the paid Apple Developer Program for this. A free Apple ID gives Xcode a "Personal Team" that can install apps on your own phone.</p>
+<h2 id="step-1-create-the-developer-apple-id-email-2">Step 1: create the developer Apple ID (email 2)<a class="anchor-link" href="#step-1-create-the-developer-apple-id-email-2">#</a></h2>
+<p>You need an email address Apple has not seen before. Your phone number can be the same one email 1 uses; Apple allows one number on several Apple IDs.</p>
+<ol>
+<li>On the Mac, open https://appleid.apple.com and click <strong>Create Your Apple ID</strong>.
+</li>
+<li>Enter your name, birthday, email 2 and a new password. Do not use the email 1 address.
+</li>
+<li>Enter your phone number and choose text message. Apple sends a code to the phone; type it in.
+</li>
+<li>Apple sends a code to email 2; type it in.
+</li>
+<li>Two-factor authentication is on by default. Keep it on; Xcode needs it.
+</li>
+<li>Do not sign the iPhone in to this account. It is for the Mac only.
+</li>
+</ol>
+<p>Optional, not needed for testing: https://developer.apple.com/programs/ is the paid program (99 US dollars a year) for the App Store and TestFlight. Skip it for now.</p>
+<h2 id="step-2-sign-xcode-in-with-email-2">Step 2: sign Xcode in with email 2<a class="anchor-link" href="#step-2-sign-xcode-in-with-email-2">#</a></h2>
+<ol>
+<li>On the Mac, open Xcode.
+</li>
+<li>Menu <strong>Xcode</strong>, then <strong>Settings</strong>, then the <strong>Accounts</strong> tab.
+</li>
+<li>Click <strong>+</strong> at the bottom left, choose <strong>Apple ID</strong>, and sign in with email 2 and its password. A code comes to your phone (two-factor); type it in.
+</li>
+<li>The account appears on the left. Select it. On the right you see one team, <strong>"Your Name (Personal Team)"</strong>. That is all you need.
+</li>
+</ol>
+<p>Xcode makes the signing certificate itself the first time it builds an app for the phone (step 4). Nothing to download.</p>
+<h2 id="step-3-turn-on-developer-mode-on-the-iphone">Step 3: turn on Developer Mode on the iPhone<a class="anchor-link" href="#step-3-turn-on-developer-mode-on-the-iphone">#</a></h2>
+<p>The phone is already connected and paired with this Mac, so the switch is visible.</p>
+<ol>
+<li>On the iPhone, open <strong>Settings</strong>, then <strong>Privacy &amp; Security</strong>.
+</li>
+<li>Scroll to the bottom and tap <strong>Developer Mode</strong>.
+</li>
+<li>Turn it on. The phone asks to restart; tap <strong>Restart</strong>.
+</li>
+<li>After the restart, the phone asks <strong>Turn on Developer Mode?</strong> Tap <strong>Turn On</strong> and enter your passcode.
+</li>
+</ol>
+<p>If <strong>Developer Mode</strong> is not in the list: connect the phone to the Mac with the cable, unlock it, tap <strong>Trust</strong> on the phone if asked, and look again.</p>
+<h2 id="step-4-put-a-first-app-on-the-phone-and-trust-it">Step 4: put a first app on the phone and trust it<a class="anchor-link" href="#step-4-put-a-first-app-on-the-phone-and-trust-it">#</a></h2>
+<p>This one-time step creates the signing profile the probe uses. It is Apple's rule that the first install of a new app id goes through Xcode.</p>
+<ol>
+<li>In Xcode, menu <strong>File</strong>, then <strong>New</strong>, then <strong>Project</strong>. Choose <strong>iOS</strong>, then <strong>App</strong>, click <strong>Next</strong>.
+</li>
+<li>Product Name: <code>TechieRagProbeSetup</code>. Team: <strong>Your Name (Personal Team)</strong> (email 2). Organization Identifier: <code>com.techierathore.techierag</code>. Bundle Identifier must read exactly <code>com.techierathore.techierag.probe</code>; if Xcode shows something else, change the Product Name to <code>probe</code>. Interface SwiftUI, language Swift. Click <strong>Next</strong> and save it anywhere outside this repository, for example Desktop.
+</li>
+<li>At the top of the Xcode window, click the device menu (it says a simulator name) and choose <strong>TechieiPhone</strong> under <strong>Devices</strong>.
+</li>
+<li>Click the <strong>Run</strong> button (the triangle) or press Command-R. Xcode signs the app, installs it and tries to open it. The first time, the phone refuses with "Untrusted Developer".
+</li>
+<li>On the iPhone: <strong>Settings</strong>, then <strong>General</strong>, then <strong>VPN &amp; Device Management</strong>. Under <strong>Developer App</strong>, tap the entry showing email 2, then tap <strong>Trust</strong>, then <strong>Trust</strong> again.
+</li>
+<li>Back in Xcode, click <strong>Run</strong> once more. The empty app opens on the phone. Close Xcode; you can delete this project.
+</li>
+</ol>
+<p>That is the whole one-time setup. Check on the Mac that it worked:</p>
+<pre><code>security find-identity -v -p codesigning</code></pre>
+<p>It should now list one "Apple Development" certificate.</p>
+<h2 id="step-5-the-probe-run">Step 5: the probe run<a class="anchor-link" href="#step-5-the-probe-run">#</a></h2>
+<p>Connect the phone with the cable, unlock it, and paste this to the agent:</p>
+<pre><code>record the iPhone probe run for REQ-FN-060</code></pre>
+<p>The agent builds the probe for the phone, installs it, presses both buttons and writes the numbers into the UsageGuide's "Local model: measured per platform" table. If it wants to be sure, it runs the runbook's step 3 command itself:</p>
+<pre><code>dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 -p:ValidateXcodeVersion=false -t:Run -p:_DeviceName=00008150-001E450C3E02401C</code></pre>
+<h2 id="things-to-know">Things to know<a class="anchor-link" href="#things-to-know">#</a></h2>
 <ul>
-<li>None
+<li><strong>The free profile expires after 7 days.</strong> The app then refuses to open. Run it once more from Xcode (step 4, point 4) or from the agent's command and it works for another 7 days. Nothing else expires.
 </li>
-</ul>
-<h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
-<ul>
-<li>🔶 <strong>iPhone run (REQ-FN-060):</strong> the iPhone 17 Pro is connected and its device build passes, but Developer Mode is off on the phone and no Apple ID is signed in to Xcode. Steps: <code>docs/TechieRag-iPhone-Setup.md</code>. Then paste <code>record the iPhone probe run for REQ-FN-060</code>.
+<li><strong>Free team limits:</strong> at most 10 different app ids per week and 3 apps installed at once. The probe is one app; you will not notice.
 </li>
-<li>🔶 <strong>BRD §9 platform matrix:</strong> the phase-1 BRD's Windows and Mac Catalyst cells for <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Local</code> should say "tested", as the UsageGuide does. Fix with the analyst's <code>*amend-docs</code>.
+<li><strong>Two-factor codes for email 2 arrive on the same phone</strong> because it shares your phone number. That is expected and fine.
 </li>
-<li>🔶 <strong>DevGuide findings:</strong> nine small code and comment findings from 2026-09-25 are Remarks on their checklist rows and in the phase-2 DevGuide's Known issues; none changes a verdict. Fix them with <code>*fix-issues</code> when convenient.
+<li><strong>Do not sign the phone in to email 2</strong> anywhere (iCloud, App Store, Settings). It is not needed, and it would split your purchases and iCloud data.
 </li>
-<li>🔶 <strong>Owner git:</strong> commit today's work.
+<li><strong>Xcode version:</strong> this Mac has Xcode 27.0 while .NET for iOS asks for 26.5, so every probe build carries <code>-p:ValidateXcodeVersion=false</code>. The UsageGuide runbook says the same.
 </li>
-</ul>
-<h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
-<p>Last five passes; older passes live in <code>docs/metrics/gates.jsonl</code>.</p>
-<table>
-<thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
-<tbody>
-<tr><td>2026-09-25</td><td>build-phase</td><td>78/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>build-phase</td><td>81/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>build-phase</td><td>81/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>build-phase</td><td>83/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>handoff-phase</td><td>83/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-</tbody>
-</table>
-<h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
-<ul>
-<li>OnnxRuntime: 1 open · 0 closed — docs/TechieRag-OnnxRuntime-Feedback.md
-</li>
-<li>OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
-</li>
-</ul>
-<h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
-<ul>
-<li>Last check 2026-09-25: 0 findings, see the checklist Remarks.
-</li>
-</ul>
-<h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
-<ul>
-<li>The physical iPhone row of the UsageGuide's measured-per-platform table, after the owner's two steps.
-</li>
-<li>OS built-in models (Apple, Android Gemini Nano) as a later <code>ILocalLlmRuntime</code>.
-</li>
-<li>LLamaSharp with Metal on the Mac, behind the same provider (decision 2 option B).
-</li>
-<li>Hugging Face tokens for gated models in <code>LocalModel.FromHuggingFace</code>.
-</li>
-<li><code>REQ-RAG-046</code> deferred endpoints; <code>TechieRag.Agents</code> phase D items (proposal §7).
-</li>
-<li>Ollama and Gemini multi-turn tool use.
-</li>
-<li>Rename TechieDesk to Sevak in about 15 XML doc comments under <code>src/TechieRag</code>.
-</li>
-<li>Update the Android emulator in Visual Studio's SDK (31.2.10 is older than its system image).
+<li><strong>The phone's UDID</strong> is <code>00008150-001E450C3E02401C</code> (from <code>xcrun devicectl list devices</code>); the agent uses it in the deploy command.
 </li>
 </ul>
   </main>
