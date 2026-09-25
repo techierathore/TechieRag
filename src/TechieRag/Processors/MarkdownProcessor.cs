@@ -1,6 +1,7 @@
 using Markdig;
 using TechieRag.Abstractions;
 using TechieRag.Models;
+using TechieRag.Processors.Chunking;
 
 namespace TechieRag.Processors;
 
@@ -12,7 +13,9 @@ namespace TechieRag.Processors;
 /// and splits into chunks suitable for embedding and retrieval operations.</para>
 /// <para><b>Code Flow:</b>
 /// 1) Reads Markdown content from stream
-/// 2) Parses Markdown using Markdig and converts to plain text
+/// 2) Parses Markdown using Markdig and converts to plain text; when the configured chunker is
+/// the <see cref="MarkdownChunker"/>, heading markers and code fences are kept so the chunker can
+/// split on heading boundaries
 /// 3) Uses TextChunker to split text into appropriately sized chunks
 /// 4) Creates TextChunk objects with metadata
 /// </para>
@@ -81,8 +84,13 @@ public class MarkdownProcessor : IDocumentProcessor
             return chunks;
         }
 
-        // Parse Markdown and convert to plain text
-        var plainText = ConvertMarkdownToPlainText(markdown);
+        // Parse Markdown and convert to plain text. The markdown strategy splits on heading
+        // boundaries and keeps code fences whole, so it gets the structure-preserving text
+        // (heading markers and fences kept, inline formatting stripped); every other strategy
+        // gets the plain text exactly as before (REQ-RAG-071).
+        var plainText = options.Chunker is MarkdownChunker
+            ? ConvertMarkdownToStructuredText(markdown)
+            : ConvertMarkdownToPlainText(markdown);
 
         if (string.IsNullOrWhiteSpace(plainText))
         {
@@ -129,6 +137,66 @@ public class MarkdownProcessor : IDocumentProcessor
         // Use Markdig to convert to plain text
         var document = Markdown.Parse(markdown, Pipeline);
         return ExtractPlainText(document);
+    }
+
+    /// <summary>
+    /// Converts Markdown content to text that keeps the document's structure for the
+    /// markdown chunking strategy.
+    /// </summary>
+    /// <param name="markdown">The Markdown content to convert.</param>
+    /// <returns>Text with ATX heading markers (<c>#</c> to <c>######</c>) and fenced code blocks
+    /// preserved, and inline formatting (emphasis, links, images) reduced to its text.</returns>
+    /// <remarks>
+    /// Setext headings (underlined with <c>===</c> or <c>---</c>) are emitted as ATX headings and
+    /// indented code blocks as fenced ones, so <see cref="MarkdownChunker"/> recognises both.
+    /// </remarks>
+    private static string ConvertMarkdownToStructuredText(string markdown)
+    {
+        var document = Markdown.Parse(markdown, Pipeline);
+        var writer = new System.IO.StringWriter();
+        ExtractStructuredTextFromBlock(document, writer);
+        return writer.ToString().Trim();
+    }
+
+    /// <summary>
+    /// Recursively writes Markdown blocks as structure-preserving text.
+    /// </summary>
+    /// <param name="block">The Markdown block to process.</param>
+    /// <param name="writer">The text writer to write extracted text to.</param>
+    private static void ExtractStructuredTextFromBlock(Markdig.Syntax.MarkdownObject block, System.IO.TextWriter writer)
+    {
+        switch (block)
+        {
+            case Markdig.Syntax.HeadingBlock heading:
+                writer.WriteLine();
+                writer.Write(new string('#', Math.Clamp(heading.Level, 1, 6)));
+                writer.Write(' ');
+                if (heading.Inline != null)
+                {
+                    ExtractTextFromInline(heading.Inline, writer);
+                }
+                writer.WriteLine();
+                break;
+
+            case Markdig.Syntax.CodeBlock code:
+                var info = (code as Markdig.Syntax.FencedCodeBlock)?.Info;
+                writer.WriteLine();
+                writer.WriteLine($"```{info}");
+                writer.WriteLine(code.Lines.ToString());
+                writer.WriteLine("```");
+                break;
+
+            case Markdig.Syntax.LeafBlock:
+                ExtractTextFromBlock(block, writer);
+                break;
+
+            case Markdig.Syntax.ContainerBlock containerBlock:
+                foreach (var child in containerBlock)
+                {
+                    ExtractStructuredTextFromBlock(child, writer);
+                }
+                break;
+        }
     }
 
     /// <summary>

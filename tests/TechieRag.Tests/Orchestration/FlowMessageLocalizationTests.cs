@@ -31,7 +31,7 @@ public sealed class FlowMessageLocalizationTests
     /// user reads carries a stable code plus the guardrail id and the tool name, so the sentence can
     /// be written in Hindi with the two invariant values dropped in wherever the grammar wants them.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-050 ARefusedToolCallGivesTheTraceRowACodeAndItsArguments")]
     public async Task ARefusedToolCallGivesTheTraceRowACodeAndItsArguments()
     {
         var provider = new ScriptedLlmProvider(
@@ -214,7 +214,7 @@ public sealed class FlowMessageLocalizationTests
     /// An exhausted step budget codes both halves of what a user is shown: the row's content names
     /// the budget and the node it stopped before, the row's detail names the budget alone.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-050 AnExhaustedStepBudgetCodesTheBudgetAndTheNodeItStoppedBefore")]
     public async Task AnExhaustedStepBudgetCodesTheBudgetAndTheNodeItStoppedBefore()
     {
         var provider = new ScriptedLlmProvider(
@@ -287,7 +287,7 @@ public sealed class FlowMessageLocalizationTests
     /// no more placeholders than it has arguments. A code whose sentence needs a value it was never
     /// given cannot be translated at all — the translator would have nothing to put there.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-050 EveryMessageARunEmitsHasAnArgumentForEveryPlaceholder")]
     public async Task EveryMessageARunEmitsHasAnArgumentForEveryPlaceholder()
     {
         var messages = (await EveryScenarioAsync()).ToList();

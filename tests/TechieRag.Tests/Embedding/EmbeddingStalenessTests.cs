@@ -57,7 +57,7 @@ public sealed class EmbeddingStalenessTests
     /// The case a provider/model comparison alone would miss, and the one that actually happened:
     /// TR-RAG-044 changed neither the provider nor the model, only the encoding.
     /// </remarks>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-052 AnEarlierRevisionOfTheSameModelIsStale")]
     public void AnEarlierRevisionOfTheSameModelIsStale()
     {
         var report = EmbeddingStaleness.Analyze([Stamped("doc-1", Previous)], Current);

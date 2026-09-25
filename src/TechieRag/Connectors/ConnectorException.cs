@@ -50,4 +50,11 @@ public sealed class ConnectorException : Exception
     /// <summary>Gets the HTTP status that caused the failure, or null when it was not an HTTP failure.</summary>
     /// <remarks>401 and 403 mean the caller should re-check the credential it supplied; 429 means the run hit a rate limit it could not wait out.</remarks>
     public int? StatusCode { get; }
+
+    /// <summary>
+    /// Gets the stable code for the limit that ended the run, from <see cref="ConnectorErrorCodes"/>,
+    /// or null when the failure has no code (REQ-RAG-082).
+    /// </summary>
+    /// <remarks>A host switches on this rather than parsing <see cref="Exception.Message"/>, which is English.</remarks>
+    public string? ErrorCode { get; init; }
 }

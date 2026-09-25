@@ -1,37 +1,45 @@
+using System.Data.Common;
 using System.Text.Json;
-using Dapper;
 using Microsoft.Data.Sqlite;
+using SQLitePCL;
 using TechieRag.Abstractions;
 using TechieRag.Models;
+using TechieRag.Persistence;
 
 namespace TechieRag.VectorStores;
 
 /// <summary>
-/// SQLite-vec vector store implementation for embedded database scenarios.
+/// Embedded SQLite vector store: zero configuration, one file, the same code on Windows, macOS,
+/// Mac Catalyst, Android and iOS.
 /// </summary>
 /// <remarks>
-/// <para><b>Purpose:</b> Provides a zero-configuration embedded vector database using SQLite
-/// with optional sqlite-vec extension support for vector similarity search. This is the default
-/// vector store for TechieRag, suitable for development and single-machine deployments.</para>
+/// <para><b>Purpose:</b> The default vector store for TechieRag, suitable for development,
+/// desktop and phone apps and single-machine deployments.</para>
 /// <para><b>Code Flow:</b> Created by TechieRagBuilder when VectorStoreType.SqliteVec is configured.
 /// InitializeAsync creates tables on first use. UpsertAsync/UpsertBatchAsync store chunks with vectors
-/// as BLOB data. SearchAsync performs similarity search when sqlite-vec is available.</para>
-/// <para><b>Dependencies:</b>
-/// - Microsoft.Data.Sqlite for database connectivity
-/// - Dapper for simplified data access
-/// - sqlite-vec extension (optional) for vector similarity search</para>
-/// <para><b>Fallback Mode:</b> When sqlite-vec extension is not available, vectors are stored
-/// as BLOB data in the Chunks table. SearchAsync returns empty results in fallback mode.</para>
+/// as raw float32 BLOBs. SearchAsync is an exact, vectorised cosine scan in managed code.</para>
+/// <para><b>Search is managed code, on every platform, by design (REQ-RAG-056 / BRD-93).</b> The
+/// sqlite-vec extension is NOT used: it is a native library that would have to be shipped and
+/// loaded per platform, and phones and the Mac Catalyst sandbox forbid loading arbitrary native
+/// extensions. The managed path is exact (not approximate), needs nothing beyond
+/// Microsoft.Data.Sqlite, and was measured at 1,000, 10,000 and 50,000 chunks — the timings are in
+/// the UsageGuide's "Platform notes". The type keeps its historical name (and <see cref="Name"/>
+/// keeps "SQLite-vec") so existing configuration and stored statistics stay valid.</para>
+/// <para><b>Dependencies:</b> Microsoft.Data.Sqlite only. Parameters and rows are mapped by hand
+/// (REQ-FN-056): Dapper's Reflection.Emit mappers threw <see cref="PlatformNotSupportedException"/>
+/// in every ahead-of-time compiled iOS and Mac Catalyst Release build.</para>
 /// </remarks>
 public class SqliteVecStore : IVectorStore
 {
     /// <inheritdoc/>
     public string Name => "SQLite-vec";
 
+    /// <summary>Gets the vector width this store was created for (REQ-RAG-106 / BRD-158).</summary>
+    public int Dimensions => dimensions;
+
     private readonly string connectionString;
     private readonly int dimensions;
     private bool initialized;
-    private bool sqliteVecAvailable;
 
     /// <summary>
     /// Creates a new SQLite-vec vector store instance.
@@ -61,9 +69,8 @@ public class SqliteVecStore : IVectorStore
     /// <item><description>Documents - stores document metadata (Id, Name, SourcePath, ChunkCount, IngestedAt, Metadata)</description></item>
     /// <item><description>Chunks - stores text chunks with vectors as BLOB (Id, DocumentId, Text, Vector, PageNumber, ChunkIndex, Metadata, CreatedAt)</description></item>
     /// </list>
-    /// <para><b>Note:</b> The ChunksVec virtual table for sqlite-vec is not created automatically
-    /// as the extension may not be available at build time. Vector search requires the sqlite-vec
-    /// extension to be loaded at runtime.</para>
+    /// <para><b>Note:</b> No sqlite-vec virtual table is created and no extension is loaded; the
+    /// search is the managed scan described on the class.</para>
     /// </remarks>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -71,9 +78,6 @@ public class SqliteVecStore : IVectorStore
 
         using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
-
-        // Try to load sqlite-vec extension (may not be available)
-        sqliteVecAvailable = TryLoadSqliteVecExtension(connection);
 
         // Create Documents table
         await connection.ExecuteAsync(@"
@@ -84,7 +88,7 @@ public class SqliteVecStore : IVectorStore
                 ChunkCount INTEGER DEFAULT 0,
                 IngestedAt TEXT NOT NULL,
                 Metadata TEXT
-            )");
+            )", cancellationToken);
 
         // Create Chunks table with Vector stored as BLOB
         await connection.ExecuteAsync(@"
@@ -98,36 +102,16 @@ public class SqliteVecStore : IVectorStore
                 Metadata TEXT,
                 CreatedAt TEXT NOT NULL,
                 FOREIGN KEY (DocumentId) REFERENCES Documents(Id) ON DELETE CASCADE
-            )");
+            )", cancellationToken);
 
         // Create index for efficient document-based queries
         await connection.ExecuteAsync(@"
-            CREATE INDEX IF NOT EXISTS IdxChunksDocument ON Chunks(DocumentId)");
+            CREATE INDEX IF NOT EXISTS IdxChunksDocument ON Chunks(DocumentId)", cancellationToken);
 
         // Enable foreign key constraints
-        await connection.ExecuteAsync("PRAGMA foreign_keys = ON");
+        await connection.ExecuteAsync("PRAGMA foreign_keys = ON", cancellationToken);
 
         initialized = true;
-    }
-
-    /// <summary>
-    /// Attempts to load the sqlite-vec extension for vector operations.
-    /// </summary>
-    /// <param name="connection">The open SQLite connection.</param>
-    /// <returns>True if the extension was loaded successfully; otherwise, false.</returns>
-    private static bool TryLoadSqliteVecExtension(SqliteConnection connection)
-    {
-        try
-        {
-            // sqlite-vec extension loading would happen here
-            // For now, we operate in fallback mode without the extension
-            // connection.LoadExtension("vec0");
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     /// <summary>
@@ -160,14 +144,8 @@ public class SqliteVecStore : IVectorStore
         await connection.ExecuteAsync(@"
             INSERT OR IGNORE INTO Documents (Id, Name, SourcePath, ChunkCount, IngestedAt, Metadata)
             VALUES (@Id, @Name, @SourcePath, 0, @IngestedAt, @Metadata)",
-            new
-            {
-                Id = chunk.DocumentId,
-                Name = docName,
-                SourcePath = sourcePath,
-                IngestedAt = DateTime.UtcNow.ToString("o"),
-                Metadata = SerializeDocumentMetadata(chunk)
-            });
+            cancellationToken,
+            DocumentParameters(chunk.DocumentId, docName, sourcePath, chunk));
 
         var vectorBytes = chunk.Vector != null ? SerializeVector(chunk.Vector) : null;
         var metadataJson = JsonSerializer.Serialize(chunk.Metadata);
@@ -175,20 +153,11 @@ public class SqliteVecStore : IVectorStore
         await connection.ExecuteAsync(@"
             INSERT OR REPLACE INTO Chunks (Id, DocumentId, Text, Vector, PageNumber, ChunkIndex, Metadata, CreatedAt)
             VALUES (@Id, @DocumentId, @Text, @Vector, @PageNumber, @ChunkIndex, @Metadata, @CreatedAt)",
-            new
-            {
-                chunk.Id,
-                chunk.DocumentId,
-                chunk.Text,
-                Vector = vectorBytes,
-                chunk.PageNumber,
-                chunk.ChunkIndex,
-                Metadata = metadataJson,
-                CreatedAt = chunk.CreatedAt.ToString("o")
-            });
+            cancellationToken,
+            ChunkParameters(chunk, vectorBytes, metadataJson));
 
         // Update document chunk count
-        await UpdateDocumentChunkCountAsync(connection, chunk.DocumentId);
+        await UpdateDocumentChunkCountAsync(connection, chunk.DocumentId, null, cancellationToken);
 
         return chunk.Id;
     }
@@ -237,15 +206,9 @@ public class SqliteVecStore : IVectorStore
                 await connection.ExecuteAsync(@"
                     INSERT OR IGNORE INTO Documents (Id, Name, SourcePath, ChunkCount, IngestedAt, Metadata)
                     VALUES (@Id, @Name, @SourcePath, 0, @IngestedAt, @Metadata)",
-                    new
-                    {
-                        Id = docId,
-                        Name = docName,
-                        SourcePath = sourcePath,
-                        IngestedAt = DateTime.UtcNow.ToString("o"),
-                        Metadata = SerializeDocumentMetadata(firstChunk)
-                    },
-                    transaction);
+                    transaction,
+                    cancellationToken,
+                    DocumentParameters(docId, docName, sourcePath, firstChunk));
             }
 
             // Now insert the chunks
@@ -257,18 +220,9 @@ public class SqliteVecStore : IVectorStore
                 await connection.ExecuteAsync(@"
                     INSERT OR REPLACE INTO Chunks (Id, DocumentId, Text, Vector, PageNumber, ChunkIndex, Metadata, CreatedAt)
                     VALUES (@Id, @DocumentId, @Text, @Vector, @PageNumber, @ChunkIndex, @Metadata, @CreatedAt)",
-                    new
-                    {
-                        chunk.Id,
-                        chunk.DocumentId,
-                        chunk.Text,
-                        Vector = vectorBytes,
-                        chunk.PageNumber,
-                        chunk.ChunkIndex,
-                        Metadata = metadataJson,
-                        CreatedAt = chunk.CreatedAt.ToString("o")
-                    },
-                    transaction);
+                    transaction,
+                    cancellationToken,
+                    ChunkParameters(chunk, vectorBytes, metadataJson));
 
                 ids.Add(chunk.Id);
             }
@@ -276,7 +230,7 @@ public class SqliteVecStore : IVectorStore
             // Update chunk counts for all affected documents
             foreach (var documentId in documentIds)
             {
-                await UpdateDocumentChunkCountAsync(connection, documentId, transaction);
+                await UpdateDocumentChunkCountAsync(connection, documentId, transaction, cancellationToken);
             }
 
             transaction.Commit();
@@ -297,15 +251,22 @@ public class SqliteVecStore : IVectorStore
     /// <param name="topK">Maximum number of results to return.</param>
     /// <param name="documentFilter">Optional document ID to restrict search scope.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>Ranked search results ordered by similarity score.</returns>
+    /// <returns>Ranked search results ordered by similarity score, highest first.</returns>
     /// <remarks>
-    /// <para><b>Note:</b> This implementation requires the sqlite-vec extension for actual
-    /// vector similarity search. When the extension is not available, this method returns
-    /// an empty result set. Future versions will implement fallback cosine similarity
-    /// calculation in managed code.</para>
-    /// <para><b>Algorithm (when sqlite-vec available):</b> Uses sqlite-vec's MATCH operator
-    /// for approximate nearest neighbor search. Results are sorted by distance and
-    /// converted to similarity scores (score = 1 - distance).</para>
+    /// <para><b>Algorithm (REQ-RAG-056 / BRD-93):</b> an exact cosine scan in two passes.</para>
+    /// <list type="number">
+    /// <item><description>Only <c>rowid</c> and the <c>Vector</c> BLOB are read. Each BLOB is scored
+    /// in place — a span over SQLite's own row buffer reinterpreted as float32, no copy — with SIMD
+    /// <see cref="System.Numerics.Vector{T}"/> arithmetic, and a bounded heap keeps the best
+    /// <paramref name="topK"/>. Nothing else is materialised per row.</description></item>
+    /// <item><description>The full rows (text, metadata) are fetched for the winners only.</description></item>
+    /// </list>
+    /// <para>The previous implementation read and JSON-parsed every row, deserialised every vector
+    /// into a new array and sorted the whole table. The ranking is identical — ties broken by scan
+    /// order exactly as the old stable sort did, scores equal to within float rounding (SIMD sums in a
+    /// different order) — which <c>SqliteVecSearchTests</c> and the benchmark assert.</para>
+    /// <para>A stored vector whose width differs from the query scores 0, and a zero vector scores
+    /// 0, as before.</para>
     /// </remarks>
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(
         float[] queryVector,
@@ -314,91 +275,113 @@ public class SqliteVecStore : IVectorStore
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(queryVector);
-        await InitializeAsync(cancellationToken);
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
-        // When sqlite-vec is not available, return empty results
-        // A full implementation would require loading the sqlite-vec extension
-        // or implementing cosine similarity in managed code
-        if (!sqliteVecAvailable)
+        if (topK <= 0)
         {
-            // Fallback: compute cosine similarity in managed code
-            return await ComputeSimilarityFallbackAsync(queryVector, topK, documentFilter, cancellationToken);
+            return Array.Empty<SearchResult>();
         }
 
-        // sqlite-vec search would be implemented here when extension is available
-        return Array.Empty<SearchResult>();
+        using var connection = new SqliteConnection(connectionString);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        var winners = ScoreAllChunks(connection, queryVector, topK, documentFilter, cancellationToken);
+        if (winners.Count == 0)
+        {
+            return Array.Empty<SearchResult>();
+        }
+
+        // One named parameter per winner, the expansion Dapper used to do for "IN @RowIds".
+        var rowIdParameters = new DbParam[winners.Count];
+        for (var i = 0; i < winners.Count; i++)
+        {
+            rowIdParameters[i] = DbParam.Int64("RowId" + i, winners[i].RowId);
+        }
+
+        var rows = await connection.QueryAsync(
+            "SELECT rowid AS RowId, Id, DocumentId, Text, Vector, PageNumber, ChunkIndex, Metadata, CreatedAt FROM Chunks WHERE rowid IN ("
+                + string.Join(", ", rowIdParameters.Select(p => "@" + p.Name)) + ")",
+            ChunkRow.Read,
+            cancellationToken,
+            rowIdParameters).ConfigureAwait(false);
+
+        var byRowId = rows.ToDictionary(r => r.RowId);
+        var results = new List<SearchResult>(winners.Count);
+        foreach (var winner in winners)
+        {
+            // A row deleted between the two passes is simply dropped.
+            if (byRowId.TryGetValue(winner.RowId, out var row))
+            {
+                results.Add(new SearchResult { Chunk = row.ToTextChunk(), Score = winner.Score });
+            }
+        }
+
+        return results;
     }
 
     /// <summary>
-    /// Computes cosine similarity in managed code as a fallback when sqlite-vec is not available.
+    /// First search pass: scores every stored vector against the query and keeps the best.
     /// </summary>
-    /// <param name="queryVector">The query embedding vector.</param>
-    /// <param name="topK">Maximum number of results to return.</param>
+    /// <param name="connection">An open connection.</param>
+    /// <param name="queryVector">The query vector.</param>
+    /// <param name="topK">How many winners to keep.</param>
     /// <param name="documentFilter">Optional document ID filter.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Search results ranked by similarity score.</returns>
-    private async Task<IReadOnlyList<SearchResult>> ComputeSimilarityFallbackAsync(
+    /// <param name="cancellationToken">Checked every 1,024 rows.</param>
+    /// <returns>The winners, best first.</returns>
+    private static IReadOnlyList<ManagedVectorSearch.Candidate> ScoreAllChunks(
+        SqliteConnection connection,
         float[] queryVector,
         int topK,
         string? documentFilter,
         CancellationToken cancellationToken)
     {
-        using var connection = new SqliteConnection(connectionString);
-        await connection.OpenAsync(cancellationToken);
-
+        // Straight to SQLite's C API: sqlite3_column_blob hands back a span over SQLite's own row
+        // buffer, so a vector is scored where it lies — no byte[] per row, no copy. SqliteDataReader
+        // offers only copying reads (GetBytes, GetFieldValue<byte[]>), which cost more than the maths.
         var sql = documentFilter is null
-            ? "SELECT Id, DocumentId, Text, Vector, PageNumber, ChunkIndex, Metadata, CreatedAt FROM Chunks WHERE Vector IS NOT NULL"
-            : "SELECT Id, DocumentId, Text, Vector, PageNumber, ChunkIndex, Metadata, CreatedAt FROM Chunks WHERE Vector IS NOT NULL AND DocumentId = @DocumentFilter";
+            ? "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL"
+            : "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL AND DocumentId = ?1";
 
-        var rows = await connection.QueryAsync<ChunkRow>(sql, new { DocumentFilter = documentFilter });
+        var database = connection.Handle!;
+        var rc = raw.sqlite3_prepare_v2(database, sql, out var statement);
+        SqliteException.ThrowExceptionForRC(rc, database);
 
-        var results = new List<(TextChunk Chunk, float Score)>();
+        var collector = new ManagedVectorSearch.TopKCollector(topK);
+        var queryMagnitude = ManagedVectorSearch.Magnitude(queryVector);
+        long sequence = 0;
 
-        foreach (var row in rows)
+        using (statement)
         {
-            if (row.Vector == null || row.Vector.Length == 0)
-                continue;
+            if (documentFilter is not null)
+            {
+                SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(statement, 1, documentFilter), database);
+            }
 
-            var storedVector = DeserializeVector(row.Vector);
-            var similarity = ComputeCosineSimilarity(queryVector, storedVector);
+            while ((rc = raw.sqlite3_step(statement)) == raw.SQLITE_ROW)
+            {
+                if ((sequence & 1023) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
 
-            results.Add((row.ToTextChunk(), similarity));
+                var blob = raw.sqlite3_column_blob(statement, 1);
+                if (blob.Length == 0)
+                {
+                    continue;
+                }
+
+                var stored = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(blob);
+                var score = ManagedVectorSearch.CosineSimilarity(queryVector, queryMagnitude, stored);
+                collector.Add(raw.sqlite3_column_int64(statement, 0), score, sequence++);
+            }
+
+            if (rc != raw.SQLITE_DONE)
+            {
+                SqliteException.ThrowExceptionForRC(rc, database);
+            }
         }
 
-        return results
-            .OrderByDescending(r => r.Score)
-            .Take(topK)
-            .Select(r => new SearchResult { Chunk = r.Chunk, Score = r.Score })
-            .ToList();
-    }
-
-    /// <summary>
-    /// Computes cosine similarity between two vectors.
-    /// </summary>
-    /// <param name="vectorA">First vector.</param>
-    /// <param name="vectorB">Second vector.</param>
-    /// <returns>Cosine similarity score between 0 and 1.</returns>
-    private static float ComputeCosineSimilarity(float[] vectorA, float[] vectorB)
-    {
-        if (vectorA.Length != vectorB.Length)
-            return 0f;
-
-        float dotProduct = 0f;
-        float magnitudeA = 0f;
-        float magnitudeB = 0f;
-
-        for (int i = 0; i < vectorA.Length; i++)
-        {
-            dotProduct += vectorA[i] * vectorB[i];
-            magnitudeA += vectorA[i] * vectorA[i];
-            magnitudeB += vectorB[i] * vectorB[i];
-        }
-
-        var magnitude = (float)(Math.Sqrt(magnitudeA) * Math.Sqrt(magnitudeB));
-        if (magnitude == 0f)
-            return 0f;
-
-        return dotProduct / magnitude;
+        return collector.ToRankedList();
     }
 
     /// <summary>
@@ -420,16 +403,19 @@ public class SqliteVecStore : IVectorStore
         await connection.OpenAsync(cancellationToken);
 
         // Get the document ID before deletion to update chunk count
-        var documentId = await connection.QueryFirstOrDefaultAsync<string>(
+        var documentId = await connection.ScalarAsync(
             "SELECT DocumentId FROM Chunks WHERE Id = @ChunkId",
-            new { ChunkId = chunkId });
+            null,
+            cancellationToken,
+            DbParam.Text("ChunkId", chunkId)) as string;
 
-        await connection.ExecuteAsync("DELETE FROM Chunks WHERE Id = @ChunkId", new { ChunkId = chunkId });
+        await connection.ExecuteAsync(
+            "DELETE FROM Chunks WHERE Id = @ChunkId", cancellationToken, DbParam.Text("ChunkId", chunkId));
 
         // Update chunk count if document was found
         if (!string.IsNullOrEmpty(documentId))
         {
-            await UpdateDocumentChunkCountAsync(connection, documentId);
+            await UpdateDocumentChunkCountAsync(connection, documentId, null, cancellationToken);
         }
     }
 
@@ -452,13 +438,15 @@ public class SqliteVecStore : IVectorStore
         await connection.OpenAsync(cancellationToken);
 
         // Enable foreign keys to ensure cascade delete
-        await connection.ExecuteAsync("PRAGMA foreign_keys = ON");
+        await connection.ExecuteAsync("PRAGMA foreign_keys = ON", cancellationToken);
 
         // Delete document (cascades to chunks)
-        await connection.ExecuteAsync("DELETE FROM Documents WHERE Id = @DocumentId", new { DocumentId = documentId });
+        await connection.ExecuteAsync(
+            "DELETE FROM Documents WHERE Id = @DocumentId", cancellationToken, DbParam.Text("DocumentId", documentId));
 
         // Also explicitly delete chunks in case foreign keys didn't cascade
-        await connection.ExecuteAsync("DELETE FROM Chunks WHERE DocumentId = @DocumentId", new { DocumentId = documentId });
+        await connection.ExecuteAsync(
+            "DELETE FROM Chunks WHERE DocumentId = @DocumentId", cancellationToken, DbParam.Text("DocumentId", documentId));
     }
 
     /// <summary>
@@ -476,8 +464,10 @@ public class SqliteVecStore : IVectorStore
         using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
-        var rows = await connection.QueryAsync<DocumentRow>(
-            "SELECT Id, Name, SourcePath, ChunkCount, IngestedAt, Metadata FROM Documents ORDER BY IngestedAt DESC");
+        var rows = await connection.QueryAsync(
+            "SELECT Id, Name, SourcePath, ChunkCount, IngestedAt, Metadata FROM Documents ORDER BY IngestedAt DESC",
+            DocumentRow.Read,
+            cancellationToken);
 
         return rows.Select(r => r.ToDocument()).ToList();
     }
@@ -498,17 +488,17 @@ public class SqliteVecStore : IVectorStore
         using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
-        var documentCount = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM Documents");
-        var chunkCount = await connection.QuerySingleAsync<int>("SELECT COUNT(*) FROM Chunks");
+        var documentCount = (int)await ScalarInt64Async(connection, "SELECT COUNT(*) FROM Documents", null, cancellationToken);
+        var chunkCount = (int)await ScalarInt64Async(connection, "SELECT COUNT(*) FROM Chunks", null, cancellationToken);
 
         // Get database file size using SQLite pragmas
-        var pageCount = await connection.QuerySingleAsync<long>("SELECT page_count FROM pragma_page_count()");
-        var pageSize = await connection.QuerySingleAsync<long>("SELECT page_size FROM pragma_page_size()");
+        var pageCount = await ScalarInt64Async(connection, "SELECT page_count FROM pragma_page_count()", null, cancellationToken);
+        var pageSize = await ScalarInt64Async(connection, "SELECT page_size FROM pragma_page_size()", null, cancellationToken);
         var sizeBytes = pageCount * pageSize;
 
         // Get last ingestion time
-        var lastIngestion = await connection.QueryFirstOrDefaultAsync<string>(
-            "SELECT MAX(IngestedAt) FROM Documents");
+        var lastIngestion = await connection.ScalarAsync(
+            "SELECT MAX(IngestedAt) FROM Documents", null, cancellationToken) as string;
         DateTime? lastIngestionTime = null;
         if (!string.IsNullOrEmpty(lastIngestion))
         {
@@ -542,11 +532,11 @@ public class SqliteVecStore : IVectorStore
         using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
 
-        await connection.ExecuteAsync("DELETE FROM Chunks");
-        await connection.ExecuteAsync("DELETE FROM Documents");
+        await connection.ExecuteAsync("DELETE FROM Chunks", cancellationToken);
+        await connection.ExecuteAsync("DELETE FROM Documents", cancellationToken);
 
         // Reclaim disk space
-        await connection.ExecuteAsync("VACUUM");
+        await connection.ExecuteAsync("VACUUM", cancellationToken);
     }
 
     /// <summary>
@@ -555,21 +545,85 @@ public class SqliteVecStore : IVectorStore
     /// <param name="connection">The database connection.</param>
     /// <param name="documentId">The document ID to update.</param>
     /// <param name="transaction">Optional transaction to participate in.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
     private static async Task UpdateDocumentChunkCountAsync(
         SqliteConnection connection,
         string documentId,
-        SqliteTransaction? transaction = null)
+        SqliteTransaction? transaction,
+        CancellationToken cancellationToken)
     {
-        var count = await connection.QuerySingleAsync<int>(
+        var count = (int)await ScalarInt64Async(
+            connection,
             "SELECT COUNT(*) FROM Chunks WHERE DocumentId = @DocumentId",
-            new { DocumentId = documentId },
-            transaction);
+            transaction,
+            cancellationToken,
+            DbParam.Text("DocumentId", documentId));
 
         await connection.ExecuteAsync(
             "UPDATE Documents SET ChunkCount = @Count WHERE Id = @DocumentId",
-            new { Count = count, DocumentId = documentId },
-            transaction);
+            transaction,
+            cancellationToken,
+            DbParam.Int32("Count", count),
+            DbParam.Text("DocumentId", documentId));
     }
+
+    /// <summary>
+    /// Runs a query whose single row and column is an integer.
+    /// </summary>
+    /// <param name="connection">An open connection.</param>
+    /// <param name="sql">The query.</param>
+    /// <param name="transaction">Optional transaction to participate in.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <param name="parameters">The query's parameters.</param>
+    /// <returns>The value.</returns>
+    /// <exception cref="InvalidOperationException">The query returned no row or SQL NULL.</exception>
+    private static async Task<long> ScalarInt64Async(
+        SqliteConnection connection,
+        string sql,
+        SqliteTransaction? transaction,
+        CancellationToken cancellationToken,
+        params DbParam[] parameters)
+    {
+        var value = await connection.ScalarAsync(sql, transaction, cancellationToken, parameters)
+            ?? throw new InvalidOperationException("Sequence contains no elements");
+        return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Builds the parameters of a <c>Documents</c> row insert.
+    /// </summary>
+    /// <param name="documentId">The document ID.</param>
+    /// <param name="name">The document name.</param>
+    /// <param name="sourcePath">The document's source path.</param>
+    /// <param name="firstChunk">The chunk the document row is being created from.</param>
+    /// <returns>The <c>@Id</c>, <c>@Name</c>, <c>@SourcePath</c>, <c>@IngestedAt</c> and <c>@Metadata</c> parameters.</returns>
+    private static DbParam[] DocumentParameters(string documentId, string name, string sourcePath, TextChunk firstChunk) =>
+    [
+        DbParam.Text("Id", documentId),
+        DbParam.Text("Name", name),
+        DbParam.Text("SourcePath", sourcePath),
+        DbParam.Text("IngestedAt", DateTime.UtcNow.ToString("o")),
+        DbParam.Text("Metadata", SerializeDocumentMetadata(firstChunk))
+    ];
+
+    /// <summary>
+    /// Builds the parameters of a <c>Chunks</c> row insert.
+    /// </summary>
+    /// <param name="chunk">The chunk.</param>
+    /// <param name="vectorBytes">The serialized vector, or <see langword="null"/>.</param>
+    /// <param name="metadataJson">The chunk metadata as JSON.</param>
+    /// <returns>One parameter per <c>Chunks</c> column.</returns>
+    private static DbParam[] ChunkParameters(TextChunk chunk, byte[]? vectorBytes, string metadataJson) =>
+    [
+        DbParam.Text("Id", chunk.Id),
+        DbParam.Text("DocumentId", chunk.DocumentId),
+        DbParam.Text("Text", chunk.Text),
+        DbParam.Blob("Vector", vectorBytes),
+        DbParam.Int32("PageNumber", chunk.PageNumber),
+        DbParam.Int32("ChunkIndex", chunk.ChunkIndex),
+        DbParam.Text("Metadata", metadataJson),
+        DbParam.Text("CreatedAt", chunk.CreatedAt.ToString("o"))
+    ];
 
     /// <summary>
     /// Builds the JSON written to a document row's <c>Metadata</c> column.
@@ -623,6 +677,7 @@ public class SqliteVecStore : IVectorStore
     /// </summary>
     private class ChunkRow
     {
+        public long RowId { get; set; }
         public string Id { get; set; } = string.Empty;
         public string DocumentId { get; set; } = string.Empty;
         public string Text { get; set; } = string.Empty;
@@ -631,6 +686,22 @@ public class SqliteVecStore : IVectorStore
         public int? ChunkIndex { get; set; }
         public string? Metadata { get; set; }
         public string CreatedAt { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Maps the current row of a query selecting the columns in declaration order.
+        /// </summary>
+        public static ChunkRow Read(DbDataReader reader) => new()
+        {
+            RowId = reader.GetNullableInt64(0) ?? 0,
+            Id = reader.GetNullableString(1) ?? string.Empty,
+            DocumentId = reader.GetNullableString(2) ?? string.Empty,
+            Text = reader.GetNullableString(3) ?? string.Empty,
+            Vector = reader.GetNullableBytes(4),
+            PageNumber = (int?)reader.GetNullableInt64(5),
+            ChunkIndex = (int?)reader.GetNullableInt64(6),
+            Metadata = reader.GetNullableString(7),
+            CreatedAt = reader.GetNullableString(8) ?? string.Empty
+        };
 
         /// <summary>
         /// Converts this row to a TextChunk model.
@@ -666,6 +737,19 @@ public class SqliteVecStore : IVectorStore
         public int ChunkCount { get; set; }
         public string IngestedAt { get; set; } = string.Empty;
         public string? Metadata { get; set; }
+
+        /// <summary>
+        /// Maps the current row of a query selecting the columns in declaration order.
+        /// </summary>
+        public static DocumentRow Read(DbDataReader reader) => new()
+        {
+            Id = reader.GetNullableString(0) ?? string.Empty,
+            Name = reader.GetNullableString(1) ?? string.Empty,
+            SourcePath = reader.GetNullableString(2) ?? string.Empty,
+            ChunkCount = (int)(reader.GetNullableInt64(3) ?? 0),
+            IngestedAt = reader.GetNullableString(4) ?? string.Empty,
+            Metadata = reader.GetNullableString(5)
+        };
 
         /// <summary>
         /// Converts this row to a Document model.

@@ -25,7 +25,7 @@ public sealed class HttpWebContentFetcherGuardTests
     /// HANDLER. The fetcher's own textual check would refuse this URL before a socket was opened,
     /// which would let a broken handler pass.
     /// </remarks>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-077 GuardedHandlerRefusesToConnectToLoopback")]
     public async Task GuardedHandlerRefusesToConnectToLoopback()
     {
         using var listener = LoopbackServer.Start();
@@ -47,7 +47,7 @@ public sealed class HttpWebContentFetcherGuardTests
     /// surface as "replied 302 (Found)" — safe, but it told the operator nothing about the URL they
     /// had pasted.
     /// </remarks>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-077 UnfollowedRedirectToAPrivateHostIsReportedAsRefused")]
     public async Task UnfollowedRedirectToAPrivateHostIsReportedAsRefused()
     {
         using var client = new HttpClient(new RedirectingHandler("http://169.254.169.254/latest/meta-data/"));

@@ -74,6 +74,12 @@ public static class LlmProviderFactory
                 route.ModelId,
                 loggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>()),
 
+            // REQ-RAG-070: a subscription has no API key; it needs the host's sign-in callback.
+            LlmSource.Subscription => throw SubscriptionNeedsSignIn(connector),
+
+            // REQ-RAG-064: the in-process model; no endpoint, no key. Served by TechieRag.Local.
+            LlmSource.Local => LocalLlmProviderRegistry.Create(route.ModelId, loggerFactory),
+
             _ => throw new InvalidOperationException($"Connector '{connector.Name}' has no provider implementation.")
         };
     }
@@ -93,4 +99,61 @@ public static class LlmProviderFactory
         ILoggerFactory? loggerFactory = null,
         int maxTokens = 2048) =>
         Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens);
+
+    /// <summary>
+    /// Creates a provider for a <see cref="LlmSource.Subscription"/> route, signing in through the
+    /// host's callback (REQ-RAG-069 / REQ-RAG-070).
+    /// </summary>
+    /// <param name="route">A subscription route, e.g. from <c>ModelRouter.Require("chatgpt-subscription/gpt-6-luna")</c>.</param>
+    /// <param name="signInCallback">Called with the page and code when the user must sign in; the host opens the browser.</param>
+    /// <param name="sessionStore">Where the session is kept; null keeps it in memory.</param>
+    /// <param name="loggerFactory">Optional logger factory.</param>
+    /// <returns>A provider billed to the signed-in user's subscription.</returns>
+    /// <exception cref="ArgumentNullException">A required argument is null.</exception>
+    /// <exception cref="SubscriptionSignInException">The route's vendor does not permit subscription sign-in
+    /// (<see cref="SubscriptionSignInException.CodeNotPermitted"/>); the message carries the vendor's terms.</exception>
+    /// <exception cref="InvalidOperationException">The route is not a subscription route.</exception>
+    public static ILlmProvider CreateSubscription(
+        ModelRoute route,
+        Func<Models.SubscriptionSignInPrompt, CancellationToken, Task> signInCallback,
+        ISubscriptionSessionStore? sessionStore = null,
+        ILoggerFactory? loggerFactory = null)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        ArgumentNullException.ThrowIfNull(signInCallback);
+
+        var connector = route.Connector;
+        if (connector.Source != LlmSource.Subscription || connector.Subscription is null)
+        {
+            throw new InvalidOperationException($"Connector '{connector.Name}' is not a subscription connector.");
+        }
+
+        return connector.Name switch
+        {
+            SubscriptionConnectorRows.ChatGptName when connector.Subscription.Permitted => new ChatGptSubscriptionLlmProvider(
+                signInCallback,
+                new ChatGptSubscriptionOptions { Model = route.ModelId, SessionStore = sessionStore },
+                loggerFactory?.CreateLogger<ChatGptSubscriptionLlmProvider>()),
+
+            _ => throw NotPermitted(connector)
+        };
+    }
+
+    /// <summary>
+    /// The exception for a <see cref="LlmSource.Subscription"/> connector reached without the host's
+    /// sign-in callback: an <see cref="InvalidOperationException"/> naming the builder method when the
+    /// vendor permits sign-in, otherwise the coded not-permitted exception carrying the vendor's terms.
+    /// Shared with <c>TechieRagBuilder</c> so configuration and the factory give the same message (REQ-FN-066).
+    /// </summary>
+    /// <param name="connector">The subscription connector.</param>
+    /// <returns>The exception to throw.</returns>
+    internal static Exception SubscriptionNeedsSignIn(LlmConnectorDescriptor connector) =>
+        connector.Subscription is { Permitted: true, BuilderMethod: { } method }
+            ? new InvalidOperationException(
+                $"Connector '{connector.Name}' is a subscription and needs a sign-in callback: use {method} or LlmProviderFactory.CreateSubscription.")
+            : NotPermitted(connector);
+
+    private static SubscriptionSignInException NotPermitted(LlmConnectorDescriptor connector) =>
+        new(SubscriptionSignInException.CodeNotPermitted,
+            $"Connector '{connector.Name}' offers no subscription sign-in (terms checked {connector.Subscription?.CheckedOn:yyyy-MM-dd}): {connector.Subscription?.Terms}");
 }

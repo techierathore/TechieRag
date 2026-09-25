@@ -13,14 +13,14 @@ A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. 
 - **Multiple Vector Stores**: SQLite-vec (local), PostgreSQL/pgvector, Qdrant
 - **Built-in Document Processors**: PDF, DOCX, HTML, Markdown, JSON, TOML, and code files
 - **Fluent Builder API**: Easy configuration with method chaining
-- **Offline Capable**: Use `TechieRag.Embedded` for completely offline operation with BGE-M3 model
+- **Offline after one download**: `TechieRag.Embedded` downloads the BGE-M3 model once, then works offline; `TechieRag.Local` does the same for an in-process language model
 
 ## Packages
 
 | Package | Description | User Guide |
 |---------|-------------|------------|
 | `TechieRag` | Core library with all embedding providers and vector stores | [User Guide](docs/TechieRag-UserGuide.md) |
-| `TechieRag.Embedded` | Self-contained package with embedded BGE-M3 ONNX model for offline use | [User Guide](docs/TechieRag.Embedded-UserGuide.md) |
+| `TechieRag.Embedded` | ONNX embeddings and reranking; the BGE-M3 model downloads once, then works offline | [User Guide](docs/TechieRag.Embedded-UserGuide.md) |
 
 ## Installation
 
@@ -31,7 +31,7 @@ no `nuget.config` edit — the default NuGet feed every .NET SDK already has is 
 # Core package — bring your own embedding service (Ollama, OpenAI, Azure OpenAI, LM Studio, ...)
 dotnet add package TechieRag
 
-# OR the self-contained package — embedded BGE-M3 model, works fully offline
+# OR the embedded package — the BGE-M3 model downloads once, then works offline
 dotnet add package TechieRag.Embedded
 ```
 
@@ -119,7 +119,7 @@ Never commit a `nuget.config` that carries the token. The publishing pipeline fo
 
 ## Quick Start
 
-### Using TechieRag.Embedded (Offline, No Setup Required)
+### Using TechieRag.Embedded (downloads once, then works offline)
 
 ```csharp
 using TechieRag;
@@ -365,18 +365,9 @@ Use cases:
 
 ## Sample Application
 
-The repository includes a Blazor Server application (**TechieDesk**, formerly `TechieRagWeb`) demonstrating:
-- **File Ingestion UI** - Upload and process documents from local directories
-- **Text Ingestion UI** - Paste and ingest raw text content directly
-- Search interface
-- Configuration management
-- Qdrant database administration
+**Sevak** (TechieDesk until 2026-09-24) is the application that shows the full capabilities of TechieRag: document library, workspaces and chat with sources, LLM settings for every provider, agents and flows, connectors, token usage, Qdrant administration. Since 2026-09-24 it lives in its own repository and consumes `TechieRag` and `TechieRag.Embedded` from NuGet exactly as any other application does. The repository is private until Sevak v0.1; the link will appear here with the first release.
 
-Run it with:
-```bash
-cd apps/TechieDesk
-dotnet run
-```
+A small four-platform probe app (`samples/TechieRag.Probe`, .NET MAUI for Windows, macOS, Android and iOS) is planned in this repository; see `docs/TechieRag-P2-BRD.md`.
 
 ## Documentation
 

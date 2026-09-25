@@ -40,7 +40,7 @@
 
 ## Introduction
 
-TechieRag.Embedded is a self-contained RAG (Retrieval-Augmented Generation) library that includes an embedded BGE-M3 ONNX model for completely offline operation. No external embedding services required!
+TechieRag.Embedded is a self-contained RAG (Retrieval-Augmented Generation) library that runs the BGE-M3 ONNX model in-process: it downloads once, then works offline. No external embedding services required!
 
 ### Key Features
 
@@ -57,7 +57,7 @@ TechieRag.Embedded is a self-contained RAG (Retrieval-Augmented Generation) libr
 | Package Size | Small (~2MB) | Small (~2MB) |
 | Model Size | N/A | ~2.3GB (downloaded) |
 | External Service | Required | Not Required |
-| Offline Mode | No | Yes |
+| Offline Mode | No | Yes, after a one-time download |
 | Setup Complexity | Medium | Zero |
 
 ---

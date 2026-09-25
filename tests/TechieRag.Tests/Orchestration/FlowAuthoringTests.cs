@@ -64,7 +64,7 @@ public sealed class FlowAuthoringTests
     }
 
     /// <summary>Everything a builder sets survives a store-and-reopen, including uninterpreted canvas metadata.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-087 AFlowRoundTripsThroughTheSerializerUnchanged")]
     public void AFlowRoundTripsThroughTheSerializerUnchanged()
     {
         var original = SampleFlow();
@@ -146,7 +146,7 @@ public sealed class FlowAuthoringTests
     }
 
     /// <summary>A cycle is an error by default and a warning once the flow opts in — the documented choice, both ways.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-087 ACycleIsAnErrorByDefaultAndAWarningWhenAllowed")]
     public void ACycleIsAnErrorByDefaultAndAWarningWhenAllowed()
     {
         var flow = SampleFlow();

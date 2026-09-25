@@ -20,7 +20,7 @@ public class StreamingSourcesTests
     /// completed event carrying the aggregated answer — so a streamed response carries its
     /// citations without an app-side workaround.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-103 StreamingYieldsSourcesThenTokensThenCompleted")]
     public async Task StreamingYieldsSourcesThenTokensThenCompleted()
     {
         var results = new[]

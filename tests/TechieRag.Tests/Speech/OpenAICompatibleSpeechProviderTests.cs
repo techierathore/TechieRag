@@ -13,7 +13,7 @@ namespace TechieRag.Tests.Speech;
 public class OpenAICompatibleSpeechProviderTests
 {
     /// <summary>Verifies a verbose transcription response yields text, language and duration.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-105 TranscribeReadsTextLanguageAndDuration")]
     public async Task TranscribeReadsTextLanguageAndDuration()
     {
         var handler = new SpeechStubHandler(VerboseTranscriptJson(), "application/json");

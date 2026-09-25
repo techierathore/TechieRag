@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- REQ-RAG-016 / BRD-84, ADR-008: agents on Microsoft Agent Framework live in their OWN package.
+         MAF ships roughly monthly; keeping it here means a consumer of the core package never inherits
+         that churn. Frameworks mirror TechieRag so an LTS consumer can take it too. No MSBuild targets:
+         the AI-reference files stay the core package's job (ADR-006). -->
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- Package Metadata -->
+    <PackageId>TechieRag.Agents</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Techie Rathor</Authors>
+    <Company>TechieRathor</Company>
+    <Description>Microsoft Agent Framework agents over TechieRag: a fluent TechieRagAgentBuilder (LM Studio first, Ollama, OpenAI, OpenAI-compatible, or the LLM already configured on TechieRag), agentic retrieval tools with citation refs and match-quality status, and public adapters between TechieRag's ILlmProvider, IToolHandler, IProgress&lt;AgentStep&gt; and IConversationMemory seams and Microsoft.Extensions.AI / Agent Framework. No hosted tools, no telemetry exporters: nothing leaves the machine except calls to the model you configure.</Description>
+    <PackageTags>RAG;AI;Agents;AgentFramework;MicrosoftAgentFramework;Microsoft.Extensions.AI;LLM;LMStudio;Ollama;OpenAI;ToolCalling</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- REQ-FN-065 / BRD-156: same publishing posture as TechieRag core - see NUGET-PUBLISHING.md §3.
+         Packing is explicit (a publish workflow's dotnet pack), SourceLink via the SDK's bundled
+         GitHub provider, symbols as a .snupkg alongside the .nupkg. -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TechieRag.Agents.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Versions confirmed live on nuget.org on 2026-09-24 (REQ-RAG-016): Microsoft.Agents.AI 1.22.0
+         (published 2026-09-18; the proposal's 1.20.0 is two releases behind) depends on
+         Microsoft.Extensions.AI 10.10.0, so the MEAI pins match it exactly. Stable releases only.
+         Microsoft.Extensions.AI.OpenAI brings OpenAI 2.13.0, which unifies with core's
+         Azure.AI.OpenAI 2.1.0 (open lower bound OpenAI >= 2.1.0); AzureOpenAICompatibilityTests
+         proves the core embedding provider still constructs against it.
+         Not referenced on purpose: Microsoft.Agents.AI.OpenAI, .Workflows, .Hosting*, OllamaSharp. -->
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.22.0" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.0" />
+  </ItemGroup>
+
+</Project>

@@ -86,7 +86,7 @@ public sealed class LiveEmbeddedTokenizerDiagnosticTests
     /// Cross-language retrieval ranks the relevant passage higher — the claim REQ-NFR-006 makes for
     /// BGE-M3's 100+ languages, and the assertion that exposed the reranker's defect.
     /// </summary>
-    [EmbedderDiagnosticFact]
+    [EmbedderDiagnosticFact(DisplayName = "REQ-RAG-052 HindiQueryRanksTheRelevantEnglishPassageHigher")]
     public async Task HindiQueryRanksTheRelevantEnglishPassageHigher()
     {
         var (relevant, irrelevant) = await SimilaritiesAsync(HindiQuestion);

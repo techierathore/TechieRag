@@ -150,7 +150,7 @@ public sealed class EmailConnectorTests
     /// An incremental run asks the server for recent mail only, with a day of overlap because IMAP's
     /// date search is day-granular and clocks disagree.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-081 AsksOnlyForMailSinceThePreviousRun")]
     public async Task AsksOnlyForMailSinceThePreviousRun()
     {
         var transport = new FakeMailTransport().Message(
@@ -186,7 +186,7 @@ public sealed class EmailConnectorTests
     }
 
     /// <summary>Attachment text is appended when asked for, and read from memory rather than disk.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-081 IncludesAttachmentTextWhenAsked")]
     public async Task IncludesAttachmentTextWhenAsked()
     {
         var transport = new FakeMailTransport().Message(

@@ -80,6 +80,30 @@ public interface IWorkspaceStore
     Task RemoveDocumentAsync(string workspaceId, string documentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Removes a document's membership from every workspace that holds it (REQ-RAG-095 / BRD-142).
+    /// </summary>
+    /// <param name="documentId">The document identifier.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>A task representing the asynchronous delete.</returns>
+    /// <remarks>
+    /// <para>Called by <c>TechieRagClient.DeleteDocumentAsync</c> after the document's vectors are
+    /// deleted, so a deleted document leaves no membership row pointing at nothing. The default
+    /// implementation walks every workspace through <see cref="RemoveDocumentAsync"/>, so an
+    /// existing external implementation keeps compiling and behaves correctly; the relational
+    /// stores override it with one statement.</para>
+    /// </remarks>
+    async Task RemoveDocumentFromAllWorkspacesAsync(string documentId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(documentId);
+
+        var workspaces = await ListWorkspacesAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var workspace in workspaces)
+        {
+            await RemoveDocumentAsync(workspace.WorkspaceId, documentId, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// Lists all document memberships for a workspace.
     /// </summary>
     /// <param name="workspaceId">The workspace identifier.</param>

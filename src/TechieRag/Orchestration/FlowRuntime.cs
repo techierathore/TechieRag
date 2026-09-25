@@ -103,4 +103,24 @@ public sealed class FlowRuntime
     /// own. Null adds nothing.
     /// </summary>
     public string? SystemPreamble { get; set; }
+
+    /// <summary>The time limit a runtime applies unless the host sets another: ten minutes.</summary>
+    public static readonly TimeSpan DefaultTimeLimit = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// Gets or sets how long one flow run may take before it is stopped with
+    /// <see cref="FlowRunOutcome.TimedOut"/> and a <see cref="FlowMessageCodes.FlowTimedOut"/> message
+    /// (REQ-RAG-088 / BRD-135). Null, zero, negative or <see cref="Timeout.InfiniteTimeSpan"/> means no
+    /// limit.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why the host sets it, not the flow.</b> The limit exists for the case a flow author
+    /// cannot see: a tool node or a guardrail that waits on a person — an egress confirmation, an
+    /// approval — who never answers. Without a bound such a run holds its caller forever.</para>
+    /// <para><b>It holds even against code that ignores cancellation.</b> The runner stops waiting on
+    /// the running node when the limit passes; a confirmation that never observes its token is
+    /// abandoned rather than awaited. A flow exposed as a tool (<see cref="AgentToolHandler.ForFlow"/>)
+    /// shares this runtime, so its inner run carries the same limit.</para>
+    /// </remarks>
+    public TimeSpan? TimeLimit { get; set; } = DefaultTimeLimit;
 }

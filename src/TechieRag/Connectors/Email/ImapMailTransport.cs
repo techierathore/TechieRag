@@ -471,7 +471,10 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
                 {
                     throw new ConnectorException(
                         "email",
-                        $"{options.Host} announced {length:N0} bytes of message content, beyond the {options.MaxMessageBytes:N0}-byte limit for one response. Raise ImapMailboxOptions.MaxMessageBytes if this mailbox genuinely holds mail that large.");
+                        $"{options.Host} announced {length:N0} bytes of message content, beyond the {options.MaxMessageBytes:N0}-byte limit for one response. Raise ImapMailboxOptions.MaxMessageBytes if this mailbox genuinely holds mail that large.")
+                    {
+                        ErrorCode = ConnectorErrorCodes.ImapLiteralTooLarge,
+                    };
                 }
 
                 literalBudget -= length;

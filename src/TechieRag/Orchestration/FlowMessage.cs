@@ -176,4 +176,11 @@ public static class FlowMessageCodes
 
     /// <summary>A handler exposing an agent or flow hit its per-turn invocation ceiling. <c>{0}</c> tool name, <c>{1}</c> the ceiling.</summary>
     public const string SubFlowInvocationLimitReached = "SubFlowInvocationLimitReached";
+
+    /// <summary>
+    /// The run did not finish within its time limit (REQ-RAG-088 / BRD-135). <c>{0}</c> the limit in
+    /// seconds, <c>{1}</c> the node that was running or waiting — typically a tool node waiting on a
+    /// host confirmation.
+    /// </summary>
+    public const string FlowTimedOut = "FlowTimedOut";
 }

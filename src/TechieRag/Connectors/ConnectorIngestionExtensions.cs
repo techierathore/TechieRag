@@ -12,7 +12,7 @@ namespace TechieRag.Connectors;
 /// </remarks>
 public static class ConnectorIngestionExtensions
 {
-    /// <summary>Runs a connector and ingests everything it fetched (REQ-RAG-032 / BRD-113).</summary>
+    /// <summary>Runs a connector and ingests each document as it is fetched (REQ-RAG-032 / BRD-113, REQ-RAG-083 / BRD-127).</summary>
     /// <param name="rag">The RAG instance.</param>
     /// <param name="connector">The connector to run.</param>
     /// <param name="previousSync">State from the previous run, or null for a first, full run.</param>
@@ -20,6 +20,7 @@ public static class ConnectorIngestionExtensions
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>What was ingested, what was skipped and why, and the state for the next run.</returns>
     /// <exception cref="ConnectorException">The source could not be read at all, or too many items failed in a row.</exception>
+    /// <exception cref="OperationCanceledException">The run was cancelled; every document fetched before that is already ingested.</exception>
     public static async Task<ConnectorIngestionResult> IngestConnectorAsync(
         this ITechieRag rag,
         IDataConnector connector,
@@ -30,38 +31,45 @@ public static class ConnectorIngestionExtensions
         ArgumentNullException.ThrowIfNull(rag);
         ArgumentNullException.ThrowIfNull(connector);
 
+        var ingested = new List<string>();
+        var skipped = new List<ConnectorItemFailure>();
+
+        // Each document is ingested the moment the runner fetches it (REQ-RAG-083 / BRD-127), so a
+        // run cancelled or failed part-way keeps everything it had already fetched. Ingesting after
+        // the walk lost every fetched document on cancellation (TR-RAG-022).
         var run = await new ConnectorRunner()
-            .RunAsync(connector, previousSync, options, cancellationToken)
+            .RunAsync(
+                connector,
+                previousSync,
+                options,
+                async (document, token) =>
+                {
+                    // An item whose text is empty is a binary file, an empty page or a message with
+                    // nothing but an image in it. Ingesting it would add a document that can never be
+                    // retrieved and would make the ingested count a lie about what is searchable. Its
+                    // version stays recorded: it was read successfully and genuinely has no text.
+                    if (string.IsNullOrWhiteSpace(document.Text))
+                    {
+                        skipped.Add(new ConnectorItemFailure(
+                            document.Item.Id, document.Item.Name, "The item held no readable text."));
+                        return;
+                    }
+
+                    ingested.Add(await rag.IngestTextAsync(
+                        document.Text,
+                        document.Item.Name,
+                        BuildMetadata(connector, document.Item),
+                        token).ConfigureAwait(false));
+                },
+                cancellationToken)
             .ConfigureAwait(false);
 
-        var ingested = new List<string>();
-        var skipped = new List<ConnectorItemFailure>(run.Failures);
+        skipped.InsertRange(0, run.Failures);
 
-        foreach (var document in run.Documents)
+        return new ConnectorIngestionResult(ingested, skipped, run.Sync, run.ReachedLimit)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            // An item whose text is empty is a binary file, an empty page or a message with nothing
-            // but an image in it. Ingesting it would add a document that can never be retrieved and
-            // would make the ingested count a lie about what is searchable.
-            if (string.IsNullOrWhiteSpace(document.Text))
-            {
-                skipped.Add(new ConnectorItemFailure(
-                    document.Item.Id, document.Item.Name, "The item held no readable text."));
-
-                // The version stays recorded: the item was read successfully and genuinely has no
-                // text, so re-fetching it on every future run would cost the same and find the same.
-                continue;
-            }
-
-            ingested.Add(await rag.IngestTextAsync(
-                document.Text,
-                document.Item.Name,
-                BuildMetadata(connector, document.Item),
-                cancellationToken).ConfigureAwait(false));
-        }
-
-        return new ConnectorIngestionResult(ingested, skipped, run.Sync, run.ReachedLimit);
+            LimitCode = run.LimitCode,
+        };
     }
 
     private static Dictionary<string, object> BuildMetadata(IDataConnector connector, ConnectorItem item)
@@ -122,4 +130,11 @@ public sealed record ConnectorIngestionResult(
     IReadOnlyList<string> DocumentIds,
     IReadOnlyList<ConnectorItemFailure> Skipped,
     ConnectorSyncState Sync,
-    bool ReachedLimit = false);
+    bool ReachedLimit = false)
+{
+    /// <summary>
+    /// Gets the stable code of the budget that stopped the run, from <see cref="ConnectorErrorCodes"/>;
+    /// null when <see cref="ReachedLimit"/> is false (REQ-RAG-082).
+    /// </summary>
+    public string? LimitCode { get; init; }
+}

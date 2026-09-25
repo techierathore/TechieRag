@@ -1,7 +1,7 @@
 namespace TechieRag.Tests.Web.Live;
 
 /// <summary>
-/// The real hosts the live-network suite reads from (REQ-RAG-016/017/018).
+/// The real hosts the live-network suite reads from (REQ-RAG-016/017).
 /// </summary>
 /// <remarks>
 /// <para>Chosen for stability and for being fair game. <c>example.com</c> and <c>iana.org</c> exist
@@ -68,12 +68,6 @@ public static class LiveTargets
     /// literal host string lets it through and the request lands on loopback.
     /// </remarks>
     public const string HostnameResolvingToLoopback = "127.0.0.1.nip.io";
-
-    /// <summary>A video with a large, stable set of caption tracks, including a manual English one.</summary>
-    public const string VideoWithCaptions = "https://www.youtube.com/watch?v=aircAruvnKk";
-
-    /// <summary>A video that publishes no caption tracks at all.</summary>
-    public const string VideoWithoutCaptions = "https://www.youtube.com/watch?v=1La4QzGeaaQ";
 
     /// <summary>Builds an open-redirect URL that lands on the given target.</summary>
     /// <param name="target">The absolute URL the redirector should send the client to.</param>

@@ -93,7 +93,7 @@ public sealed class ConnectorIngestionTests
     }
 
     /// <summary>The state for the next run comes back with the result, ready to persist.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-078 ReturnsSyncStateForTheNextRun")]
     public async Task ReturnsSyncStateForTheNextRun()
     {
         var rag = new RecordingRag();
@@ -106,7 +106,7 @@ public sealed class ConnectorIngestionTests
     }
 
     /// <summary>A second run with the returned state ingests nothing that has not changed.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-078 ASecondRunIngestsOnlyWhatChanged")]
     public async Task ASecondRunIngestsOnlyWhatChanged()
     {
         var rag = new RecordingRag();
@@ -118,6 +118,29 @@ public sealed class ConnectorIngestionTests
 
         Assert.Single(second.DocumentIds);
         Assert.Equal("b", rag.Ingested[^1].Name);
+    }
+
+    /// <summary>
+    /// A connector ingestion stopped by the byte budget reports the same stable code the run does, so
+    /// a host calling <c>IngestConnectorAsync</c> can switch on it without running the runner itself.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-082 IngestionCarriesTheByteBudgetCode")]
+    public async Task IngestionCarriesTheByteBudgetCode()
+    {
+        var rag = new RecordingRag();
+        var connector = new FakeDataConnector()
+            .Page(Item("a"), Item("b"), Item("c"))
+            .WithText("a", new string('x', 400))
+            .WithText("b", new string('x', 400))
+            .WithText("c", new string('x', 400));
+        var options = NoDelay();
+        options.MaxTotalBytes = 700;
+
+        var result = await rag.IngestConnectorAsync(connector, options: options);
+
+        Assert.Equal(2, result.DocumentIds.Count);
+        Assert.True(result.ReachedLimit);
+        Assert.Equal(ConnectorErrorCodes.RunByteBudgetReached, result.LimitCode);
     }
 
     private static ConnectorRunOptions NoDelay() => new() { RequestDelay = TimeSpan.Zero };

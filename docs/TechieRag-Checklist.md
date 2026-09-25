@@ -1,240 +1,247 @@
 # TechieRag — Checklist
 
-> Migrated from docs/trrag-refactoring-roadmap.md + docs/techierag-v2-llm-implementation-spec.md on 2026-06-25. Phase structure, completion %, and status remarks carried over verbatim — verify before building. All UI lives in the **TechieDesk** Blazor Server app at `apps/TechieDesk` (renamed from `samples/TechieRagWeb` 2026-07-17, BRD-82 / REQ-UI-014 — Verified).
->
-> Merged on 2026-06-26 from the former docs/TechieRag-UI-Checklist.md (REQ-UI-*) and docs/TechieRag-Functional-Checklist.md (REQ-FN/RAG/NFR-*) into this single checklist. Rows, statuses, %, remarks, and detail anchors carried over verbatim.
-
-## Table of Contents
-
-1. [Goal](#goal)
-2. [Requirements Status](#requirements-status)
-3. [UI / Pages](#ui--pages)
-4. [Functional requirements](#functional-requirements)
-5. [RAG / AI requirements (→ /techierag)](#rag-ai-requirements-techierag)
-6. [Non-functional](#non-functional)
+| | |
+|---|---|
+| App | TechieRag |
+| Size | Medium |
+| Phase | 1 of 2 |
 
 ## Goal
 
-Deliver a configurable .NET RAG library (BRD §1) whose ingestion, embedding, vector storage, retrieval, and LLM-generation capabilities are all pluggable by configuration. This single checklist is the whole app's work list: it tracks the UI (`REQ-UI-*`, the **TechieDesk** Blazor Server app — formerly `TechieRagWeb` — + Qdrant administration UI), the library/backend (`REQ-FN-*`), the RAG/AI domain (`REQ-RAG-*`), and cross-cutting non-functionals (`REQ-NFR-*`). All items were delivered across v1.1 (roadmap, completed 2025-12-30) and v2 (LLM spec, completed 2026-02-18) and are migrated as **Done (pre-existing)**.
+Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` §1: ingestion, embedding, vector storage, retrieval and generation, all pluggable by configuration. Phase 1 is the shipped core; every row was carried on 2026-09-24 from the June checklist with its id and status preserved (the fourteen application rows were re-classed from REQ-UI to REQ-FN and marked N/A because their screens moved to Sevak). Phase 2 is `docs/TechieRag-P2-Checklist.md`.
 
 ## Requirements Status
 
 | ID | Requirement | Status | % | Remarks | Details |
 |----|-------------|--------|---|---------|---------|
-| REQ-UI-001 | Home landing + navigation | Verified | 100% | ✅ VERIFIED 2026-07-01 (verifier *verify ui, live boot on :5099): render+visual gate PASS — landing header + all six nav cards render with Lucide icons; nav links resolve to every feature route. Screenshots test-results/screens/home-{desktop,mobile}.png. Prior: Done (pre-existing) v1.1. ✅ re-confirmed 2026-07-02 (verifier *verify all): render+visual PASS @1280/390 | [view](#d-req-ui-001) |
-| REQ-UI-002 | Settings page (embedding + vector store) | Done (pre-existing) | 100% | v1.1; roadmap Phase 5.2; v2 TrBlazeUI rewrite (spec Phase 6). ⚠ DevGuide 2026-06-25: "Reset to Defaults" never calls `RagManager.ReconfigureAsync` (Settings.razor:326-331) so the live instance keeps old config until next Save; `EnableTelemetry` is persisted but never read by `TechieRagManager` (no usage at TechieRagManager.cs:94-253) — toggle is a no-op (static — confirm at runtime). Core save/init path unaffected. ✅ 2026-07-01 verifier (render+visual gate, live boot): Settings page renders all controls + looks right @ 1280/390; loads real config (Embedding=Embedded/BGE-M3, Vector Store=SqliteVec, DB=techieragex.db — matches techierag-config.json). Save/Reset write-actions NOT re-exercised this run (would mutate live config); the pre-existing Reset-no-op notes above are static, unchanged. Screenshot settings-desktop.png. ✅ 2026-07-02 verifier (*verify all): runtime render+visual re-confirmed @1280/390; Save/Reset/Initialize write-actions again not re-driven (mutate live config) | [view](#d-req-ui-002) |
-| REQ-UI-003 | LLM Settings page (provider/fallback/usage/resilience/prompts) | Verified | 100% | ✅ FIXED+VERIFIED 2026-07-01 (flow-master *build-phase, live smoke): `ResetToDefaultsAsync` now resets the config sections then calls `ConfigService.SaveConfigAsync` + `RagManager.ReconfigureAsync` in the same try/catch/toast pattern as Save. The sample is now bootable (TrBlazeUI PAT refreshed); live smoke confirmed `techierag-config.json` is rewritten with a full `llm` defaults block on Reset, no exception. ✅ Toast now renders too: the app-wide overlay bug (TrBlazeUI **TR-001**) was root-caused to the sample's static-layout render mode and FIXED same day (global interactivity in `App.razor`); live-verified the Source dropdown opens/selects and Save/Reset show their success toast. Prior: in-memory no-op. ✅ 2026-07-01 verifier (render+visual gate re-confirm): LLM Settings renders all four tabs (Provider/Fallback/Usage/Prompts), Source select, Reset/Save + Test LLM Connection card + looks right @ 1280/390. Screenshot llm-settings-desktop.png. (Running instance Source=None this run — Save/Reset config-mutation not re-driven; prior live smoke stands). ✅ re-confirmed 2026-07-02 (*verify all): render+visual PASS @1280/390; live Test LLM Connection from this page succeeded in 912ms (LM Studio qwen2.5-coder-32b) | [view](#d-req-ui-003) |
-| REQ-UI-004 | Ingestion + Text Ingestion pages | Verified | 100% | ✅ VERIFIED 2026-07-01 (verifier *verify ui, live boot): render+visual gate PASS on BOTH pages + **data-render confirmed with real SQLite data** — Vector Store Statistics / Statistics cards show Documents=2, Chunks=151, Storage=768.0 KB, Last Ingestion 12/31/2025 (not blank). Folder/pattern inputs, Ingest/Clear buttons, live char/word counters all render + look right @ 1280/390. Screenshots ingestion-{desktop,mobile}.png, text-ingestion-desktop.png. (Ingest write-action not re-run this session; existing store data proves the stats/documents render path.) Prior: Done (pre-existing) v1.1. ⚠ visual regression observed 2026-07-02 (verifier, incidental probe during *verify REQ-UI-007): `/ingestion` overflows the 390px viewport — `document.scrollWidth=560` on fresh load (same non-wrapping-content + shell-stretch pattern as REQ-UI-007 / TR-003); right-side content clips off-canvas on mobile. Needs a mobile-width layout pass + re-verify. ✅ FIXED + RE-VERIFIED 2026-07-02 (same-day): `/ingestion` `scrollWidth` now exactly 390 @390 (was 560) — `main{min-width:0}` (TR-003 workaround), `min-w-0` on the stats/documents grid Cards, `relative overflow-x-auto` wrappers around both DataTables (TR-004: pagination sr-only abspos spans escaped to `<main>`). All controls fit and render at both widths — screenshots ingestion-fixed-{desktop,mobile}.png. ✅✅ INGEST WRITE-PATH VERIFIED LIVE 2026-07-02 (verifier *verify all, tests/verify/rag-datapath.spec.ts): raw-text ingest 'verify-datapath-tmp' → success toast + doc id, /ingestion stats Documents 2→3 with the new row rendered non-empty, then targeted per-row delete on /text-ingestion → back to 2, temp doc gone — full chunk→BGE-M3-embed→SQLite-vec cycle proven (rag-ingest.png). Render+visual PASS both widths (DataTable pagination sits in its local overflow-x-auto wrapper @390 — the accepted TR-004 containment pattern; ui.spec geometry gate now exempts local scroll wrappers, shell-level scroll still fails) | [view](#d-req-ui-004) |
-| REQ-UI-005 | Chat page (RAG chat, streaming, sources, top-K, filter) | Verified | 100% | ✅ FIXED 2026-07-01 (flow-master *build-phase): both streaming branches now capture the `ITokenTracker` session-usage delta (falling back to `provider.EstimateTokenCount` + `RecordUsage` when a provider reports 0 streamed usage) so the footer moves off zero; `HandleAutoRag` streaming now does ONE `SearchAsync` and streams via `provider.ChatStreamAsync` on the retrieved context — eliminating the second vector search. Compiles clean; page renders + visual gate PASS. ⚠ Data-path (streamed token/cost) NOT live-verified — **no LLM provider reachable in this environment** (no Ollama/API key). Library gaps logged **TR-RAG-001** (streaming RAG can't return sources / bypasses PromptTemplateEngine) and **TR-RAG-002** (OpenAI-compat streaming reports 0 usage). Needs a live LLM to reach Verified. ✅ 2026-07-01 verifier (render+visual gate, live boot): Chat page renders all controls (Mode/Top-K/Doc-filter/Streaming config, message pane, Ask input + Send, Clear Chat/New Conversation, footer `Session: 0 tokens $0.0000`) + looks right @ 1280/390 — screenshot chat-desktop.png. ✅✅ DATA-PATH VERIFIED LIVE 2026-07-01 (verifier, LM Studio `qwen2.5-coder-32b-instruct` @192.168.1.13:1234): Mode=Direct LLM + Streaming=On, asked "Reply with one word: PONG" → assistant streamed "PONG" and the **footer moved OFF ZERO to "Session: 10 tokens · 2 messages"** — the streamed token-accounting fix works (screenshot chat-streamed.png). ($0.0000 cost is the separate pricing-table gap, not this REQ.) NOTE: to reach the LLM the RAG instance must be warm first — a cold Chat visit deadlocks (**TR-RAG-005**, GetLlmProvider sync-over-async). ✅✅ RAG-MODE + SOURCES VERIFIED LIVE 2026-07-02 (verifier *verify all): Auto-RAG + streaming ON → streamed answer, "Sources Used" panel rendered with % relevance scores, session footer off zero (rag-chat-sources.png) — the previously-unverified sources/RAG data-path is now proven; direct-LLM streaming footer re-confirmed same day (llm.spec.ts) | [view](#d-req-ui-005) |
-| REQ-UI-006 | LLM Playground page (completion/structured/chat) | Verified | 100% | ✅ FIXED 2026-07-01 (flow-master *build-phase): `GenerateCompletion` now parses Temperature (`float?`) + Max Tokens (`int?`) via a `BuildCompletionOptions()` helper (invariant culture) and passes the `LlmCompletionOptions` to both `CompleteStreamAsync`/`CompleteAsync` (both accept options — no library gap). "Structured Output" now calls the typed `ILlmProvider.CompleteAsync<T>` per selected type (new local records SentimentAnalysis/WeatherForecast/BookSummary) and renders the DESERIALIZED object fields. Compiles clean; page renders (Temperature 0.7 / Max Tokens 2048 inputs) + visual gate PASS. ⚠ Data-path (completion + typed parse) NOT live-verified — **no LLM provider reachable in this environment**. Needs a live LLM to reach Verified. ✅ 2026-07-01 verifier (render+visual gate, live boot): Playground renders all three tabs (Completion/Structured/Chat), System+User Prompt, **Temperature=0.7 + Max Tokens=2048 inputs render** (the fix), Streaming toggle, Generate + looks right @ 1280/390 — screenshot llm-playground-desktop.png. ✅✅ DATA-PATH VERIFIED LIVE 2026-07-01 (verifier, LM Studio qwen2.5-coder-32b): **Completion** returns text + real token counts — stats `981ms | Input: 43 | Output: 3` (from `response.Usage`), Temperature/MaxTokens options passed. **Structured Output** deserializes to the typed object — returned `SentimentAnalysis (typed) Sentiment: positive Confidence: 0.95 Explanation: …` (rendered typed fields, not raw JSON). Both acceptance criteria met (screenshots llm-completion.png, llm-structured.png). NOTE: requires a warm instance (cold visit deadlocks — **TR-RAG-005**). ✅ re-confirmed live 2026-07-02 (*verify all): completion returned text + real token counts; Structured Output deserialized to the typed object (llm.spec.ts PASS) | [view](#d-req-ui-006) |
-| REQ-UI-007 | Tool Demo page (agent loop, execution trace) | Verified | 100% | v2; spec Phase 6 (#24, NEW). ⚠ DevGuide 2026-06-25: the Execution Trace always shows a single hardcoded step regardless of real tool calls — `AgentLoopRunner.RunAsync` (AgentLoopRunner.cs:61-126) exposes no per-step callback, so `executionSteps` only ever gets `new ExecutionStep(1, ...)` (ToolDemo.razor:275-278). Root cause is a library API gap (static — confirm at runtime). ✅ FIXED 2026-06-25: `AgentLoopRunner.RunAsync` now reports an `IProgress<AgentStep>` (new `Models/AgentStep.cs`); ToolDemo passes a `Progress<AgentStep>` that appends each tool request/execution + final answer to the live trace (`ToExecutionStep`). Core lib builds clean (0 errors); kept `Needs re-verify` until the sample is booted to confirm the trace renders. ⚠ DevGuide 2026-06-30 (`--update`): re-mapped ToolDemo lineage to as-built anchors (`RunAsync` now AgentLoopRunner.cs:66; `progress.Report` at :99/:108/:132/:156; page injects `ITechieRag` directly, not `TechieRagManager`); core lib re-built clean (0 errors); still needed a boot to confirm. ✅ 2026-07-01 (flow-master *build-phase): sample now boots (PAT refreshed → TrBlazeUI 200); Tool Demo page renders live with the Available Tools table populated (get_weather/calculate_math/search_documents/get_current_time, all Active) + visual gate PASS. Library `AgentStep` progress fix confirmed compiled into the running app. ⚠ Execution-trace data-path NOT live-verified — **no LLM provider reachable in this environment** to run the agent loop. Needs a live tool-calling LLM to reach Verified. ✅ 2026-07-01 verifier (render+visual gate, live boot): Tool Demo renders + looks right @ 1280/390 — **Available Tools DataTable populated live** (get_weather / calculate_math / search_documents / get_current_time, all Active), Add Custom Tool, Agent Interaction input + Run Agent Loop. Screenshot tool-demo-desktop.png. ⚠ DATA-PATH FAILED live 2026-07-01 (verifier, LM Studio qwen2.5-coder-32b): ran the agent loop ("call get_weather for Tokyo") — the loop returned a plain answer and the model HALLUCINATED the weather; the `IProgress<AgentStep>` callback fired **zero times** so the Execution Trace showed only the hardcoded fallback "Step 1: LLM generated final answer" (`ToolDemo.razor:283`, the `executionSteps.Count==0` branch) — **no ToolCallRequested/ToolExecuted step ever rendered**. Proven NOT a model/endpoint limit: a raw call to the same endpoint WITH the tool schema returns `finish_reason:tool_calls get_weather({"city":"Tokyo"})`. So the agent-loop/provider path does not elicit or surface tool calls → **TR-RAG-006** logged. Acceptance ("LLM calls tools; trace shows each step") UNMET. (Page render + Available-Tools table + loop-runs + final-answer all OK; also gated by the **TR-RAG-005** cold-start deadlock.) Needs the tool round-trip fixed, then re-verify. ✅ FIXED + LIVE-SMOKED 2026-07-01 (*build-phase, TR-RAG-006): `LmStudioLlmProvider` now serializes `tools`/`tool_choice` and parses `tool_calls` (mirrors OpenAICompatible); `SupportsToolCalling=true`; 3 new xUnit tests pass. Live agent-loop smoke vs LM Studio qwen2.5-coder-32b through the real library path made a genuine `get_weather({"city":"Tokyo"})` call, executed it, and `IProgress<AgentStep>` fired ToolCallRequested → ToolExecuted → FinalAnswer with the answer using the tool result (not hallucinated). Cold-start deadlock also fixed (TR-RAG-005: async accessors). → Implemented pending verifier UI-render of the Execution Trace on the Tool Demo page (*verify ui). ✅✅ ACCEPTANCE MET LIVE 2026-07-02 (verifier `*verify REQ-UI-007`, LM Studio qwen2.5-coder-32b @192.168.1.13:1234): **Execution Trace renders REAL steps live in the UI** — "Step 1: LLM requested tool(s): get_weather" → "Step 2: Executed get_weather({"city":"Tokyo"})" with result block `32°C, Partly Cloudy, Humidity: 65% in Tokyo` → Final Answer uses the tool result (not hallucinated); ran twice, consistent; the hardcoded single-step fallback (ToolDemo.razor:283) was NOT hit. Render gate PASS (Available Tools 4 live rows, trace result blocks non-empty); visual gate PASS @1280 (test tests/verify/req-ui-007.spec.ts, screenshot test-results/screens/req-ui-007-trace-desktop.png). Embedding served from the bundled BGE-M3 under bin/models/bge-m3 — no download. ⚠ visual @390: page min-width ~455px overflows the 390px viewport by 65px (fresh-load reproduced, scrollWidth=455) — "Add Custom Tool" (non-wrapping `justify-between` row, ToolDemo.razor:20) and "Run Agent Loop" (`flex gap-2` row, ToolDemo.razor:84) clip off-canvas (screenshot test-results/screens/req-ui-007-freshload-mobile.png); shell-containment note logged **TR-003**. Behavior fully verified; mobile layout fix pending → Needs re-verify (visual-only). ✅✅ MOBILE FIXED + FULLY VERIFIED 2026-07-02 (same-day fix pass): root cause was NOT the flex rows alone — (1) TrBlazeUI `SidebarInset` `<main>` lacks `min-width:0` so content min-width stretched the whole shell (TR-003; app workaround `main{min-width:0}` in `wwwroot/styles/base.css`); (2) the DataTable pagination's `sr-only` absolutely-positioned spans escape scroll containers to `<main>` and widen the document (TR-004; fixed by wrapping DataTables in `relative overflow-x-auto`, the shadcn pattern); (3) header/input rows now wrap (`flex-wrap`, `flex-col sm:flex-row`). Both Playwright tests PASS — live trace (Step 1 requested get_weather → Step 2 Executed + result → Step 3 final answer) + render gate + visual gate @1280 AND @390, `document.scrollWidth=390` at 390px. Screenshots req-ui-007-trace-{desktop,mobile}.png. ✅ re-confirmed live 2026-07-02 (*verify all): agent loop made real get_weather AND calculate_math tool calls, Execution Trace rendered each step; render+visual PASS @1280/390 (req-ui-007.spec.ts + llm.spec.ts) | [view](#d-req-ui-007) |
-| REQ-UI-008 | Token Usage dashboard page | Verified | 100% | v2; spec Phase 6 (#22, NEW). ⚠ DevGuide 2026-06-25: Estimated Cost reads $0.0000 for any model absent from the hard-coded pricing table even though tokens are counted (TokenUsageTracker.cs:207-217) — silent under-reporting for unlisted models (static — confirm at runtime). ✅ 2026-07-01 verifier (render+visual gate, live boot): Token Usage dashboard renders all four summary cards (Total Tokens 0, Input/Output 0/0, Estimated Cost $0.0000, Operations 0), Reset Session, and "Usage by Model → No usage data yet." valid empty-state + looks right @ 1280/390 — screenshot token-usage-desktop.png. Zeros are expected (no LLM calls this session; in-memory tracker). Render+visual-confirmed. ✅✅ DATA-PATH VERIFIED LIVE 2026-07-02 (verifier *verify all): after live LLM ops the dashboard shows NON-ZERO Total Tokens/Operations and a populated Usage-by-Model row for qwen2.5-coder-32b-instruct with non-empty cells (token-usage-live.png) — counts update across a session → Verified. Caveats: budget alert not exercised (no budget configured); Estimated Cost stays $0.0000 for models absent from the hard-coded pricing table (known gap, TokenUsageTracker.cs:207-217) | [view](#d-req-ui-008) |
-| REQ-UI-009 | Test LLM connection UI | Verified | 100% | v2; spec Phase 6. ✅ VERIFIED LIVE 2026-07-01: Save + Test both work and are fully logged. Live smoke against the user's LM Studio (`http://192.168.1.13:1234`, qwen2.5-coder-32b-instruct): Save reconfigured in <1s (toast "LLM configuration saved and applied"), Test connected in 1295ms. FIXED same day: added Serilog logging (Save/Test/Reconfigure now emit Information logs to console + rolling file), a 20s timeout on the Test call (was hanging on the provider's 120s HttpClient timeout), `StateHasChanged()` in the finally blocks, and toast+log on Test failure/timeout (the catch previously logged nothing — the "no log" symptom). Note (unchanged): Test still uses the last-saved instance via `GetLlmProvider()`, so Save before Test. ✅ 2026-07-01 verifier (render gate re-confirm): Connection Test card + "Test LLM Connection" button render on the LLM Settings page; prior live smoke stands. ⚠ 2026-07-01: Test/Save consume `GetLlmProvider()` which deadlocks on a COLD instance (**TR-RAG-005**) — works only after an async-build page has warmed the singleton (which is likely why the earlier live smoke succeeded). ✅ re-confirmed live 2026-07-02 (*verify all): Test succeeded in 912ms from the UI (inline alert + toast, Serilog logged) on a fresh session — TR-RAG-005 async-accessor fix holding | [view](#d-req-ui-009) |
-| REQ-UI-010 | All pages render via TrBlazeUI components + Lucide icons | Verified | 100% | ✅ VERIFIED 2026-07-01 (verifier *verify ui, live boot): render+visual gate PASS across ALL 11 screens — TrBlazeUI Card/Input/Select/Textarea/Switch/DataTable/Tabs/Button components render throughout, sidebar + card headers use Lucide icons, Tailwind-class styling (no raw/unstyled HTML form controls observed), no `#blazor-error-ui` on any page. Confirmed visually on all screenshots under test-results/screens/. Prior: Done (pre-existing) v2. ✅ re-confirmed 2026-07-02 (*verify all): all 10 routed screens pass the render+visual sweep @1280/390 | [view](#d-req-ui-010) |
-| REQ-UI-011 | Qdrant Admin: Docker container lifecycle UI | Verified | 100% | ✅✅ MOBILE FIXED + VERIFIED LIVE 2026-07-02 (flow-master *build-phase, live boot :5099 + running Qdrant container `vectordb-a1757a23` qdrant/qdrant:v1.15.5): the @390 off-canvas defect is resolved and re-verified with a container RUNNING (the state that triggered it). Root cause was DEEPER than "add a scroll wrapper": the `.overflow-x-auto` Tailwind utility is **purged from the shipped TrBlazeUI CSS** so the existing `<div class="relative overflow-x-auto">` wrappers were INERT (computed `overflow-x: visible`); the 6-column containers DataTable (~488px, long image name) escaped its 374px wrapper → `document.scrollWidth=496` @390. A `base.css` rule reviving the utility also failed to deliver (`MapStaticAssets` served a 0-byte `base.css` to `Accept-Encoding: br,gzip` clients — TR-004 correction). Fix = **inline `style="overflow-x:auto;max-width:100%"`** on the three QdrantAdmin DataTable wrappers (immune to purge + the static-asset pipeline). Live-verified: `document.scrollWidth` 496→**390** @390, wrapper computes `overflow-x:auto`, wide table scrolls inside its local container, Stop/connect buttons contained; desktop 1280 no regression (tests/verify/req-ui-011-mobile-fix.spec.ts — both cases PASS; screenshots req-ui-011-fixed-{mobile,desktop}.png). Container lifecycle create/start/stop not exercised (pre-existing owner container). v1.1; roadmap Phase 7.1/7.3. ✅ 2026-07-01 verifier (render+visual gate, live boot): Qdrant Admin console renders + looks right @ 1280/390 — Connection Config (Host/gRPC Port 6334/API Key), Connect, and status cards show **live-accurate state**: Docker "Available" (Docker daemon up, correctly detected), Qdrant "Disconnected" (Qdrant down), Version "N/A". Container lifecycle actions (create/start/stop) not exercised this run. Screenshots qdrant-admin-{desktop,mobile}.png. ✅ DESKTOP LIVE PASS 2026-07-02 (verifier *verify all, Qdrant 1.15.5 container running): Connect with API key → Docker "Available", Qdrant "Connected", Version "1.15.5" (real server — qdrant-connected-desktop.png); lifecycle create/start/stop buttons not exercised (pre-existing owner container). ⚠ visual 2026-07-02: with a RUNNING container the Container-Management row's Stop + logs icon buttons sit off-canvas @390 (x 666..765 vs 390px page width) reachable only by panning the whole shell `<main>` — TR-003 class, row needs flex-wrap/local containment; only manifests when a container is running, which is why earlier mobile passes (container stopped) missed it. Screenshot test-results/ui-REQ-UI-011-qdrant-admin-—-render-visual/test-failed-1.png → Needs re-verify (mobile layout fix) | [view](#d-req-ui-011) |
-| REQ-UI-012 | Qdrant Admin: collection CRUD | Verified | 100% | ✅ FIXED+VERIFIED 2026-07-01 (flow-master *build-phase, live smoke vs Qdrant 1.15.5): `GetClusterInfoAsync` now reads `client.HealthAsync().Version` (falls back to "Unknown", never a fabricated number); `ListCollectionsAsync` binds Vectors→`IndexedVectorsCount` (distinct from Points→`PointsCount`). Live smoke against a seeded collection confirmed **Version renders "1.15.5"** (real server, was hard-coded "1.12.x") and the grid shows **Points=25 / Vectors=0** (independently sourced, no longer a duplicate). Container-lifecycle + collection CRUD also confirmed live. TR-RAG-003 logged (`CollectionInfo` exposes no total-vectors count; IndexedVectorsCount is the closest distinct figure). ✅ 2026-07-01 verifier (render gate re-confirm): the fabricated-version defect is confirmed resolved — Version card shows "N/A" (not the old hard-coded "1.12.x") when no server is reachable. Collection CRUD not re-exercised this run (Qdrant down — no server); prior 2026-07-01 live smoke vs Qdrant 1.15.5 stands. ✅✅ CRUD RE-VERIFIED LIVE 2026-07-02 (verifier *verify all, tests/verify/qdrant-crud.spec.ts vs live Qdrant 1.15.5): collections table lists all 4 server collections with non-empty Name/Points/Vectors cells; created `verify_crud_tmp` (1024/Cosine) via the New Collection dialog → appeared in the table; deleted it → gone; Version card shows real "1.15.5" (qdrant-{connected,collections}-desktop.png) | [view](#d-req-ui-012) |
-| REQ-UI-013 | Qdrant Admin: vector browse / search / detail / bulk delete | Verified | 100% | ✅ FIXED+VERIFIED 2026-07-01 (flow-master *build-phase, live smoke, 25 UUID-id points): `BrowseVectorsAsync` now threads Qdrant's opaque `ScrollResponse.NextPageOffset` cursor (serialized `num:`/`uuid:`) instead of a numeric `PointId.Num`; `QdrantAdmin.razor` keeps a `pageCursors` history so Previous replays exact pages (scroll is forward-only). Live smoke proved page1 "Showing 1-20 of 25" and page2 "Showing 21-25 of 25" return **non-overlapping UUID-keyed rows** (page1 IDs 05657463…/10a08cda…/3e44b7a0…; page2 c8b88608…/d1b14316…/eae36bf5…) and Previous restores page 1 byte-for-byte — the exact case the old numeric cursor broke. TR-RAG-004 logged (Qdrant scroll is cursor-based). NOTE (pre-existing, not this fix): the inner TrBlazeUI `<DataTable>` has its own 5/page client pager nested under the server cursor (items 6-20 reachable via the inner pager) and the per-row View detail modal did not open in smoke — this was the same static-layout overlay issue as **TR-001**, now FIXED 2026-07-01 (global interactivity in `App.razor`), so the Dialog portal works; re-confirm the modal contents when Qdrant is reseeded. Does not affect the cursor acceptance. ✅ 2026-07-01 verifier: vector browse/detail/bulk-delete not re-exercised this run (Qdrant down — no seeded collection to page); Qdrant Admin console shell renders + looks right. Prior 2026-07-01 live smoke (25 UUID-id points, page1/page2 non-overlapping + Previous replay) stands. ✅ RE-VERIFIED LIVE 2026-07-02 (*verify all): browsed techierag_chunks (1,043 points) — rows render with non-empty ID cells, pager "Showing 1-20 of 1,043" → Next (21-40) → Previous (1-20) replays correctly; vector detail dialog opened with non-empty ID + payload then closed (TR-001 Dialog fix holding; qdrant-vectors-desktop.png). Bulk delete still NOT exercised — every Delete targets real owner vectors; needs a seeded scratch collection to verify destructively | [view](#d-req-ui-013) |
-| REQ-UI-014 | Rename app TechieRagWeb → TechieDesk (folder `apps/TechieDesk`, csproj/namespaces, slnx, branding, config/log names, Playwright refs) | Verified | 100% | ✅ VERIFIED 2026-07-17 (flow-master *build-phase → inline verify-phase, live boot :5099). Rename complete + regression-clean: folder `samples/TechieRagWeb` → **`apps/TechieDesk`** (`samples/` removed); `TechieDesk.csproj` with explicit `<RootNamespace>`/`<AssemblyName>`=TechieDesk; `TechieRag.slnx` folder `/samples/`→`/apps/` + project path updated; all namespaces/`@using`s `TechieRagWeb.*`→`TechieDesk.*` (Services ×3, _Imports, Program, page @injects); branding = TechieDesk (Home `<PageTitle>`+H1, sidebar brand span, App.razor scoped-CSS link `TechieDesk.styles.css`); Serilog log sink `logs/techiedesk-*.log` + "Starting TechieDesk host"; launchSettings profile → TechieDesk; README run-path → `apps/TechieDesk`; `ui.spec.ts` home-title expectation → "TechieDesk". Build **0-err** (46 pre-existing warnings). App boots on :5099 (log confirms host name + content root `apps/TechieDesk`). **Smoke/verify PASS:** all 10 routes HTTP 200 no `#blazor-error-ui`; **Playwright render+visual sweep 10/10 PASS @1280/390** (tests/verify/ui.spec.ts) — re-confirms REQ-UI-001…010 did not regress under the rename; home now titles "TechieDesk". NOTE: `techierag-config.json` kept as-is (it is the TechieRag *library* config, not app identity — reviewed, no rename needed); scoped-CSS bundle 404 is pre-existing TR-002 (was `TechieRagWeb.styles.css`, now `TechieDesk.styles.css` — same behavior, real styling via base.css/theme.css which serve 200); per-feature page titles that reference the "TechieRag" library (e.g. "TechieRag Settings") left unchanged — the rename is of the app host, not the library. BRD-82. (BRD-81 product mandate remains a roadmap umbrella — its buildable REQs land per phase from docs/TechieRag-CompetitorAnalysis.md GAP register.) | [view](#d-req-ui-014) |
-| REQ-FN-001 | Configuration & builder (fluent / appsettings / DI / config object) | Done (pre-existing) | 100% | v1.1; roadmap Phase 2 (completed 2025-12-30). ✅ 2026-07-02 verifier (*verify all): static confirm (ServiceCollectionExtensions.cs:57 builder-DI + :133 IConfiguration binding; TechieRagBuilder fluent; TechieRagConfig object) + runtime indirect — the live sample builds its instance from techierag-config.json (config-only provider selection observed). No xUnit coverage (deferred test suite) | [view](#d-req-fn-001) |
-| REQ-FN-002 | AI-agent autodistribution (MSBuild skill deploy) | Done (pre-existing) | 100% | v1.1; per ai-agent-autodistribution-guide.md. ✅ 2026-07-02 verifier static confirm: build/TechieRag.targets:39-60 (three AfterTargets=Build copy targets for .techierag/, .claude/commands/, .opencode/command/), payload files present under build/content/, packed into build\ + buildTransitive\ (TechieRag.csproj:36-43). Consumer-build deploy itself untested (no MSBuild test harness — deferred) | [view](#d-req-fn-002) |
-| REQ-FN-003 | NuGet packaging & publishing (GitHub Actions) | Verified | 100% | 🔁 2026-09-03 (later, owner decision) [REQ-FN-003]: the `v*` tag trigger was REMOVED again from `publish-nuget.yml` — public releases are manual dispatch against the release tag, the same ceremony as the owner's other libraries (GitHub Release → GitHub Packages automatically → dispatch nuget.org workflow by hand). The version fix is unchanged (tag-derived via determine-version.sh, duplicate/non-increment guard, `-p:Version` everywhere, no `--skip-duplicate`); YAML re-parsed (trigger: workflow_dispatch only) and the 9-case replay re-run green. DECISIONS.md 2026-09-03 (later). · ✅ FIXED + VERIFIED 2026-09-03 [REQ-FN-003] (flow-master *fix-issues → verify-phase chained inline; ledger docs/.last-verify.json). **Fix:** `publish-nuget.yml` now triggers on `v*` tag push (plus dispatch), and a new `Determine version` step runs `.github/workflows/scripts/determine-version.sh` — version = tag minus `v`; a real run on a non-tag ref fails; a version already on nuget.org fails; a version not greater than the latest published fails; `-p:Version` passed to build, test AND pack; `Confirm packed version` asserts both nupkg filenames carry it; push no longer `--skip-duplicate`. DECISIONS.md 2026-09-03 records the reversal of the 2026-08-09 "public feed never publishes itself" rule. **Evidence (build + acceptance gates):** `tests/verify/publish-nuget-version.sh` replays the exact CI script — 9/9: v1.0.7 past 1.0.0 → `1.0.7`; v1.0.0 → FAIL "ALREADY on nuget.org"; v0.9.9 → FAIL "not greater"; real dispatch on `main` → FAIL "push a tag"; dry-run on `main` → `1.0.0-dryrun.42`; `v2.0.0-preview.1` accepted; never-published (404) path accepted; LIVE nuget.org: v1.0.1 accepted, v1.0.0 rejected. `dotnet pack -p:Version=1.0.7` → `TechieRag.1.0.7.nupkg`, nuspec `<version>1.0.7</version>`, assembly `1.0.7.0` / `1.0.7+b1473b6`. Test gate at `-p:Version=1.0.7`: 723 pass / 0 fail / 41 skipped. YAML parsed (PyYAML): triggers push.tags `v*` + workflow_dispatch; 12 steps. The GitHub-hosted run itself is not observable from here (needs the owner's tag push) — static + replayed-script validation is the applicable check for a workflow. ⚠ UAT bug 2026-09-03 (owner report; kind: data/logic; triage-issues, analyze-only): **the public release pipeline never bumps the version.** Reproduced: `.github/workflows/publish-nuget.yml` has no version step at all — it packs with whatever `<Version>` the csproj carries (both csproj files: `1.0.0`, never touched since 2026-08-09) and only *reads the number back* from the packed filename in step `Resolve package version` (publish-nuget.yml:91-97, `basename … | sed 's/^TechieRag\.//'`). Replayed locally: `dotnet pack` of this tree → `TechieRag.1.0.0.nupkg` → the step resolves `1.0.0`. nuget.org already holds `TechieRag 1.0.0` + `TechieRag.Embedded 1.0.0` (published 2026-08-09; flat-container index lists that single version for both), so every dispatch's `dotnet nuget push --skip-duplicate` (line 154-157) is a **silent no-op** — and would be a hard 409 without the flag. The `v*` tags `v1.0.1`…`v1.0.6` exist and are honoured only by `publish-github-packages.yml` (its `Determine version` step, lines 53-68, strips the `v` from `github.ref_name`), which publishes to GitHub Packages — the public workflow is `workflow_dispatch`-only (no tag trigger), so a tagged push publishes nothing to nuget.org. Escaped every gate: the 2026-07-02 `Verified` was a static YAML parse of the *old* workflow; the 2026-08-09 pipeline addition (DECISIONS.md) was never re-verified against this REQ's own acceptance ("semantic versioning overridden from tag/run number", BRD-61). Prior status: Verified 100%. → `*fix-issues`. — Prior remark: v1.1; per NUGET-PUBLISHING-GUIDE.md + publish-nuget.yml. ✅ GAPS CLOSED + STATIC-VALIDATED 2026-07-02 (flow-master *build-phase, YAML parsed with PyYAML): both PARTIAL gaps fixed. (1) The `Run tests` step is now a **blocking gate** — `continue-on-error: true` REMOVED (parsed: no continue-on-error anywhere), so test failures fail the build and prevent publish (BRD-59). (2) The `publish-nuget-org` job is **un-commented and implemented, secret-gated** — `if: startsWith(github.ref, 'refs/tags/v')`, `env.NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}`, push step `if: env.NUGET_API_KEY != ''` (+ an explicit "skipped" step when absent) — i.e. publishes to NuGet.org on a release tag WHEN the secret is present, matching BRD-60 (the `secrets` context can't be used in a job-level `if`, hence the env-map pattern). Semver from v* tag / run-number unchanged (BRD-61). YAML well-formed, 3 jobs (build → publish-github, publish-nuget-org). The CI run itself executes only on GitHub Actions runners — not observable in this sandbox; static validation is the applicable check for a workflow config. | [view](#d-req-fn-003) |
-| REQ-FN-004 | Public install path documented (nuget.org first, no authentication) | Verified | 100% | ✅ BUILT + VERIFIED 2026-09-03 [REQ-FN-004] (flow-master *fix-issues + one general-purpose docs sub-agent → verify-phase chained inline; ledger docs/.last-verify.json). **Built:** `README.md` §Installation leads with `dotnet add package TechieRag` / `.Embedded` (no source, no PAT), PackageReference snippet, target frameworks, NuGet badges → nuget.org, a "Your first search in five minutes" walk (Ollama `bge-m3` + SQLite-vec, complete `Program.cs`), and a collapsed **"GitHub Packages — internal development builds only"** section with the "public consumers never need this" callout. Same treatment in `docs/TechieRag-UserGuide.md`, `docs/TechieRag.Embedded-UserGuide.md`, `docs/TechieRag-AI-Reference.md` + its byte-identical packaged twin `src/TechieRag/build/content/TechieRag-AI-Reference.md`, and the two auto-deployed agent command files (`techierag-claude-command.md`, `techierag-opencode-command.md`: nuget.org by default, internal feed only when the human asks); `NUGET-PUBLISHING.md` §1/§3/§4/§6 and `docs/TechieRag-Architecture.md` §6 (bullet + diagram) updated to the tag-push model. ⚠ **Found on the walk and fixed (MISS-TechieRag-20260903-03):** the README's search samples used `result.Content` / `result.DocumentId` / `result.Metadata`, none of which exist on `SearchResult` (it has `Chunk` + `Score`) — the first copy-paste failed to compile; all three samples now use `result.Chunk.Text` etc. **Evidence (acceptance gate — the stranger walk, executed):** `dotnet nuget locals http-cache --clear`; `dotnet new console`; `NuGet.config` with `<clear/>` + nuget.org only; `dotnet add package TechieRag` → restored `1.0.0` from nuget.org with no credentials; README `Program.cs` verbatim; Ollama `bge-m3` (Docker, `:11434`) → `dotnet run` printed 2 scored results, `about-techierag` first (0.681 vs 0.286). Wall clock new-console → search: **36 s** (plus the one-time `ollama pull bge-m3`, ~1.2 GB) — well inside the fifteen-minute bar. Grep proof: every remaining `read:packages` / `nuget.pkg.github` / `--source github` hit in the edited docs sits under an internal/maintainer-only heading. Prior: logged from UAT 2026-09-03 (owner report; kind: data/logic — documentation contradicts the shipped distribution; triage-issues, analyze-only). Reproduced by reading: both packages are live on nuget.org (`TechieRag 1.0.0`, `TechieRag.Embedded 1.0.0`, restorable with no credentials), yet **every install instruction a stranger can reach documents GitHub Packages only** — create a PAT with `read:packages`, add the `nuget.pkg.github.com/techierathore` source, edit `nuget.config`, `dotnet add package … --source github-techierathore`. Sites: `README.md` §Installation (lines 24-67) + the NuGet badge (line 4) linking to GitHub packages; `docs/TechieRag-UserGuide.md` §From GitHub Packages (64-104); `docs/TechieRag.Embedded-UserGuide.md` §From GitHub Packages (67-107); `docs/TechieRag-AI-Reference.md` (19-41) and its packaged copy `src/TechieRag/build/content/TechieRag-AI-Reference.md` (19-41, ships inside the nupkg to every consumer); `src/TechieRag/build/content/techierag-claude-command.md` (95-131) + `techierag-opencode-command.md` (177-185, 255) — the AI-agent skill files auto-deployed into consumer repos, which will steer an agent to the PAT path; `NUGET-PUBLISHING.md` §1 names GitHub Packages "primary … day-to-day feed"; `DECISIONS.md` 2026-08-09 likewise. Not in scope (correct as written): `docs/NUGET-PUBLISHING-GUIDE.md` (generic hosting tutorial, already lists nuget.org install at 310-313); `docs/TechieRag-UsageGuide.md` / `publish-desktop.yml` / `TechieDesk-*` PAT mentions — those concern the **TrBlazeUI** dependency of the sample app (REQ-NFR-001 in the TechieDesk checklist), not consumer installs. No REQ owned consumer-facing install docs — BRD-59/60/61 cover the pipeline, never the reader. → `*fix-issues`. | [view](#d-req-fn-004) |
-| REQ-RAG-001 | Document ingestion & processing (9 formats + chunking) | Done (pre-existing) | 100% | v1.1; roadmap Phase 4 (completed 2025-12-30). ✅ runtime-confirmed (text path) 2026-07-02 (verifier *verify all): raw-text ingest → chunk → embed → store → per-doc delete, live end-to-end via the sample. File/directory ingest + the 9 format processors remain static-only (implementations present, zero unit tests — deferred suite) | [view](#d-req-rag-001) |
-| REQ-RAG-002 | Embedding providers (6 + custom) | Done (pre-existing) | 100% | v1.1; roadmap Phase 4.3. ✅ 2026-07-02: Embedded ONNX (BGE-M3) provider runtime-confirmed live (embedding ran during ingest + query, bundled model). Ollama/LM Studio/Azure OpenAI/HTTP providers + custom hook static-only (implementations present, zero unit tests) | [view](#d-req-rag-002) |
-| REQ-RAG-003 | Vector stores (SQLite-vec / pgvector / Qdrant) | Done (pre-existing) | 100% | v1.1; roadmap Phase 3. ✅ 2026-07-02 runtime-confirmed: SqliteVec upsert/search/delete/stats live (ingest cycle + chat retrieval); Qdrant collection create/list/delete + cursor scroll browse live vs server 1.15.5 (admin service path). PgVector static-only; no xUnit CRUD tests for any store | [view](#d-req-rag-003) |
-| REQ-RAG-004 | Semantic search & retrieval (topK, filter, scoring) | Done (pre-existing) | 100% | v1.1; roadmap Phase 3/5. ✅ runtime-confirmed 2026-07-02: live Auto-RAG chat retrieval returned ranked sources with % relevance scores (SearchAsync topK path via the sample). documentFilter param + 0-1 score-range assertions have no automated test (deferred) | [view](#d-req-rag-004) |
-| REQ-RAG-005 | Offline embedded embedding (BGE-M3 ONNX) | Done (pre-existing) | 100% | v1.1; per TechieRag.Embedded-UserGuide.md. ✅ runtime-confirmed 2026-07-02: .UseEmbedded() BGE-M3 served fully offline from the bundled model during live ingest + query (no download). One-time-download + progress-event path static-only (ModelDownloadService progress math untested) | [view](#d-req-rag-005) |
-| REQ-RAG-006 | LLM provider integration (6 providers) | Done (pre-existing) | 100% | v2; spec Phase 3 (completed 2026-02-18). ✅ 2026-07-02: LM Studio provider live-verified (completion/chat/streaming/tool-calling vs qwen2.5-coder-32b) + 3 xUnit tests PASS (LmStudioLlmProviderTests). Ollama/OpenAI-compat/Azure Foundry/Gemini/Anthropic wire formats static-only (zero tests) | [view](#d-req-rag-006) |
-| REQ-RAG-007 | Auto-RAG generation (Ask / AskStream / ChatWithRag) | Done (pre-existing) | 100% | v2; spec Phase 4. ✅ runtime-confirmed 2026-07-02: streaming Auto-RAG chat live via the sample (retrieval + streamed generation + sources + token accounting). NOTE the sample's streaming path works around the library (TR-RAG-001: AskStream/ChatWithRagStream can't return sources and bypass PromptTemplateEngine) — library-level streaming-with-sources API gap still open | [view](#d-req-rag-007) |
-| REQ-RAG-008 | Structured / typed output (CompleteAsync&lt;T&gt;) | Done (pre-existing) | 100% | v2; spec Phase 1/3. ✅ runtime-confirmed 2026-07-02: CompleteAsync&lt;T&gt; live typed deserialization (SentimentAnalysis fields rendered, not raw JSON) via the playground vs LM Studio. Deserialization-failure handling untested | [view](#d-req-rag-008) |
-| REQ-RAG-009 | Tool calling & agent loop | Done (pre-existing) | 100% | v2; spec Phase 5. ⚠ DevGuide 2026-06-25: `AgentLoopRunner.RunAsync` (AgentLoopRunner.cs:61-126) returns only the final `LlmResponse` and exposes no per-iteration/per-tool callback or step log, so consumers cannot observe the loop's intermediate steps — this is why the sample's Tool Demo execution trace is unwired (see REQ-UI-007). Core loop (tool declaration/registration + max-iteration guard) works as specified; this is an observability/API-surface gap, not a loop defect (static — confirm at runtime). ✅ RESOLVED 2026-06-25: added an optional `IProgress<AgentStep>` parameter to `AgentLoopRunner.RunAsync` (new `Models/AgentStep.cs` + `AgentStepKind`) that reports each tool-call request, each tool execution (name/args/result/success), and the final answer; core library builds clean (0 errors). ✅ runtime-confirmed 2026-07-02 (*verify all): live agent loop made real get_weather + calculate_math tool calls with IProgress&lt;AgentStep&gt; steps rendered end-to-end; max-iteration guard (default 10, AgentLoopRunner.cs:43/:89) static. AgentLoopRunner/ToolRegistry still have no direct unit tests (only provider-level serialization tests) | [view](#d-req-rag-009) |
-| REQ-RAG-010 | Conversation memory (token-budget trimming) | Done (pre-existing) | 100% | v2; spec Phase 2. 2026-07-02 verifier: static-only — InMemoryConversationMemory.cs:60-92 trims newest-first within token budget preserving the system message; pure logic, easily unit-testable, no test; trimming not directly observed at runtime | [view](#d-req-rag-010) |
-| REQ-RAG-011 | Token tracking & budgets | Done (pre-existing) | 100% | v2; spec Phase 2. ✅ runtime-confirmed 2026-07-02: per-operation/session/model tracking live (Token Usage dashboard non-zero with populated model row after real LLM ops). Budgets/alerts/blocking untested (no budget configured; no unit tests for cost math or threshold firing); Estimated Cost $0.0000 for unlisted models (pricing-table gap, TokenUsageTracker.cs:207-217) | [view](#d-req-rag-011) |
-| REQ-RAG-012 | Resilience & retry (backoff / 429 / circuit breaker) | Verified | 100% | v2; spec Phase 2. ✅✅ RETRY-AFTER GAP CLOSED + UNIT-TESTED 2026-07-02 (flow-master *build-phase): BRD-52 now fully met. New `Llm/LlmHttpGuard.EnsureSuccess` (wired into ALL 6 providers — Ollama/LmStudio/OpenAICompatible/AzureAIFoundry/GoogleGemini/Anthropic, replacing bare `EnsureSuccessStatusCode`) parses the `Retry-After` response header (delta-seconds AND HTTP-date forms) and surfaces 429 — plus 503-with-Retry-After — as the new `Models/LlmRateLimitException : HttpRequestException` carrying the hint. `RetryHandler.ExecuteWithRetryAsync` (RetryHandler.cs:131-139) honors that delay capped at `MaxRetryDelayMs`, falling back to exponential backoff when absent/unparseable; backward-compatible (still an HttpRequestException). **11/11 xUnit tests PASS** (Release, `dotnet test`) incl. RetryHandlerTests: Retry-After delta-seconds honored, HTTP-date honored, capped-at-max (120s hint→30s), unparseable→exponential fallback, backoff-cap, transient-retry, circuit-breaker open + half-open recovery. Retry/backoff/breaker state machine now has direct coverage (was the flagged gap). | [view](#d-req-rag-012) |
-| REQ-RAG-013 | Fallback LLM provider | Done (pre-existing) | 100% | v2; spec Phase 2. 2026-07-02 verifier: static-only (FallbackLlmHandler.cs:18 : ILlmProvider; WithFallbackLlm TechieRagBuilder.cs:246); no test or runtime proof that fallback actually engages on primary failure | [view](#d-req-rag-013) |
-| REQ-RAG-014 | Prompt templates (default + custom) | Done (pre-existing) | 100% | v2; spec Phase 2. 2026-07-02 verifier: static-only (PromptTemplateEngine.cs:13 default impl; IPromptTemplate abstraction; WithPromptTemplate/WithCustomPromptTemplate builder hooks). Rendering logic untested; TR-RAG-001 note stands (streaming RAG paths bypass the engine) | [view](#d-req-rag-014) |
-| REQ-NFR-001 | Performance targets (token est, streaming, batch) | Done (pre-existing) | 100% | v2; per spec §NFR. ✅ 2026-07-02: real-time streaming + immediate token counts observed live; backoff cap 30s / agent cap 10 / 4000-token context trim confirmed as config defaults (static); no automated performance assertions | [view](#d-req-nfr-001) |
-| REQ-NFR-002 | Reliability (retry + circuit breaker + fallback) | Done (pre-existing) | 100% | v2; per spec §NFR. 2026-07-02 verifier: static-only — same code as REQ-RAG-012/013 (inherits the Retry-After caveat logged there); no fault-injection tests | [view](#d-req-nfr-002) |
-| REQ-NFR-003 | Scalability (budget/model/history scaling) | Done (pre-existing) | 100% | v2; per spec §NFR. 2026-07-02 verifier: static-only (long-range budgets TechieRagConfig.cs:459, per-model grouping, token-budget history windowing); no boundary tests (0 / long.MaxValue) | [view](#d-req-nfr-003) |
-| REQ-NFR-004 | Security (key handling, HTTPS, tool validation, budget block) | Done (pre-existing) | 100% | v2; per spec §NFR. 2026-07-02 verifier: static-only — keys are config-only params with HTTPS default endpoints; budget BlockOnExceeded flag present. Caveat: tool-name validation is null/empty-only (ToolRegistry.cs:40-43), no character/format validation; no security-focused tests | [view](#d-req-nfr-004) |
-| REQ-NFR-005 | Observability (completion events, logging) | Done (pre-existing) | 100% | v2; per spec §NFR. ✅ 2026-07-01: sample now uses **Serilog** (console + daily rolling file `logs/techieragweb-*.log`, `UseSerilogRequestLogging`) so library + app logs are visible and persisted; verified LLM Save/Test activity is captured to both sinks. ✅ runtime re-confirmed 2026-07-02 (*verify all): Serilog console + rolling file live (connection-test/ingest/Qdrant activity all captured in .verify/app.log + logs/); OnCompletionCompleted event + NullLogger fallback static (no event-payload test) | [view](#d-req-nfr-005) |
-| REQ-NFR-006 | Portability / accessibility (formats, languages, uniform API) | Done (pre-existing) | 100% | v1.1+v2. 2026-07-02 verifier: static-only (9 IDocumentProcessor implementations, BGE-M3 100+ languages, uniform ILlmProvider/ITechieRag API); no cross-format or multilingual tests | [view](#d-req-nfr-006) |
-| REQ-NFR-007 | Backward compatibility (v1 → v2 additive) | Done (pre-existing) | 100% | v2; spec Phase 1–6 backward-compat mandate. 2026-07-02 verifier: static-only API-shape inspection (v1 surface Ingest*/Search/Delete/List/GetStats intact; v2 members additive); no public-API snapshot/compat test | [view](#d-req-nfr-007) |
+| REQ-FN-001 | Configuration & builder (fluent / appsettings / DI / config object) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-001) |
+| REQ-FN-002 | AI-agent autodistribution (MSBuild skill deploy) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-002) |
+| REQ-FN-003 | NuGet packaging & publishing (GitHub Actions) | Done (pre-existing) | 100% | Verified 2026-09-03 (owner dispatch of publish-nuget.yml still the owner's; version rules 9/9 incl. live nuget.org). Migrated 2026-09-24, status preserved. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-003) |
+| REQ-NFR-001 | Performance targets (token est, streaming, batch) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-001) |
+| REQ-NFR-002 | Reliability (retry + circuit breaker + fallback) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-002) |
+| REQ-NFR-003 | Scalability (budget/model/history scaling) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-003) |
+| REQ-NFR-004 | Security (key handling, HTTPS, tool validation, budget block) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-004) |
+| REQ-NFR-005 | Observability (completion events, logging) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-005) |
+| REQ-NFR-006 | Portability / accessibility (formats, languages, uniform API) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-006) |
+| REQ-NFR-007 | Backward compatibility (v1 → v2 additive) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-007) |
+| REQ-RAG-001 | Document ingestion & processing (9 formats + chunking) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-001) |
+| REQ-RAG-002 | Embedding providers (6 + custom) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-002) |
+| REQ-RAG-003 | Vector stores (SQLite-vec / pgvector / Qdrant) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-003) |
+| REQ-RAG-004 | Semantic search & retrieval (topK, filter, scoring) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-004) |
+| REQ-RAG-005 | Offline embedded embedding (BGE-M3 ONNX) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-005) |
+| REQ-RAG-006 | LLM provider integration (6 providers) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-006) |
+| REQ-RAG-007 | Auto-RAG generation (Ask / AskStream / ChatWithRag) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-007) |
+| REQ-RAG-008 | Structured / typed output (CompleteAsync&lt;T&gt;) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-008) |
+| REQ-RAG-009 | Tool calling & agent loop | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-009) |
+| REQ-RAG-010 | Conversation memory (token-budget trimming) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-010) |
+| REQ-RAG-011 | Token tracking & budgets | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-011) |
+| REQ-RAG-012 | Resilience & retry (backoff / 429 / circuit breaker) | Done (pre-existing) | 100% | Verified 2026-07-02: Retry-After parsed via LlmHttpGuard in all six providers, 4 unit tests. Migrated 2026-09-24, status preserved. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-012) |
+| REQ-RAG-013 | Fallback LLM provider | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-013) |
+| REQ-RAG-014 | Prompt templates (default + custom) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-014) |
+| REQ-FN-007 | Sevak (formerly TechieDesk): Home landing + navigation; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-001, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-007) |
+| REQ-FN-008 | Sevak (formerly TechieDesk): Settings page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-002, Done (pre-existing) 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-008) |
+| REQ-FN-009 | Sevak (formerly TechieDesk): LLM Settings page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-003, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-009) |
+| REQ-FN-010 | Sevak (formerly TechieDesk): Ingestion + Text Ingestion pages; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-004, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-010) |
+| REQ-FN-011 | Sevak (formerly TechieDesk): Chat page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-005, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-011) |
+| REQ-FN-012 | Sevak (formerly TechieDesk): LLM Playground page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-006, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-012) |
+| REQ-FN-013 | Sevak (formerly TechieDesk): Tool Demo page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-007, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-013) |
+| REQ-FN-014 | Sevak (formerly TechieDesk): Token Usage dashboard page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-008, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-014) |
+| REQ-FN-015 | Sevak (formerly TechieDesk): Test LLM connection UI; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-009, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-015) |
+| REQ-FN-016 | Sevak (formerly TechieDesk): All pages render via TrBlazeUI components + Lucide icons; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-010, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-016) |
+| REQ-FN-017 | Sevak (formerly TechieDesk): Qdrant Admin: Docker container lifecycle UI; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-011, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-017) |
+| REQ-FN-018 | Sevak (formerly TechieDesk): Qdrant Admin: collection CRUD; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-012, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-018) |
+| REQ-FN-019 | Sevak (formerly TechieDesk): Qdrant Admin: vector browse / search / detail / bulk delete; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-013, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-019) |
+| REQ-FN-020 | Sevak (formerly TechieDesk): Rename app TechieRagWeb → TechieDesk; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-014, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-020) |
 
-**Status values:** `Not Started` · `In Progress` · `Implemented` (code done, not yet verified) · `Verified` (self-smoke or verifier PASS — acceptance AND data-render AND visual gates all pass) · `Done (pre-existing)` (migrated from an earlier dev plan as already complete — build agents must NOT rebuild; terminal like `Verified`) · `Needs re-verify` (a defect or change was logged — must be re-run before it can return to `Verified`) · `PARTIAL` (some acceptance unmet — say what in Remarks) · `FAIL` (verifier ran and failed — bug in Remarks) · `Blocked` (external/library gap — link the TR-/TR-RAG- entry in Remarks) · `N/A`.
+**Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`. `Owner-UAT` marks a row only the owner can close, by following the UsageGuide test plan; the verifier cannot reach it from this machine.
 
-**% guide:** `0` not started · `25` scaffolded · `50` in progress · `75` implemented-unverified · `100` verified.
-
-**Remarks:** date + what was done / what is missing / bug or library reference. This is the home for bugs and change notes — do not spawn a separate file. Visual-gate failures are prefixed `⚠ visual:`; security findings `⚠ SECURITY`.
-
-> **Note:** the UI REQs are migrated as `Done (pre-existing)`. Restoring/running the sample for live UI verification requires the `TrBlazeUI.*` GitHub Packages credential (see PROJECT-STATUS Known blockers).
-
-> **Deferred (not yet built, NOT a migrated BRD):** formal automated xUnit test suite (v2 Phase 7 — validated manually only) and optional OpenTelemetry exporters. Tracked in PROJECT-STATUS "Deferred / future"; no `REQ-*` assigned because they are not BRD requirements.
-
-## UI / Pages
-
-<!-- Each REQ carries an explicit `<a id="d-REQ-ID">` anchor (lowercase) so the
-     Details column above links straight to it in both Markdown and rendered HTML.
-     UI scope is the TechieDesk app (formerly `TechieRagWeb`) — Blazor Server (TrBlazeUI components +
-     Lucide icons) that exercises every TechieRag capability across ten routed pages,
-     plus the Qdrant administration UI. Traces to BRD §9 F-WEB and F-QDRANT (BRD-62…BRD-73). -->
-
-### Page: Home (`/`)
-
-<a id="d-req-ui-001"></a>
-- **REQ-UI-001** — Landing page with navigation to all feature pages (BRD-62…BRD-68 entry points).
-  - *Acceptance:* page renders; nav links resolve to every feature route.
-
-### Page: Settings (`/settings`)
-
-<a id="d-req-ui-002"></a>
-- **REQ-UI-002** — Configure embedding source/endpoint/model and vector store type/connection; Save + Initialize (BRD-62).
-  - *Acceptance:* settings persist to `techierag-config.json`; Save shows a success toast; Initialize creates the client.
-
-### Page: LLM Settings (`/llm-settings`)
-
-<a id="d-req-ui-003"></a>
-- **REQ-UI-003** — Tabs for Primary provider, Fallback, Usage/budget, Resilience, and Prompts configuration (BRD-63).
-  - *Acceptance:* each tab saves its config section; values reload correctly.
-
-### Page: Ingestion (`/ingestion`) + Text Ingestion (`/text-ingestion`)
-
-<a id="d-req-ui-004"></a>
-- **REQ-UI-004** — Upload/manage documents and ingest raw text; show document list + stats (BRD-64).
-  - *Acceptance:* file ingest returns a doc id and updates the document/chunk counts; raw-text ingest works with metadata.
-
-### Page: Chat (`/chat`)
-
-<a id="d-req-ui-005"></a>
-- **REQ-UI-005** — RAG chat with mode selector, document filter, top-K, streaming toggle, and a sources panel (BRD-65).
-  - *Acceptance:* answers stream token-by-token; sources show relevance scores; filter scopes results.
-
-### Page: LLM Playground (`/llm-playground`)
-
-<a id="d-req-ui-006"></a>
-- **REQ-UI-006** — Direct LLM testing: Completion, Structured Output, and Chat tabs (BRD-66).
-  - *Acceptance:* completion returns text + token counts; structured output parses to a typed object.
-
-### Page: Tool Demo (`/tool-demo`)
-
-<a id="d-req-ui-007"></a>
-- **REQ-UI-007** — Agent loop demonstration with built-in and custom tools and an execution trace (BRD-67).
-  - *Acceptance:* the LLM calls tools (e.g. get_weather, calculate_math); the trace shows each step.
-
-### Page: Token Usage (`/token-usage`)
-
-<a id="d-req-ui-008"></a>
-- **REQ-UI-008** — Usage dashboard: tracking, budget status, per-model breakdown, recent operations (BRD-68).
-  - *Acceptance:* counts/costs update across a session; budget alert shows at threshold.
-
-### Cross-page: connection test + UI framework
-
-<a id="d-req-ui-009"></a>
-- **REQ-UI-009** — Test LLM connection before running queries (BRD-69).
-  - *Acceptance:* test succeeds for a reachable provider; shows a clear error on failure.
-
-<a id="d-req-ui-010"></a>
-- **REQ-UI-010** — All form inputs and layout use TrBlazeUI components (Input, Select, Field, Card, DataTable, Tabs, Dialog, Toast) and Lucide icons; styling via Tailwind class parameter, not inline styles (BRD-70).
-  - *Acceptance:* no raw HTML form controls remain; navigation uses Lucide icons.
-
-### Page: Qdrant Admin (`/qdrant-admin`)
-
-<a id="d-req-ui-011"></a>
-- **REQ-UI-011** — Docker status detection and container create/start/stop/remove + logs (BRD-71).
-  - *Acceptance:* container lifecycle actions reflect real Docker state; status indicator updates.
-
-<a id="d-req-ui-012"></a>
-- **REQ-UI-012** — Collection create / list / inspect / delete with cluster info (BRD-72).
-  - *Acceptance:* a created collection appears in the table; delete removes it.
-
-<a id="d-req-ui-013"></a>
-- **REQ-UI-013** — Paginated vector browse + search, vector detail (payload, chunk, source), bulk delete (BRD-73).
-  - *Acceptance:* vectors page through; detail modal shows payload and source; bulk delete removes selected vectors.
-
-## Functional requirements
+## Surface: Configuration
 
 <a id="d-req-fn-001"></a>
-- **REQ-FN-001** — Configure TechieRag via fluent builder, `appsettings.json` binding, the `AddTechieRag(...)` DI extension, or a hand-built `TechieRagConfig`; any provider swappable by config alone (BRD-19, BRD-20, BRD-21, BRD-22, BRD-23).
+- **REQ-FN-001** — Configuration & builder (fluent / appsettings / DI / config object). *BRD:* BRD-19, BRD-20, BRD-21, BRD-22, BRD-23. *Phase 1.*
+  - *Acceptance:* When a developer configures the library through `TechieRagBuilder` on the configuration API and calls `Build()`, then an `ITechieRag` with those providers returns.
+
+## Surface: Autodistribution
 
 <a id="d-req-fn-002"></a>
-- **REQ-FN-002** — `TechieRag.targets` auto-deploys AI skill files (`.techierag/`, `.claude/commands/`, `.opencode/command/`) into a consumer repo on build, refreshed on each package update (BRD-57, BRD-58).
+- **REQ-FN-002** — AI-agent autodistribution (MSBuild skill deploy). *BRD:* BRD-57, BRD-58. *Phase 1.*
+  - *Acceptance:* When a consumer builds a project referencing `TechieRag` on their machine, then `.techierag/TechieRag-AI-Reference.md` and the two command files appear in the repository root.
+
+## Surface: Packaging
 
 <a id="d-req-fn-003"></a>
-- **REQ-FN-003** — GitHub Actions builds, tests, packs, and publishes both packages to GitHub Packages (auto) and NuGet.org (gated on secret); semantic versioning overridden from tag/run number (BRD-59, BRD-60, BRD-61).
-  - *Acceptance (re-stated 2026-09-03 after the UAT bug):* the public workflow `publish-nuget.yml` derives the package version from the `v*` tag being published (never from the csproj's standing `<Version>`); a tag push publishes both packages to NuGet.org at that version; a version already on nuget.org, or one not greater than the latest published, fails the run loudly before any push instead of `--skip-duplicate` no-op-ing it.
-
-<a id="d-req-fn-004"></a>
-- **REQ-FN-004** — Consumer-facing install documentation leads with the public feed: `dotnet add package TechieRag` / `dotnet add package TechieRag.Embedded` from nuget.org with **no authentication, no PAT, no nuget.config edit**; GitHub Packages survives only as a clearly labelled secondary section for the owner's internal development builds (logged via *triage-issues 2026-09-03; no BRD line — flag `*amend-docs` if the owner wants it in the BRD).
-  - *Acceptance:* (1) `README.md` §Installation's first and default path is `dotnet add package TechieRag` (and `.Embedded`) with no source flag; the NuGet badge links to nuget.org. (2) A section titled to make its audience unmistakable ("internal development builds" / "for maintainers") holds the GitHub Packages + PAT instructions and states plainly that public consumers never need it. (3) `docs/TechieRag-UserGuide.md`, `docs/TechieRag.Embedded-UserGuide.md`, `docs/TechieRag-AI-Reference.md` and the packaged copies under `src/TechieRag/build/content/` (AI-Reference + both command files) say the same. (4) Proven, not asserted: from a fresh console project whose `NuGet.config` has `<clear/>` + nuget.org only, `dotnet add package TechieRag` restores, builds, and a search returns results following the README verbatim — the "stranger with no GitHub account, README to working search" walk.
-
-## RAG / AI requirements (→ /techierag)
-
-<a id="d-req-rag-001"></a>
-- **REQ-RAG-001** — Ingest from file / directory / raw text; extract text from 9 formats; chunk with configurable size+overlap; manage document lifecycle (BRD-1…BRD-7).
-
-<a id="d-req-rag-002"></a>
-- **REQ-RAG-002** — Generate single + batch embeddings behind `IEmbeddingProvider` across Ollama, LM Studio, ONNX, Azure OpenAI, HTTP, and custom (BRD-8…BRD-11).
-
-<a id="d-req-rag-003"></a>
-- **REQ-RAG-003** — Store and similarity-search embeddings via SQLite-vec, pgvector, or Qdrant with full CRUD, batch upsert, filtered search, and stats (BRD-12…BRD-15).
-
-<a id="d-req-rag-004"></a>
-- **REQ-RAG-004** — Semantic search via `SearchAsync(query, topK, documentFilter?)` returning ranked results with 0–1 scores and chunk metadata (BRD-16…BRD-18).
-
-<a id="d-req-rag-005"></a>
-- **REQ-RAG-005** — Fully offline embedding via `.UseEmbedded()` (BGE-M3 ONNX), one-time model download to a platform cache, with progress events (BRD-24…BRD-26).
-
-<a id="d-req-rag-006"></a>
-- **REQ-RAG-006** — Unified `ILlmProvider` for completion/chat/streaming/tool-calling across Ollama, LM Studio, OpenAI-compatible, Azure AI Foundry, Gemini, Anthropic, and custom (BRD-27…BRD-33).
-
-<a id="d-req-rag-007"></a>
-- **REQ-RAG-007** — Auto-RAG via `AskAsync`, `AskStreamAsync`, `ChatWithRagAsync`, `ChatWithRagStreamAsync`; identical to v1 when no LLM configured (BRD-34…BRD-38).
-
-<a id="d-req-rag-008"></a>
-- **REQ-RAG-008** — Typed JSON output deserialized to `T` via `CompleteAsync<T>` (BRD-39).
-
-<a id="d-req-rag-009"></a>
-- **REQ-RAG-009** — Tool declaration (`ToolDefinition`), delegate/`IToolHandler` registration, and an agent loop with a max-iteration guard (BRD-40…BRD-43).
-
-<a id="d-req-rag-010"></a>
-- **REQ-RAG-010** — Optional conversation memory with token-budget trimming and custom implementations (BRD-44…BRD-46).
-
-<a id="d-req-rag-011"></a>
-- **REQ-RAG-011** — Token usage + cost tracking per operation/session/model with budgets, alerts, and optional blocking (BRD-47…BRD-50).
-
-<a id="d-req-rag-012"></a>
-- **REQ-RAG-012** — Automatic retry with backoff, HTTP-429/`Retry-After` handling, and a circuit breaker on all LLM calls (BRD-51…BRD-53).
-
-<a id="d-req-rag-013"></a>
-- **REQ-RAG-013** — Fallback LLM that takes over automatically when the primary fails (BRD-54).
-
-<a id="d-req-rag-014"></a>
-- **REQ-RAG-014** — Customizable RAG prompt (system prompt, context template, limits) and full replacement via custom `IPromptTemplate` (BRD-55, BRD-56).
+- **REQ-FN-003** — NuGet packaging & publishing (GitHub Actions). *BRD:* BRD-59, BRD-60, BRD-61. *Phase 1.*
+  - *Acceptance:* When a maintainer pushes to `main` or dispatches the release workflow on GitHub Actions, then the packages are built, tested and packed by GitHub Actions.
 
 ## Non-functional
 
 <a id="d-req-nfr-001"></a>
-- **REQ-NFR-001** — Performance: immediate token estimation; real-time streaming; batch embedding; backoff cap 30s; agent cap 10; context trimmed to 4,000 tokens (BRD-74).
+- **REQ-NFR-001** — Performance targets (token est, streaming, batch). *BRD:* BRD-74. *Phase 1.*
+  - *Acceptance:* When token estimation, streaming and batch embedding are measured, then estimation is immediate, streaming unbuffered and batches accepted.
 
 <a id="d-req-nfr-002"></a>
-- **REQ-NFR-002** — Reliability: retry + circuit breaker absorb transient failures; optional fallback preserves continuity (BRD-75).
+- **REQ-NFR-002** — Reliability (retry + circuit breaker + fallback). *BRD:* BRD-75. *Phase 1.*
+  - *Acceptance:* When transient failures are injected, then retry, circuit breaker and fallback keep the call succeeding within their limits.
 
 <a id="d-req-nfr-003"></a>
-- **REQ-NFR-003** — Scalability: budgets 0→`long.MaxValue`; arbitrary model counts; unbounded history with windowing (BRD-76).
+- **REQ-NFR-003** — Scalability (budget/model/history scaling). *BRD:* BRD-76. *Phase 1.*
+  - *Acceptance:* When budgets, model counts and history grow, then tracking and trimming keep working without a fixed ceiling.
 
 <a id="d-req-nfr-004"></a>
-- **REQ-NFR-004** — Security: keys as config (consumer secrets manager), HTTPS, tool-name validation, null-checks, budget blocking (BRD-77).
+- **REQ-NFR-004** — Security (key handling, HTTPS, tool validation, budget block). *BRD:* BRD-77. *Phase 1.*
+  - *Acceptance:* When keys, endpoints, tool names and inputs are reviewed, then keys stay configuration, HTTPS is supported, tool names validated and inputs null-checked.
 
 <a id="d-req-nfr-005"></a>
-- **REQ-NFR-005** — Observability: per-completion telemetry events (model, duration, tokens); `ILoggerFactory` integration with `NullLogger` fallback (BRD-78).
+- **REQ-NFR-005** — Observability (completion events, logging). *BRD:* BRD-78. *Phase 1.*
+  - *Acceptance:* When a completion finishes, then an event with model, duration and token counts fires and logs flow through the host's `ILoggerFactory`.
 
 <a id="d-req-nfr-006"></a>
-- **REQ-NFR-006** — Portability/accessibility: 9 formats, 100+ languages (BGE-M3), uniform `ILlmProvider` API, builder + config paths (BRD-79).
+- **REQ-NFR-006** — Portability / accessibility (formats, languages, uniform API). *BRD:* BRD-79. *Phase 1.*
+  - *Acceptance:* When the format, language and provider breadth are checked, then nine formats, 100+ languages and one `ILlmProvider` API across six backends hold.
 
 <a id="d-req-nfr-007"></a>
-- **REQ-NFR-007** — Backward compatibility: all v2 additions additive; v1 methods/config unchanged; `TechieRag.Embedded` unchanged (BRD-80).
+- **REQ-NFR-007** — Backward compatibility (v1 → v2 additive). *BRD:* BRD-80. *Phase 1.*
+  - *Acceptance:* When a v1 consumer upgrades to v2, then existing methods and configuration keep working unchanged.
 
-<a id="d-req-ui-014"></a>
-- **REQ-UI-014** — Rename the application `TechieRagWeb` → **TechieDesk** (BRD-82, added 2026-07-17). Acceptance: project folder `samples/TechieRagWeb` → `apps/TechieDesk`; csproj + RootNamespace + AssemblyName renamed; `TechieRag.slnx` entry updated; all namespaces/`@using`s updated; in-app branding (page titles, Home page) says TechieDesk; `techierag-config.json` + Serilog log-file naming reviewed/updated; `playwright.config.ts` + verify specs boot the renamed app; solution + app build 0-err and the app boots (smoke gate). Context: BRD-81 repositions the app as a productized, self-hostable AnythingLLM alternative — BRD-81 itself is an umbrella (no single buildable REQ); its per-phase REQs will be appended from the `docs/TechieRag-CompetitorAnalysis.md` GAP-LIB-*/GAP-APP-* register as each phase is scheduled via *amend-docs.
-</content>
-</invoke>
+## Surface: Ingestion
+
+<a id="d-req-rag-001"></a>
+- **REQ-RAG-001** — Document ingestion & processing (9 formats + chunking). *BRD:* BRD-1, BRD-2, BRD-3, BRD-4, BRD-5, BRD-6, BRD-7. *Phase 1.*
+  - *Acceptance:* When a developer calls `IngestAsync` with a PDF path on the ingestion API, then the file is processed by the PDF processor and a document id returns.
+
+## Surface: Embedding providers
+
+<a id="d-req-rag-002"></a>
+- **REQ-RAG-002** — Embedding providers (6 + custom). *BRD:* BRD-8, BRD-9, BRD-10, BRD-11. *Phase 1.*
+  - *Acceptance:* When a developer calls `EmbedAsync` and `EmbedBatchAsync` on any provider, then vectors of the provider's dimension return for one text and for a batch.
+
+## Surface: Vector stores
+
+<a id="d-req-rag-003"></a>
+- **REQ-RAG-003** — Vector stores (SQLite-vec / pgvector / Qdrant). *BRD:* BRD-12, BRD-13, BRD-14, BRD-15. *Phase 1.*
+  - *Acceptance:* When a developer upserts, batch-upserts, searches with a document filter, deletes and reads stats on each store, then every operation behaves the same.
+
+## Surface: Semantic search
+
+<a id="d-req-rag-004"></a>
+- **REQ-RAG-004** — Semantic search & retrieval (topK, filter, scoring). *BRD:* BRD-16, BRD-17, BRD-18. *Phase 1.*
+  - *Acceptance:* When a developer calls `SearchAsync` with a query and top-K on the search API, then that many results return in descending score order.
+
+## Surface: Embedded package
+
+<a id="d-req-rag-005"></a>
+- **REQ-RAG-005** — Offline embedded embedding (BGE-M3 ONNX). *BRD:* BRD-24, BRD-25, BRD-26. *Phase 1.*
+  - *Acceptance:* When a developer calls `UseEmbedded()` on the Embedded package and embeds text, then a 1024-dimension vector returns with no network after the first run.
+
+## Surface: LLM providers
+
+<a id="d-req-rag-006"></a>
+- **REQ-RAG-006** — LLM provider integration (6 providers). *BRD:* BRD-27, BRD-28, BRD-29, BRD-30, BRD-31, BRD-32, BRD-33. *Phase 1.*
+  - *Acceptance:* When a developer calls complete, chat, stream and tool-calling members on any `ILlmProvider`, then each behaves per the contract and capability flags.
+
+## Surface: RAG generation
+
+<a id="d-req-rag-007"></a>
+- **REQ-RAG-007** — Auto-RAG generation (Ask / AskStream / ChatWithRag). *BRD:* BRD-34, BRD-35, BRD-36, BRD-37, BRD-38. *Phase 1.*
+  - *Acceptance:* When a developer calls `AskAsync` with a question, then the answer, its sources with scores and token usage return.
+
+## Surface: Structured output
+
+<a id="d-req-rag-008"></a>
+- **REQ-RAG-008** — Structured / typed output (CompleteAsync&lt;T&gt;). *BRD:* BRD-39. *Phase 1.*
+  - *Acceptance:* When a developer calls `CompleteAsync<T>` with a prompt, then the model's JSON deserialises into `T`.
+
+## Surface: Agent loop
+
+<a id="d-req-rag-009"></a>
+- **REQ-RAG-009** — Tool calling & agent loop. *BRD:* BRD-40, BRD-41, BRD-42, BRD-43. *Phase 1.*
+  - *Acceptance:* When a developer runs the agent loop on a tool-using prompt, then tools execute and a final answer returns.
+
+## Surface: Conversation memory
+
+<a id="d-req-rag-010"></a>
+- **REQ-RAG-010** — Conversation memory (token-budget trimming). *BRD:* BRD-44, BRD-45, BRD-46. *Phase 1.*
+  - *Acceptance:* When a developer enables `WithConversationMemory()` and chats twice, then the second turn sees the first.
+
+## Surface: Token tracking
+
+<a id="d-req-rag-011"></a>
+- **REQ-RAG-011** — Token tracking & budgets. *BRD:* BRD-47, BRD-48, BRD-49, BRD-50. *Phase 1.*
+  - *Acceptance:* When a developer completes a prompt with tracking on, then `ITokenTracker` records tokens and estimated cost for the operation and the session.
+
+## Surface: Resilience
+
+<a id="d-req-rag-012"></a>
+- **REQ-RAG-012** — Resilience & retry (backoff / 429 / circuit breaker). *BRD:* BRD-51, BRD-52, BRD-53. *Phase 1.*
+  - *Acceptance:* When a provider call fails transiently, then it is retried with exponential backoff up to `MaxRetries` within the timeout.
+
+## Surface: Fallback provider
+
+<a id="d-req-rag-013"></a>
+- **REQ-RAG-013** — Fallback LLM provider. *BRD:* BRD-54. *Phase 1.*
+  - *Acceptance:* When the primary provider fails after retries, then the fallback provider answers the same request.
+
+## Surface: Prompt templates
+
+<a id="d-req-rag-014"></a>
+- **REQ-RAG-014** — Prompt templates (default + custom). *BRD:* BRD-55, BRD-56. *Phase 1.*
+  - *Acceptance:* When a developer sets a system prompt and context template with `WithPromptTemplate`, then the RAG prompt uses them.
+
+## Surface: Sevak application (moved)
+
+<a id="d-req-fn-007"></a>
+- **REQ-FN-007** — Sevak (formerly TechieDesk): Home landing + navigation; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-62, BRD-63, BRD-64, BRD-65, BRD-66, BRD-67, BRD-68. *Phase 1.*
+  - *Acceptance:* When a user opens the Settings page on Sevak, then the embedding source and vector store can be configured and saved.
+
+<a id="d-req-fn-008"></a>
+- **REQ-FN-008** — Sevak (formerly TechieDesk): Settings page; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-62. *Phase 1.*
+  - *Acceptance:* When a user opens the Settings page on Sevak, then the embedding source and vector store can be configured and saved.
+
+<a id="d-req-fn-009"></a>
+- **REQ-FN-009** — Sevak (formerly TechieDesk): LLM Settings page; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-63. *Phase 1.*
+  - *Acceptance:* When a user opens the LLM Settings page on Sevak, then provider, fallback, usage, resilience and prompts can be configured.
+
+<a id="d-req-fn-010"></a>
+- **REQ-FN-010** — Sevak (formerly TechieDesk): Ingestion + Text Ingestion pages; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-64. *Phase 1.*
+  - *Acceptance:* When a user uploads a file or pastes text on Sevak, then the document is ingested and listed.
+
+<a id="d-req-fn-011"></a>
+- **REQ-FN-011** — Sevak (formerly TechieDesk): Chat page; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-65. *Phase 1.*
+  - *Acceptance:* When a user asks a question on the Chat page on Sevak, then the answer streams with sources, top-K and a document filter.
+
+<a id="d-req-fn-012"></a>
+- **REQ-FN-012** — Sevak (formerly TechieDesk): LLM Playground page; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-66. *Phase 1.*
+  - *Acceptance:* When a user runs completion, structured output and chat on the LLM Playground page on Sevak, then each returns a result.
+
+<a id="d-req-fn-013"></a>
+- **REQ-FN-013** — Sevak (formerly TechieDesk): Tool Demo page; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-67. *Phase 1.*
+  - *Acceptance:* When a user runs a tool-using prompt on the Tool Demo page on Sevak, then tool calls and results show in the trace.
+
+<a id="d-req-fn-014"></a>
+- **REQ-FN-014** — Sevak (formerly TechieDesk): Token Usage dashboard page; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-68. *Phase 1.*
+  - *Acceptance:* When a user opens the Token Usage page on Sevak, then usage, budget status and the per-model breakdown show.
+
+<a id="d-req-fn-015"></a>
+- **REQ-FN-015** — Sevak (formerly TechieDesk): Test LLM connection UI; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-69. *Phase 1.*
+  - *Acceptance:* When a user presses Test connection on Sevak, then a reachable provider reports success and an unreachable one a clear error.
+
+<a id="d-req-fn-016"></a>
+- **REQ-FN-016** — Sevak (formerly TechieDesk): All pages render via TrBlazeUI components + Lucide icons; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-70. *Phase 1.*
+  - *Acceptance:* When a user opens any page on Sevak, then it renders with TrBlazeUI components and Lucide icons.
+
+<a id="d-req-fn-017"></a>
+- **REQ-FN-017** — Sevak (formerly TechieDesk): Qdrant Admin: Docker container lifecycle UI; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-71. *Phase 1.*
+  - *Acceptance:* When a user opens the Qdrant Admin page on Sevak, then Docker status shows and the container can be created, started, stopped and removed.
+
+<a id="d-req-fn-018"></a>
+- **REQ-FN-018** — Sevak (formerly TechieDesk): Qdrant Admin: collection CRUD; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-72. *Phase 1.*
+  - *Acceptance:* When a user manages collections on the Qdrant Admin page on Sevak, then create, list, inspect and delete reflect the server.
+
+<a id="d-req-fn-019"></a>
+- **REQ-FN-019** — Sevak (formerly TechieDesk): Qdrant Admin: vector browse / search / detail / bulk delete; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-73. *Phase 1.*
+  - *Acceptance:* When a user browses vectors on the Qdrant Admin page on Sevak, then search, detail and bulk delete work against the collection.
+
+<a id="d-req-fn-020"></a>
+- **REQ-FN-020** — Sevak (formerly TechieDesk): Rename app TechieRagWeb → TechieDesk; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-81, BRD-82. *Phase 1.*
+  - *Acceptance:* When a reader opens the product statement on Sevak, then Sevak is the application showing the full capabilities of TechieRag, freemium, limited not gated.
+

@@ -55,14 +55,15 @@ dotnet build
 # Expected: Build succeeded. 0 Warning(s) 0 Error(s)
 ```
 
-### 2. Run the Sample Web Application
+### 2. Run the Library Tests
 
 ```powershell
-# Run TechieRagWeb
-dotnet run --project apps/TechieDesk/TechieDesk.csproj
-
-# Open browser to: https://localhost:5001 or http://localhost:5000
+dotnet test tests/TechieRag.Tests
 ```
+
+This repository is the library only (since 2026-09-24, BRD-87 / `REQ-FN-006`). The application that
+shows the library end to end — **Sevak**, formerly TechieDesk / TechieRagWeb — lives in its own
+repository and consumes `TechieRag` / `TechieRag.Embedded` from NuGet.
 
 ---
 
@@ -255,6 +256,10 @@ builder.Services.AddTechieRag(builder.Configuration.GetSection("TechieRag"));
 
 ## Running TechieRagWeb Sample
 
+> **Moved (2026-09-24, BRD-87 / `REQ-FN-006`).** The sample web application is now **Sevak** and
+> lives in its own repository; the steps below are run there, not in this library repository. They
+> are kept here as a description of the end-to-end flow the library supports.
+
 ### Step 1: Ensure Ollama is Running
 
 ```powershell
@@ -268,8 +273,8 @@ ollama serve
 ### Step 2: Start the Web Application
 
 ```powershell
-cd C:\3AIGenCode\TechieRag
-dotnet run --project apps/TechieDesk/TechieDesk.csproj
+# In the Sevak repository (not this one)
+dotnet run --project <Sevak app project>
 ```
 
 ### Step 3: Open in Browser
@@ -309,10 +314,9 @@ Navigate to: `https://localhost:5001` or `http://localhost:5000`
 
 ## Live-network tests (opt-in)
 
-The web-ingestion requirements (REQ-RAG-016 single page, REQ-RAG-017 site crawl, REQ-RAG-018 YouTube
-transcript) have a second test suite that talks to the **real internet** and runs the **real embedded
-embedding model**. It lives in `tests/TechieRag.Tests/Web/Live/` and
-`tests/TechieDesk.Tests/Web/Live/`.
+The web-ingestion requirements (REQ-RAG-016 single page, REQ-RAG-017 site crawl) have a second test suite that talks to the **real internet** and runs the **real embedded
+embedding model**. It lives in `tests/TechieRag.Tests/Web/Live/` (the application-side live tests moved to the Sevak
+repository on 2026-09-24).
 
 **It is excluded from the default run and must stay that way.** These tests depend on third-party
 hosts that can be slow, rate-limited, unreachable from a build agent, or simply free to change their
@@ -327,9 +331,8 @@ dotnet test
 # Live network suite only.
 TechieRagLiveNetworkTests=1 dotnet test --filter "Category=LiveNetwork"
 
-# One project at a time.
+# This project only.
 TechieRagLiveNetworkTests=1 dotnet test tests/TechieRag.Tests --filter "Category=LiveNetwork"
-TechieRagLiveNetworkTests=1 dotnet test tests/TechieDesk.Tests --filter "Category=LiveNetwork"
 ```
 
 On Windows PowerShell, set the variable first: `$env:TechieRagLiveNetworkTests = "1"`.
@@ -338,7 +341,7 @@ On Windows PowerShell, set the variable first: `$env:TechieRagLiveNetworkTests =
 
 | Need | Detail |
 |------|--------|
-| Outbound HTTPS and HTTP | `example.com`, `en.wikipedia.org`, `quotes.toscrape.com`, `registry.npmjs.org`, `postman-echo.com`, `nip.io`, `www.youtube.com` |
+| Outbound HTTPS and HTTP | `example.com`, `en.wikipedia.org`, `quotes.toscrape.com`, `registry.npmjs.org`, `postman-echo.com`, `nip.io` |
 | Loopback listeners | The SSRF tests bind an `HttpListener` on a free 127.0.0.1 port |
 | The BGE-M3 ONNX model | ~2.3 GB, downloaded automatically on first use into `<test output>/models/bge-m3` |
 
@@ -353,8 +356,8 @@ for f in model.onnx model.onnx_data tokenizer.json sentencepiece.bpe.model confi
 done
 
 # Per output directory.
-mkdir -p tests/TechieDesk.Tests/bin/Debug/net10.0/models
-ln -sfn ~/.cache/techierag-models/bge-m3 tests/TechieDesk.Tests/bin/Debug/net10.0/models/bge-m3
+mkdir -p tests/TechieRag.Tests/bin/Debug/net10.0/models
+ln -sfn ~/.cache/techierag-models/bge-m3 tests/TechieRag.Tests/bin/Debug/net10.0/models/bge-m3
 ```
 
 ### Reading a failure
@@ -363,12 +366,6 @@ A red live test is **not automatically a bug in this repository** — that is th
 kept out of the default run. Check in this order: is the target host up; has the page's copy changed
 (the assertions are pinned to structure, not wording, but wording is asserted where nothing else
 identifies the content); and only then, is the code wrong.
-
-One test is **knowingly red**: `TranscriptIsReadFromARealVideoWithCaptions`. YouTube serves every
-caption URL derived from a watch page as HTTP 200 with an empty body, so no transcript can be read
-(TR-RAG-015 in `docs/TechieDesk-TechieRag-Feedback.md`). It is deliberately left asserting the
-requirement rather than relaxed to match the outage, because it is the only instrument that will
-report the day transcript ingestion starts working again.
 
 ---
 

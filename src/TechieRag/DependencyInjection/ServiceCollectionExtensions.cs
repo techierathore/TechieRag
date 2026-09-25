@@ -143,108 +143,8 @@ public static class ServiceCollectionExtensions
                 "TechieRag configuration section not found or could not be bound. " +
                 "Ensure the configuration section exists and contains valid TechieRag settings.");
 
-        // Use the builder-based registration with configuration values
-        return services.AddTechieRag(builder =>
-        {
-            // Configure embedding
-            builder.UseEmbedding(
-                config.Embedding.Source,
-                config.Embedding.Endpoint,
-                config.Embedding.ApiKey,
-                config.Embedding.Model,
-                config.Embedding.ModelPath);
-
-            // Configure vector store
-            builder.UseVectorStore(
-                config.VectorStore.Type,
-                config.VectorStore.ConnectionString);
-
-            // Configure processing
-            builder.WithChunkSize(
-                config.Processing.DefaultChunkSize,
-                config.Processing.DefaultChunkOverlap);
-            builder.WithChunking(config.Processing.ChunkingStrategy);
-
-            // Configure telemetry
-            builder.WithTelemetry(config.EnableTelemetry);
-
-            // Configure reranking (if specified). The reranker is registered whenever credentials
-            // exist, even with Rerank.Enabled false, so a workspace with RerankEnabled = true can
-            // still opt in per call (REQ-RAG-047); Enabled is then restored as the global default.
-            if (config.Rerank.Source is RerankSource.Cohere or RerankSource.Jina
-                && !string.IsNullOrEmpty(config.Rerank.ApiKey))
-            {
-                builder.WithReranker(
-                    config.Rerank.Source,
-                    config.Rerank.ApiKey,
-                    config.Rerank.Model,
-                    config.Rerank.Endpoint,
-                    config.Rerank.TopN,
-                    config.Rerank.CandidateCount);
-                builder.WithRerankEnabledByDefault(config.Rerank.Enabled);
-            }
-
-            // Configure persistence (if specified)
-            if (config.Persistence.Provider != StoreProvider.None && config.Persistence.ConnectionString is not null)
-            {
-                builder.WithPersistence(
-                    config.Persistence.Provider,
-                    config.Persistence.ConnectionString,
-                    config.Persistence.DefaultUserId);
-            }
-
-            // Configure LLM (if specified)
-            if (config.Llm.Source != LlmSource.None)
-            {
-                builder.UseLlm(
-                    config.Llm.Source,
-                    config.Llm.Endpoint,
-                    config.Llm.ApiKey,
-                    config.Llm.Model,
-                    config.Llm.Temperature,
-                    config.Llm.MaxTokens);
-            }
-
-            // Configure fallback LLM
-            if (config.LlmFallback is not null && config.LlmFallback.Source != LlmSource.None)
-            {
-                builder.WithFallbackLlm(fb =>
-                {
-                    fb.Source = config.LlmFallback.Source;
-                    fb.Endpoint = config.LlmFallback.Endpoint;
-                    fb.ApiKey = config.LlmFallback.ApiKey;
-                    fb.Model = config.LlmFallback.Model;
-                    fb.Temperature = config.LlmFallback.Temperature;
-                    fb.MaxTokens = config.LlmFallback.MaxTokens;
-                });
-            }
-
-            // Configure usage tracking
-            if (config.UsageTracking.Enabled)
-            {
-                builder.WithUsageTracking(tracking =>
-                {
-                    tracking.MaxTotalTokens = config.UsageTracking.MaxTotalTokens;
-                    tracking.MaxCostUsd = config.UsageTracking.MaxCostUsd;
-                    tracking.AlertThreshold = config.UsageTracking.AlertThreshold;
-                    tracking.BlockOnExceeded = config.UsageTracking.BlockOnExceeded;
-                    tracking.Pricing = config.UsageTracking.Pricing;
-                });
-            }
-
-            // Configure resilience
-            builder.WithResilience(r =>
-            {
-                r.MaxRetries = config.Resilience.MaxRetries;
-                r.InitialRetryDelayMs = config.Resilience.InitialRetryDelayMs;
-                r.MaxRetryDelayMs = config.Resilience.MaxRetryDelayMs;
-                r.BackoffMultiplier = config.Resilience.BackoffMultiplier;
-                r.HandleRateLimiting = config.Resilience.HandleRateLimiting;
-                r.CircuitBreakerThreshold = config.Resilience.CircuitBreakerThreshold;
-                r.CircuitBreakerRecoverySeconds = config.Resilience.CircuitBreakerRecoverySeconds;
-                r.TimeoutSeconds = config.Resilience.TimeoutSeconds;
-            });
-        });
+        // REQ-FN-066: one mapper for both overloads, so every bound field reaches the builder.
+        return services.AddTechieRag(builder => TechieRagConfigMapper.Apply(builder, config));
     }
 
     /// <summary>
@@ -276,24 +176,6 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(config);
 
-        return services.AddTechieRag(builder =>
-        {
-            builder.UseEmbedding(
-                config.Embedding.Source,
-                config.Embedding.Endpoint,
-                config.Embedding.ApiKey,
-                config.Embedding.Model,
-                config.Embedding.ModelPath);
-
-            builder.UseVectorStore(
-                config.VectorStore.Type,
-                config.VectorStore.ConnectionString);
-
-            builder.WithChunkSize(
-                config.Processing.DefaultChunkSize,
-                config.Processing.DefaultChunkOverlap);
-
-            builder.WithTelemetry(config.EnableTelemetry);
-        });
+        return services.AddTechieRag(builder => TechieRagConfigMapper.Apply(builder, config));
     }
 }

@@ -1,284 +1,360 @@
 # TechieRag — Architecture
 
-**Last updated:** 2026-06-25
-**Status:** Current (brownfield) — amended 2026-07-17: TechieDesk repositioning (app renamed from TechieRagWeb, promoted from sample to product; ADR-007)
+| | |
+|---|---|
+| App | TechieRag |
+| Kind | library |
+| Size | Large |
+| Stack answer set | dotnet |
+| Date | 2026-09-24 |
 
-## Table of Contents
+Status: Current (post-implementation; read from the code on 2026-09-24, decisions log brought up to the end of phase 2 on 2026-09-25). This document describes the five-package .NET library (`TechieRag`, `TechieRag.Embedded`, `TechieRag.Telemetry`, `TechieRag.Agents`, `TechieRag.Local`) as it is built; every planned change is a Decisions-log row naming its BRD item. The application that consumes the packages, **Sevak** (TechieDesk until 2026-09-24), lives in its own repository and is described there. Harvested from the previous Architecture (2026-06-25, amended 2026-07-17, 2026-09-03 and 2026-09-24; now `docs/OldDocs/TechieRag-Architecture.md`), `DECISIONS.md`, `docs/TechieRag.Agents-Proposal.md`, `NUGET-PUBLISHING.md` and a full scan of `src/`, `tests/` and `.github/workflows/`.
 
-1. [Tech stack](#tech-stack)
-2. [Component map](#component-map)
-3. [Data flow — primary path](#data-flow-primary-path)
-4. [Module responsibilities](#module-responsibilities)
-5. [Cross-cutting concerns](#cross-cutting-concerns)
-6. [Deployment architecture](#deployment-architecture)
-7. [Architectural decisions (ADR-style log)](#architectural-decisions-adr-style-log)
-8. [Target architecture](#target-architecture)
-9. [Open questions / risks](#open-questions-risks)
-10. [Sources harvested](#sources-harvested)
+## 1. Stack decisions
 
-## 1. Tech stack
+One row per stack question. "Source" says where the answer came from: the answer set, the owner, or the existing code.
 
-TechieRag is a **configurable RAG (Retrieval-Augmented Generation) library for .NET**, shipped as two NuGet packages (`TechieRag`, `TechieRag.Embedded`) plus the **TechieDesk** Blazor Server application (formerly `TechieRagWeb`; folder `apps/TechieDesk`, renamed per BRD-82 / REQ-UI-014 on 2026-07-17) and an xUnit test project. The library is a class-library SDK, not a hosted application — consumers reference it and wire it into their own apps via a fluent builder or DI. TechieDesk is being productized as a self-hostable AnythingLLM alternative built on the library (BRD-81; roadmap in `docs/TechieRag-CompetitorAnalysis.md`).
+| Q | Topic | Decision | Source |
+|---|---|---|---|
+| Q1 | Configuration | The library binds a `TechieRag` section of the host's `IConfiguration` (`AddTechieRag(IConfiguration)`), or takes a fluent `TechieRagBuilder`, or a hand-built `TechieRagConfig`. It reads two environment variables of its own, `TECHIERAG_MODEL_BASE_URL` and `TECHIERAG_RERANKER_BASE_URL` (model download mirrors). The library never owns an `appsettings.json`; the host does. | code (`DependencyInjection/ServiceCollectionExtensions.cs`, `TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:36`); answer set for the host's layering |
+| Q2 | Secrets in development | API keys are configuration strings the host supplies; the library never persists one. Live tests read keys and connection strings from environment variables (`TechieRagLiveNetworkTests`, `TechieRagTestPostgres`) and skip when absent. No `secrets.example.json` exists; the UsageGuide lists every key the tests read. | code (`tests/TechieRag.Tests/*/Live/*FactAttribute.cs`); answer set (user secrets) applies to consumers, not to the library |
+| Q3 | Database | The library owns no database of its own. Its stores are pluggable: SQLite (`Microsoft.Data.Sqlite`, default file `techierag.db`), PostgreSQL with pgvector (`Npgsql` 10 + `Pgvector`), and Qdrant (`Qdrant.Client`). Conversation and workspace stores exist for SQLite and PostgreSQL. Live PostgreSQL tests run only when `TechieRagTestPostgres` names a server; nothing starts a container. | code (`VectorStores/`, `Persistence/`); overrides the answer set's "PostgreSQL in Docker" because a library must not pick its consumer's engine |
+| Q4 | Authentication | None in the library. Identity, roles, licences and subscriptions are the consuming application's concern (Sevak uses AppManager). The planned subscription sign-in (BRD-112…114) authenticates the *user to an LLM vendor*, not the user to the app, and the host persists that session. | owner decision 2026-09-24 (`docs/TechieRag-Update-Brief.md` decision 8); answer set Q4 ("AppManager, or something else?") answered "none, library" |
+| Q5 | Logging | `Microsoft.Extensions.Logging.Abstractions` only (`ILogger<T>`, `NullLogger` fallback), injected through `WithLogging(ILoggerFactory)` or DI. No logging framework is referenced; the host chooses Serilog or anything else. Three `Console.WriteLine` calls remain in `EmbeddedEmbeddingProvider` (download progress) and are a defect to route through `ModelDownloadService` events (BRD-92). | code (39 files use `ILogger`); overrides the answer set's Serilog because a package must not pin a sink |
+| Q6 | Tests | xUnit 2.9.3 with coverlet, `tests/TechieRag.Tests` (96 files, about 634 test methods; 558 `[Fact]`, 35 `[Theory]`, 41 live-gated). Live tests are gated by custom `FactAttribute`s that set `Skip` with a reason. No mocking library; hand-written doubles in `TestDoubles/`. A second test project, `tests/TechieRag.Agents.Tests`, covers the Agents package (BRD-84; 2026-09-24) so the core suite never loads Microsoft Agent Framework; its live LM Studio tests are gated by `LiveLmStudioFactAttribute` (`TechieRagLiveLmStudioModel`). | code; answer set (xUnit) |
+| Q7 | Layout and naming | `src/` holds one folder per package (`TechieRag`, `TechieRag.Embedded`, `TechieRag.Telemetry`; planned `TechieRag.Agents`, `TechieRag.Local`); `tests/` holds the test projects; `samples/` is planned for the MAUI probe app (BRD-94). Package id equals folder name equals root namespace. There is no executable head: the "primary project" is the core package `TechieRag`. | code (`TechieRag.slnx`); answer set Q7 for `src/` and `tests/` |
+| Q8 | User interface | None. The library ships no UI. Sevak (TrBlazeUI, MAUI Blazor Hybrid) and MyDiary (MAUI) are its consumers and own their screens. | code; owner (`docs/TechieRag-Update-Brief.md` decision 3) |
+| Q11 | Standing rules | (1) Log files under the build output folder, never at the repository root. (2) No stray folders at the repository root; everything under `src/`, `tests/`, `samples/` or `docs/`. (3) Agents never run git; the owner commits. (4) Core stays dependency-light: raw `HttpClient` + `System.Text.Json` for every LLM and embedding provider; a heavy or fast-moving dependency (ONNX Runtime, OpenTelemetry exporters, Microsoft Agent Framework, a local inference runtime) goes into a sibling package, never into `TechieRag`. (5) Every public member carries XML documentation (this is a published SDK). (6) Every `ILlmProvider` change is additive until a major version is decided; `LlmSource.None` keeps v1 behaviour. | answer set defaults (1, 2); `AGENTS.md` (3); ADR-003/005/008/014 (4, 6); Coding Standards (5) |
 
-| Layer | Choice | Version | Notes |
-|-------|--------|---------|-------|
-| Runtime | .NET | net10.0 | All projects target `net10.0`; nullable + implicit usings enabled |
-| Package type | NuGet class library | 1.0.0 | `TechieRag` + `TechieRag.Embedded`; semantic versioning, version overridden at CI pack time |
-| Document parsing | PdfPig, DocumentFormat.OpenXml, HtmlAgilityPack, Markdig, Tomlyn | 0.1.13 / 3.4.1 / 1.12.4 / 0.45.0 / 0.20.0 | One library per format processor |
-| Vector stores | Microsoft.Data.Sqlite + sqlite-vec, Npgsql + Pgvector, Qdrant.Client | 10.0.3 / 10.0.1 + 0.3.2 / 1.16.1 | Pluggable; SQLite-vec is the zero-config default |
-| Data access | Dapper | 2.1.66 | Used by the SQL-based vector stores |
-| Cloud embedding | Azure.AI.OpenAI | 2.1.0 | Azure OpenAI embedding provider |
-| Embedded embedding | Microsoft.ML.OnnxRuntime (+ Managed), Microsoft.ML.Tokenizers | 1.24.1 / 2.0.0 | `TechieRag.Embedded` only — BGE-M3 ONNX inference |
-| DI / config | Microsoft.Extensions.{DependencyInjection,Configuration,Logging,Options}.Abstractions | 10.0.3 | Abstractions only — no framework lock-in |
-| TechieDesk UI | Blazor Server + TrBlazeUI.Components + TrBlazeUI.Icons.Lucide | 1.0.3 | `apps/TechieDesk` only (from GitHub Packages) |
-| Test | xUnit | — | `tests/TechieRag.Tests` |
+Q9 (hosting) and Q10 (production secrets) do not apply: the library is published as NuGet packages, not deployed. The publishing process is in `NUGET-PUBLISHING.md`.
 
-**LLM providers** are implemented with raw `HttpClient` + `System.Text.Json` (no heavy vendor SDKs) so the core package stays dependency-light: Ollama, LM Studio, OpenAI-compatible, Azure AI Foundry, Google Gemini, Anthropic Claude.
+## 2. Solution structure
 
-## 2. Component map
+| Project | Kind | Purpose |
+|---|---|---|
+| `TechieRag` | class library, NuGet package (`net10.0;net8.0`) | The core: ingestion and 13 document processors, 4 chunkers, 8 embedding providers, 3 vector stores, semantic search with optional reranking, 6 LLM providers behind `ILlmProvider`, auto-RAG (`Ask*`, `ChatWithRag*`), structured output, the tool-calling agent loop and flow orchestration, MCP client, data connectors (Confluence, email, repository), web ingestion, conversation and workspace stores, token tracking, resilience, prompt templates, and the MSBuild targets that install the AI skill files into a consumer's repository. 17 packages, no vendor AI SDKs. |
+| `TechieRag.Embedded` | class library, NuGet package (`net10.0`) | Offline embeddings and reranking on ONNX Runtime: `UseEmbedded()` (bge-m3, 1024 dimensions, downloaded once), `UseMiniLM` / `UseBgeSmall` (384 dimensions), `UseEmbeddedReranker()` (bge-reranker-v2-m3), `ModelDownloadService`, the macOS native-library resolver. |
+| `TechieRag.Telemetry` | class library, NuGet package (`net10.0;net8.0`) | Opt-in OpenTelemetry exporters (OTLP, console) over the core's `ActivitySource` and `Meter`, so the core links no exporter. Never packed by either workflow today (Open question 4). |
+| `TechieRag.Tests` | xUnit test project (`net10.0`) | Unit tests plus live-gated tests for network, PostgreSQL, the ONNX reranker and the embedder tokenizer. References all three packages. |
+| `TechieRag.Agents` *(BRD-84/85, ADR-008/011; built 2026-09-24)* | class library, NuGet package (`net10.0;net8.0`) | Agents on Microsoft Agent Framework 1.22.0 over TechieRag: `TechieRagAgentBuilder` (LM Studio first), `ITechieRagAgent`, `RetrievalContextProvider` over the core `TechieRag.Agentic` contract, and the four public seam adapters in `Interop/`. References `Microsoft.Agents.AI` 1.22.0, `Microsoft.Extensions.AI` 10.10.0, `Microsoft.Extensions.AI.OpenAI` 10.10.0. No MSBuild targets. |
+| `TechieRag.Agents.Tests` | xUnit test project (`net10.0`) | Offline tests of the builder and adapters against a scripted `IChatClient` and a real `TechieRagClient`; live LM Studio tests gated by `LiveLmStudioFactAttribute`. |
+| `TechieRag.Local` *(BRD-96…109, ADR-014; built 2026-09-24 up to the runtime)* | class library, NuGet package (`net10.0`) | In-process local language model behind `UseLocalLlm()` (via `UseCustomLlmProvider`): one public `LocalLlmProvider` over the internal `ILocalLlmRuntime` seam; `LocalModel` catalog (Qwen2.5 0.5B on phones, Phi-3 mini on desktops; one pinned, SHA-256-hashed file set per runtime format); terms-gated resumable download through `TechieRag.Embedded`'s `ModelDownloadService` into the model root; `MemoryGate`; chat templates, stop sequences and the context-length refusal in managed code; `LocalLlm.Register()` for `LlmSource.Local`. References core and `TechieRag.Embedded`; **no inference runtime and no `buildTransitive` targets yet** — both wait for the owner's per-platform runtime choice (Open question 11). |
+| `TechieRag.Local.Tests` *(built 2026-09-24)* | xUnit test project (`net10.0`) | The runtime-neutral conformance suite (`LocalLlmConformanceTests`) run against a scripted runtime, provider, download (loopback HTTP), memory, template and registration tests; live tests gated by `LiveLocalLlmFactAttribute` in the non-parallel `LiveLocalLlm` collection. |
+| `samples/TechieRag.Probe` *(planned, BRD-94)* | .NET MAUI app, four heads | The four-platform proof: embed, store, search, generate, with timings. Not packed. |
+
+Removed on 2026-09-24 (BRD-87, `REQ-FN-006`): the five `apps/TechieDesk*` projects, `tests/TechieDesk.Tests`, `tests/appium`, `tests/verify`, `playwright.config.ts`, `publish-desktop.yml`, the application documents and mockups. They live in the Sevak repository, which pins `TechieRag` and `TechieRag.Embedded` 1.0.7.
+
+## 3. Component map
 
 ```mermaid
 flowchart TB
-  subgraph Src["src — shipped packages"]
-    Core["TechieRag (core library)"]
-    Embed["TechieRag.Embedded (ONNX BGE-M3)"]
-  end
-  subgraph Samples["samples"]
-    Web["TechieDesk (Blazor Server app, formerly TechieRagWeb)"]
+  subgraph Packages["src — the packages"]
+    Core["TechieRag (core)"]
+    Embed["TechieRag.Embedded (ONNX: bge-m3, MiniLM, reranker)"]
+    Tel["TechieRag.Telemetry (OTLP / console exporters)"]
+    Agents["TechieRag.Agents (Microsoft Agent Framework 1.22.0; BRD-84/85)"]
+    Local["TechieRag.Local (BRD-96…109; ONNX Runtime GenAI)"]
   end
   subgraph Tests["tests"]
-    UT["TechieRag.Tests (xUnit)"]
+    UT["TechieRag.Tests"]
+    AT["TechieRag.Agents.Tests"]
+    LT["TechieRag.Local.Tests"]
   end
+  Probe["samples/TechieRag.Probe — planned (BRD-94)"]
+  Sevak["Sevak — separate repository; PackageReference 1.0.7"]
+  Diary["MyDiary — MAUI consumer; first mobile consumer of TechieRag.Local"]
   Embed -->|"ProjectReference"| Core
-  Web -->|"ProjectReference"| Core
-  Web -->|"ProjectReference"| Embed
-  UT -->|"ProjectReference"| Core
+  Tel -->|"ProjectReference"| Core
+  Agents -->|"ProjectReference"| Core
+  AT --> Agents
+  Local -->|"ProjectReference"| Core
+  Local -->|"ProjectReference (ModelDownloadService)"| Embed
+  LT --> Local
+  UT --> Core
+  UT --> Embed
+  UT --> Tel
+  Probe -.-> Embed
+  Probe -.-> Local
+  Sevak -.-> Core
+  Sevak -.-> Embed
+  Diary -.-> Local
 ```
 
-**Inside `src/TechieRag` — module folders:**
+Inside the core, every backend sits behind an interface in `Abstractions/`, and `TechieRagClient` depends only on those interfaces:
 
 ```mermaid
 flowchart TB
   subgraph Surface["Public surface (namespace root)"]
-    ITR["ITechieRag (interface)"]
-    Client["TechieRagClient (impl)"]
-    Builder["TechieRagBuilder (fluent)"]
-    Cfg["TechieRagConfig (+ sub-configs)"]
+    ITR["ITechieRag"]
+    Client["TechieRagClient"]
+    Builder["TechieRagBuilder (Use* / With* / Build)"]
+    Cfg["TechieRagConfig (+ sub-configs, enums)"]
   end
-  subgraph Abs["Abstractions — provider contracts"]
+  subgraph Abs["Abstractions"]
     IEmb["IEmbeddingProvider"]
     IVec["IVectorStore"]
-    IDoc["IDocumentProcessor"]
-    ILlm["ILlmProvider"]
-    IPrompt["IPromptTemplate"]
+    IDoc["IDocumentProcessor / IChunker"]
+    ILlm["ILlmProvider / IMultimodalLlmProvider"]
+    IRr["IReranker"]
+    IMem["IConversationMemory / IConversationStore / IWorkspaceStore"]
     ITool["IToolHandler"]
-    IMem["IConversationMemory"]
-    ITok["ITokenTracker"]
+    ISp["ISpeechToText / ITextToSpeech"]
   end
   subgraph Impl["Implementations"]
-    Emb["Embedding — Ollama / LmStudio / Onnx / AzureOpenAI / Http"]
-    Llm["Llm — Ollama / LmStudio / OpenAICompatible / AzureAIFoundry / Gemini / Anthropic"]
-    Proc["Processors — Pdf / Docx / Markdown / Html / Json / Toml / Code / Text / Generic + TextChunker"]
-    Vec["VectorStores — SqliteVec / PgVector / Qdrant"]
-    Svc["Services — Retry / Fallback / Memory / PromptEngine / TokenTracker / ToolRegistry / AgentLoop"]
+    Emb["Embedding — Ollama, LmStudio, OpenAICompatible, AzureOpenAI, Cohere, Gemini, Http, Onnx"]
+    Vec["VectorStores — SqliteVec, PgVector, Qdrant"]
+    Proc["Processors — Pdf, Docx, Xlsx, Pptx, Csv, Html, Markdown, Json, Toml, Code, Text, Generic, AudioTranscription + 4 chunkers"]
+    Llm["Llm — Ollama, LmStudio, OpenAICompatible, AzureAIFoundry, Gemini, Anthropic + LlmProviderFactory, ModelRouter, LlmConnectorCatalog"]
+    Svc["Services — AgentLoopRunner, ToolRegistry, CompositeToolHandler, RetryHandler, FallbackLlmHandler, TokenUsageTracker, PromptTemplateEngine, InMemory/DbConversationMemory, WorkspaceManager"]
+    Orch["Orchestration — FlowRunner, FlowRuntime, FlowValidator, guardrails, AgentToolHandler"]
+    Mcp["Mcp — McpClient, Stdio/Http transports, McpToolHandler, trust policy"]
+    Conn["Connectors — ConnectorRunner, Confluence, Email (IMAP, mbox), Repository, HTTP transport"]
+    Web["Web — HttpWebContentFetcher, SiteCrawler, WebPageReader"]
+    Pers["Persistence — Sqlite/Postgres conversation and workspace stores"]
+    Rr["Reranking — Cohere, Jina (+ ONNX cross-encoder in Embedded)"]
+    Sp["Speech — OpenAI-compatible STT / TTS"]
   end
+  Diag["Diagnostics — TechieRagTelemetry (ActivitySource + Meter)"]
+  DI["DependencyInjection — AddTechieRag ×3"] --> Builder
   Builder --> Client
+  Cfg --> Builder
   Client --> Abs
   Abs --> Impl
-  Cfg --> Builder
-  DI["DependencyInjection — ServiceCollectionExtensions"] --> Builder
+  Impl --> Diag
   Build["build — TechieRag.targets + AI skill files"]
 ```
 
-## 3. Data flow — primary path
+**How a request travels** (one `AskAsync` call; per-service detail is in the DevGuide):
+1. The host calls `AddTechieRag(...)` or builds a `TechieRagBuilder`; `Build()` (`TechieRagBuilder.cs:604`) creates the embedding provider, the vector store (`TechieRagBuilder.cs:854`), the optional LLM provider wrapped in `RetryHandler` and `FallbackLlmHandler`, the token tracker, the prompt engine and the optional reranker, and returns a `TechieRagClient`.
+2. `InitializeAsync` calls `IVectorStore.InitializeAsync`, which runs the store's idempotent `CREATE TABLE IF NOT EXISTS` (or creates the Qdrant collections).
+3. `AskAsync(question, topK, ...)` embeds the question through `IEmbeddingProvider.EmbedAsync`, then calls `IVectorStore.SearchAsync(vector, topK, documentFilter)`. On SQLite that is a managed cosine scan over every chunk (`SqliteVecStore.cs:340`); on pgvector an `ivfflat` cosine query; on Qdrant a `SearchAsync` against `techierag_chunks`.
+4. When a reranker is configured, `IReranker.RerankAsync` reorders the candidate set (`CandidateCount`, default 20) down to `TopN`.
+5. `PromptTemplateEngine` builds the system and user messages from the top chunks within `MaxContextTokens`; `ILlmProvider.ChatAsync` (or `ChatStreamAsync`) sends them; `RetryHandler` retries transient failures with backoff and honours `Retry-After`; `FallbackLlmHandler` switches provider when the primary fails.
+6. The provider raises `OnCompletionCompleted`; `TokenUsageTracker` records tokens and cost and fires budget alerts; `TechieRagTelemetry.RecordSearch` and `RecordLlmCompletion` update the `Meter` and the `TechieRag.Search` activity.
+7. `RagResponse` (answer, sources with scores, usage) returns to the host. Streaming variants yield text pieces, or `RagStreamEvent`s when sources are wanted mid-stream.
 
-The core flow is **ingest → embed → store**, then **query → embed → search → (optionally) generate**.
+### 3.1 Typed streaming and the agent layer (BRD-110, BRD-111, BRD-83…85; 2026-09-24)
 
-```mermaid
-sequenceDiagram
-  actor Dev as "Consumer code"
-  participant Client as "TechieRagClient"
-  participant Proc as "IDocumentProcessor"
-  participant Emb as "IEmbeddingProvider"
-  participant Vec as "IVectorStore"
-  participant Llm as "ILlmProvider"
-  Note over Dev,Vec: Ingestion
-  Dev->>Client: IngestAsync(filePath)
-  Client->>Proc: ProcessAsync(stream) -> chunks
-  Client->>Emb: EmbedBatchAsync(chunk texts)
-  Client->>Vec: UpsertBatchAsync(chunks + vectors)
-  Note over Dev,Llm: Ask (RAG + generation)
-  Dev->>Client: AskAsync(question)
-  Client->>Emb: EmbedAsync(question)
-  Client->>Vec: SearchAsync(queryVector, topK)
-  Vec-->>Client: ranked SearchResult list
-  Client->>Llm: ChatAsync(prompt with context)
-  Llm-->>Client: answer + token usage
-  Client-->>Dev: RagResponse(answer, sources, usage)
+**Typed streaming contract (core, `TechieRag.Models` / `TechieRag.Abstractions`).** This is the contract later providers (the local-model and subscription providers) implement:
+
+```csharp
+// ILlmProvider — additive, with a default interface implementation (ADR-005/013)
+IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(
+    IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default);
+
+public enum LlmStreamEventKind { TextDelta, ToolCall, Completed }
+public sealed class LlmStreamEvent
+{
+    LlmStreamEventKind Kind; string? Text; ToolCall? ToolCall; TokenUsage? Usage; string? FinishReason; string? ModelName;
+    static LlmStreamEvent FromText(string); FromToolCall(ToolCall); FromCompleted(TokenUsage, string finishReason, string modelName);
+}
+// TechieRag.Llm.LlmStreamEventExtensions
+static IAsyncEnumerable<string> ToTextStreamAsync(this IAsyncEnumerable<LlmStreamEvent>, CancellationToken = default);
 ```
 
-For `SearchAsync` (retrieval only, v1 behaviour) the LLM leg is skipped and the ranked `SearchResult` list is returned directly. `AskStreamAsync` / `ChatWithRagStreamAsync` replace the single `ChatAsync` call with `ChatStreamAsync`, yielding tokens through an `IAsyncEnumerable<string>`.
+- **Order:** zero or more `TextDelta`, then zero or more `ToolCall` (each complete: id, name, full arguments JSON), then exactly one `Completed` (usage, finish reason, model), always last.
+- **Built-in providers:** all six override it. `ChatStreamAsync` is now `ChatStreamEventsAsync(...).ToTextStreamAsync()` in each, so the text path cannot drift from the typed path, and `CompleteStreamAsync` still delegates to `ChatStreamAsync` (unchanged behaviour). OpenAI-style services (`OpenAICompatible`, `LmStudio`, `AzureAIFoundry`) share `Llm/OpenAIStreamReader`, which assembles `tool_calls` fragments by `index`; Anthropic assembles `input_json_delta` fragments in `Llm/AnthropicStreamState` and emits the call at `content_block_stop`; Ollama and Gemini send calls whole, emitted after the text. Each still raises `OnCompletionCompleted` once, now with `InvolvedToolCalls` and cache-read tokens.
+- **Decorators:** `RetryHandler` (circuit breaker, no mid-stream retry) and `FallbackLlmHandler` (fails over before the first event) forward it.
+- **Default for custom providers** (`Llm/LlmStreamEventFallback`): with tools, or when `SupportsStreaming` is false, it calls `ChatAsync` and replays text, tool calls, completed; otherwise it projects `ChatStreamAsync` into text deltas with estimated usage. A custom provider that implements `ChatStreamAsync` over the typed method must override the typed method too, or the two defaults recurse.
 
-## 4. Module responsibilities
+**Streaming agent loop (core).** `AgentLoopRunner.RunStreamAsync(List<ChatMessage>, LlmCompletionOptions?, IProgress<AgentStep>?, CancellationToken) → IAsyncEnumerable<AgentStreamEvent>` (`AgentStreamEventKind`: `TextDelta`, `ToolCallRequested`, `ToolExecuted`, `Completed`). Every model call goes through `ChatStreamEventsAsync`; every tool call runs through the constructor's `IToolHandler` (a `ToolRegistry`, composite or guarded handler) exactly as `RunAsync` does, appending the same assistant and tool messages and reporting the same `AgentStep` trace. `Completed.Response.Usage` is summed over the run; `MaxIterationsReached` flags a forced final answer.
 
-| Module | Key types | Responsibility | Depends on |
-|--------|-----------|----------------|------------|
-| (root) | `ITechieRag`, `TechieRagClient`, `TechieRagBuilder`, `TechieRagConfig` | Public SDK surface — orchestration + fluent configuration | Abstractions |
-| `Abstractions` | `IEmbeddingProvider`, `IVectorStore`, `IDocumentProcessor`, `ILlmProvider`, `IPromptTemplate`, `IToolHandler`, `IConversationMemory`, `ITokenTracker` | Provider contracts that make every backend pluggable | (none) |
-| `Embedding` | `OllamaEmbeddingProvider`, `LmStudioEmbeddingProvider`, `OnnxEmbeddingProvider`, `AzureOpenAIEmbeddingProvider`, `HttpEmbeddingProvider` | Turn text into vectors across local + cloud services | Abstractions |
-| `Llm` | `OllamaLlmProvider`, `LmStudioLlmProvider`, `OpenAICompatibleLlmProvider`, `AzureAIFoundryLlmProvider`, `GoogleGeminiLlmProvider`, `AnthropicLlmProvider` | Chat / completion / streaming / tool-calling across 6 LLM backends | Abstractions, Models |
-| `Processors` | `Pdf/Docx/Text/Markdown/Html/Json/Toml/Code/GenericTextProcessor`, `TextChunker` | Extract text from 9 formats and split into overlapping chunks | format libraries |
-| `VectorStores` | `SqliteVecStore`, `PgVectorStore`, `QdrantStore` | Persist + similarity-search embeddings | Dapper, Npgsql, Qdrant.Client |
-| `Services` | `RetryHandler`, `FallbackLlmHandler`, `InMemoryConversationMemory`, `PromptTemplateEngine`, `TokenUsageTracker`, `ToolRegistry`, `AgentLoopRunner` | Resilience, prompt building, token accounting, multi-turn memory, agent loop | Abstractions, Models |
-| `Models` | `TextChunk`, `SearchResult`, `Document`, `RagResponse`, `LlmResponse`, `ChatMessage`, `ToolDefinition/Call/Result`, `TokenUsage`, `IngestionStats` | Immutable DTOs across the pipeline | (none) |
-| `Telemetry` | `EmbeddingCompletedEventArgs`, `LlmCompletionEventArgs` | Event payloads carrying model, duration, token counts | Models |
-| `DependencyInjection` | `ServiceCollectionExtensions` | `AddTechieRag(...)` registration (builder + `IConfiguration` overloads) | builder |
-| `build` | `TechieRag.targets`, AI skill markdown | Post-build autodistribution of AI-agent skill files into consumer repos | MSBuild |
+**Agentic retrieval contract (core, `TechieRag.Agentic`, zero packages; ADR-009).** `IRetrievalSource` (`TechieRagRetrievalSource` over `ITechieRag` with an explicit rerank switch, `DelegateRetrievalSource` over delegates), `RetrievalToolOptions` (TopK 5, MaxTopK 20, MaxSearchesPerTurn 4, WeakScoreThreshold 0.55, NoneScoreThreshold 0.35, MaxChunkChars 1500), `RetrievalTurnState` (budget, refs S1… stable per chunk across turns, typed `Collected` results, `Searches` traces; `BeginTurn()` per user turn), `RetrievalTrace`, `KnowledgeBaseTools` (descriptions, schemas, `ExecuteSearchAsync` → JSON with `status` strong / weak / none / limit_reached, `best_score`, `searches_used`, `searches_remaining`, `results[]` with `ref`, `document`, `document_id`, `page`, `chunk_index`, `score`, `text`, and `hint`), `AgenticInstructions.Default` / `WithDomainGuidance`, and `ToolRegistry.RegisterKnowledgeBase(source, options, state)`. Model-facing strings are invariant English.
 
-**Provider abstractions (`Abstractions`).** Every backend choice — embedding source, vector store, document format, LLM, prompt template, tool handler, conversation memory, token tracker — sits behind an interface. This is the architectural keystone: `TechieRagClient` depends only on the interfaces, so switching Ollama → OpenAI or SQLite-vec → Qdrant is a configuration change, never a code change.
+**`TechieRag.Agents` (ADR-008/011).** `TechieRagAgentBuilder(ITechieRag)` → `ITechieRagAgent` (`Agent : AIAgent`, `Rag`, `CreateSessionAsync`, `AskAsync(string | IEnumerable<ChatMessage>, AgentSession?)` → `AgentRagResponse { Answer, Sources, Searches, PendingApprovals, Raw }`, `AskStreamAsync` → `RagStreamEvent`s). `Build()` wraps the chosen `IChatClient` in `FunctionInvokingChatClient` (cap `WithMaxToolIterations`, default 8), creates a `ChatClientAgent` whose `AIContextProviders` include `RetrievalContextProvider` (one `RetrievalTurnState` per `AgentSession`, tools served through adapter 2a over a `ToolRegistry`), and applies `AgentStepReporter` when `WithTrace` is set. Public adapters in `Interop/`: `LlmProviderChatClient` (`ILlmProvider` → `IChatClient`; its streaming runs over `ChatStreamEventsAsync`, so a tool-using MAF turn streams end to end), `ToolHandlerFunctions` / `ToolHandlerAIFunction` (`IToolHandler` → `AITool`, `RequiresConfirmation` → `ApprovalRequiredAIFunction`), `AIToolHandler` (`AITool` / `AIAgent` → `IToolHandler`), `AgentStepReporter.WithAgentSteps` (MAF run and function middleware → `IProgress<AgentStep>`, four loop kinds only, `ToolResult.Message` codes carried), `ConversationMemoryChatHistoryProvider` (`IConversationMemory` → `ChatHistoryProvider`). DI: `AddTechieRagAgent(Action<TechieRagAgentBuilder>)` registers `ITechieRagAgent` and a keyed `AIAgent` (`"techierag"`). Not used: `HarnessAgent`, hosted tools, MAF exporters.
 
-**`TechieRagClient` (orchestrator).** The single concrete implementation of `ITechieRag`. It selects the right `IDocumentProcessor` by file extension, drives the embed→store ingestion pipeline, and on query composes embedding + vector search + prompt building + LLM completion. v2 added the auto-RAG methods (`AskAsync`, `AskStreamAsync`, `ChatWithRagAsync`, `ChatWithRagStreamAsync`) on top of the v1 retrieval surface without breaking it.
+### 3.2 `TechieRag.Local` (BRD-96…109, ADR-014; 2026-09-24)
 
-**`Services` (cross-cutting behaviours).** `RetryHandler` and `FallbackLlmHandler` are decorators over `ILlmProvider` (exponential backoff, HTTP-429 handling, circuit breaker, primary→fallback failover). `AgentLoopRunner` drives the tool-calling loop; `ToolRegistry` lets callers register tools as delegates. `TokenUsageTracker` subscribes to provider completion events and enforces budgets. `InMemoryConversationMemory` holds per-conversation history with token-budget trimming.
+**One provider, a runtime per platform underneath.** `LocalLlmProvider : ILlmProvider` is the only thing an app sees. Everything observable is done in it, above the internal seam, so every runtime behaves the same: the chat template (`ChatTemplateFormatter`: ChatML, Phi-3, Llama 3, Gemma, applied in managed code), stop sequences (`StopSequenceFilter`, the caller's plus the template's end-of-turn marker, never partly streamed), the context-length refusal (`LocalPromptTooLongException` before inference), `MaxTokens` clamped to the room left, usage from the model's tokenizer, the typed-stream order, `OnCompletionCompleted` once per call. `ChatStreamAsync` is `ChatStreamEventsAsync(...).ToTextStreamAsync()`; `ChatStreamEventsAsync` is overridden. `CompleteAsync<T>` sends `T`'s JSON schema (`JsonSchemaExporter`) with JSON mode so a runtime can constrain to it, then parses strictly. `SupportsToolCalling` is false and a request with tools is refused.
 
-### Secondary flow — embedded ONNX model load (`TechieRag.Embedded`)
-
-```mermaid
-sequenceDiagram
-  participant Dev as "Consumer code"
-  participant Prov as "EmbeddedEmbeddingProvider"
-  participant DL as "ModelDownloadService"
-  participant HF as "Hugging Face"
-  participant Cache as "Local model cache"
-  Dev->>Prov: first EmbedAsync(...)
-  Prov->>DL: ensure model present
-  alt model missing
-    DL->>HF: download BGE-M3 ONNX (~2.3GB)
-    DL->>Cache: write files (one-time)
-    DL-->>Prov: ProgressChanged events
-  end
-  DL-->>Prov: cached model path
-  Prov->>Prov: init ONNX session + tokenizer (lazy)
-  Prov-->>Dev: embeddings (offline thereafter)
+```csharp
+internal interface ILocalLlmRuntime   // OnnxGenAiRuntime on every platform (DECISIONS.md 2026-09-25)
+{
+    string Name { get; }                       // logs only
+    LocalModelFormat Format { get; }           // OnnxGenAi (Test for the scripted stand-in)
+    ILocalTokenizer LoadTokenizer(string modelDirectory);
+    ILocalLlmModel Load(string modelDirectory, int contextSize, int? threads);
+}
+internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): special tokens parsed, no BOS
+{
+    IAsyncEnumerable<string> GenerateAsync(string templatedPrompt, LocalGenerationSettings settings, CancellationToken ct);
+}
 ```
 
-`TechieRag.Embedded` adds `.UseEmbedded()` to the builder. The BGE-M3 model (1024-dim, multilingual) is **not** packed into the NuGet (size) — it is fetched once to a platform cache (`%LOCALAPPDATA%\TechieRag\Models` / `~/.local/share/TechieRag/Models`), after which the provider runs fully offline. `ModelDownloadService` is a singleton exposing a `ProgressChanged` event for download UX.
+**Load path (lazy; `LoadAsync` pre-loads).** Pick the runtime (`LocalRuntimeSelector.ForCurrentPlatform()`: `OnnxGenAiRuntime` on Windows and Linux x64/Arm64, Apple-silicon macOS, Android, iOS and Mac Catalyst; null on an Intel Mac, where the package ships no native library, so a load throws `PlatformNotSupportedException`) → pick the model's file set for that format (one per model; a variant with no default address needs `TECHIERAG_MODEL_BASE_URL` when files are missing) → `LocalModelStore.EnsureAsync`: terms (`LocalLlmOptions.TermsAccepted` or `ConfirmTermsAsync`; otherwise `LocalModelTermsNotAcceptedException` carrying the terms URL, no request sent) → `ModelDownloadService.DownloadAsync` (size before the first byte, `.part` resume, progress events; `TECHIERAG_MODEL_BASE_URL` as `<mirror>/<folder>/<file>`) → SHA-256 of every file against the catalog (mismatch deletes the file; a `.techierag-verified` mark avoids re-hashing) → `MemoryGate` (weights + context cache per token × context + 256 MB against `MemAvailable` / `GlobalMemoryStatusEx` / `os_proc_available_memory` (iOS); `LocalModelMemoryException` names the shortfall) → `runtime.Load`.
 
-### Secondary flow — agent/tool loop
+**Core side (additive).** `LlmSource.Local`; `LlmConnectorCatalog` row `local` (no endpoint, no key, no prefixes, so only `local/<model>` routes there); `LlmProviderFactory` and `TechieRagBuilder.CreateLlmProviderFromConfig` arms call `LocalLlmProviderRegistry.Create`, which `LocalLlm.Register()` fills (every `UseLocalLlm()` overload calls it).
 
-```mermaid
-flowchart LR
-  A["AskAsync with tools"] --> B["LLM call"]
-  B --> C{"tool_calls returned?"}
-  C -->|"yes"| D["execute each tool via IToolHandler"]
-  D --> E["append tool results to messages"]
-  E --> B
-  C -->|"no (text answer)"| F["return RagResponse"]
-  B --> G{"max iterations (default 10)?"}
-  G -->|"exceeded"| F
-```
+## 4. Data model
 
-### Secondary flow — LLM resilience decorators
+The library owns no schema of its own beyond the tables its stores create on first use. Every store uses `IF NOT EXISTS` DDL; none records a schema version (Open question 6).
 
 ```mermaid
-flowchart LR
-  Call["ChatAsync"] --> Retry["RetryHandler"]
-  Retry -->|"success"| Done["response"]
-  Retry -->|"HTTP 429 / transient"| Backoff["exponential backoff + Retry-After"]
-  Backoff --> Retry
-  Retry -->|"5 consecutive failures"| CB["circuit open 30s"]
-  Retry -->|"exhausted"| FB["FallbackLlmHandler -> secondary provider"]
-  FB --> Done
+erDiagram
+  DOCUMENTS ||--o{ CHUNKS : "has"
+  TRTHREAD ||--o{ TRMESSAGE : "holds"
+  TRWORKSPACE ||--o{ TRWORKSPACEDOCUMENT : "pins"
+  DOCUMENTS {
+    string Id PK
+    string Name
+    string SourcePath
+    int ChunkCount
+    string IngestedAt
+    string Metadata
+  }
+  CHUNKS {
+    string Id PK
+    string DocumentId FK
+    string Text
+    blob Vector
+    int PageNumber
+    int ChunkIndex
+    string Metadata
+    string CreatedAt
+  }
+  TRTHREAD {
+    string ThreadId PK
+    string UserId
+    string WorkspaceId
+    string Title
+    string CreatedAt
+    string UpdatedAt
+  }
+  TRMESSAGE {
+    string MessageId PK
+    string ThreadId FK
+    string Role
+    string Content
+    string ContentJson
+    string SourcesJson
+    string CreatedAt
+  }
+  TRWORKSPACE {
+    string WorkspaceId PK
+    string Name
+    string SystemPrompt
+    string LlmModel
+    float SimilarityThreshold
+    int TopK
+    int RerankEnabled
+    string ChatMode
+  }
+  TRWORKSPACEDOCUMENT {
+    string WorkspaceId PK
+    string DocumentId PK
+    string ContentHash
+    int IsPinned
+    string AddedAt
+  }
 ```
 
-## 5. Cross-cutting concerns
+| Entity | Key fields | Notes |
+|---|---|---|
+| `Documents` (SQLite, pgvector) | `Id` text PK; `Name`, `SourcePath`, `ChunkCount`, `IngestedAt`, `Metadata` (JSON / JSONB) | Created at `SqliteVecStore.cs:80`, `PgVectorStore.cs:90`. No table prefix, so a shared host database sees `Documents` and `Chunks` unqualified. |
+| `Chunks` (SQLite, pgvector) | `Id` text PK; `DocumentId` FK cascade; `Text`; `Vector` BLOB (SQLite, raw float32) or `Embedding vector(N)` (pgvector); `PageNumber`, `ChunkIndex`, `Metadata`, `CreatedAt`; index `IdxChunksDocument`; pgvector adds `IdxChunksEmbedding` (ivfflat, cosine) | On SQLite the sqlite-vec extension is never loaded (`SqliteVecStore.cs:118`): every search is a managed cosine scan. On pgvector the ivfflat index is built on an empty table. |
+| Qdrant `techierag_chunks`, `techierag_documents` | Point id = GUID, or MD5 of the string id; payload `DocumentId`, `Text`, `CreatedAt`, optional `PageNumber`, `ChunkIndex`, `Metadata`; documents collection has a 1-dimension dummy vector | Names configurable via the constructor. No payload index on `DocumentId`. |
+| `TrThread`, `TrMessage` | `ThreadId`, `MessageId` PKs; indexes `IxTrThreadUserId`, `IxTrMessageThreadId` | `RelationalConversationStore.cs:49`; the only migration in the library is `ALTER TABLE TrMessage ADD COLUMN ContentJson` (attempt and swallow, line 104). Dates are text on both engines. No foreign keys. |
+| `TrWorkspace`, `TrWorkspaceDocument` | `WorkspaceId` PK; composite PK (`WorkspaceId`, `DocumentId`); index on `ContentHash` | `RelationalWorkspaceStore.cs:42`. |
+| Vector dimension | the embedder's `Dimensions`, passed into every store at `Build()` | Since 2026-09-25 (BRD-158, REQ-RAG-106): pgvector and Qdrant are created with the embedder's size (1024 for bge-m3, 384 for all-MiniLM-L6-v2, 1536 for Cohere and OpenAI, 3072 for Gemini); 1024 remains only the fallback when a provider reports none. |
+| Model caches (files) | `<LocalApplicationData>/TechieRag/models/<model>/` (`ModelRoot`, core `Models/ModelRoot.cs`): `bge-m3` (2.3 GB, desktop default), `all-minilm-l6-v2` (91 MB, Android and iOS default), `bge-reranker-v2-m3` | Since 2026-09-24 (BRD-89, REQ-RAG-053); host override `UseModelRoot` / `ModelRoot.Set` / `TECHIERAG_MODEL_ROOT`; a complete copy under the old `<TechieRag.Embedded.dll folder>/models/` is still read. The live tests expect `~/.cache/techierag-models/` instead (Open question 7). |
+| Consumer repository files | `.techierag/TechieRag-AI-Reference.md`, `.claude/commands/techierag.md`, `.opencode/command/techierag.md` | Written into the consumer's repository by `build/TechieRag.targets` after every build (ADR-006). |
 
-- **Logging** — `Microsoft.Extensions.Logging.Abstractions` (`ILogger<T>`) injected throughout; `NullLogger` fallback when no `ILoggerFactory` is supplied via `.WithLogging(...)`. Serilog-compatible (the consumer owns the sink).
-- **Configuration / options** — `TechieRagConfig` is the root, with nested `EmbeddingConfig`, `VectorStoreConfig`, `ProcessingConfig`, `LlmConfig`, `LlmFallbackConfig`, `UsageTrackingConfig`, `PromptConfig`, `ResilienceConfig`. Bindable from `appsettings.json` (`TechieRag` section) or built fluently. Four equivalent configuration paths: fluent builder, `appsettings.json`, DI extension, or a hand-built `TechieRagConfig` object.
-- **Dependency injection** — `ServiceCollectionExtensions.AddTechieRag(...)` registers `ITechieRag` and conditionally registers `ILlmProvider`, `ITokenTracker`, `IConversationMemory`, `IPromptTemplate`, `IToolHandler`, `AgentLoopRunner` based on what was configured; LLM completion events are auto-wired to the token tracker.
-- **Telemetry** — event-based: `IEmbeddingProvider.OnEmbeddingCompleted` and `ILlmProvider.OnCompletionCompleted` carry model name, duration, and token counts. `TokenUsageTracker` aggregates per-model usage and cost, fires `OnBudgetAlert` at a configurable threshold (default 80%), and can block on budget exceed. (OpenTelemetry counters / distributed tracing are explicitly deferred — see §9.)
-- **Resilience** — retry with exponential backoff (1s→30s, ×2), HTTP-429 `Retry-After` handling, circuit breaker (open after 5 failures, 30s recovery), 120s default timeout, and optional fallback provider — all applied automatically to LLM calls via decorators.
-- **Error handling** — argument null-checks at the public surface; structured exceptions with descriptive messages; resilience decorators absorb transient failures.
+## 5. Cross-cutting
 
-**Pluggable provider matrix:**
+- **Identity:** none in the library (Q4). The consuming app owns users and roles. Subscription sign-in (planned, BRD-112) returns a vendor session to the host through `ISubscriptionSessionStore`; the library never stores a secret.
+- **Configuration:** three equivalent entry points, fluent builder, `IConfiguration` section, config object (`ServiceCollectionExtensions.cs:57/133/272`). The `IConfiguration` path today drops `VectorStore.ApiKey`, the embedding `Dimensions`, `ApiFormat`, `ApiPath`, `RequestDelayMs` and the `Prompt` section (Open question 5). Two environment variables redirect model downloads. `EmbeddingSource.Embedded` through `UseEmbedding` throws by design (`TechieRagBuilder.cs:877`); callers use `UseEmbedded()` from the Embedded package.
+- **Logging:** `ILogger<T>` from `Microsoft.Extensions.Logging.Abstractions`, `NullLogger` fallback, `WithLogging(ILoggerFactory)` or DI. No sink is referenced.
+- **Telemetry:** `Diagnostics/TechieRagTelemetry` holds one `ActivitySource` and one `Meter`, both named `TechieRag`, gated by `TechieRagTelemetry.Enabled`; instruments `techierag.llm.*`, `techierag.ingestion.*`, `techierag.search.*`; the only activity is `TechieRag.Search`. `TechieRag.Telemetry` turns exporters on. Events: `OnCompletionCompleted`, `OnEmbeddingCompleted`, `OnBudgetAlert`, `OnUsageRecorded`, `ContextTruncated`, `ModelDownloadService.ProgressChanged`.
+- **Errors:** providers throw; `RetryHandler` absorbs transient failures (exponential backoff, HTTP 429 with `Retry-After`, circuit breaker after 5 failures, 120 s timeout) and `FallbackLlmHandler` fails over. A vector store read against an unreachable server throws rather than returning an empty list (REQ-RAG-044). Flow orchestration reports user-visible refusals as `FlowMessage` codes with arguments, never as English sentences, so the host can localise (REQ-RAG-050).
+- **Resilience and budgets:** `ResilienceConfig` defaults (3 retries, 1 s initial, 30 s cap, ×2), `UsageTrackingConfig` budgets from 0 to `long.MaxValue` with an alert threshold and optional blocking.
+- **Concurrency:** SQLite is single-process by design (documented limitation). Every SQLite operation opens its own connection and re-applies `PRAGMA foreign_keys`.
+- **Naming and style:** 256 of 256 private instance fields are bare camelCase (no prefix, no underscore); file-scoped namespaces in 208 of 208 files; nullable and implicit usings on; `var` in about 88 percent of locals; `ConfigureAwait(false)` in about 55 percent of awaits (Open question 9). Recorded in `docs/TechieRag-Coding-Standards.md`.
+- **Packaging:** SourceLink, `snupkg` symbols and the MIT licence on `TechieRag` and `TechieRag.Embedded`; `TechieRag.Telemetry` lacks those switches (Open question 4). Versions are stamped from the release tag at pack time; `1.0.0` in the csproj is a standing dev number.
 
-| Category | Implementations |
-|----------|-----------------|
-| Embedding | Ollama · LM Studio · ONNX (local) · Azure OpenAI · generic HTTP · embedded BGE-M3 · custom |
-| Vector store | SQLite-vec (default) · PostgreSQL/pgvector · Qdrant |
-| LLM | Ollama · LM Studio · OpenAI-compatible · Azure AI Foundry · Google Gemini · Anthropic Claude · custom |
-| Document processor | PDF · DOCX · Markdown · HTML · JSON · TOML · Code · Text · Generic |
-| Prompt template | `PromptTemplateEngine` (default) · custom `IPromptTemplate` |
-| Conversation memory | `InMemoryConversationMemory` · custom |
+## 6. Decisions log
 
-## 6. Deployment architecture
+One row per decision. Every package added to the project has a row saying why.
 
-TechieRag is published as NuGet packages, not deployed as a service.
+| Date | Decision | Why | Status |
+|---|---|---|---|
+| 2026-06-25 | ADR-001: document the shipped stack as-is; `net10.0` class libraries | Brownfield baseline | done |
+| 2026-06-25 | ADR-002: every backend (embedding, vector store, processor, LLM, memory, tool handler, prompt template, token tracker) behind an interface in `Abstractions/` | Swap by configuration, not code; the library's core value | done |
+| 2026-06-25 | ADR-003: LLM and embedding providers use raw `HttpClient` + `System.Text.Json`, no vendor SDKs | Keep the core package light and uniform across vendors | done |
+| 2026-06-25 | ADR-004: the embedded model is downloaded on first use, never packed | 2.3 GB does not belong in a NuGet package; offline after the first run | done |
+| 2026-06-25 | ADR-005: v2 (LLM, RAG, agents) is additive; `LlmSource.None` keeps v1 behaviour | Backward compatibility for every v1 consumer | done |
+| 2026-06-25 | ADR-006: `buildTransitive` MSBuild targets install the AI skill files into the consumer's repository | A consumer gets `/techierag` guidance with no manual step | done |
+| 2026-06-25 | Packages `Dapper`, `Npgsql` + `Pgvector`, `Qdrant.Client`, `Microsoft.Data.Sqlite` + `SQLitePCLRaw.lib.e_sqlite3` | One data-access helper and one client per supported store; the SQLite raw pin closes GHSA-2m69-gcr7-jv3q | done |
+| 2026-06-25 | Packages `PdfPig`, `DocumentFormat.OpenXml`, `HtmlAgilityPack`, `Markdig`, `Tomlyn` | One parser per document format processor | done |
+| 2026-06-25 | Packages `Microsoft.Extensions.{Configuration,DependencyInjection,Logging}.Abstractions`, `Options`, `Configuration.Binder` | Abstractions only, no framework lock-in for the host | done |
+| 2026-06-25 | Package `Azure.AI.OpenAI` 2.1.0 | The Azure OpenAI embedding provider (the LLM providers stay raw HTTP) | done |
+| 2026-06-25 | Packages `Microsoft.ML.OnnxRuntime` (+ `.Managed`), `Microsoft.ML.Tokenizers` in `TechieRag.Embedded` only | Offline inference belongs in the sibling package, not core | done |
+| 2026-07-17 | ADR-007: the sample app becomes TechieDesk, a product in the monorepo; repo split deferred | Owner repositioning; superseded by ADR-010 | superseded |
+| 2026-07-29 | Add `net8.0` to `TechieRag` and `TechieRag.Telemetry` (GAP-LIB-21) | Wider consumer reach; `TechieRag.Embedded` stays `net10.0` for ONNX Runtime | done |
+| 2026-07-31 | `IVectorStore` set fixed at SQLite, pgvector, Qdrant (BRD-125 re-scope, `REQ-RAG-044`) | Three stores cover local, server and managed; more stores wait for demand | done |
+| 2026-08-01 | Flow orchestration built in core with zero new packages: conditions are data, not delegates; termination triple-bounded (`AllowCycles`, `MaxSteps`, validation) | A flow is persisted user data; a delegate cannot be stored, shown or validated (`REQ-RAG-042`) | done |
+| 2026-08-02 | User-visible flow refusals carry `FlowMessage` codes with arguments (`REQ-RAG-050`) | The library has no localisation; the host renders the sentence in the user's language | done |
+| 2026-08-09 / 2026-09-03 | Packages `OpenTelemetry`, `.Exporter.Console`, `.Exporter.OpenTelemetryProtocol` in `TechieRag.Telemetry` only (`REQ-RAG-036`, BRD-117) | The core links no exporter (REQ-NFR-008) | done |
+| 2026-08-09 / 2026-09-03 | Dual-feed publishing: GitHub Packages on push and tag; nuget.org by manual dispatch against the release tag through Trusted Publishing; the tag is the version | Owner's standard ceremony across libraries (`DECISIONS.md`) | done |
+| 2026-09-03 | ADR-008: `TechieRag.Agents` on Microsoft Agent Framework as a sibling package; nothing MAF-shaped enters core | MAF's ecosystem is worth adopting, its monthly cadence is not worth importing into every consumer (BRD-84) | done 2026-09-24 (`src/TechieRag.Agents`) |
+| 2026-09-03 | ADR-009: the agentic retrieval contract lives in core (`TechieRag.Agentic`) and both loops bind it (BRD-83) | One tested contract instead of two prompts drifting apart | done 2026-09-24 (`src/TechieRag/Agentic`) |
+| 2026-09-03 | ADR-010: TechieDesk moves to its own repository and consumes the packages (BRD-87) | It should consume the library exactly as a customer does | done 2026-09-24 |
+| 2026-09-03 | ADR-011: seam adapters are public API of `TechieRag.Agents` (BRD-85) | A consumer keeps one provider configuration and one tool catalogue | done 2026-09-24 (`src/TechieRag.Agents/Interop`) |
+| 2026-09-24 | ADR-012: the application is renamed Sevak at the split; one product, one name; freemium, limited not gated; repository private until v0.1 | Owner decisions 1 to 6 (`docs/TechieRag-Update-Brief.md`); the rename is free only at creation | done (rename, split); the deletion here completed 2026-09-24 |
+| 2026-09-24 | ADR-013: typed streaming events on `ILlmProvider`, additive, before `TechieRag.Local` exists (BRD-110, BRD-111) | Chatur TR-RAG-002; six providers once instead of seven twice; keeps the 1.0.x line | done 2026-09-24 (`ChatStreamEventsAsync`, `AgentLoopRunner.RunStreamAsync`; §3.1) |
+| 2026-09-24 | Packages `Microsoft.Agents.AI` 1.22.0, `Microsoft.Extensions.AI` 10.10.0, `Microsoft.Extensions.AI.OpenAI` 10.10.0 in `TechieRag.Agents` only (versions confirmed live on nuget.org 2026-09-24; 1.22.0 published 2026-09-18 supersedes the proposal's 1.20.0 and needs MEAI 10.10.0) | MAF agent, session, context providers, middleware and approval; MEAI function invocation; the OpenAI SDK route for `UseLmStudio` / `UseOllama` / `UseOpenAI` / `UseOpenAICompatible`. Brings `OpenAI` 2.13.0, which unifies with core's `Azure.AI.OpenAI` 2.1.0 (`OpenAI >= 2.1.0`); a test constructs the core Azure provider against it | done |
+| 2026-09-24 | ADR-014: `TechieRag.Local` as a sibling package; one public provider over an internal per-platform runtime; weights downloaded, never packed (BRD-96…109) | MyDiary TR-RAG-001; neither LLamaSharp nor ONNX Runtime GenAI is proven on all four platforms, so the design must not bet on one | built 2026-09-25: ONNX Runtime GenAI on all four platforms (DECISIONS.md 2026-09-25) |
+| 2026-09-24 | `TechieRag.Local` references `TechieRag.Embedded` and no inference package yet | Reuses `ModelDownloadService` and the mirror convention instead of forking them (BRD-100); the runtime package (LLamaSharp 0.27.0 + a backend, or `Microsoft.ML.OnnxRuntimeGenAI` 0.16.0, versions checked on nuget.org 2026-09-24) is added with the owner's decision. GenAI 0.16.0 depends on `Microsoft.ML.OnnxRuntime` 1.30.0, above `TechieRag.Embedded`'s 1.24.1 pin, so choosing it moves that pin too | done 2026-09-25: GenAI 0.16.0 referenced, `TechieRag.Embedded` on ONNX Runtime 1.30.0 |
+| 2026-09-24 | ADR-015: subscription sign-in is in scope; the host drives the browser; vendor terms are dated facts in the catalog, never rules in code (BRD-112…114) | Chatur TR-RAG-001; owner decision that who signs in decides personal or team use | done 2026-09-25 (REQ-RAG-069, REQ-RAG-070, REQ-FN-062) |
+| 2026-09-24 | ADR-016: platform groundwork lives in the packages: per-user app-data model root, `buildTransitive` native wiring in `TechieRag.Embedded` and `TechieRag.Local`, small default model on phones, the probe app (BRD-88…95) | Every consuming MAUI app would otherwise solve these by hand; the local model inherits every one of them | done 2026-09-25 (REQ-RAG-053 to REQ-RAG-056, REQ-FN-054 to REQ-FN-057; probe run on Windows, Mac Catalyst, Android and the iOS simulator) |
+| 2026-09-24 | Pass the embedder's `Dimensions` into every vector store at `Build()` | Every store is fixed at 1024 today; Cohere, OpenAI and Gemini embedders produce other sizes (Open question 2) | done 2026-09-25 (REQ-RAG-106) |
+| 2026-09-24 | Pack and publish `TechieRag.Telemetry` in both workflows with the same SourceLink and symbol settings as the other packages | The package exists, is tested and referenced by the Architecture, and is never published (Open question 4) | done 2026-09-25 (REQ-FN-065) |
+| 2026-09-24 | Remove the automatic nuget.org job from `publish-github-packages.yml` | It contradicts the 2026-09-03 decision that the public feed publishes only by manual dispatch (Open question 3) | done 2026-09-25 (REQ-FN-067) |
+| 2026-09-25 | ONNX Runtime GenAI is the local engine on Windows, Android, iOS and Mac Catalyst; LLamaSharp and GGUF leave the catalogue; `TechieRag.Embedded` moves to ONNX Runtime 1.30.0 | Measured on the Windows laptop and the M4 Max Mac; the only engine of the two on iOS; the Mac Catalyst library ships inside GenAI's iOS xcframework (`DECISIONS.md` 2026-09-25, owner decisions 1–2) | done (REQ-RAG-057/058, REQ-FN-058) |
+| 2026-09-25 | `LocalModel.FromHuggingFace(repository, folder, version)`: any ONNX Runtime GenAI model by name; files listed by Hugging Face's public API, licence from the model card shown before download, every file checked against Hugging Face's own fingerprint, an unpinned name resolved to one version and recorded | Removes the tie to the two built-in models, as LM Studio lets you pull any model, without losing the tamper check (owner decision 1, 2026-09-25) | done 2026-09-25 (BRD-166, REQ-RAG-108) |
+| 2026-09-25 | The built-in phone default is the library's own Qwen2.5 0.5B conversion, published on the owner's Hugging Face account and pinned by version | 317 MB, 0.5 GB memory and twice the speed of the nearest published alternative (Arm's Gemma 3 1B, 866 MB, 1.7 GB), Apache-2.0; the curated-default model Ollama and LM Studio use (owner decision 2, 2026-09-25) | done 2026-09-25 (`techierathore/Qwen2.5-0.5B-Instruct-onnx-genai`, pinned to one commit; downloaded by the Android phone and emulator, the Windows tests and the iOS simulator) |
+| 2026-09-25 | The AI reference and the two persona command files the package installs (ADR-006) are refreshed in the same phase as the features they describe, and a structural test in `tests/TechieRag.Tests/Documentation` fails the build when a shipped builder method is missing from them | The owner found the installed `/techierag` agent still described v2 after phase 2 was verified; a consumer's agent would integrate against a stale surface (BRD-167) | done 2026-09-25 (REQ-FN-070) |
 
-```mermaid
-flowchart LR
-  Push["push to main / PR"] --> GHW["publish-github-packages.yml"]
-  Rel["GitHub Release → tag v*"] --> GHW
-  Dispatch["manual dispatch, ref = release tag\n(dry run: any ref; real: tag only)"] --> PUB["publish-nuget.yml"]
-  GHW --> GHB["restore → build → test (blocking) → pack\nversion: tag, else 1.0.0-preview.N"]
-  GHB --> GHP["GitHub Packages (internal dev / pre-release feed)"]
-  PUB --> VER["determine-version.sh\nversion = tag; fail if on nuget.org or not > latest"]
-  VER --> PB["restore → build → test (blocking) → pack, all -p:Version"]
-  PB --> OIDC["NuGet/login OIDC → temp key"]
-  OIDC --> NORG["NuGet.org (public feed) — push, no --skip-duplicate"]
-```
+## 7. Module responsibilities
 
-- **CI** — two workflows, one per feed. `.github/workflows/publish-github-packages.yml` runs on push to `main`, `v*` tags and PRs and publishes to GitHub Packages (the internal dev / pre-release feed); its version comes from the `v*` tag when present, else `1.0.0-preview.{run_number}`. `.github/workflows/publish-nuget.yml` is **manual dispatch only** (never a push or tag trigger): the owner selects the release tag as `ref` and it publishes to nuget.org (the public feed) via OIDC trusted publishing — no stored API key; its version is derived from that tag by `.github/workflows/scripts/determine-version.sh`, which fails the run if that version is already on nuget.org or does not increment past the latest published (a real run must be a tag; a dry run may use any ref).
-- **NuGet feeds** — `nuget.config` adds nuget.org plus a `TrBlazeUI` GitHub Packages source (`nuget.pkg.github.com/techierathore`) for the sample's UI dependency.
-- **AI-agent autodistribution** — `src/TechieRag/build/TechieRag.targets` runs post-build in any consumer project and copies the AI skill files (`.techierag/TechieRag-AI-Reference.md`, `.claude/commands/techierag.md`, `.opencode/command/techierag.md`) into the consuming repo, so `/techierag` is available with zero manual setup.
+| Module | Responsibility | Depends on |
+|---|---|---|
+| root (`ITechieRag`, `TechieRagClient`, `TechieRagBuilder`, `TechieRagConfig`) | Public SDK surface: fluent configuration, orchestration of embed → store → search → rerank → prompt → LLM | Abstractions, Models |
+| `Abstractions` | The 15 provider contracts that make every backend pluggable | (none) |
+| `Models` | Immutable DTOs: `Document`, `TextChunk`, `SearchResult`, `SearchOptions`, `RagResponse`, `RagStreamEvent`, `ChatMessage`, `LlmResponse`, `LlmCompletionOptions`, `TokenUsage`, `Workspace`, `ConversationThread`, `EmbeddingStaleness`, tool types | (none) |
+| `Embedding` | Eight embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) | Abstractions, `HttpClient` |
+| `VectorStores` | `SqliteVecStore`, `PgVectorStore`, `QdrantStore`: upsert, search, delete, list, stats, clear | Dapper, Npgsql, Pgvector, Qdrant.Client, Microsoft.Data.Sqlite |
+| `Processors` (+ `Chunking`) | 13 format processors and 4 chunkers (recursive, token, markdown, sentence) | PdfPig, OpenXml, HtmlAgilityPack, Markdig, Tomlyn |
+| `Llm` | Six LLM providers, `LlmProviderFactory`, `ModelRouter` (longest-prefix model-name routing), `LlmConnectorCatalog`, `LlmHttpGuard` | Abstractions, Models, `HttpClient` |
+| `Services` | `AgentLoopRunner`, `ToolRegistry`, `CompositeToolHandler`, `RetryHandler`, `FallbackLlmHandler`, `TokenUsageTracker`, `PromptTemplateEngine`, `InMemoryConversationMemory`, `DbConversationMemory`, `WorkspaceManager` | Abstractions, Models |
+| `Orchestration` | Flow graphs (Agent, Tool, Condition, Handoff, Terminal nodes), `FlowRunner`, `FlowRuntime`, `FlowValidator`, `FlowSerializer`, guardrail chain, `GuardedToolHandler`, `AgentToolHandler`, `FlowMessage` codes | Services, Abstractions |
+| `Mcp` | `McpClient`, stdio and HTTP transports, `McpToolHandler`, `McpTrustPolicy`, server registry | Abstractions, `HttpClient`, `System.Diagnostics.Process` |
+| `Connectors` (`Confluence/`, `Email/`, `Http/`, `Repository/`) | `IDataConnector`, `ConnectorRunner`, sync state, rate-limited HTTP transport, IMAP and mbox mail, MIME parsing | `HttpClient`, root ingestion |
+| `Web` | URL fetch, site crawl with depth and link caps, page reading, `WebIngestionExtensions` | HtmlAgilityPack, `HttpClient` |
+| `Persistence` | SQLite and PostgreSQL conversation and workspace stores over one relational base | Microsoft.Data.Sqlite, Npgsql |
+| `Reranking` | `CohereReranker`, `JinaReranker` (API rerankers) | `HttpClient` |
+| `Speech` | OpenAI-compatible speech-to-text and text-to-speech | `HttpClient` |
+| `Diagnostics` | `TechieRagTelemetry`: `ActivitySource`, `Meter`, instruments | `System.Diagnostics` |
+| `DependencyInjection` | `AddTechieRag(...)` ×3 | root |
+| `build` | `TechieRag.targets` and the three AI skill files | MSBuild |
+| `TechieRag.Embedded` | `EmbeddedEmbeddingProvider` (bge-m3), MiniLM / bge-small, `OnnxCrossEncoderReranker`, `ModelDownloadService`, `OnnxNativeLibraryResolver`, `OnnxRuntimeProbe` | core, ONNX Runtime, Tokenizers |
+| `TechieRag.Telemetry` | `TechieRagTelemetryOptions`, `TechieRagTelemetryPipeline`, `AddTechieRagTelemetry` | core, OpenTelemetry |
+| `TechieRag.Local` | `LocalLlmProvider`, `LocalModel`, `LocalLlmOptions`, `UseLocalLlm()`, `LocalLlm.Register()`, `LocalModelStore`, `MemoryGate`, the internal `ILocalLlmRuntime` seam | core, `TechieRag.Embedded` (download service); a runtime per platform once chosen |
+| `Agentic` (core) | The agentic retrieval contract: `KnowledgeBaseTools`, `IRetrievalSource`, `RetrievalToolOptions`, `RetrievalTurnState`, `AgenticInstructions`, `ToolRegistry.RegisterKnowledgeBase` | Services, Models, `System.Text.Json` |
+| `TechieRag.Agents` | `TechieRagAgentBuilder`, `ITechieRagAgent`, `RetrievalContextProvider`, the four `Interop/` seam adapters, `AddTechieRagAgent` | core, Microsoft.Agents.AI, Microsoft.Extensions.AI (+ .OpenAI) |
 
-```mermaid
-flowchart LR
-  Install["consumer: dotnet add package TechieRag"] --> Build["consumer: dotnet build"]
-  Build --> Targets["TechieRag.targets fires (After Build)"]
-  Targets --> F1[".techierag/TechieRag-AI-Reference.md"]
-  Targets --> F2[".claude/commands/techierag.md"]
-  Targets --> F3[".opencode/command/techierag.md"]
-```
+## 8. Open questions
 
-## 7. Architectural decisions (ADR-style log)
-
-- **ADR-001 — Current stack as-is (reverse-doc baseline).** net10.0 class libraries; the architecture documented here is the shipped state at 2026-06-25.
-- **ADR-002 — Everything behind a provider interface.** Embedding, vector store, document processor, and LLM are all abstractions so backends swap by configuration, not code. This is the library's core value proposition.
-- **ADR-003 — Raw HttpClient + System.Text.Json for LLM providers.** Avoids heavy vendor SDK dependencies, keeps the core package light, and gives uniform behaviour across all 6 LLM backends.
-- **ADR-004 — Embedded model downloaded on first use, not packed.** The ~2.3GB BGE-M3 ONNX model is fetched from Hugging Face to a local cache instead of bloating the NuGet; offline after first run.
-- **ADR-005 — Additive v2 (LLM/RAG generation).** All v2 methods are additive; `LlmSource.None` preserves identical v1 (retrieval-only) behaviour — guaranteed backward compatibility.
-- **ADR-006 — MSBuild autodistribution of AI skills.** Skill files ship inside the package and self-install into consumer repos via `buildTransitive` targets.
-- **ADR-007 — TechieDesk repositioning (2026-07-17).** The companion app `TechieRagWeb` is renamed **TechieDesk** and promoted from demo sample to a first-class, self-hostable AnythingLLM-alternative product in the monorepo (folder `apps/TechieDesk` per the BRD-82 rename, completed 2026-07-17 / REQ-UI-014); the TechieRag library remains the reusable core powering it and any other consumer. Repo split into separate library/app repositories is deferred until post-MVP (rationale + phased roadmap: `docs/TechieRag-CompetitorAnalysis.md` §6–7).
-
-## 8. Target architecture
-
-No structural change is in flight — the shipped architecture above is current and stable. The only known forward-looking deltas are **additive, deferred enhancements** (not restructures), tracked in §9 and the BRD §4:
-
-- Optional OpenTelemetry metrics (`TechieRagMetrics`) and distributed tracing (`TechieRagActivitySource`) for Prometheus/Grafana/Jaeger consumers.
-- A formal automated test suite to complement the current manual/integration validation.
-
-These bolt onto existing seams (telemetry events, the test project) without changing module boundaries.
-
-## 9. Open questions / risks
-
-- **Field-naming convention (resolved):** the codebase uses **bare camelCase, no prefix, no underscores** for instance fields/params/locals (~95%+ dominance — standard Microsoft style, e.g. `private readonly ILlmProvider llmProvider;`). Recorded as the project convention in Coding-Standards §"Fields, Parameters, Locals". The TechieFlow default `obj`/`a`/`v` prefixes are **not** adopted for this established library; new code follows the codebase's camelCase convention. No drift remediation required.
-- **Formal automated tests:** the `tests/TechieRag.Tests` project exists but the suite is minimal — v2 was validated by manual/integration testing (21 documented scenarios, all passed). Formal unit tests are deferred (v2 Phase 7). This is the single largest gap for long-term maintainability.
-- **Observability depth:** event-based telemetry exists; OpenTelemetry exporters are deferred (enterprise feature).
-- **TechieDesk build dependency:** the app (`apps/TechieDesk`) pulls `TrBlazeUI.*` from GitHub Packages, which needs an authenticated `nuget.config` token. A clean restore of the **app** requires that credential; the two shipped library packages have no such dependency and restore from nuget.org alone.
-- **SQLite concurrency:** documented limitation — multiple processes against one `.db` file can lock; single-instance or a server-backed store (PgVector/Qdrant) for multi-user.
-
-## 10. Sources harvested
-
-This architecture was reverse-documented from the codebase and the following source docs:
-
-- `docs/techierag-v2-llm-implementation-spec.md` — v2 LLM/RAG component design and phase status
-- `docs/trrag-refactoring-roadmap.md` — v1.1 phased build plan and module inventory
-- `docs/TechieRag-AI-Reference.md`, `docs/TechieRag-UserGuide.md`, `docs/TechieRag.Embedded-UserGuide.md` — API surface and behaviour
-- `docs/ai-agent-autodistribution-guide.md` — MSBuild skill-file distribution
-- `docs/SETUP-AND-TESTING-GUIDE.md`, `docs/integration-testing-guide.md`, `docs/NUGET-PUBLISHING-GUIDE.md`, `docs/EMBEDDED-PACKAGE-GUIDE.md` — runbook, test plan, packaging
-- `README.md`, `docs/brainstorming-session-results.md` — project intent
-- Code scan of `src/TechieRag`, `src/TechieRag.Embedded`, `apps/TechieDesk`, `tests/TechieRag.Tests`
-
----
-Last updated: 2026-06-25
+1. **sqlite-vec is never loaded.** Resolved 2026-09-24 (BRD-93, REQ-RAG-056): the dead loading code is removed and the managed scan is the documented path, vectorised (`VectorStores/ManagedVectorSearch.cs`, zero-copy BLOB read, bounded top-K heap) and measured at 1k/10k/50k chunks in the UsageGuide.
+2. **Every vector store was fixed at 1024 dimensions.** Resolved 2026-09-25 (BRD-158, REQ-RAG-106): `Build()` passes the embedder's `Dimensions` into every store; Cohere, OpenAI and Gemini embedders work with pgvector and Qdrant.
+3. **Two paths published to nuget.org.** Resolved 2026-09-25 (BRD-160, REQ-FN-067): only the manual dispatch of `publish-nuget.yml` publishes there; the automatic job in `publish-github-packages.yml` is removed.
+4. **`TechieRag.Telemetry` was never packed or published.** Resolved 2026-09-25 (BRD-156, REQ-FN-065): both workflows pack and publish it with the same SourceLink, symbol and README settings as the other packages.
+5. **The `IConfiguration` registration path is lossy.** It drops `VectorStore.ApiKey` (so Qdrant with a key cannot come from appsettings), the embedding `Dimensions`, `ApiFormat`, `ApiPath`, `RequestDelayMs`, and the whole `Prompt` section; `AddTechieRag(TechieRagConfig)` maps even less. `Microsoft.Extensions.Options` is referenced but no `IOptions<T>` pattern exists.
+6. **No store records a schema version.** The only migration is an attempt-and-swallow `ALTER TABLE TrMessage ADD COLUMN ContentJson`. A future column change has nowhere to hang.
+7. **Model cache location.** The library writes under the `TechieRag.Embedded.dll` folder (read-only on phones); the live reranker and embedder tests stage weights under `~/.cache/techierag-models/`. BRD-89 moves the library to the per-user application data root; the tests should follow.
+8. **`net8.0` is built but never tested**: `TechieRag.Tests` targets `net10.0` only.
+9. **`ConfigureAwait(false)` is inconsistent**: about 374 uses against about 305 awaits without it; the vector stores and older code omit it, `Persistence`, `Mcp` and `Connectors` use it. The Coding Standards require it in library code.
+10. **Download progress is written with `Console.WriteLine`.** Resolved 2026-09-24 (BRD-92, REQ-RAG-055): the three calls are gone; `ModelDownloadService.DownloadAsync` is the one public downloader (size-known event before the first byte, progress, resume) for the embedder, the reranker and the planned local model.
+11. **Local runtime choice — answered 2026-09-25:** ONNX Runtime GenAI on Windows, Android, iOS and Mac Catalyst, measured on the Windows laptop and the M4 Max Mac (`DECISIONS.md` 2026-09-25). History: it was to be decided after the probe comparison on named devices (plan 08 step 2) and recorded in `DECISIONS.md` before BRD-96…98 are built. Costly to reverse. 2026-09-24: everything above the runtime seam is built (§3.2); the desktop comparison (WSL and Windows on the Windows 11 laptop), the per-platform package facts (LLamaSharp ships no iOS or Mac Catalyst native library; ONNX Runtime GenAI ships none for Mac Catalyst) and a recommendation are in `docs/TechieRag-Decision-Request.md` for the owner; phone and Mac numbers need the owner's devices.
+12. **Vendor subscription policy** changes: OpenAI permits external-tool use for personal use, Anthropic prohibits it since April 2026, Google, Groq, xAI and Meta unknown (BRD-114 research before BRD-112).
+13. **Mobile memory limits**: iOS and Android kill an over-budget app without warning; `MemoryGate` (BRD-99), small default models (BRD-91, BRD-96) and per-device limits in the matrix (BRD-108).
+14. **Owner-run git after the split**: `tests/TechieDesk.Tests/TestResults/res.trx` is still tracked; the gitignore audit printed the `git rm -r --cached` line for the owner, and the deletions of 2026-09-24 are uncommitted until the owner commits.

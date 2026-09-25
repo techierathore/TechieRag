@@ -13,13 +13,13 @@ namespace TechieRag.Connectors;
 /// wiki and a mailbox, and writing them once means the three connectors are each only the part that
 /// is genuinely source-specific. It also means all five behaviours are tested once, against a fake
 /// connector, with no network anywhere.</para>
-/// <para><b>Fetched documents are collected, not streamed.</b> A streaming enumerable would use less
-/// memory, but the failures and the sync state are produced by the same walk and would then have to
-/// be handed back through a side channel the caller must remember to read — which is how per-item
-/// failures end up ignored. Collecting keeps the whole outcome in one value the caller cannot miss,
-/// and <see cref="ConnectorRunOptions.MaxTotalBytes"/> bounds what that costs — directly, rather
-/// than as the product of the item count and the per-item cap, which multiply into a far larger
-/// number than anyone intends to hold in memory.</para>
+/// <para><b>Two ways to receive documents.</b> The first overload collects every fetched document
+/// into <see cref="ConnectorRunResult.Documents"/>, so the whole outcome is one value the caller
+/// cannot miss, and <see cref="ConnectorRunOptions.MaxTotalBytes"/> bounds what that costs. The
+/// overload taking a document handler hands each document over the moment it is fetched instead
+/// (REQ-RAG-083 / BRD-127, TR-RAG-020/022): a run cancelled or failed part-way has already delivered
+/// everything it fetched, and the documents are not held in memory. Failures, the unchanged list and
+/// the sync state still come back on the one result value either way.</para>
 /// </remarks>
 public sealed class ConnectorRunner
 {
@@ -42,16 +42,63 @@ public sealed class ConnectorRunner
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Documents fetched, items skipped, items failed, and the state for the next run.</returns>
     /// <exception cref="ConnectorException">The source could not be read at all, or too many items failed in a row.</exception>
-    public async Task<ConnectorRunResult> RunAsync(
+    public Task<ConnectorRunResult> RunAsync(
         IDataConnector connector,
         ConnectorSyncState? previousSync = null,
         ConnectorRunOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connector);
-        options ??= new ConnectorRunOptions();
+        return RunCoreAsync(connector, previousSync, options ?? new ConnectorRunOptions(), null, cancellationToken);
+    }
 
+    /// <summary>
+    /// Runs a connector and hands each fetched document to <paramref name="onDocument"/> as it
+    /// arrives, instead of collecting them (REQ-RAG-083 / BRD-127).
+    /// </summary>
+    /// <param name="connector">The connector to drive.</param>
+    /// <param name="previousSync">State returned by the previous run, or null for a first, full run.</param>
+    /// <param name="options">Run bounds; defaults are conservative.</param>
+    /// <param name="onDocument">
+    /// Receives each document the moment it is fetched, before the next item is fetched. An item's
+    /// version is recorded in the sync state only after this returns, so a document the handler
+    /// failed on is fetched again next run. An exception from the handler ends the run.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// Items skipped, items failed, and the state for the next run. <see cref="ConnectorRunResult.Documents"/>
+    /// is empty: every document has already been handed to <paramref name="onDocument"/>.
+    /// </returns>
+    /// <exception cref="ConnectorException">The source could not be read at all, or too many items failed in a row.</exception>
+    /// <exception cref="OperationCanceledException">The run was cancelled; every document fetched before that has already been handed over.</exception>
+    public Task<ConnectorRunResult> RunAsync(
+        IDataConnector connector,
+        ConnectorSyncState? previousSync,
+        ConnectorRunOptions? options,
+        Func<ConnectorDocument, CancellationToken, Task> onDocument,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connector);
+        ArgumentNullException.ThrowIfNull(onDocument);
+        return RunCoreAsync(connector, previousSync, options ?? new ConnectorRunOptions(), onDocument, cancellationToken);
+    }
+
+    /// <summary>The one walk both overloads share.</summary>
+    /// <param name="connector">The connector to drive.</param>
+    /// <param name="previousSync">State from the previous run, or null.</param>
+    /// <param name="options">Run bounds.</param>
+    /// <param name="onDocument">Per-document handler, or null to collect documents into the result.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The run result.</returns>
+    private async Task<ConnectorRunResult> RunCoreAsync(
+        IDataConnector connector,
+        ConnectorSyncState? previousSync,
+        ConnectorRunOptions options,
+        Func<ConnectorDocument, CancellationToken, Task>? onDocument,
+        CancellationToken cancellationToken)
+    {
         var documents = new List<ConnectorDocument>();
+        var fetchedCount = 0;
         var unchanged = new List<ConnectorItem>();
         var failures = new List<ConnectorItemFailure>();
         var seenIds = new HashSet<string>(StringComparer.Ordinal);
@@ -73,6 +120,7 @@ public sealed class ConnectorRunner
         var unchangedCount = 0;
         var totalBytes = 0L;
         var reachedLimit = false;
+        var limitCode = (string?)null;
         var isFirstFetch = true;
 
         while (true)
@@ -84,6 +132,7 @@ public sealed class ConnectorRunner
                 logger.LogWarning(
                     "{Source} run stopped at the {Pages}-page listing limit", connector.SourceName, options.MaxPages);
                 reachedLimit = true;
+                limitCode = ConnectorErrorCodes.RunPageLimitReached;
                 break;
             }
 
@@ -102,9 +151,10 @@ public sealed class ConnectorRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (documents.Count >= options.MaxItems)
+                if (fetchedCount >= options.MaxItems)
                 {
                     reachedLimit = true;
+                    limitCode = ConnectorErrorCodes.RunItemLimitReached;
                     break;
                 }
 
@@ -177,7 +227,18 @@ public sealed class ConnectorRunner
                 }
 
                 consecutiveFailures = 0;
-                documents.Add(document);
+                fetchedCount++;
+
+                // Handed over before anything else is fetched, so a run stopped after this point has
+                // already delivered this document (REQ-RAG-083). Without a handler it is collected.
+                if (onDocument is null)
+                {
+                    documents.Add(document);
+                }
+                else
+                {
+                    await onDocument(document, cancellationToken).ConfigureAwait(false);
+                }
 
                 // Measured in real UTF-8 bytes rather than characters, so the number the option
                 // promises is the number enforced for text that is not ASCII.
@@ -199,6 +260,7 @@ public sealed class ConnectorRunner
                         connector.SourceName,
                         options.MaxTotalBytes);
                     reachedLimit = true;
+                    limitCode = ConnectorErrorCodes.RunByteBudgetReached;
                     break;
                 }
             }
@@ -226,10 +288,13 @@ public sealed class ConnectorRunner
         logger.LogInformation(
             "{Source} run fetched {Fetched}, skipped {Unchanged} unchanged, {Failed} failed",
             connector.SourceName,
-            documents.Count,
+            fetchedCount,
             unchangedCount,
             failures.Count);
 
-        return new ConnectorRunResult(documents, unchanged, failures, sync, reachedLimit);
+        return new ConnectorRunResult(documents, unchanged, failures, sync, reachedLimit)
+        {
+            LimitCode = limitCode,
+        };
     }
 }

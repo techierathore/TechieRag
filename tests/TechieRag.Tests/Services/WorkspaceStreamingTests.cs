@@ -56,7 +56,7 @@ public class WorkspaceStreamingTests : IDisposable
     /// vector store would happily return is excluded when it belongs to another workspace
     /// (REQ-RAG-007 isolation, carried into the streaming path).
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-092 StreamedSourcesExcludeOtherWorkspaceDocuments")]
     public async Task StreamedSourcesExcludeOtherWorkspaceDocuments()
     {
         var results = new[]

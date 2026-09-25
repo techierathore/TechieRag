@@ -63,7 +63,7 @@ public sealed class ImapMailTransportTests
     }
 
     /// <summary>The scope filters are sent as IMAP search keys, so the server does the filtering.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-081 PushesTheScopeFiltersToTheServer")]
     public async Task PushesTheScopeFiltersToTheServer()
     {
         var connection = Connected()

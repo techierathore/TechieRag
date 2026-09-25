@@ -1,3 +1,5 @@
+using TechieRag.Models;
+
 namespace TechieRag.Embedded;
 
 /// <summary>
@@ -6,14 +8,19 @@ namespace TechieRag.Embedded;
 public static class TechieRagBuilderExtensions
 {
     /// <summary>
-    /// Configures TechieRag to use the BGE-M3 embedding model with auto-download.
-    /// Model is downloaded on first use (~2.3GB) and cached locally.
+    /// Configures TechieRag to use this platform's default embedded model, downloaded once into the
+    /// model root: bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS.
     /// </summary>
     /// <param name="builder">The TechieRag builder instance.</param>
     /// <returns>The builder instance for chaining.</returns>
     /// <remarks>
-    /// <para><b>Model:</b> BGE-M3 (1024 dimensions, multilingual, best quality)</para>
-    /// <para><b>First Use:</b> Downloads ~2.3GB model (cached for subsequent uses)</para>
+    /// <para><b>Desktop (Windows, macOS, Mac Catalyst, Linux):</b> BGE-M3 — 1024 dimensions,
+    /// multilingual, a 2.3 GB first download.</para>
+    /// <para><b>Android and iOS:</b> all-MiniLM-L6-v2 — 384 dimensions, English, a 91 MB first
+    /// download (REQ-RAG-054 / BRD-91).</para>
+    /// <para><b>Where:</b> <c>&lt;ModelRoot&gt;/&lt;model&gt;</c>, the per-user application data folder
+    /// unless <see cref="UseModelRoot"/> moved it (REQ-RAG-053). The size is reported before the
+    /// first byte through <see cref="ModelDownloadService.DownloadSizeKnown"/> (REQ-RAG-055).</para>
     /// <para><b>Example:</b></para>
     /// <code>
     /// var rag = new TechieRagBuilder()
@@ -22,20 +29,55 @@ public static class TechieRagBuilderExtensions
     ///     .Build();
     /// </code>
     /// </remarks>
-    public static TechieRagBuilder UseEmbedded(this TechieRagBuilder builder)
+    public static TechieRagBuilder UseEmbedded(this TechieRagBuilder builder) =>
+        UseEmbedded(builder, EmbeddedModel.PlatformDefault);
+
+    /// <summary>
+    /// Configures TechieRag to use one embedded model, downloaded once into the model root.
+    /// </summary>
+    /// <param name="builder">The TechieRag builder instance.</param>
+    /// <param name="model"><see cref="EmbeddedModel.BgeM3"/> or <see cref="EmbeddedModel.MiniLM"/>.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    /// <exception cref="NotSupportedException">
+    /// <paramref name="model"/> is bge-m3 and this is Android or iOS; the message names its 2.3 GB size.
+    /// </exception>
+    public static TechieRagBuilder UseEmbedded(this TechieRagBuilder builder, EmbeddedModel model) =>
+        UseEmbedded(builder, model, EmbeddedModel.IsPhonePlatform);
+
+    /// <summary>
+    /// Registers an embedded model after checking it against a platform.
+    /// </summary>
+    /// <param name="builder">The TechieRag builder instance.</param>
+    /// <param name="model">The model.</param>
+    /// <param name="isPhone">Whether the platform is Android or iOS; a parameter so tests can ask for either.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    internal static TechieRagBuilder UseEmbedded(TechieRagBuilder builder, EmbeddedModel model, bool isPhone)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(model);
+        model.EnsureSupported(isPhone);
 
-        // Set the config to indicate we're using Embedded source
-        // This ensures Settings page shows correct selection
+        // The config records the choice so a settings screen shows it.
         var config = builder.GetConfig();
         config.Embedding.Source = EmbeddingSource.Embedded;
-        config.Embedding.Model = "bge-m3";
+        config.Embedding.Model = model.Name;
 
-        // Register the EmbeddedEmbeddingProvider factory
-        // This creates the BGE-M3 provider with auto-download on first use
-        builder.UseCustomEmbeddingProvider(() => EmbeddedEmbeddingProvider.CreateDefault());
+        builder.UseCustomEmbeddingProvider(() => new EmbeddedEmbeddingProvider(model));
+        return builder;
+    }
 
+    /// <summary>
+    /// Moves the folder every local model (embedding model, reranker, local language model) is
+    /// downloaded to and loaded from, for the whole process.
+    /// </summary>
+    /// <param name="builder">The TechieRag builder instance.</param>
+    /// <param name="modelRoot">The folder; each model gets a sub-folder named after it.</param>
+    /// <returns>The builder instance for chaining.</returns>
+    /// <remarks>Same as <see cref="ModelRoot.Set"/>; call it before the first model loads.</remarks>
+    public static TechieRagBuilder UseModelRoot(this TechieRagBuilder builder, string modelRoot)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ModelRoot.Set(modelRoot);
         return builder;
     }
 
@@ -81,27 +123,34 @@ public static class TechieRagBuilderExtensions
     /// Configures TechieRag to use the all-MiniLM-L6-v2 model if available in the default location.
     /// </summary>
     /// <param name="builder">The TechieRag builder instance.</param>
-    /// <param name="modelDirectory">Optional custom model directory. Defaults to ./models/all-MiniLM-L6-v2</param>
+    /// <param name="modelDirectory">
+    /// Optional pre-staged model directory. When omitted, all-MiniLM-L6-v2 is downloaded once into
+    /// <c>&lt;ModelRoot&gt;/all-minilm-l6-v2</c>, exactly as <c>UseEmbedded(EmbeddedModel.MiniLM)</c>.
+    /// </param>
     /// <returns>The builder instance for chaining.</returns>
     public static TechieRagBuilder UseMiniLM(
         this TechieRagBuilder builder,
         string? modelDirectory = null)
     {
-        var path = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "models", "all-MiniLM-L6-v2");
-        return builder.UseEmbeddedModel(path, dimensions: 384);
+        return modelDirectory is null
+            ? builder.UseEmbedded(EmbeddedModel.MiniLM)
+            : builder.UseEmbeddedModel(modelDirectory, dimensions: 384);
     }
 
     /// <summary>
     /// Configures TechieRag to use the BGE-Small model if available.
     /// </summary>
     /// <param name="builder">The TechieRag builder instance.</param>
-    /// <param name="modelDirectory">Optional custom model directory.</param>
+    /// <param name="modelDirectory">
+    /// Optional custom model directory. Defaults to <c>&lt;ModelRoot&gt;/bge-small-en-v1.5</c>, where the
+    /// files must be staged by the host (this model is not downloaded automatically).
+    /// </param>
     /// <returns>The builder instance for chaining.</returns>
     public static TechieRagBuilder UseBgeSmall(
         this TechieRagBuilder builder,
         string? modelDirectory = null)
     {
-        var path = modelDirectory ?? Path.Combine(AppContext.BaseDirectory, "models", "bge-small-en-v1.5");
+        var path = modelDirectory ?? ModelRoot.GetModelDirectory("bge-small-en-v1.5");
         return builder.UseEmbeddedModel(path, dimensions: 384);
     }
 

@@ -73,7 +73,7 @@ public sealed class WorkspaceRetrievalSettingsTests : IDisposable
     /// Two workspaces over the same documents with different retrieval settings get different
     /// result sets in the same process — the settings are per workspace, not global.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-092 RetrievalSettingsAreIsolatedBetweenWorkspaces")]
     public async Task RetrievalSettingsAreIsolatedBetweenWorkspaces()
     {
         var manager = CreateManager();
@@ -92,7 +92,7 @@ public sealed class WorkspaceRetrievalSettingsTests : IDisposable
     /// document instead of embedding it again. The counting embedding provider fails this test if
     /// the content hash lookup is skipped.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-093 IdenticalContentIsEmbeddedOnceAndReusedAcrossWorkspaces")]
     public async Task IdenticalContentIsEmbeddedOnceAndReusedAcrossWorkspaces()
     {
         var embeddings = new CountingEmbeddingProvider();

@@ -89,7 +89,7 @@ public sealed class TechieRagTelemetryExporterTests : IDisposable
     /// loopback collector, carrying the TechieRag source name and instrument names. "It compiles" is
     /// not proof, so this reads the bytes that landed.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-FN-064 EnabledPipelineDeliversSpansAndMetricsToTheCollector")]
     public async Task EnabledPipelineDeliversSpansAndMetricsToTheCollector()
     {
         using var collector = LoopbackCollector.Start();
@@ -234,7 +234,7 @@ public sealed class TechieRagTelemetryExporterTests : IDisposable
     /// The DI entry point called with no configuration registers an inert pipeline and sends nothing,
     /// so wiring the package into a container is not itself an opt-in.
     /// </summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-FN-064 DiRegistrationWithoutConfigurationSendsNothing")]
     public async Task DiRegistrationWithoutConfigurationSendsNothing()
     {
         using var collector = LoopbackCollector.Start();

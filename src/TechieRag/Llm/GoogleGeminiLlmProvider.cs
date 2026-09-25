@@ -156,7 +156,14 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
     }
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    /// <remarks>The text-only projection of <see cref="ChatStreamEventsAsync"/> (REQ-RAG-067).</remarks>
+    public IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        ChatStreamEventsAsync(messages, options, cancellationToken).ToTextStreamAsync(cancellationToken);
+
+    /// <inheritdoc/>
+    /// <remarks>Gemini sends each <c>functionCall</c> part whole; they are collected and emitted after
+    /// the text (REQ-RAG-067 / BRD-110).</remarks>
+    public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var sw = Stopwatch.StartNew();
         var url = $"{baseUrl}/v1beta/models/{options?.Model ?? ModelName}:streamGenerateContent?key={apiKey}&alt=sse";
@@ -173,11 +180,13 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        int cacheReadTokens = 0;
         var outputText = new StringBuilder();
+        var toolCalls = new List<ToolCall>();
 
-        while (!reader.EndOfStream)
+        // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
+        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
-            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
             if (string.IsNullOrEmpty(line) || !line.StartsWith("data: ")) continue;
 
             var data = line["data: ".Length..];
@@ -188,26 +197,31 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
             {
                 totalInputTokens = chunk.UsageMetadata.PromptTokenCount;
                 totalOutputTokens = chunk.UsageMetadata.CandidatesTokenCount;
+                cacheReadTokens = chunk.UsageMetadata.CachedContentTokenCount;
             }
 
-            var text = ExtractText(chunk.Candidates?.FirstOrDefault());
+            var candidate = chunk.Candidates?.FirstOrDefault();
+            toolCalls.AddRange(ExtractToolCalls(candidate) ?? []);
+
+            var text = ExtractText(candidate);
             if (!string.IsNullOrEmpty(text))
             {
                 outputText.Append(text);
-                yield return text;
+                yield return LlmStreamEvent.FromText(text);
             }
         }
 
-        sw.Stop();
-
-        // Fallback: estimate when the API sent no usage metadata
-        if (totalInputTokens == 0 && totalOutputTokens == 0)
+        foreach (var toolCall in toolCalls)
         {
-            totalInputTokens = messages.Sum(m => EstimateTokenCount(m.Content ?? string.Empty));
-            totalOutputTokens = EstimateTokenCount(outputText.ToString());
+            yield return LlmStreamEvent.FromToolCall(toolCall);
         }
 
-        RaiseCompletionEvent(totalInputTokens, totalOutputTokens, sw.Elapsed, true, false);
+        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { });
+        var usage = context.BuildUsage(totalInputTokens, totalOutputTokens, cacheReadTokens, outputText.ToString());
+        sw.Stop();
+        RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, toolCalls.Count > 0, cacheReadTokens);
+
+        yield return LlmStreamEvent.FromCompleted(usage, toolCalls.Count > 0 ? "tool_calls" : "stop", ModelName);
     }
 
     /// <inheritdoc/>

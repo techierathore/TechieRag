@@ -118,6 +118,15 @@ public class FallbackLlmHandler : ILlmProvider
     }
 
     /// <inheritdoc/>
+    public IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
+    {
+        return StreamWithFallbackAsync(
+            () => primary.ChatStreamEventsAsync(messages, options, cancellationToken),
+            () => fallback.ChatStreamEventsAsync(messages, options, cancellationToken),
+            cancellationToken);
+    }
+
+    /// <inheritdoc/>
     public async Task<T> CompleteAsync<T>(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) where T : class
     {
         try
@@ -140,12 +149,12 @@ public class FallbackLlmHandler : ILlmProvider
     /// Uses a Channel to bridge the async enumerable through try-catch, since
     /// yield return is not allowed in try-catch blocks in C#.
     /// </summary>
-    private async IAsyncEnumerable<string> StreamWithFallbackAsync(
-        Func<IAsyncEnumerable<string>> primaryFactory,
-        Func<IAsyncEnumerable<string>> fallbackFactory,
+    private async IAsyncEnumerable<T> StreamWithFallbackAsync<T>(
+        Func<IAsyncEnumerable<T>> primaryFactory,
+        Func<IAsyncEnumerable<T>> fallbackFactory,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var channel = Channel.CreateUnbounded<string>();
+        var channel = Channel.CreateUnbounded<T>();
         var writerTask = Task.Run(async () =>
         {
             try

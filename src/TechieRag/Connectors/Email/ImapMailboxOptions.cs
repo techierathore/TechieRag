@@ -9,6 +9,10 @@ namespace TechieRag.Connectors.Email;
 /// <c>ISecretStore</c> — and lives in memory for the connection's lifetime only. TechieRag has no
 /// secret store, never writes this value to disk, and never includes it in a log line or an
 /// exception message. Do not persist a populated instance of this class.</para>
+/// <para><b>Any reachable host, private ones included.</b> <see cref="Host"/> is set by the host
+/// application, never read from content, so unlike a URL handed to the web fetcher it is not put
+/// through the SSRF guard: a mail server on a LAN or at a loopback address is accepted
+/// (REQ-RAG-082). TLS to that host name is still required.</para>
 /// </remarks>
 public sealed class ImapMailboxOptions
 {

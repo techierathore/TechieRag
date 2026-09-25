@@ -13,8 +13,8 @@ namespace TechieRag.Embedded;
 /// <para><b>Purpose:</b> Fully offline second-stage reranking: each (query, chunk) pair is
 /// scored by a cross-encoder model, which is far more precise than vector similarity alone.</para>
 /// <para><b>Model:</b> BGE-Reranker-v2-M3 (multilingual, XLM-RoBERTa based). The ONNX model
-/// is downloaded on first use and cached next to the assembly, following the same
-/// ModelDownloadService pattern as <see cref="EmbeddedEmbeddingProvider"/>. A pre-downloaded
+/// is downloaded on first use into <c>&lt;ModelRoot&gt;/bge-reranker-v2-m3</c> (REQ-RAG-053) through
+/// <see cref="ModelDownloadService"/>, like <see cref="EmbeddedEmbeddingProvider"/>. A pre-downloaded
 /// model directory can be supplied instead to skip the download.</para>
 /// <para><b>Usage:</b>
 /// <code>
@@ -83,9 +83,6 @@ public class OnnxCrossEncoderReranker : IReranker, IDisposable
     /// France". That is what <c>ItRanksAcrossLanguages</c> caught.</para>
     /// </remarks>
     private const int FairseqOffset = 1;
-
-    private static readonly SemaphoreSlim DownloadSemaphore = new(1, 1);
-    private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromHours(2) };
 
     /// <summary>One file the model needs, and which repository it comes from.</summary>
     /// <param name="Filename">The name as it is stored on disk, and as it is fetched.</param>
@@ -168,13 +165,8 @@ public class OnnxCrossEncoderReranker : IReranker, IDisposable
     /// <summary>
     /// Gets the local cache directory for the reranker model.
     /// </summary>
-    /// <returns>The model directory path next to the executing assembly.</returns>
-    public static string GetModelDirectory()
-    {
-        var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
-        var assemblyDir = Path.GetDirectoryName(assemblyLocation) ?? AppContext.BaseDirectory;
-        return Path.Combine(assemblyDir, "models", RerankerModelName);
-    }
+    /// <returns><c>&lt;ModelRoot&gt;/bge-reranker-v2-m3</c>, the per-user application data folder unless the host moved it.</returns>
+    public static string GetModelDirectory() => ModelRoot.GetModelDirectory(RerankerModelName);
 
     /// <summary>
     /// Checks whether the reranker model is already downloaded and complete.
@@ -188,18 +180,8 @@ public class OnnxCrossEncoderReranker : IReranker, IDisposable
     /// <c>EmbeddedEmbeddingProvider.IsModelDownloaded</c> has always done, and it doubles as the
     /// partial-download guard: a fetch interrupted halfway leaves a short file that fails this test.
     /// </remarks>
-    public static bool IsModelDownloaded()
-    {
-        var modelDir = GetModelDirectory();
-        var modelPath = Path.Combine(modelDir, "model.onnx");
-        var dataPath = Path.Combine(modelDir, "model.onnx_data");
-        var tokenizerPath = Path.Combine(modelDir, "sentencepiece.bpe.model");
-
-        return File.Exists(modelPath)
-            && File.Exists(dataPath)
-            && File.Exists(tokenizerPath)
-            && new FileInfo(dataPath).Length > 2_000_000_000;
-    }
+    public static bool IsModelDownloaded() =>
+        ModelDownloadService.IsComplete(GetModelDirectory(), GetDownloadFiles(ModelBaseUrl));
 
     /// <summary>
     /// Initializes the reranker, downloading the model on first use.
@@ -329,88 +311,36 @@ public class OnnxCrossEncoderReranker : IReranker, IDisposable
 
     private async Task<string> EnsureModelDownloadedAsync(CancellationToken cancellationToken)
     {
+        var files = GetDownloadFiles(downloadBaseUrl);
         var modelDir = GetModelDirectory();
-        var service = ModelDownloadService.Instance;
 
-        if (IsModelDownloaded()) return modelDir;
-
-        await DownloadSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-        try
+        // A complete copy an older version downloaded next to the assembly is used as is, so an
+        // upgrade does not fetch 2.27 GB again.
+        if (!ModelDownloadService.IsComplete(modelDir, files)
+            && EmbeddedModel.LegacyDirectory(RerankerModelName) is { } legacy
+            && ModelDownloadService.IsComplete(legacy, files))
         {
-            if (IsModelDownloaded()) return modelDir;
-
-            Directory.CreateDirectory(modelDir);
-
-            service.UpdateProgress(p =>
-            {
-                p.Status = ModelDownloadStatus.Downloading;
-                p.TotalFiles = ModelFiles.Length;
-                p.CompletedFiles = 0;
-            });
-
-            for (var i = 0; i < ModelFiles.Length; i++)
-            {
-                var file = ModelFiles[i];
-                var destPath = Path.Combine(modelDir, file.Filename);
-
-                // A file counts as already-fetched only when it is PLAUSIBLY COMPLETE. The old test
-                // was "exists and is non-empty", which accepts the truncated remains of an
-                // interrupted 2.27 GB download and then fails deep inside InferenceSession with
-                // nothing pointing back here. A 5% tolerance absorbs the difference between the
-                // recorded approximate size and what the repo actually serves.
-                if (File.Exists(destPath) && new FileInfo(destPath).Length >= file.ApproxBytes * 0.95)
-                {
-                    service.UpdateProgress(p => p.CompletedFiles = i + 1);
-                    continue;
-                }
-
-                service.UpdateProgress(p =>
-                {
-                    p.CurrentFile = file.Filename;
-                    p.CurrentFileSize = file.DisplaySize;
-                    p.CurrentFileTotalBytes = file.ApproxBytes;
-                    p.CurrentFileBytesDownloaded = 0;
-                });
-
-                var baseUrl = file.IsTokenizer ? DefaultTokenizerBaseUrl : downloadBaseUrl;
-                await DownloadFileAsync($"{baseUrl}/{file.Filename}", destPath, cancellationToken)
-                    .ConfigureAwait(false);
-
-                service.UpdateProgress(p => p.CompletedFiles = i + 1);
-            }
-
-            service.UpdateProgress(p => p.Status = ModelDownloadStatus.Completed);
-            return modelDir;
+            return legacy;
         }
-        finally
-        {
-            DownloadSemaphore.Release();
-        }
-    }
 
-    private static async Task DownloadFileAsync(string url, string destPath, CancellationToken cancellationToken)
-    {
-        var service = ModelDownloadService.Instance;
-
-        using var response = await HttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        // Size before the first byte, progress after, a partial file resumed (REQ-RAG-055). A file
+        // counts as fetched only at 95% of its recorded size or more, so the truncated remains of an
+        // interrupted 2.27 GB download are never loaded.
+        await ModelDownloadService.Instance
+            .DownloadAsync(RerankerModelName, modelDir, files, cancellationToken)
             .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
-
-        await using var contentStream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        await using var fileStream = File.Create(destPath);
-
-        var buffer = new byte[81920];
-        long totalRead = 0;
-        int bytesRead;
-
-        while ((bytesRead = await contentStream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
-        {
-            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), cancellationToken).ConfigureAwait(false);
-            totalRead += bytesRead;
-            var read = totalRead;
-            service.UpdateProgress(p => p.CurrentFileBytesDownloaded = read);
-        }
+        return modelDir;
     }
+
+    /// <summary>The reranker's files as download entries.</summary>
+    /// <param name="weightsBaseUrl">Where the ONNX files come from.</param>
+    /// <returns>One entry per file; the tokenizer always comes from <see cref="DefaultTokenizerBaseUrl"/>.</returns>
+    private static IReadOnlyList<ModelDownloadFile> GetDownloadFiles(string weightsBaseUrl) => ModelFiles
+        .Select(f => new ModelDownloadFile(
+            f.Filename,
+            new Uri($"{(f.IsTokenizer ? DefaultTokenizerBaseUrl : weightsBaseUrl.TrimEnd('/'))}/{f.Filename}"),
+            f.ApproxBytes))
+        .ToList();
 
     private static string FindModelFile(string directory)
     {

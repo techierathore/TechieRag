@@ -99,7 +99,7 @@ Legend: ✅ full · ⚠️ partial · ❌ missing · N/A not applicable to that 
 | Realtime / live audio | ❌ | ✅ | ❌ |
 | Image/video generation | ❌ (BRD out of scope — revisit) | ✅ | ❌ |
 | Embedding providers | ⚠️ 6 + custom (incl. offline BGE-M3 ONNX) | ✅ incl. Voyage/Upstage specialists | ✅ 14+ incl. native zero-setup |
-| **Offline embedded model (no external service)** | ✅ **TechieRag.Embedded (BGE-M3)** | ❌ | ✅ native embedder |
+| **Embedded model, no external service (downloads once, then works offline)** | ✅ **TechieRag.Embedded (BGE-M3)** | ❌ | ✅ native embedder |
 | Vector stores | ⚠️ 3 (SqliteVec, PgVector, Qdrant) | ⚠️ 5 (Chroma, PgVector, Pinecone, Faiss, Qdrant) | ✅ 10 |
 | **Document ingestion pipeline (files→chunks→vectors)** | ✅ 9 processors, 70+ code exts | ❌ none | ✅ |
 | Web/URL/connector ingestion | ❌ | ❌ (URL as chat input only) | ✅ scraper, crawler, YouTube, GitHub/GitLab, Confluence |
@@ -156,7 +156,7 @@ Legend: ✅ full · ⚠️ partial · ❌ missing · N/A not applicable to that 
 ### 4.3 What we already do BETTER (differentiators to protect)
 
 1. **Embeddable .NET library** — neither competitor offers "add full RAG to your existing .NET app via one NuGet." LLMTornado has no document pipeline; AnythingLLM is not a library at all.
-2. **TechieRag.Embedded** — fully offline BGE-M3 embeddings, no service dependency. LLMTornado has nothing comparable.
+2. **TechieRag.Embedded** — BGE-M3 embeddings that download once, then work offline, no service dependency. LLMTornado has nothing comparable.
 3. **Qdrant admin console with Docker lifecycle management** — unique operator tooling.
 4. **Token/cost dashboard + budget alerts with block-on-exceed** — stronger than either competitor's cost story.
 5. **Resilience depth** — Retry-After parsing (delta + HTTP-date), circuit breaker, fallback provider, all provider-uniform.
@@ -177,7 +177,7 @@ Every gap has a stable ID for checklist migration. Effort: **S** ≤ 3 days · *
 | GAP-LIB-02 | **Reranking stage** — `IReranker` abstraction; local cross-encoder ONNX option + API rerankers (Cohere/Voyage/Jina) (both) | P0 | M |
 | GAP-LIB-03 | **Chunking strategies** — recursive splitter, token-based, markdown/code-aware, sentence; pluggable `IChunker` (both) | P0 | M |
 | GAP-LIB-04 | **Provider expansion + model-name routing** — named connectors (AWS Bedrock, Groq, Mistral, Cohere, DeepSeek, xAI, OpenRouter, Together, Perplexity…) mostly over existing OpenAI-compatible wire format; resolve provider from model name (LLMTornado) | P1 | L |
-| GAP-LIB-05 | **Web ingestion** — URL scraper + site crawler (depth/maxLinks), YouTube transcripts (AnythingLLM) | P1 | M |
+| GAP-LIB-05 | **Web ingestion** — URL scraper + site crawler (depth/maxLinks); the YouTube-transcript part was built, then removed 2026-09-24 by owner decision (BRD-164) | P1 | M |
 | GAP-LIB-06 | **Connector framework** — `IDataConnector` + GitHub/GitLab, Confluence connectors (AnythingLLM) | P1 | L |
 | GAP-LIB-07 | **Persistent conversation memory** — DB-backed `IConversationMemory` (SQLite/Postgres) w/ threads (both) | P0 | M |
 | GAP-LIB-08 | **Workspace/collection concept in library** — named contexts w/ isolated docs + settings; doc pinning; similarity threshold; query-vs-chat mode (AnythingLLM) | P0 | M |
@@ -206,7 +206,7 @@ Every gap has a stable ID for checklist migration. Effort: **S** ≤ 3 days · *
 | GAP-APP-03 | **Persistent chat history** — DB-backed (EF Core + SQLite/Postgres), per-user, exportable | P0 | M |
 | GAP-APP-04 | **Document library UI** — drag-drop upload, per-workspace embed/unembed, pinning, status, dedupe (embed-once reuse) | P0 | L |
 | GAP-APP-05 | **Streaming citations UX** — native sources during streaming (unblocked by GAP-LIB-01) | P0 | S |
-| GAP-APP-06 | **Data connectors UI** — URL scrape, crawler, YouTube, GitHub, Confluence (on GAP-LIB-05/06) | P1 | M |
+| GAP-APP-06 | **Data connectors UI** — URL scrape, crawler, GitHub, Confluence (on GAP-LIB-05/06) | P1 | M |
 | GAP-APP-07 | **Developer REST API** — workspaces/docs/chat endpoints, API keys, Swagger UI | P1 | L |
 | GAP-APP-08 | **Embeddable chat widget** — JS snippet served by app, workspace-scoped, key-authenticated | P1 | M |
 | GAP-APP-09 | **Retrieval tuning UI** — similarity threshold, snippet count, rerank toggle per workspace | P1 | S |
@@ -239,7 +239,7 @@ Assumptions: one AI-assisted developer (TechieFlow workflow), TrBlazeUI componen
 - **Exit criteria:** a stranger can `docker compose up`, create an account, make a workspace, drag in PDFs, and chat with streamed cited answers.
 
 ### Phase 3 — Ingestion breadth + providers — **~4–6 weeks**
-- GAP-LIB-05 URL/crawler/YouTube · GAP-LIB-11 XLSX/PPTX · GAP-LIB-04 provider expansion + model-name routing · GAP-LIB-15 more embedders · GAP-APP-06 connectors UI · GAP-LIB-06 GitHub/Confluence connectors.
+- GAP-LIB-05 URL/crawler (YouTube removed 2026-09-24, BRD-164) · GAP-LIB-11 XLSX/PPTX · GAP-LIB-04 provider expansion + model-name routing · GAP-LIB-15 more embedders · GAP-APP-06 connectors UI · GAP-LIB-06 GitHub/Confluence connectors.
 - **≈ MVP line: cumulative ~12–16 weeks — a credible AnythingLLM alternative.**
 
 ### Phase 4 — Developer platform — **~4–5 weeks**

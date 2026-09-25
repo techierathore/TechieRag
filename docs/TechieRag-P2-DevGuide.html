@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Developer Guide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieRag — Developer Guide</h1>
+    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-P2-DevGuide.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#architecture-cheat-sheet">Architecture cheat-sheet</a></li>
+        <li><a href="#screen-by-screen-code-map">Screen-by-screen code map</a></li>
+        <li class="h3"><a href="#registration-and-the-model-catalogue-uselocalllm-localllm-localmodel-techierag-local">Registration and the model catalogue: UseLocalLlm, LocalLlm, LocalModel (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#terms-download-and-verification-localmodelstore-and-modeldownloadservice-techierag-local">Terms, download and verification: LocalModelStore and ModelDownloadService (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#memory-check-before-load-memorygate-availablememory-localmodelmemoryexception-techierag-local">Memory check before load: MemoryGate, AvailableMemory, LocalModelMemoryException (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#generation-streaming-and-typed-answers-localllmprovider-over-onnxgenaimodel-techierag-local">Generation, streaming and typed answers: LocalLlmProvider over OnnxGenAiModel (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#chat-templates-and-stop-sequences-chattemplateformatter-localchattemplate-stopsequencefilter-techierag-local">Chat templates and stop sequences: ChatTemplateFormatter, LocalChatTemplate, StopSequenceFilter (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#the-probe-s-second-button-localproberunner-peakmemory-generationresult-samples-techierag-probe">The probe&#x27;s second button: LocalProbeRunner, PeakMemory, GenerationResult (samples/TechieRag.Probe)</a></li>
+        <li class="h3"><a href="#probe-screen-mainpage-samples-techierag-probe">Probe screen: MainPage (samples/TechieRag.Probe)</a></li>
+        <li class="h3"><a href="#model-root-and-the-phone-default-modelroot-embeddedmodel-useembedded-techierag-techierag-embedded">Model root and the phone default: ModelRoot, EmbeddedModel, UseEmbedded (TechieRag, TechieRag.Embedded)</a></li>
+        <li class="h3"><a href="#download-size-decline-and-resume-modeldownloadservice-techierag-embedded">Download size, decline and resume: ModelDownloadService (TechieRag.Embedded)</a></li>
+        <li class="h3"><a href="#sqlite-exact-search-sqlitevecstore-searchasync-techierag">SQLite exact search: SqliteVecStore.SearchAsync (TechieRag)</a></li>
+        <li class="h3"><a href="#native-onnx-runtime-wiring-techierag-embedded-targets-and-techierag-local-targets-techierag-embedded-techierag-local">Native ONNX Runtime wiring: TechieRag.Embedded.targets and TechieRag.Local.targets (TechieRag.Embedded, TechieRag.Local)</a></li>
+        <li class="h3"><a href="#ci-and-the-scripts-probe-yml-select-xcode-sh-run-android-emulator-sh-invoke-probewindows-ps1-github-workflows-samples-techierag-probe-scripts">CI and the scripts: probe.yml, select-xcode.sh, run-android-emulator.sh, Invoke-ProbeWindows.ps1 (.github/workflows, samples/TechieRag.Probe/scripts)</a></li>
+        <li class="h3"><a href="#agent-builder-and-registration-techierag-agents">Agent builder and registration (TechieRag.Agents)</a></li>
+        <li class="h3"><a href="#agentic-retrieval-the-knowledge-base-tools-techierag">Agentic retrieval: the knowledge-base tools (TechieRag)</a></li>
+        <li class="h3"><a href="#seam-adapters-techierag-agents">Seam adapters (TechieRag.Agents)</a></li>
+        <li class="h3"><a href="#typed-streaming-on-a-provider-chatstreameventsasync-techierag">Typed streaming on a provider: ChatStreamEventsAsync (TechieRag)</a></li>
+        <li class="h3"><a href="#streaming-agent-loop-agentlooprunner-runstreamasync-techierag">Streaming agent loop: AgentLoopRunner.RunStreamAsync (TechieRag)</a></li>
+        <li class="h3"><a href="#chatgpt-subscription-sign-in-techierag">ChatGPT subscription sign-in (TechieRag)</a></li>
+        <li class="h3"><a href="#connector-catalog-model-routing-and-the-subscription-factory-arm-techierag">Connector catalog, model routing and the subscription factory arm (TechieRag)</a></li>
+        <li class="h3"><a href="#configuration-mapping-addtechierag-iconfiguration-and-techieragconfig-techierag">Configuration mapping: AddTechieRag(IConfiguration) and TechieRagConfig (TechieRag)</a></li>
+        <li class="h3"><a href="#web-ingestion-and-the-ssrf-guard-ingesturlasync-crawlasync-createguardedhandler-techierag">Web ingestion and the SSRF guard: IngestUrlAsync, CrawlAsync, CreateGuardedHandler (TechieRag)</a></li>
+        <li class="h3"><a href="#connectorrunner-and-repositoryconnector-techierag">ConnectorRunner and RepositoryConnector (TechieRag)</a></li>
+        <li class="h3"><a href="#emailconnector-with-imap-and-mbox-transports-techierag">EmailConnector with IMAP and mbox transports (TechieRag)</a></li>
+        <li class="h3"><a href="#reranking-and-search-options-searchoptions-rerank-withreranker-techierag-techierag-embedded">Reranking and search options: SearchOptions.Rerank, WithReranker (TechieRag, TechieRag.Embedded)</a></li>
+        <li class="h3"><a href="#telemetry-packaging-techierag-telemetry-addtechieragtelemetry-the-publish-workflows-techierag-telemetry">Telemetry packaging: TechieRag.Telemetry, AddTechieRagTelemetry, the publish workflows (TechieRag.Telemetry)</a></li>
+        <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
+        <li class="h3"><a href="#configuration">Configuration</a></li>
+        <li class="h3"><a href="#model-files-on-disk">Model files on disk</a></li>
+        <li class="h3"><a href="#platform-build-and-ci">Platform build and CI</a></li>
+        <li class="h3"><a href="#logging-and-errors">Logging and errors</a></li>
+        <li><a href="#known-issues">Known issues</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Kind</td><td>library</td></tr>
+<tr><td>Size</td><td>Large</td></tr>
+<tr><td>Phase</td><td>2 of 2</td></tr>
+<tr><td>Verified on</td><td>2026-09-25</td></tr>
+<tr><td>Date</td><td>2026-09-25</td></tr>
+</tbody>
+</table>
+<p>This guide maps each public service that phase 2 added or changed to the code that serves it, read at file and line on 2026-09-25: the local model package <code>TechieRag.Local</code>, the phase-2 changes in <code>TechieRag.Embedded</code> and the platform work, the <code>TechieRag.Agents</code> package and typed streaming, and subscription sign-in, provider routing, configuration mapping, connectors, reranking and telemetry packaging in <code>TechieRag</code>. Phase-1 services are in <code>docs/TechieRag-DevGuide.md</code>. The sample that runs here is <code>samples/TechieRag.Probe</code>, a MAUI app with one screen: it booted on this Mac as the Mac Catalyst head and in the iOS 26.1 simulator on 2026-09-25, and the four screenshots under <code>docs/screenshots/TechieRag/probe-*.png</code> come from those runs. Entries the probe exercises are marked <code>renders</code>; the rest have no sample here and are <code>static-only (unconfirmed)</code>, covered by the test project each entry names, and their image is the July 2026 screen of the sample application of that time (TechieDesk, now Sevak, in its own repository since 2026-09-24) that exercised the service. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.</p>
+<h2 id="architecture-cheat-sheet">Architecture cheat-sheet<a class="anchor-link" href="#architecture-cheat-sheet">#</a></h2>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Host["Host application"] --&gt; Builder["TechieRagBuilder / AddTechieRag(IConfiguration)"]
+  Builder --&gt; Client["TechieRagClient : ITechieRag"]
+  Client --&gt; Emb["IEmbeddingProvider (TechieRag.Embedded)"]
+  Client --&gt; Store["IVectorStore (SqliteVecStore SIMD scan)"]
+  Client --&gt; Llm["ILlmProvider: 6 HTTP providers + ChatGPT subscription + TechieRag.Local"]
+  Llm --&gt; Events["LlmStreamEvent / AgentStreamEvent"]
+  Host --&gt; Agents["TechieRag.Agents: TechieRagAgentBuilder over Microsoft Agent Framework"]
+  Agents --&gt; Client
+  Emb --&gt; Download["ModelDownloadService + ModelRoot"]
+  Local["TechieRag.Local: LocalLlmProvider over ONNX Runtime GenAI"] --&gt; Download
+  Probe["samples/TechieRag.Probe (4 heads)"] --&gt; Emb
+  Probe --&gt; Local</pre>
+</div>
+<table>
+<thead><tr><th>Layer</th><th>Project or folder</th><th>What lives here</th></tr></thead>
+<tbody>
+<tr><td>Public entry points</td><td><code>src/TechieRag/TechieRagBuilder.cs</code>, <code>src/TechieRag/DependencyInjection/</code></td><td>builder methods, <code>AddTechieRag(IConfiguration)</code> through <code>TechieRagConfigMapper</code></td></tr>
+<tr><td>Providers and routing</td><td><code>src/TechieRag/Providers/</code>, <code>src/TechieRag/Services/LlmProviderFactory.cs</code>, <code>ModelRouter.cs</code></td><td>the HTTP providers, typed streaming readers, the subscription sign-in provider, the catalog</td></tr>
+<tr><td>Agentic retrieval</td><td><code>src/TechieRag/Agentic/</code></td><td>the knowledge-base tools both agent loops bind</td></tr>
+<tr><td>Agents package</td><td><code>src/TechieRag.Agents/</code></td><td><code>TechieRagAgentBuilder</code>, <code>TechieRagAgent</code>, the seam adapters in <code>Interop/</code></td></tr>
+<tr><td>Embedded models</td><td><code>src/TechieRag.Embedded/</code></td><td>ONNX embedding and reranking, <code>ModelDownloadService</code>, <code>EmbeddedModel</code>, <code>buildTransitive/TechieRag.Embedded.targets</code></td></tr>
+<tr><td>Local model</td><td><code>src/TechieRag.Local/</code></td><td><code>LocalLlmProvider</code>, <code>LocalModelStore</code>, <code>MemoryGate</code>, the ONNX Runtime GenAI runtime, <code>buildTransitive/TechieRag.Local.targets</code></td></tr>
+<tr><td>Connectors and web</td><td><code>src/TechieRag/Connectors/</code>, <code>src/TechieRag/Web/</code></td><td><code>ConnectorRunner</code>, repository and email connectors, the SSRF-guarded fetcher</td></tr>
+<tr><td>Telemetry</td><td><code>src/TechieRag.Telemetry/</code></td><td><code>AddTechieRagTelemetry</code>, packed by both publish workflows</td></tr>
+<tr><td>Sample and CI</td><td><code>samples/TechieRag.Probe/</code>, <code>.github/workflows/probe.yml</code></td><td>the four-head probe, its scripts, the CI that builds every head</td></tr>
+<tr><td>Tests</td><td><code>tests/TechieRag.Tests</code>, <code>tests/TechieRag.Local.Tests</code>, <code>tests/TechieRag.Agents.Tests</code></td><td>1,097 tests; each entry names the file that covers it</td></tr>
+</tbody>
+</table>
+<h2 id="screen-by-screen-code-map">Screen-by-screen code map<a class="anchor-link" href="#screen-by-screen-code-map">#</a></h2>
+<h3 id="registration-and-the-model-catalogue-uselocalllm-localllm-localmodel-techierag-local">Registration and the model catalogue: <code>UseLocalLlm</code>, <code>LocalLlm</code>, <code>LocalModel</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#registration-and-the-model-catalogue-uselocalllm-localllm-localmodel-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head running the local model that <code>UseLocalLlm()</code> picks on that platform, Phi-3 mini" style="max-width:100%"></p>
+<p>The probe constructs <code>LocalLlmProvider</code> directly rather than through the builder; the builder path is covered by tests in tests/TechieRag.Local.Tests.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>. The probe reaches only <code>LocalModel.PlatformDefault</code>; the overloads, <code>LocalLlm.Register</code> and the <code>local/&lt;model&gt;</code> route are proven by <code>LocalRegistrationTests</code> and <code>LocalModelCatalogTests</code>.</p>
+<p><strong>Call chain:</strong> <code>LocalLlmBuilderExtensions.UseLocalLlm(builder, configure)</code> → <code>UseLocalLlm(builder, LocalModel.PlatformDefault, configure)</code> → <code>LocalModel.EnsureSupported</code> → <code>LocalLlm.Register</code> → <code>LocalLlmProviderRegistry.Register</code> (core) → <code>TechieRagBuilder.UseCustomLlmProvider(() =&gt; new LocalLlmProvider(options, logger))</code>. Configuration route: <code>LlmProviderFactory</code> (<code>src/TechieRag/Llm/LlmProviderFactory.cs:81</code>, the <code>LlmSource.Local</code> arm) → <code>LocalLlmProviderRegistry.Create</code> → <code>LocalLlm.Create</code> → <code>LocalLlm.RequireModel</code> → <code>LocalModel.FromId</code>.</p>
+<p><code>UseLocalLlm()</code> picks the platform default: Qwen2.5 0.5B Instruct on phones, Phi-3 mini 4k Instruct on desktops and Mac Catalyst. The string overload takes a catalogue id; the <code>DirectoryInfo</code> overload a host-filled folder, with no download or terms. All end in the <code>LocalModel</code> overload: refuse Phi-3 on a phone, write <code>LlmSource.Local</code> and the model id into the config, hand the builder a provider factory. Nothing touches network or disk until the first call.</p>
+<p><code>LocalModel</code> is the catalogue: two models pinned to Hugging Face commits, every file with size and SHA-256. <code>FromHuggingFace</code> names any other GenAI model, starting empty with <code>ContextLength</code> 0, and restores an earlier resolution from disk offline. Without <code>LocalLlm.Register</code>, a model named in <code>IConfiguration</code> makes the core's factory throw.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalLlmBuilderExtensions.cs:77</code></td><td><code>UseLocalLlm(builder, model, configure)</code></td><td><code>model.RunsOnPhones</code></td><td><code>NotSupportedException</code> only for Phi-3 on a phone</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmBuilderExtensions.cs:85</code></td><td><code>UseLocalLlm(builder, model, configure)</code></td><td><code>config.Llm.Source</code>, <code>config.Llm.Model</code></td><td><code>LlmSource.Local</code>, the model id; <code>Endpoint</code> and <code>ApiKey</code> null</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlm.cs:56</code></td><td><code>LocalLlm.RequireModel</code></td><td><code>LocalModel.FromId(modelId)</code></td><td>a catalogue model, or <code>ArgumentException</code> listing known ids</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModel.cs:154</code></td><td><code>LocalModel.PlatformDefault</code></td><td><code>IsPhonePlatform</code></td><td>true on Android and real iOS; false on Catalyst and desktops</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModel.cs:284</code></td><td><code>LocalModel.FromHuggingFace(repository, folder, version, modelRoot)</code></td><td><code>source.Id</code>, <code>contextLength</code></td><td><code>owner/name[/folder]</code>; 0 until <code>genai_config.json</code> exists</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>LocalModel.DefaultContextSize</code> (<code>src/TechieRag.Local/LocalModel.cs:338</code>): min(model context length, 2,048 on a phone or 4,096 elsewhere); <code>LocalModelVariant.DownloadBytes</code> (<code>src/TechieRag.Local/Runtime/LocalModelVariant.cs:23</code>) sums file sizes: Qwen 332,589,148 ("333 MB"), Phi-3 2,725,536,824 ("2.7 GB").</p>
+<h3 id="terms-download-and-verification-localmodelstore-and-modeldownloadservice-techierag-local">Terms, download and verification: <code>LocalModelStore</code> and <code>ModelDownloadService</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#terms-download-and-verification-localmodelstore-and-modeldownloadservice-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head after "Generate one sentence", Phi-3 mini downloaded once after the terms dialog" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head, 2026-09-25)</code>.</p>
+<p><strong>Call chain:</strong> <code>LocalLlmProvider.LoadAsync</code> → <code>LocalModelStore.PrepareAsync</code> (Hugging Face names only: <code>HuggingFaceHub.ResolveAsync</code> → <code>HuggingFaceSnapshot.WriteManifest</code> → <code>HuggingFaceResolution.WritePin</code>) → <code>LocalLlmProvider.Resolve</code> → <code>LocalModelStore.EnsureAsync</code> → <code>LocalModelVariant.IsOnDisk</code> → <code>LocalModelVariant.GetDownloadFiles(mirror)</code> → <code>LocalModelStore.RequireTermsAsync</code> → <code>LocalLlmOptions.ConfirmTermsAsync</code> → <code>ModelDownloadService.DownloadAsync</code> → <code>DownloadFileAsync</code> (writes <code>&lt;file&gt;.part</code>, then renames) → <code>LocalModelStore.VerifyAsync</code> → <code>HashAsync</code> or <code>HashGitBlobAsync</code> → writes <code>.techierag-verified</code>.</p>
+<p><code>LocalModelStore</code> is internal; the host sees <code>LoadAsync</code>, the <code>ConfirmTermsAsync</code> callback and three exceptions. The order is fixed: terms, bytes, hashes. A missing or wrong-size file makes the store build a <code>LocalModelTerms</code> and ask; <code>TermsAccepted = true</code> skips the callback, and a false or missing answer throws <code>LocalModelTermsNotAcceptedException</code> before any request.</p>
+<p><code>ModelDownloadService</code> (<code>TechieRag.Embedded</code>) resumes a <code>.part</code> file with a range request. <code>TECHIERAG_MODEL_BASE_URL</code> redirects catalogue models only; a Hugging Face name uses its pinned <code>resolve/&lt;commit&gt;</code> address. Hashes are SHA-256, or git blob SHA-1 for small Hugging Face files; a mismatch deletes the file and throws <code>LocalModelIntegrityException</code>. Passed files go into <code>.techierag-verified</code>, so later starts re-hash only changes. An unpinned Hugging Face name is resolved once into <code>&lt;root&gt;/hf--owner--name[@version].pin</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:182</code></td><td><code>LoadAsync</code></td><td><code>mirror</code></td><td><code>TECHIERAG_MODEL_BASE_URL</code> for catalogue models; null for Hugging Face</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModelStore.cs:129</code></td><td><code>EnsureAsync</code></td><td><code>variant.IsOnDisk(directory)</code></td><td>false on the first run; true afterwards</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModelStore.cs:176</code></td><td><code>RequireTermsAsync</code></td><td><code>options.TermsAccepted</code>, <code>options.ConfirmTermsAsync</code></td><td>probe: false plus the alert callback; false throws at line 186</td></tr>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:381</code></td><td><code>DownloadFileAsync</code></td><td><code>resumeFrom</code></td><td><code>.part</code> length when resuming, else 0; Range at line 386</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModelStore.cs:213</code></td><td><code>VerifyAsync</code></td><td><code>actual</code> against <code>file.Hash</code></td><td>equal lower-case hex; mismatch deletes at line 215, throws</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>ModelDownloadService.GetPendingBytes</code> (<code>src/TechieRag.Embedded/ModelDownloadService.cs:257</code>): incomplete files' expected size minus <code>.part</code> length; <code>LocalModelStore.HashGitBlobAsync</code> (<code>src/TechieRag.Local/LocalModelStore.cs:249</code>): SHA-1 over git blob header plus bytes; <code>HuggingFaceModelSource.FolderName</code> (<code>src/TechieRag.Local/HuggingFace/HuggingFaceModelSource.cs:106</code>): stem plus commit's first 12 characters.</p>
+<h3 id="memory-check-before-load-memorygate-availablememory-localmodelmemoryexception-techierag-local">Memory check before load: <code>MemoryGate</code>, <code>AvailableMemory</code>, <code>LocalModelMemoryException</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#memory-check-before-load-memorygate-availablememory-localmodelmemoryexception-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head after the memory gate let Phi-3 mini load and generate" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head, 2026-09-25)</code>; the refusal is covered by <code>MemoryGateTests</code> and <code>AvailableMemoryIosTests</code>.</p>
+<p><strong>Call chain:</strong> <code>LocalLlmProvider.LoadAsync</code> → <code>LocalModel.EstimateMemoryBytes(weightBytes, ContextSize)</code> → <code>MemoryGate.Ensure(Model.Id, required)</code> → <code>AvailableMemory.Read</code> → one of <code>ReadProcMeminfo</code> (Linux, Android), <code>ReadWindows</code> (<code>GlobalMemoryStatusEx</code>), <code>OsProcAvailableMemory</code> + <code>FromIosLimit</code> (iOS), <code>ReadRuntimeEstimate</code> (Mac Catalyst, macOS, anything else) → <code>throw new LocalModelMemoryException</code> or return → <code>ILocalLlmRuntime.Load</code> on the thread pool.</p>
+<p>A phone kills a process that allocates past its limit, so the provider estimates the load first: weight files (pinned size, or the folder's size) plus the key/value cache for the context size plus 256 MiB. Catalogue models carry their cache cost per token (Qwen 12,288 bytes, Phi-3 393,216); a Hugging Face model reads it from <code>genai_config.json</code>.</p>
+<p>If nothing could be read, the gate returns null and the load proceeds. On iOS <code>os_proc_available_memory()</code> is the room left before the app is killed; the simulator reports 0, which <code>FromIosLimit</code> replaces with the .NET estimate (<code>GC.GetGCMemoryInfo().TotalAvailableMemoryBytes</code> minus the working set), the figure Mac Catalyst always uses. A refusal names the model, bytes needed, bytes free and the shortfall; both are logged at <code>LocalLlmProvider.cs:189</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:186</code></td><td><code>LoadAsync</code></td><td><code>weightBytes</code></td><td>the variant's <code>DownloadBytes</code> (Phi-3: 2,725,536,824)</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:187</code></td><td><code>LoadAsync</code></td><td><code>required</code></td><td>Phi-3 at 4,096 tokens: 4,604,585,016; Qwen at 2,048: 626,190,428</td></tr>
+<tr><td><code>src/TechieRag.Local/MemoryGate.cs:31</code></td><td><code>MemoryGate.Ensure</code></td><td><code>available</code></td><td>bytes free, or null (load proceeds)</td></tr>
+<tr><td><code>src/TechieRag.Local/AvailableMemory.cs:41</code></td><td><code>AvailableMemory.Read</code></td><td><code>OsProcAvailableMemory()</code></td><td>non-zero on a real iPhone; 0 on simulator</td></tr>
+<tr><td><code>src/TechieRag.Local/AvailableMemory.cs:66</code></td><td><code>ReadRuntimeEstimate</code></td><td><code>info.TotalAvailableMemoryBytes - Environment.WorkingSet</code></td><td>the Catalyst figure; never below 0</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>LocalModel.EstimateMemoryBytes</code> (<code>src/TechieRag.Local/LocalModel.cs:348</code>): weights + KvBytesPerToken × contextSize + 256 MiB; <code>GenAiConfigInfo.Parse</code> (<code>src/TechieRag.Local/Runtime/GenAiConfigInfo.cs:60</code>): KvBytesPerToken = layers × kvHeads × headSize × 2 × elementBytes (2 unless <code>kv_cache_dtype</code> differs); <code>AvailableMemory.ParseMemAvailable</code> (<code>src/TechieRag.Local/AvailableMemory.cs:72</code>): <code>MemAvailable</code> kilobytes × 1,024.</p>
+<h3 id="generation-streaming-and-typed-answers-localllmprovider-over-onnxgenaimodel-techierag-local">Generation, streaming and typed answers: <code>LocalLlmProvider</code> over <code>OnnxGenAiModel</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#generation-streaming-and-typed-answers-localllmprovider-over-onnxgenaimodel-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head: the streamed Phi-3 sentence and its timings" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head, 2026-09-25)</code> for <code>ChatStreamEventsAsync</code>; <code>CompleteAsync&lt;T&gt;</code> is <code>static-only (unconfirmed)</code>, covered by <code>TypedAnswerSchemaTests</code> and <code>LocalLlmProviderTests</code>.</p>
+<p><strong>Call chain:</strong> <code>LocalLlmProvider.ChatStreamEventsAsync</code> → <code>StreamCoreAsync</code> → <code>RefuseUnsupported</code> → <code>LoadAsync</code> → <code>PrepareConversation</code> → <code>ChatTemplateFormatter.Format</code> (or <code>OnnxGenAiModel.ApplyChatTemplate</code>) → <code>OnnxGenAiModel.CountTokens</code> → <code>BuildSettings</code> → <code>OnnxGenAiModel.GenerateAsync</code> → <code>OnnxGenAiSearchOptions.From</code> → <code>CreateParameters</code> (<code>GeneratorParams.SetSearchOption</code>, <code>SetGuidance</code>) → <code>Generator.AppendTokenSequences</code> → <code>NextToken</code> (<code>generator.GenerateNextToken</code>) → <code>TokenizerStream.Decode</code> → <code>DecodedText.Clean</code> → <code>StopSequenceFilter.Push</code> → <code>LlmStreamEvent.FromText</code> / <code>FromCompleted</code>. <code>CompleteAsync&lt;T&gt;</code> → <code>TypedAnswerSchema.For(typeof(T))</code> → <code>ChatAsync</code> (same core, non-streaming) → <code>StripCodeFence</code> → <code>JsonSerializer.Deserialize&lt;T&gt;</code>.</p>
+<p>Every <code>ILlmProvider</code> member funnels into <code>StreamCoreAsync</code>: refuse tools or a foreign per-call model, load, apply the system prompt and any JSON instruction, render the template, count the prompt (no room for an answer token throws <code>LocalPromptTooLongException</code>), merge options over the defaults (512 tokens, temperature 0.7, top-p 0.95), clamp <code>MaxTokens</code> to the room left. A semaphore allows one answer at a time; each token is computed on the thread pool, decoded, stop-filtered and yielded as a <code>TextDelta</code>. <code>CompleteAsync&lt;T&gt;</code> constrains decoding to a strict JSON schema of <code>T</code>; without native guidance it throws once, then relies on strict parsing.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:349</code></td><td><code>StreamCoreAsync</code></td><td><code>promptTokens</code></td><td>below <code>ContextSize</code>, else throws at line 351</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:441</code></td><td><code>BuildSettings</code></td><td><code>MaxTokens</code></td><td>min(call's <code>MaxTokens</code> or 512, room left); probe 64</td></tr>
+<tr><td><code>src/TechieRag.Local/Runtime/OnnxGenAiSearchOptions.cs:54</code></td><td><code>OnnxGenAiSearchOptions.From</code></td><td><code>greedy</code></td><td>true when temperature ≤ 0 (the probe)</td></tr>
+<tr><td><code>src/TechieRag.Local/Runtime/OnnxGenAiModel.cs:80</code></td><td><code>GenerateAsync</code></td><td><code>token</code></td><td>one token id per loop; decoded at line 81</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:383</code></td><td><code>StreamCoreAsync</code></td><td><code>finishReason</code></td><td><code>"stop"</code> on a stop or end token; <code>"length"</code> at <code>MaxTokens</code></td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:291</code></td><td><code>CompleteAsync&lt;T&gt;</code></td><td><code>content</code></td><td>fence-stripped JSON into <code>T</code>; <code>JsonException</code> becomes <code>InvalidOperationException</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>OnnxGenAiSearchOptions.From</code> (<code>src/TechieRag.Local/Runtime/OnnxGenAiSearchOptions.cs:56</code>): <code>max_length</code> = min(contextSize, promptTokens + max(1, MaxTokens)); <code>RepetitionPenaltyFrom</code> (line 79): clamp(1 + (frequency + presence) / 2, 0.5, 2), null when neither set; usage at <code>LocalLlmProvider.cs:384</code>: prompt tokens in, tokens produced out.</p>
+<h3 id="chat-templates-and-stop-sequences-chattemplateformatter-localchattemplate-stopsequencefilter-techierag-local">Chat templates and stop sequences: <code>ChatTemplateFormatter</code>, <code>LocalChatTemplate</code>, <code>StopSequenceFilter</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#chat-templates-and-stop-sequences-chattemplateformatter-localchattemplate-stopsequencefilter-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head: a one-line answer cut at the newline stop" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head, 2026-09-25)</code> for the Phi-3 template and the <code>"\n"</code> stop; the rest is covered by <code>ChatTemplateFormatterTests</code>, <code>ModelDefinedTemplateTests</code> and <code>StopSequenceFilterTests</code>.</p>
+<p><strong>Call chain:</strong> <code>LocalLlmProvider.StreamCoreAsync</code> → <code>PrepareConversation</code> → <code>ChatTemplateFormatter.Format(Model.ChatTemplate, conversation)</code> → <code>AppendTurn</code> per message → <code>AppendAssistantOpening</code>; for <code>LocalChatTemplate.ModelDefined</code>: <code>ChatTemplateFormatter.ToMessagesJson</code> → <code>OnnxGenAiModel.ApplyChatTemplate</code> → <code>Tokenizer.ApplyChatTemplate</code>. Stops: <code>LocalLlmProvider.BuildSettings</code> → <code>ChatTemplateFormatter.EndOfTurn</code> → <code>new StopSequenceFilter(settings.StopSequences)</code> → <code>Push</code> per decoded piece → <code>FirstStopIndex</code> / <code>IsPrefixOfStop</code> → <code>Flush</code> at the end.</p>
+<p>The template is applied in managed code so the same characters reach the engine on every platform (REQ-RAG-058). Four fixed templates ship: ChatML (Qwen), Phi-3, Llama 3 and Gemma; roles normalise to system, user or assistant and the formatter ends by opening the assistant's turn. <code>ModelDefined</code> (Hugging Face models) sends a <code>[{"role","content"}]</code> array to GenAI's <code>Tokenizer.ApplyChatTemplate</code>, system messages joined and same-role neighbours merged. Each template's end-of-turn marker joins the caller's stop list; the filter cuts at the first stop, never streaming part of one, and <code>ModelDefined</code> relies on the engine's end token.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/ChatTemplateFormatter.cs:120</code></td><td><code>AppendTurn</code> (Phi-3 case)</td><td><code>builder</code></td><td><code>&lt;|user|&gt;\nWrite one sentence about the sea.&lt;|end|&gt;\n</code>, then <code>&lt;|assistant|&gt;\n</code> (line 139)</td></tr>
+<tr><td><code>src/TechieRag.Local/ChatTemplateFormatter.cs:57</code></td><td><code>EndOfTurn</code></td><td>the return</td><td><code>&lt;|end|&gt;</code> for Phi-3, <code>&lt;|im_end|&gt;</code> for ChatML, <code>&lt;end_of_turn&gt;</code> for Gemma, null for <code>ModelDefined</code></td></tr>
+<tr><td><code>src/TechieRag.Local/ChatTemplateFormatter.cs:93</code></td><td><code>ToMessagesJson</code></td><td><code>turns[^1].Role == role</code></td><td>true for same-role neighbours (joined)</td></tr>
+<tr><td><code>src/TechieRag.Local/StopSequenceFilter.cs:40</code></td><td><code>Push</code></td><td><code>cut</code></td><td>−1 until a stop; its index sets <code>Stopped</code></td></tr>
+<tr><td><code>src/TechieRag.Local/StopSequenceFilter.cs:48</code></td><td><code>Push</code></td><td><code>keep</code></td><td>at most <code>longest − 1</code>, shrunk to a prefix of some stop</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>StopSequenceFilter.Push</code> (<code>src/TechieRag.Local/StopSequenceFilter.cs:48</code>): keep = min(text length, longest stop − 1), decremented while the tail is not a prefix of any stop; the probe's list <code>["\n", "&lt;|end|&gt;"]</code> (<code>src/TechieRag.Local/LocalLlmProvider.cs:447</code>) holds at most six characters.</p>
+<h3 id="the-probe-s-second-button-localproberunner-peakmemory-generationresult-samples-techierag-probe">The probe's second button: <code>LocalProbeRunner</code>, <code>PeakMemory</code>, <code>GenerationResult</code> (<code>samples/TechieRag.Probe</code>)<a class="anchor-link" href="#the-probe-s-second-button-localproberunner-peakmemory-generationresult-samples-techierag-probe">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head after "Generate one sentence": the sentence and its timings line" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head, 2026-09-25)</code>.</p>
+<p><strong>Call chain:</strong> <code>MainPage.GenerateAsync</code> (the <code>RunGenerateButton</code> click, or <code>OnAppearing</code> when <code>ProbeLaunch.AutoRunLocal</code> is set by <code>TECHIERAG_PROBE_AUTORUN=local</code> or the Android extra <code>autorunlocal</code>) → <code>Task.Run(localRunner.RunAsync)</code> → <code>new LocalLlmProvider(new LocalLlmOptions { ConfirmTermsAsync })</code> → <code>LocalLlmProvider.LoadAsync</code> (first run: <code>MainPage.ConfirmTermsAsync</code> → <code>DisplayAlertAsync</code>, then the download) → <code>LocalLlmProvider.ChatStreamEventsAsync</code> → <code>PeakMemory.ReadBytes</code> → <code>ProcPidRusage</code> (Apple) or <code>Process.PeakWorkingSet64</code> → <code>new GenerationResult(...)</code> → <code>MainPage.Report</code> (console line prefixed <code>TECHIERAG_PROBE_RESULT:</code>, plus <code>probe-result.txt</code>).</p>
+<p>The runner uses the package as an app would: platform default model, terms through the callback, provider kept between presses so a second press measures a warm model. The prompt is "Write one sentence about the sea." with <code>MaxTokens</code> 64, temperature 0 and a newline stop. Load time wraps <code>LoadAsync</code>; time to first token runs to the first <code>TextDelta</code>; tokens per second excludes that token. Peak memory is <code>Process.PeakWorkingSet64</code> except on iOS and Mac Catalyst, where .NET reports 0, so <code>PeakMemory</code> calls <code>proc_pid_rusage</code> with <code>RUSAGE_INFO_V4</code> and reads <code>ri_lifetime_max_phys_footprint</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>samples/TechieRag.Probe/LocalProbeRunner.cs:43</code></td><td><code>RunAsync</code></td><td><code>loadMs</code></td><td>first press: terms + download + load; second: milliseconds (<code>LocalLlmProvider.cs:164</code>)</td></tr>
+<tr><td><code>samples/TechieRag.Probe/LocalProbeRunner.cs:54</code></td><td><code>RunAsync</code></td><td><code>firstTokenMs</code></td><td>set once at the first <code>TextDelta</code>; Catalyst: 110 to 520 ms</td></tr>
+<tr><td><code>samples/TechieRag.Probe/LocalProbeRunner.cs:66</code></td><td><code>RunAsync</code></td><td><code>tokensPerSecond</code></td><td>(outputTokens − 1) / ((totalMs − ttft) / 1000); Catalyst 65 to 73</td></tr>
+<tr><td><code>samples/TechieRag.Probe/PeakMemory.cs:58</code></td><td><code>ReadApplePeakFootprint</code></td><td>the <code>UInt64</code> at byte offset 16 + 28 × 8</td><td><code>ri_lifetime_max_phys_footprint</code>; Catalyst 1.96 to 2.17 GB; line 39 elsewhere</td></tr>
+<tr><td><code>samples/TechieRag.Probe/GenerationResult.cs:25</code></td><td><code>Timings</code></td><td>the string</td><td><code>load N ms · first token N ms · N.N tokens/s · peak N MB</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> tokens per second and time to first token as above (<code>LocalProbeRunner.cs:65</code> to <code>66</code>); peak MB (<code>GenerationResult.cs:26</code>, <code>:31</code>) divides by 1,048,576 while <code>ModelDownloadService.FormatBytes</code> uses decimal units, so the two "MB" figures differ by about 5 percent.</p>
+<h3 id="probe-screen-mainpage-samples-techierag-probe">Probe screen: MainPage (<code>samples/TechieRag.Probe</code>)<a class="anchor-link" href="#probe-screen-mainpage-samples-techierag-probe">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-embed.png" alt="The probe's Mac Catalyst head after a warm "Embed, store, search" press: Done, Paris top result at 0.796, timings and the model root under Library/Application Support" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head and iOS simulator, 2026-09-25)</code></p>
+<p><strong>Call chain:</strong> <code>MainPage.OnAppearing</code> → <code>MainPage.RunAsync</code> → <code>ProbeRunner.RunAsync</code> → <code>EmbeddedEmbeddingProvider.CreateDefault</code> → <code>EmbeddedEmbeddingProvider.InitializeAsync</code> → <code>EmbeddedEmbeddingProvider.EmbedBatchAsync</code> → <code>SqliteVecStore.UpsertBatchAsync</code> → <code>SqliteVecStore.SearchAsync</code> → <code>ProbeResult.ToLine</code> → <code>MainPage.Report</code></p>
+<p>One MAUI page built in code, no XAML. Every control carries an <code>AutomationId</code>; the Windows, Android and Apple drivers find controls by that id, never by position.</p>
+<p><code>RunAsync</code> disables the button, sets <code>StatusLabel</code> to <code>Running</code>, runs <code>ProbeRunner.RunAsync</code> on a worker thread, fills the labels from the returned <code>ProbeResult</code> and sets <code>Done</code>; an exception sets <code>Error: …</code> and <code>FAIL &lt;type&gt;: &lt;message&gt;</code>. <code>Report</code> then writes the line to the console with the prefix <code>TECHIERAG_PROBE_RESULT:</code> and to <code>probe-result.txt</code>; the emulator script greps logcat for that prefix.</p>
+<p>CI presses the button through autorun: <code>OnAppearing</code> calls <code>RunAsync</code> once when <code>TECHIERAG_PROBE_AUTORUN=1</code> or the Android intent extra <code>--ez autorun true</code> is set.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>samples/TechieRag.Probe/MainPage.cs:36</code></td><td><code>MainPage</code> constructor</td><td><code>runButton.AutomationId</code></td><td><code>RunEmbedButton</code>; line 47 is <code>RunGenerateButton</code></td></tr>
+<tr><td><code>samples/TechieRag.Probe/MainPage.cs:105</code></td><td><code>OnAppearing</code></td><td><code>ProbeLaunch.AutoRun</code></td><td><code>true</code> only with <code>TECHIERAG_PROBE_AUTORUN=1</code> or the Android <code>autorun</code> extra</td></tr>
+<tr><td><code>samples/TechieRag.Probe/MainPage.cs:122</code></td><td><code>RunAsync</code></td><td><code>result.TopResult</code></td><td><code>Paris is the capital city of France.</code>, score near 0.80 (bge-m3) or 0.82 (MiniLM)</td></tr>
+<tr><td><code>samples/TechieRag.Probe/MainPage.cs:181</code></td><td><code>Report</code></td><td><code>ProbeLaunch.ResultPrefix</code></td><td><code>TECHIERAG_PROBE_RESULT:</code> then a space and the line</td></tr>
+<tr><td><code>samples/TechieRag.Probe/ProbeRunner.cs:50</code></td><td><code>ProbeRunner.RunAsync</code></td><td><code>store</code></td><td><code>SqliteVecStore</code> on <code>&lt;app data&gt;/probe.db</code>, <code>Pooling=False</code>, cleared before the upserts</td></tr>
+<tr><td><code>samples/TechieRag.Probe/ProbeResult.cs:35</code></td><td><code>ProbeResult.ToLine</code></td><td>return</td><td><code>OK platform=… model=… top="…" score=0.7960 loadMs=… embedMs=… storeMs=… searchMs=… modelDir="…"</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>ProbeRunner.RunAsync</code> (<code>ProbeRunner.cs:40-69</code>) times four phases with one restarted <code>Stopwatch</code>: load (provider creation, including any download), embed, store and search (<code>SearchAsync</code>, <code>topK: 1</code>). <code>ProbeResult.Timings</code> (<code>ProbeResult.cs:29</code>) formats them as <code>load N ms · embed N ms · store N ms · search N ms</code>, invariant culture.</p>
+<h3 id="model-root-and-the-phone-default-modelroot-embeddedmodel-useembedded-techierag-techierag-embedded">Model root and the phone default: ModelRoot, EmbeddedModel, UseEmbedded (<code>TechieRag</code>, <code>TechieRag.Embedded</code>)<a class="anchor-link" href="#model-root-and-the-phone-default-modelroot-embeddedmodel-useembedded-techierag-techierag-embedded">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-embed.png" alt="The probe's model line, "bge-m3 (1024 dimensions, 2.3 GB)", and its model root under ~/Library/Application Support/TechieRag/models on Mac Catalyst" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head and iOS simulator, 2026-09-25)</code></p>
+<p><strong>Call chain:</strong> <code>TechieRagBuilderExtensions.UseEmbedded</code> → <code>EmbeddedModel.PlatformDefault</code> → <code>EmbeddedModel.DefaultFor</code> → <code>TechieRagBuilderExtensions.UseEmbedded(builder, model, isPhone)</code> → <code>EmbeddedModel.EnsureSupported</code> → <code>EmbeddedEmbeddingProvider</code> constructor; later <code>EmbeddedModel.ResolveDirectory</code> → <code>EmbeddedModel.GetModelDirectory</code> → <code>ModelRoot.GetModelDirectory</code> → <code>ModelRoot.Current</code> → <code>ModelRoot.DefaultPath</code> → <code>ModelRoot.ComputeDefault</code></p>
+<p><code>EmbeddedModel</code> has two entries: <code>BgeM3</code> (1024 dimensions, five files, 2.3 GB, <code>runsOnPhones: false</code>) and <code>MiniLM</code> (384 dimensions, two files, 91 MB, allowed everywhere). <code>PlatformDefault</code> picks MiniLM when <code>IsPhonePlatform</code> is true: Android, or iOS but not Mac Catalyst, where <code>OperatingSystem.IsIOS()</code> also answers true. <code>UseEmbedded(EmbeddedModel.BgeM3)</code> on a phone reaches <code>EnsureSupported</code>, which throws <code>NotSupportedException</code> (REQ-RAG-054). The chosen name lands in <code>config.Embedding.Model</code>.</p>
+<p><code>ModelRoot</code> is the one folder every local model lives under (REQ-RAG-053), <code>&lt;root&gt;/&lt;model name&gt;</code>. <code>Current</code> resolves <code>ModelRoot.Set</code>, then <code>TECHIERAG_MODEL_ROOT</code>, then <code>DefaultPath</code>, normally <code>&lt;LocalApplicationData&gt;/TechieRag/models</code>. On iOS and Mac Catalyst .NET reports <code>Documents</code> as <code>LocalApplicationData</code>, so <code>ComputeDefault</code> uses <code>&lt;home&gt;/Library/Application Support</code> there. <code>ResolveDirectory</code> still honours a complete copy next to the assembly.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Embedded/EmbeddedModel.cs:97</code></td><td><code>IsPhonePlatform</code></td><td>return</td><td><code>true</code> on Android and iOS proper; <code>false</code> on Mac Catalyst, Windows, macOS, Linux</td></tr>
+<tr><td><code>src/TechieRag.Embedded/EmbeddedModel.cs:177</code></td><td><code>EnsureSupported</code></td><td><code>isPhone &amp;&amp; !RunsOnPhones</code></td><td><code>true</code> only for bge-m3 on a phone; line 179 throws naming <code>2.3 GB</code></td></tr>
+<tr><td><code>src/TechieRag.Embedded/TechieRagBuilderExtensions.cs:63</code></td><td><code>UseEmbedded(builder, model, isPhone)</code></td><td><code>config.Embedding.Model</code></td><td><code>bge-m3</code> on desktops, <code>all-minilm-l6-v2</code> on phones</td></tr>
+<tr><td><code>src/TechieRag/Models/ModelRoot.cs:65</code></td><td><code>Current</code></td><td><code>configured</code></td><td>the <code>ModelRoot.Set</code> path, or <code>null</code></td></tr>
+<tr><td><code>src/TechieRag/Models/ModelRoot.cs:71</code></td><td><code>Current</code></td><td><code>fromEnvironment</code></td><td><code>TECHIERAG_MODEL_ROOT</code> when set, made absolute at line 74</td></tr>
+<tr><td><code>src/TechieRag/Models/ModelRoot.cs:132</code></td><td><code>ComputeDefault</code></td><td><code>baseFolder</code></td><td><code>&lt;home&gt;/Library/Application Support</code> on iOS and Catalyst; <code>LocalApplicationData</code> elsewhere; else <code>~/.local/share</code> or temp</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>EmbeddedModel.DownloadBytes</code> (<code>EmbeddedModel.cs:112</code>) sums the catalogue's per-file byte counts (2,289,798,201 for bge-m3, 90,636,722 for MiniLM); <code>DownloadSize</code> formats it through <code>ModelDownloadService.FormatBytes</code>, giving "2.3 GB" and "91 MB".</p>
+<h3 id="download-size-decline-and-resume-modeldownloadservice-techierag-embedded">Download size, decline and resume: ModelDownloadService (<code>TechieRag.Embedded</code>)<a class="anchor-link" href="#download-size-decline-and-resume-modeldownloadservice-techierag-embedded">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-embed.png" alt="After the download the probe's DownloadLabel reads "Model on disk: …/models/bge-m3"; during it the same label showed the size first and then a byte percentage" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head and iOS simulator, 2026-09-25)</code></p>
+<p><strong>Call chain:</strong> <code>EmbeddedEmbeddingProvider.InitializeAsync</code> → <code>EmbeddedModel.ResolveDirectory</code> → <code>EmbeddedModel.GetDownloadFiles</code> → <code>ModelDownloadService.DownloadAsync</code> → <code>ModelDownloadService.GetPendingBytes</code> → <code>DownloadSizeKnown</code> handlers → <code>ModelDownloadService.DownloadFileAsync</code> → <code>ModelDownloadService.ReportBytes</code> → <code>ModelDownloadService.UpdateProgress</code> → <code>ProgressChanged</code> handlers</p>
+<p><code>ModelDownloadService.Instance</code> is process-wide; a host subscribes once for every download. <code>DownloadAsync</code> takes a model name, a folder and <code>ModelDownloadFile</code> records, serialised through a semaphore.</p>
+<p>REQ-RAG-055 is kept in <code>DownloadAsync</code>. A file at 95 percent or more of its expected length counts as complete; nothing missing reports <code>Completed</code> without a request. Otherwise it publishes <code>Checking</code> with <code>TotalBytes</code> and raises <code>DownloadSizeKnown</code>; a handler may set <code>Decline</code>, which resets the status to <code>NotStarted</code> and throws <code>ModelDownloadDeclinedException</code> (an <code>OperationCanceledException</code>) before any HTTP request.</p>
+<p><code>DownloadFileAsync</code> writes <code>&lt;name&gt;.part</code>; an existing part file's length becomes <code>resumeFrom</code> and a <code>Range</code> header. <code>206</code> appends, <code>200</code> starts over, <code>416</code> means the part is whole and is renamed. Progress fires at most every 250 ms; the events are the only output.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:289</code></td><td><code>DownloadAsync</code></td><td><code>pending</code></td><td>files under 95 percent of expected size; empty means <code>Completed</code></td></tr>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:302</code></td><td><code>DownloadAsync</code></td><td><code>totalBytes</code></td><td>bytes still missing, <code>.part</code> lengths subtracted</td></tr>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:316</code></td><td><code>DownloadAsync</code></td><td><code>sizeKnown.Decline</code></td><td><code>false</code> continues; <code>true</code> throws before any request</td></tr>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:381</code></td><td><code>DownloadFileAsync</code></td><td><code>resumeFrom</code></td><td>length of <code>&lt;file&gt;.part</code>, or 0</td></tr>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:402</code></td><td><code>DownloadFileAsync</code></td><td><code>resumed</code></td><td><code>true</code> only on a <code>206</code>; otherwise the part file restarts at byte 0</td></tr>
+<tr><td><code>src/TechieRag.Embedded/ModelDownloadService.cs:438</code></td><td><code>DownloadFileAsync</code></td><td><code>File.Move</code></td><td><code>&lt;file&gt;.part</code> renamed to <code>&lt;file&gt;</code> after the last byte</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>GetPendingBytes</code> (<code>ModelDownloadService.cs:257</code>) sums <code>ExpectedBytes</code> minus the part-file length over incomplete files; <code>ModelDownloadProgress.OverallBytesProgressPercent</code> (<code>ModelDownloadService.cs:50</code>) is <code>BytesDownloaded / TotalBytes</code> capped at 100; <code>FormatBytes</code> (<code>ModelDownloadService.cs:359</code>) uses decimal units, one decimal for GB only.</p>
+<h3 id="sqlite-exact-search-sqlitevecstore-searchasync-techierag">SQLite exact search: SqliteVecStore.SearchAsync (<code>TechieRag</code>)<a class="anchor-link" href="#sqlite-exact-search-sqlitevecstore-searchasync-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-embed.png" alt="The probe's "search 37 ms" on Mac Catalyst is one SearchAsync over three stored bge-m3 vectors plus the query embedding" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head and iOS simulator, 2026-09-25)</code></p>
+<p><strong>Call chain:</strong> <code>SqliteVecStore.SearchAsync</code> → <code>SqliteVecStore.ScoreAllChunks</code> → <code>raw.sqlite3_step</code> / <code>raw.sqlite3_column_blob</code> → <code>ManagedVectorSearch.CosineSimilarity</code> → <code>ManagedVectorSearch.DotAndSquares</code> → <code>ManagedVectorSearch.TopKCollector.Add</code> → <code>ManagedVectorSearch.TopKCollector.ToRankedList</code> → <code>SqliteConnection.QueryAsync</code> (winners' rows)</p>
+<p>REQ-RAG-056 drops sqlite-vec, a native extension phones and the Catalyst sandbox do not load; the managed scan is the only path, exact, in two passes.</p>
+<p>Pass one reads <code>rowid</code> and the <code>Vector</code> BLOB through SQLitePCL's raw API; <code>MemoryMarshal.Cast</code> reads the blob span as <code>float32</code> in place. One SIMD pass over <code>Vector&lt;float&gt;</code> lanes accumulates the dot product and the stored sum of squares. A width mismatch or a zero vector scores 0.</p>
+<p><code>TopKCollector</code> is a worst-first <code>PriorityQueue</code> bounded at <code>topK</code>; a candidate replaces the worst only when strictly better. Pass two fetches full rows for the winning ids only; a row deleted between the passes is dropped.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/VectorStores/SqliteVecStore.cs:342</code></td><td><code>ScoreAllChunks</code></td><td><code>sql</code></td><td><code>SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL</code>, plus <code>AND DocumentId = ?1</code> when filtered</td></tr>
+<tr><td><code>src/TechieRag/VectorStores/SqliteVecStore.cs:373</code></td><td><code>ScoreAllChunks</code></td><td><code>stored</code></td><td><code>ReadOnlySpan&lt;float&gt;</code> over SQLite's row buffer, stored dimensions long</td></tr>
+<tr><td><code>src/TechieRag/VectorStores/SqliteVecStore.cs:374</code></td><td><code>ScoreAllChunks</code></td><td><code>score</code></td><td>cosine similarity in [-1, 1]; 0 for a width mismatch or zero vector</td></tr>
+<tr><td><code>src/TechieRag/VectorStores/ManagedVectorSearch.cs:63</code></td><td><code>DotAndSquares</code></td><td><code>Vector.IsHardwareAccelerated</code></td><td><code>true</code> on every probe head; line 77 handles the remainder</td></tr>
+<tr><td><code>src/TechieRag/VectorStores/ManagedVectorSearch.cs:121</code></td><td><code>TopKCollector.Add</code></td><td><code>Compare(candidate, heap.Peek())</code></td><td>positive only when the candidate beats the worst kept row</td></tr>
+<tr><td><code>src/TechieRag/VectorStores/SqliteVecStore.cs:308</code></td><td><code>SearchAsync</code></td><td><code>byRowId</code></td><td>one <code>ChunkRow</code> per winner still present, in collector order</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> cosine similarity <code>dot(q, s) / (|q| · |s|)</code> with <code>|q|</code> from <code>Magnitude</code> (<code>ManagedVectorSearch.cs:25</code>) and <code>|s|</code> from the same pass as the dot product (<code>ManagedVectorSearch.cs:56</code>); the bounded top-K heap (<code>ManagedVectorSearch.cs:93</code>). Benchmark: 50,000 chunks of 1024 dimensions in 238.2 ms, 1,896.4 ms before, top-10 identical.</p>
+<h3 id="native-onnx-runtime-wiring-techierag-embedded-targets-and-techierag-local-targets-techierag-embedded-techierag-local">Native ONNX Runtime wiring: TechieRag.Embedded.targets and TechieRag.Local.targets (<code>TechieRag.Embedded</code>, <code>TechieRag.Local</code>)<a class="anchor-link" href="#native-onnx-runtime-wiring-techierag-embedded-targets-and-techierag-local-targets-techierag-embedded-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-embed.png" alt="The Mac Catalyst probe running bge-m3 is the proof the targets linked ONNX Runtime's static xcframework; ONNX Runtime's own package links nothing on Catalyst" style="max-width:100%"></p>
+<p><strong>Runtime:</strong> <code>renders (probe Mac Catalyst head and iOS simulator, 2026-09-25)</code></p>
+<p><strong>Call chain:</strong> <code>TechieRag.Probe.csproj</code> <code>&lt;Import&gt;</code> (or NuGet's buildTransitive import) → property group <code>_TechieRagWireOnnx</code> → <code>NativeReference</code> item (Mac Catalyst) → target <code>TechieRagCheckOnnxXcframework</code> → target <code>TechieRagEnsureOnnxAndroidLibrary</code> → target <code>TechieRagBuildOnnxCustomOpsStub</code> → <code>xcrun clang</code> and <code>xcrun ar</code></p>
+<p>REQ-FN-055 puts the native wiring in a <code>buildTransitive</code> targets file; the probe imports it by path (<code>TechieRag.Probe.csproj:68</code>).</p>
+<p><strong>Mac Catalyst:</strong> ONNX Runtime ships an empty placeholder, so the targets add the static <code>NativeReference</code> to <code>onnxruntime.xcframework.zip</code> (<code>ForceLoad</code>, <code>-lc++</code>, CoreML weak), erroring when the zip is absent. <strong>Android:</strong> the targets add <code>onnxruntime.aar</code> as an <code>AndroidLibrary</code> when the package did not, erroring if absent. <strong>iOS and Catalyst Debug:</strong> a <code>RegisterCustomOps</code> stub is compiled with <code>xcrun clang</code> and linked; Debug does not trim that unused P/Invoke and no shipped binary defines it.</p>
+<p>The Local file repeats the Catalyst and Android parts for GenAI 0.16.0 (ORTGENAI-001), no stub. Switches: <code>TechieRagOnnxRuntimeVersion</code> / <code>TechieRagOnnxRuntimeGenAIVersion</code> pin versions; <code>TechieRagDisableOnnxNativeWiring</code> / <code>TechieRagDisableLocalNativeWiring</code> disable a file; <code>TechieRagDisableOnnxCustomOpsStub</code> skips the stub; all off for <code>OutputType=Library</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Embedded/buildTransitive/TechieRag.Embedded.targets:40</code></td><td>property group</td><td><code>TechieRagOnnxRuntimeVersion</code></td><td><code>1.30.0</code> unless the app set it (<code>EmbeddedPackagingTests</code> checks the PackageReference)</td></tr>
+<tr><td><code>src/TechieRag.Embedded/buildTransitive/TechieRag.Embedded.targets:44</code></td><td>property group</td><td><code>_TechieRagWireOnnx</code></td><td><code>true</code> for an app unless <code>TechieRagDisableOnnxNativeWiring</code> is <code>true</code></td></tr>
+<tr><td><code>src/TechieRag.Embedded/buildTransitive/TechieRag.Embedded.targets:52</code></td><td><code>NativeReference</code> (Mac Catalyst)</td><td><code>Include</code></td><td><code>&lt;NuGetPackageRoot&gt;/microsoft.ml.onnxruntime/1.30.0/runtimes/ios/native/onnxruntime.xcframework.zip</code></td></tr>
+<tr><td><code>src/TechieRag.Embedded/buildTransitive/TechieRag.Embedded.targets:76</code></td><td><code>TechieRagEnsureOnnxAndroidLibrary</code></td><td><code>Error</code> condition</td><td>fires only when no <code>onnxruntime.aar</code> is in <code>@(AndroidLibrary)</code> or on disk</td></tr>
+<tr><td><code>src/TechieRag.Embedded/buildTransitive/TechieRag.Embedded.targets:101</code></td><td><code>TechieRagBuildOnnxCustomOpsStub</code></td><td><code>Exec Command</code></td><td><code>xcrun clang -target &lt;arch&gt;-apple-ios&lt;min&gt;&lt;env&gt; -c onnx-customops-stub.c</code> then <code>xcrun ar rcs</code>, Debug only</td></tr>
+<tr><td><code>src/TechieRag.Local/buildTransitive/TechieRag.Local.targets:37</code></td><td>property group</td><td><code>TechieRagOnnxRuntimeGenAIVersion</code></td><td><code>0.16.0</code> unless the app set it (<code>LocalPackagingTests</code>)</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none beyond MSBuild evaluation; the clang triple is assembled at <code>TechieRag.Embedded.targets:88-94</code> from the <code>RuntimeIdentifier</code> suffix, the platform and <code>SupportedOSPlatformVersion</code> (default 15.0).</p>
+<h3 id="ci-and-the-scripts-probe-yml-select-xcode-sh-run-android-emulator-sh-invoke-probewindows-ps1-github-workflows-samples-techierag-probe-scripts">CI and the scripts: probe.yml, select-xcode.sh, run-android-emulator.sh, Invoke-ProbeWindows.ps1 (<code>.github/workflows</code>, <code>samples/TechieRag.Probe/scripts</code>)<a class="anchor-link" href="#ci-and-the-scripts-probe-yml-select-xcode-sh-run-android-emulator-sh-invoke-probewindows-ps1-github-workflows-samples-techierag-probe-scripts">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-ios-simulator-embed.png" alt="The iOS head that CI builds for the simulator, run in the iOS 26.1 simulator on this Mac on 2026-09-25" style="max-width:100%"></p>
+<p>CI itself has no screen; its run page is the evidence (run 36152358243), and the workflow is covered by tests in tests/TechieRag.Tests.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code></p>
+<p><strong>Call chain:</strong> <code>probe.yml</code> jobs <code>windows</code>, <code>android</code>, <code>maccatalyst</code>, <code>ios</code> (in parallel) → <code>report</code>; per job <code>dotnet workload install</code> → (Apple) <code>select-xcode.sh</code> → <code>dotnet build -f &lt;head&gt; -p:ProbeHead=&lt;head&gt;</code> → (Windows) <code>Invoke-ProbeWindows.ps1</code> / (Android) <code>reactivecircus/android-emulator-runner</code> → <code>run-android-emulator.sh</code></p>
+<p>REQ-FN-057: every head is built and reported on every push. One job per head, then a <code>report</code> job that always runs, writes a <code>Probe heads</code> table to the step summary and exits non-zero unless all four builds succeeded.</p>
+<p>Apple jobs run on <code>macos-26</code>. <code>select-xcode.sh</code> reads the newest <code>Microsoft.iOS.Sdk</code> or <code>Microsoft.MacCatalyst.Sdk</code> pack for the Xcode major.minor .NET demands, selects <code>/Applications/Xcode_&lt;wanted&gt;.app</code> when it exists, and otherwise writes <code>PROBE_BUILD_FLAGS=-p:ValidateXcodeVersion=false</code> to <code>$GITHUB_ENV</code>.</p>
+<p><code>run-android-emulator.sh</code> installs the APK, starts the activity with <code>--ez autorun true</code> and polls logcat every five seconds for the last <code>TECHIERAG_PROBE_RESULT:</code> line until the timeout.</p>
+<p><code>Invoke-ProbeWindows.ps1</code> launches the exe, finds its top-level window by process id, invokes <code>RunEmbedButton</code> by AutomationId, polls <code>StatusLabel</code> until <code>Done</code> or <code>Error</code>, then reads every label and captures the window. No global input is sent.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>.github/workflows/probe.yml:47</code></td><td>job <code>windows</code>, step Build</td><td><code>-p:ProbeHead</code></td><td><code>net10.0-windows10.0.19041.0</code>; also lines 80, 124, 142</td></tr>
+<tr><td><code>.github/workflows/probe.yml:99</code></td><td>job <code>android</code>, emulator step</td><td><code>script</code></td><td><code>run-android-emulator.sh &lt;apk&gt; probe-artifacts 1500</code>, with <code>continue-on-error</code></td></tr>
+<tr><td><code>.github/workflows/probe.yml:174</code></td><td>job <code>report</code></td><td><code>for r in …</code></td><td>exits 1 unless all four job results are <code>success</code></td></tr>
+<tr><td><code>samples/TechieRag.Probe/scripts/select-xcode.sh:44</code></td><td>main</td><td><code>FLAGS</code></td><td><code>-p:ValidateXcodeVersion=false</code> when <code>/Applications/Xcode_&lt;WANT&gt;.app</code> is absent (<code>WANT</code> read at line 27)</td></tr>
+<tr><td><code>samples/TechieRag.Probe/scripts/run-android-emulator.sh:25</code></td><td>main</td><td>exit status</td><td>0 only when the captured line contains <code>TECHIERAG_PROBE_RESULT: OK</code></td></tr>
+<tr><td><code>samples/TechieRag.Probe/scripts/Invoke-ProbeWindows.ps1:88</code></td><td>main loop</td><td><code>$status</code></td><td>exits the loop on <code>Done…</code> or <code>Error…</code>; line 111 exits 1 unless <code>Done</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none; <code>select-xcode.sh:24</code> reduces a version to major.minor, <code>run-android-emulator.sh:15</code> derives the deadline from the timeout argument.</p>
+<h3 id="agent-builder-and-registration-techierag-agents">Agent builder and registration (<code>TechieRag.Agents</code>)<a class="anchor-link" href="#agent-builder-and-registration-techierag-agents">#</a></h3>
+<p><img src="screenshots/TechieRag/chat.png" alt="Sevak's chat screen, July 2026: the RAG answer with sources that an agent built here returns" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that exercised RAG answering; covered by tests in tests/TechieRag.Agents.Tests — <code>TechieRagAgentBuilderTests.BuiltAgentAnswersFromDocuments</code>, <code>ServiceRegistrationTests.AddTechieRagAgentRegistersBoth</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>TechieRagAgentServiceCollectionExtensions.AddTechieRagAgent</code> → <code>TechieRagAgentBuilder.Build</code> → <code>OpenAICompatibleChatClientFactory.Create</code> (or <code>LlmProviderChatClient</code> for <code>UseConfiguredLlm</code>) → <code>ChatClientAgent</code> (Microsoft Agent Framework, wrapped by <code>FunctionInvokingChatClient</code>) → <code>TechieRagAgent.AskAsync</code> → <code>AIAgent.RunAsync</code> → <code>RetrievalContextProvider.GetState</code> — read from <code>TechieRagAgentBuilder.cs</code>, <code>TechieRagAgentServiceCollectionExtensions.cs</code> and <code>TechieRagAgent.cs</code>.</p>
+<p><code>TechieRagAgentBuilder</code> (REQ-RAG-016) builds a MAF agent over a TechieRag knowledge base. Routes: <code>UseLmStudio</code>, <code>UseOllama</code>, <code>UseOpenAI</code> and <code>UseOpenAICompatible</code> go through <code>OpenAICompatibleChatClientFactory</code> (appends <code>/v1</code>, placeholder key <code>not-needed</code>; lines 18,35-38,44-49); <code>UseConfiguredLlm</code> reuses the instance's <code>ILlmProvider</code> and throws at <code>Build</code> if absent or unable to call tools (<code>TechieRagAgentBuilder.cs:113-121</code>).</p>
+<p><code>Build</code> (lines 270-300) wires the retrieval source, the <code>RetrievalContextProvider</code> (injects knowledge-base tools per run), the chat client under <code>UseFunctionInvocation</code> with <code>MaximumIterationsPerRequest = maxToolIterations</code> (default 8), instructions (<code>AgenticInstructions.Default</code> plus <code>DOMAIN GUIDANCE</code>, line 316), optional <code>ChatHistoryProvider</code>, and <code>AgentStepReporter</code> under <code>WithTrace</code>. <code>WithPrefetch</code> adds a <code>TextSearchProvider</code> searching before the first model call (lines 323-338).</p>
+<p><code>AddTechieRagAgent</code> registers <code>ITechieRagAgent</code> as a singleton plus a keyed <code>AIAgent</code> <code>"techierag"</code>. <code>AskAsync</code> runs the turn, then reads the session's <code>RetrievalTurnState</code> into <code>AgentRagResponse.Sources</code>, <code>Searches</code> and <code>PendingApprovals</code>. <code>AskStreamAsync</code> (<code>TechieRagAgent.cs:71-90</code>) yields a <code>Sources</code> event with <code>state.Collected</code> whenever an update carries a <code>FunctionResultContent</code>, a <code>Token</code> per text fragment, and one <code>Completed</code> with the full answer.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Agents/TechieRagAgentBuilder.cs:272-276</code></td><td><code>Build</code></td><td><code>chatClientFactory</code></td><td>Non-null; null throws "Choose a model first"</td></tr>
+<tr><td><code>src/TechieRag.Agents/TechieRagAgentBuilder.cs:278-283</code></td><td><code>Build</code></td><td><code>source</code>, <code>pipeline</code></td><td><code>TechieRagRetrievalSource</code> unless <code>UseRetrievalSource</code> was called; client under the iteration cap</td></tr>
+<tr><td><code>src/TechieRag.Agents/TechieRagAgentBuilder.cs:308-309</code></td><td><code>BuildChatOptions</code></td><td><code>tools</code></td><td>Handler tools plus <code>WithTools</code> extras, or null; knowledge-base tools are not here</td></tr>
+<tr><td><code>src/TechieRag.Agents/DependencyInjection/TechieRagAgentServiceCollectionExtensions.cs:27-38</code></td><td><code>AddTechieRagAgent</code></td><td><code>builder</code></td><td>Logger factory applied before <code>configure</code>; keyed <code>AIAgent</code> is <code>ITechieRagAgent.Agent</code></td></tr>
+<tr><td><code>src/TechieRag.Agents/TechieRagAgent.cs:52-63</code></td><td><code>AskAsync</code></td><td><code>state.Collected</code>, <code>state.Searches</code></td><td>Distinct <code>SearchResult</code>s and one <code>RetrievalTrace</code> per search</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>TechieRagAgentBuilder.ComposeInstructions</code> (line 313-318) joins additional guidance with blank lines and appends it to the default or custom instructions; otherwise none.</p>
+<h3 id="agentic-retrieval-the-knowledge-base-tools-techierag">Agentic retrieval: the knowledge-base tools (<code>TechieRag</code>)<a class="anchor-link" href="#agentic-retrieval-the-knowledge-base-tools-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/tool-demo.png" alt="Sevak's tool demo screen, July 2026: a tool-calling loop of the kind the knowledge-base tools plug into" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that exercised tool calling; covered by tests in tests/TechieRag.Tests — <code>Agentic/KnowledgeBaseToolsTests</code> (<code>RegisteredSearchReturnsRefsScoresAndStatus</code>) — and tests/TechieRag.Agents.Tests — <code>TechieRagAgentBuilderTests.SessionKeepsRefsAcrossTurns</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>ToolRegistryKnowledgeBaseExtensions.RegisterKnowledgeBase</code> → <code>ToolRegistry.Register</code> (lambda) → <code>KnowledgeBaseTools.ExecuteSearchAsync</code> → <code>RetrievalTurnState.TryUseSearch</code> → <code>IRetrievalSource.SearchAsync</code> (<code>TechieRagRetrievalSource</code> → <code>ITechieRag.SearchAsync</code>) → <code>KnowledgeBaseTools.Classify</code> → <code>RetrievalTurnState.Collect</code> → <code>RetrievalTurnState.Record</code> → <code>KnowledgeBaseTools.BuildResult</code>. In the MAF agent the same chain starts at <code>RetrievalContextProvider.ProvideAIContextAsync</code>, which calls <code>BeginTurn</code> and <code>RegisterKnowledgeBase</code> on a fresh <code>ToolRegistry</code> per run (<code>src/TechieRag.Agents/Retrieval/RetrievalContextProvider.cs:55-59</code>).</p>
+<p>REQ-RAG-015 lives in the core package, no MAF dependency. <code>KnowledgeBaseTools</code> defines <code>search_knowledge_base</code> and <code>list_documents</code> with JSON schemas (<code>KnowledgeBaseTools.cs:44-65</code>); <code>RegisterKnowledgeBase</code> binds them to a <code>ToolRegistry</code>, which the agents package reaches through <code>ToolHandlerFunctions</code>.</p>
+<p>A search is parsed and clamped (<code>top_k</code> 1..<code>MaxTopK</code>; <code>DocumentFilter</code> overrides <code>document_id</code>; lines 257-258), charged against the per-turn budget, run, classified by best score, and recorded as a <code>RetrievalTrace</code>. <code>BuildResult</code> (lines 168-223) writes <code>status</code>, <code>best_score</code>, <code>searches_used</code>, <code>searches_remaining</code>, <code>results[]</code> (<code>ref</code>, <code>document_id</code>, <code>page</code>, <code>chunk_index</code>, <code>score</code>, truncated <code>text</code>) and a <code>hint</code>.</p>
+<p>Refs (<code>S1</code>, <code>S2</code>, ...) are assigned once per chunk id in <code>RetrievalTurnState</code> and reused across turns, so follow-ups can cite earlier passages. <code>BeginTurn</code> resets only the budget, <code>Collected</code> and <code>Searches</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Agentic/KnowledgeBaseTools.cs:107-112</code></td><td><code>ExecuteSearchAsync</code></td><td><code>used</code></td><td>1..<code>MaxSearchesPerTurn</code> (default 4); null means <code>limit_reached</code></td></tr>
+<tr><td><code>src/TechieRag/Agentic/KnowledgeBaseTools.cs:118-121</code></td><td><code>ExecuteSearchAsync</code></td><td><code>best</code>, <code>status</code>, <code>refs</code></td><td>Max score or null; <code>strong</code> &gt;= 0.55, <code>weak</code> &gt;= 0.35, else <code>none</code></td></tr>
+<tr><td><code>src/TechieRag/Agentic/KnowledgeBaseTools.cs:158-165</code></td><td><code>Classify</code></td><td><code>options.Rerank</code></td><td>True: only <code>RerankWeakThreshold</code> applies (null makes every hit <code>strong</code>)</td></tr>
+<tr><td><code>src/TechieRag/Agentic/RetrievalTurnState.cs:91-100</code></td><td><code>Collect</code></td><td><code>reference</code>, <code>collectedChunkIds</code></td><td><code>"S" + nextRef</code> on first sight of a chunk id, same ref after</td></tr>
+<tr><td><code>src/TechieRag/Agentic/RetrievalTurnState.cs:49-58</code></td><td><code>BeginTurn</code></td><td><code>refsByChunkId</code></td><td>Untouched; only <code>searchesUsed</code>, <code>collected</code>, <code>searches</code> cleared</td></tr>
+<tr><td><code>src/TechieRag/Agentic/TechieRagRetrievalSource.cs:31-32</code></td><td><code>SearchAsync</code></td><td><code>SearchOptions.Rerank</code></td><td>Equals the <code>rerank</code> the source was built with</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>KnowledgeBaseTools.Classify</code> (status from best score and thresholds); <code>BuildResult</code> rounds scores to two decimals and computes <code>searches_remaining = max(0, MaxSearchesPerTurn - used)</code>; <code>Truncate</code> cuts text at <code>MaxChunkChars</code> (default 1500).</p>
+<h3 id="seam-adapters-techierag-agents">Seam adapters (<code>TechieRag.Agents</code>)<a class="anchor-link" href="#seam-adapters-techierag-agents">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-playground.png" alt="Sevak's LLM playground, July 2026: one provider configuration, which the adapters let an agent reuse" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that exercised the provider; covered by tests in tests/TechieRag.Agents.Tests/Interop — <code>LlmProviderChatClientTests</code>, <code>ToolAdapterTests</code>, <code>AgentStepReporterTests</code>, <code>ConversationMemoryChatHistoryProviderTests.AgentReadsAndWritesConversationMemory</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain (adapter 1):</strong> <code>LlmProviderChatClient.GetResponseAsync</code> → <code>ChatOptionsMapper.ToCore</code> → <code>ChatMessageMapper.ToCore</code> → <code>ILlmProvider.ChatAsync</code> → <code>ChatMessageMapper.ToFunctionCall</code> per tool call. Streaming: <code>GetStreamingResponseAsync</code> → <code>ILlmProvider.ChatStreamEventsAsync</code> → <code>ToUpdate</code>.</p>
+<p>REQ-RAG-017: five adapters so TechieRag pieces plug into MAF unchanged:</p>
+<ol>
+<li><strong><code>ILlmProvider</code> → <code>IChatClient</code>: <code>LlmProviderChatClient</code>.</strong> Messages map one-to-one (a tool message per <code>FunctionResultContent</code>; <code>ChatMessageMapper.cs:30-34</code>), <code>ChatOptions.Instructions</code> becomes a leading system message (<code>ChatOptionsMapper.cs:59-68</code>), functions become <code>ToolDefinition</code>s, <code>ToolMode</code> maps to <code>none</code>/<code>required</code>/<code>auto</code>. Tool calls return as <code>FunctionCallContent</code>, so MAF's <code>FunctionInvokingChatClient</code> runs the loop. Streaming: <code>ToUpdate</code> (lines 94-113), one <code>ResponseId</code> per model call (lines 70-75).
+</li>
+<li><strong><code>IToolHandler</code> → <code>AITool</code>: <code>ToolHandlerFunctions.From</code> / <code>ToolHandlerAIFunction</code>.</strong> One <code>AIFunction</code> per <code>ToolDefinition</code>; a bad schema fails at build. Invocation rebuilds a core <code>ToolCall</code> for <code>IToolHandler.ExecuteToolAsync</code>; the model gets <code>ToolResult.Content</code>.
+</li>
+<li><strong><code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code>: <code>AIToolHandler</code>.</strong> The reverse, for the classic loop and flow nodes; unknown tools and exceptions return a failed <code>ToolResult</code>.
+</li>
+<li><strong>MAF middleware → <code>IProgress&lt;AgentStep&gt;</code>: <code>AgentStepReporter.WithAgentSteps</code>.</strong> Emits the four loop kinds; the typed <code>ToolResult</code> arrives via <code>AsyncLocal</code> (<code>ToolResultCapture</code>).
+</li>
+<li><strong><code>IConversationMemory</code> → <code>ChatHistoryProvider</code>: <code>ConversationMemoryChatHistoryProvider</code>.</strong> History read before each run, request and response appended after unless it threw; the memory's <code>ConversationId</code> picks the thread.
+</li>
+</ol>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Agents/Interop/ChatOptionsMapper.cs:22-40</code></td><td><code>ToCore</code></td><td><code>coreMessages[0]</code>, <code>coreOptions.Tools</code></td><td>System message with the instructions; tools null unless MEAI supplied functions</td></tr>
+<tr><td><code>src/TechieRag.Agents/Interop/LlmProviderChatClient.cs:97-109</code></td><td><code>ToUpdate</code></td><td><code>streamEvent.Kind</code></td><td><code>TextDelta</code> → <code>TextContent</code>; <code>ToolCall</code> → <code>FunctionCallContent</code>; <code>Completed</code> → <code>UsageContent</code> + <code>FinishReason</code></td></tr>
+<tr><td><code>src/TechieRag.Agents/Interop/ToolHandlerAIFunction.cs:55-64</code></td><td><code>InvokeCoreAsync</code></td><td><code>toolCall.Id</code>, <code>result.Content</code></td><td>MAF call id; string returned to the model</td></tr>
+<tr><td><code>src/TechieRag.Agents/Interop/ToolHandlerFunctions.cs:30-31</code></td><td><code>From</code></td><td><code>definition.RequiresConfirmation</code></td><td>True wraps in <code>ApprovalRequiredAIFunction</code></td></tr>
+<tr><td><code>src/TechieRag.Agents/Interop/AgentStepReporter.cs:81-103</code></td><td><code>InvokeFunctionAsync</code></td><td><code>iteration</code>, <code>toolResult</code></td><td><code>context.Iteration + 1</code>; captured <code>ToolResult</code> or null</td></tr>
+<tr><td><code>src/TechieRag.Agents/Interop/ConversationMemoryChatHistoryProvider.cs:48-54</code></td><td><code>StoreChatHistoryAsync</code></td><td><code>context.InvokeException</code></td><td>Null; a failed run stores nothing</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>LlmProviderChatClient.ToUsage</code> and <code>ToFinishReason</code> (field and string mappings); <code>AgentStepReporter.ReportFinal</code> picks <code>MaxIterationsReached</code> when <code>lastIteration &gt;= cap</code>; otherwise none.</p>
+<h3 id="typed-streaming-on-a-provider-chatstreameventsasync-techierag">Typed streaming on a provider: <code>ChatStreamEventsAsync</code> (<code>TechieRag</code>)<a class="anchor-link" href="#typed-streaming-on-a-provider-chatstreameventsasync-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's Mac Catalyst head: the sentence it streamed through <code>ChatStreamEventsAsync</code> on the local provider" style="max-width:100%"></p>
+<p>The probe calls <code>ChatStreamEventsAsync</code> only on the <code>TechieRag.Local</code> provider (<code>samples/TechieRag.Probe/LocalProbeRunner.cs:50-61</code>); the six built-in providers are covered by tests in tests/TechieRag.Tests — <code>Llm/TypedStreamingTests.TypedStreamOrdersTextToolCallCompleted</code> and siblings.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain (LM Studio, the worked example):</strong> <code>LmStudioLlmProvider.ChatStreamEventsAsync</code> → <code>BuildOpenAIRequest(stream: true)</code> → <code>HttpClient.SendAsync</code> (<code>POST /v1/chat/completions</code>, headers-first) → <code>LlmHttpGuard.EnsureSuccess</code> → <code>OpenAIStreamReader.ReadAsync</code> → <code>LlmStreamEvent.FromText</code> / <code>ToolCallFragments.ToToolCall</code> + <code>FromToolCall</code> / <code>StreamReadContext.BuildUsage</code> + <code>FromCompleted</code>. <code>ChatStreamAsync</code> is now <code>ChatStreamEventsAsync(...).ToTextStreamAsync()</code> (<code>LmStudioLlmProvider.cs:152-153</code>).</p>
+<p>REQ-RAG-067: <code>ILlmProvider.ChatStreamEventsAsync</code> has a default body (<code>ILlmProvider.cs:72-76</code>) via <code>LlmStreamEventFallback</code>: <code>ChatAsync</code> with tools or without streaming support, else <code>ChatStreamAsync</code> text deltas. Contract: <code>TextDelta*</code>, <code>ToolCall*</code> (each whole, once), one <code>Completed</code> with <code>Usage</code>, <code>FinishReason</code>, <code>ModelName</code>.</p>
+<p><code>OpenAIStreamReader</code> reads <code>data:</code> lines until <code>[DONE]</code>: <code>usage</code> kept, <code>finish_reason</code> last wins, tool-call fragments accumulated by <code>index</code> (id and name first, arguments appended), text yielded immediately. After the loop each assembled call is yielded, then <code>Completed</code>.</p>
+<p>Where the other providers (under <code>src/TechieRag/Llm/</code>) emit <code>ToolCall</code>:</p>
+<ul>
+<li><strong>OpenAI-compatible</strong> — <code>OpenAICompatibleLlmProvider.cs:182-203</code>, reader line 199.
+</li>
+<li><strong>Azure AI Foundry</strong> — <code>AzureAIFoundryLlmProvider.cs:165-186</code>, reader line 182.
+</li>
+<li><strong>Ollama</strong> — <code>OllamaLlmProvider.cs:168-222</code>; <code>ParseToolCalls</code> (line 195), emitted at 211-214.
+</li>
+<li><strong>Google Gemini</strong> — <code>GoogleGeminiLlmProvider.cs:166-225</code>; <code>ExtractToolCalls</code> (line 204), emitted at 214-217.
+</li>
+<li><strong>Anthropic</strong> — <code>AnthropicLlmProvider.cs:171-215</code>; fragments append until <code>content_block_stop</code> (<code>AnthropicStreamState.cs:108-123</code>); <code>tool_use</code> becomes <code>tool_calls</code> (line 213).
+</li>
+<li><strong>ChatGPT subscription</strong> — <code>ChatGptSubscriptionLlmProvider.cs:139-140,167-186</code>; <code>OpenAIResponsesStreamReader.cs:82-84,99-109</code> at <code>response.output_item.done</code>.
+</li>
+</ul>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/LmStudioLlmProvider.cs:159-165</code></td><td><code>ChatStreamEventsAsync</code></td><td><code>request</code>, <code>response.StatusCode</code></td><td><code>stream: true</code>; non-success throws before any event</td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAIStreamReader.cs:45-60</code></td><td><code>ReadAsync</code></td><td><code>chunk.Usage</code>, <code>finishReason</code>, <code>delta</code></td><td>Usage kept when present; each non-empty <code>delta.content</code> yields a <code>TextDelta</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAIStreamReader.cs:79-90</code></td><td><code>AppendToolCallFragments</code></td><td><code>index</code></td><td><code>delta.Index</code> or position; one <code>ToolCallFragments</code> per index</td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAIStreamReader.cs:63-72</code></td><td><code>ReadAsync</code></td><td><code>reason</code></td><td>Reported reason, else <code>tool_calls</code> if calls exist, else <code>stop</code>; <code>Completed</code> last</td></tr>
+<tr><td><code>src/TechieRag/Llm/StreamReadContext.cs:32-36</code></td><td><code>BuildUsage</code></td><td><code>inputTokens</code>, <code>outputTokens</code></td><td>Estimated from text only when both reported values are 0</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>StreamReadContext.BuildUsage</code> (token estimate fallback); <code>LlmStreamEventFallback.FromTextStreamAsync</code> sums <code>EstimateTokenCount</code> over message contents and the streamed text; otherwise none.</p>
+<h3 id="streaming-agent-loop-agentlooprunner-runstreamasync-techierag">Streaming agent loop: <code>AgentLoopRunner.RunStreamAsync</code> (<code>TechieRag</code>)<a class="anchor-link" href="#streaming-agent-loop-agentlooprunner-runstreamasync-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/tool-demo.png" alt="Sevak's tool demo screen, July 2026: the classic agent loop whose streaming form this entry describes" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that exercised the agent loop; covered by tests in tests/TechieRag.Tests — <code>Services/AgentLoopStreamingTests</code> (<code>StreamingRunStreamsTextAndExecutesToolThroughRegistry</code>, <code>StreamingRunSumsUsage</code>, <code>StreamingRunWorksOverLmStudioWireFormat</code>).</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>AgentLoopRunner.RunStreamAsync</code> → <code>BuildToolOptions</code> (tools from <code>IToolHandler.ToolDefinitions</code>, <code>ToolChoice</code> default <code>auto</code>) → <code>ILlmProvider.ChatStreamEventsAsync</code> → <code>StreamedTurn.Apply</code> → <code>StreamedTurn.ToResponse</code> → <code>AddUsage</code> → (per tool call) <code>AgentLoopRunner.ExecuteToolAsync</code> → <code>IToolHandler.ExecuteToolAsync</code> → <code>ChatMessage.Tool</code> appended → next iteration, or <code>Completed</code>.</p>
+<p>REQ-RAG-068 is the streaming twin of <code>RunAsync</code>: same handler, trace and message list, but text is yielded as it arrives even when the iteration ends in tool calls. Each iteration (1-based, up to <code>maxIterations</code>, default 10) opens a <code>StreamedTurn</code>, forwards each non-empty <code>TextDelta</code>, buffers <code>ToolCall</code>s and keeps <code>Completed</code>; <code>ToResponse</code> rebuilds the <code>LlmResponse</code> and its usage joins <code>totalUsage</code>.</p>
+<p>No tool calls: report <code>FinalAnswer</code>, yield <code>Completed</code>, stop. Otherwise append the assistant message and, per call in order, yield <code>ToolCallRequested</code>, execute (<code>ExecuteToolAsync</code> appends the tool message), yield <code>ToolExecuted</code> with the <code>ToolResult</code>. At the cap one more call runs without tools (<code>BuildFinalOptions</code>) under <code>Iteration = maxIterations</code>, and <code>Completed</code> carries <code>MaxIterationsReached = true</code>. <code>Completed.Response.Content</code> is the last iteration's text, <code>Usage</code> the run total (line 285).</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:157</code></td><td><code>RunStreamAsync</code></td><td><code>totalUsage</code></td><td>Zeroed <code>TokenUsage</code> with provider and model names; grows per model call</td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:165-172</code></td><td><code>RunStreamAsync</code></td><td><code>text</code></td><td>Non-null only for a <code>TextDelta</code> with content; one <code>AgentStreamEvent.TextDelta</code> each</td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:174-182</code></td><td><code>RunStreamAsync</code></td><td><code>response.HasToolCalls</code></td><td>False ends the run: <code>FinalAnswer</code>, <code>Completed</code>, <code>yield break</code></td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:192-197</code></td><td><code>RunStreamAsync</code></td><td><code>toolCall</code>, <code>result</code></td><td><code>ToolCallRequested</code> then <code>ToolExecuted</code> per call, in order</td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:249-250</code></td><td><code>ExecuteToolAsync</code></td><td><code>result.ToolCallId</code></td><td>Matches the call id; a <code>tool</code> message with <code>result.Content</code> appended</td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:322-329</code></td><td><code>ToResponse</code></td><td><code>Usage</code>, <code>FinishReason</code></td><td><code>completed.Usage</code> or a fresh <code>TokenUsage</code>; reported reason, else <code>tool_calls</code>, else <code>stop</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>AddUsage</code> (lines 274-281) sums <code>InputTokens</code>, <code>OutputTokens</code>, <code>CacheReadTokens</code>, <code>CacheWriteTokens</code> and <code>EstimatedCostUsd</code> across every model call of the run; <code>Completed</code> (lines 283-293) assigns that total to the final response's <code>Usage</code>.</p>
+<h3 id="chatgpt-subscription-sign-in-techierag">ChatGPT subscription sign-in (<code>TechieRag</code>)<a class="anchor-link" href="#chatgpt-subscription-sign-in-techierag">#</a></h3>
+<p>REQ-RAG-069. A host app can bill model calls to the user's own ChatGPT plan instead of an API key. It never opens a browser: it requests a device code, hands the URL and code to the host's callback, waits for authorisation, then keeps the tokens in an <code>ISubscriptionSessionStore</code> (default in-memory; implement the three-method seam over a secure store to sign in once per device). Tokens never reach disk or logs.</p>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host chooses the provider; a subscription sign-in would sit here" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that configured providers; covered by tests in tests/TechieRag.Tests — <code>Llm/Subscription/ChatGptSubscriptionTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>TechieRagBuilder.UseChatGptSubscriptionLlm</code> → <code>TechieRagBuilder.CreateLlmProvider</code> (returns the captured factory) → <code>ChatGptSubscriptionLlmProvider..ctor</code> (guarded <code>HttpClient</code> + <code>ChatGptDeviceSignIn</code>) → <code>ChatGptSubscriptionLlmProvider.ChatAsync</code> / <code>ChatStreamEventsAsync</code> → <code>StreamAsync</code> → <code>SendWithSessionAsync</code> → <code>GetSessionAsync</code> → <code>ISubscriptionSessionStore.LoadAsync</code> → (expired or missing) <code>RenewAsync</code> → <code>ChatGptDeviceSignIn.RefreshAsync</code> or <code>ChatGptDeviceSignIn.SignInAsync</code> → <code>RequestUserCodeAsync</code> (POST <code>{issuer}/api/accounts/deviceauth/usercode</code>) → host callback → <code>PollForAuthorisationAsync</code> (POST <code>.../deviceauth/token</code> until not 403/404) → <code>ExchangeCodeAsync</code> (POST <code>{issuer}/oauth/token</code>) → <code>ISubscriptionSessionStore.SaveAsync</code> → <code>SendAsync</code> (POST <code>{BackendEndpoint}/responses</code> with <code>Bearer</code> access token) → <code>OpenAIResponsesStreamReader.ReadAsync</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:418</code></td><td><code>UseChatGptSubscriptionLlm</code></td><td><code>config.Llm.Source</code> / <code>Connector</code></td><td><code>LlmSource.Subscription</code>, <code>"chatgpt-subscription"</code>; factory captured at line 424</td></tr>
+<tr><td><code>src/TechieRag/Llm/ChatGptSubscriptionLlmProvider.cs:59</code></td><td><code>..ctor</code></td><td><code>httpClient</code> handler</td><td><code>options.Handler</code> (test seam) or <code>HttpWebContentFetcher.CreateGuardedHandler()</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/ChatGptSubscriptionLlmProvider.cs:238</code></td><td><code>GetSessionAsync</code></td><td><code>needsRenewal</code></td><td>true on <code>forceRenewal</code> or <code>session.IsExpired(now, 5 min)</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/ChatGptDeviceSignIn.cs:118</code></td><td><code>PollForAuthorisationAsync</code></td><td><code>options.Clock() &lt; expiresAt</code></td><td>runs until <code>SignInTimeout</code> (15 min); 403/404 = not yet, else <code>CodeRejected</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/ChatGptDeviceSignIn.cs:178</code></td><td><code>BuildSession</code></td><td><code>expiresAt</code></td><td><code>now + expires_in</code> seconds, else the JWT <code>exp</code> claim via <code>JwtClaimReader</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/ChatGptSubscriptionLlmProvider.cs:203</code></td><td><code>SendWithSessionAsync</code></td><td><code>response.StatusCode</code> after renewal</td><td>not 401; a second 401 clears the store, throws <code>CodeSessionRejected</code></td></tr>
+</tbody>
+</table>
+<p>Key types: <code>ChatGptSubscriptionOptions</code> (<code>src/TechieRag/Llm/ChatGptSubscriptionOptions.cs:13</code>: model 21, client id 18, issuer 30, backend 33, <code>SignInTimeout</code> 36; <code>Handler</code>, <code>Delay</code>, <code>Clock</code> are test seams); <code>ISubscriptionSessionStore</code> (<code>src/TechieRag/Abstractions/ISubscriptionSessionStore.cs:20</code>); <code>SubscriptionSignInException</code> (<code>src/TechieRag/Llm/SubscriptionSignInException.cs:11</code>: four stable <code>Code*</code> strings, no token in messages); <code>SubscriptionSignInPrompt</code> (<code>src/TechieRag/Models/SubscriptionSignInPrompt.cs:11</code>).</p>
+<p><strong>Calculations on this service:</strong> <code>SubscriptionSession.IsExpired</code> (<code>src/TechieRag/Models/SubscriptionSession.cs:38</code>) returns <code>ExpiresAt - margin &lt;= now</code>; <code>ChatGptDeviceSignIn.ReadInterval</code> (<code>ChatGptDeviceSignIn.cs:220</code>) reads the vendor's poll interval (number or numeric string), default 5 seconds; <code>EstimateTokenCount</code> (<code>ChatGptSubscriptionLlmProvider.cs:157</code>) is <code>ceil(length / 4)</code>.</p>
+<hr>
+<h3 id="connector-catalog-model-routing-and-the-subscription-factory-arm-techierag">Connector catalog, model routing and the subscription factory arm (<code>TechieRag</code>)<a class="anchor-link" href="#connector-catalog-model-routing-and-the-subscription-factory-arm-techierag">#</a></h3>
+<p>REQ-RAG-070, REQ-FN-062, REQ-RAG-099, REQ-RAG-103. <code>LlmConnectorCatalog</code> is a static table of connectors; <code>ModelRouter</code> turns a model string into a <code>(connector, modelId)</code> route; <code>LlmProviderFactory</code> turns a route into an <code>ILlmProvider</code>. <code>CreateSubscription</code> is a separate arm: a subscription has no API key and needs the host's sign-in callback.</p>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: the provider and model choice that the router resolves" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that chose a model; covered by tests in tests/TechieRag.Tests — <code>Llm/Subscription/SubscriptionCatalogTests.cs</code>, <code>Llm/ModelRouterTests.cs</code>, <code>Documentation/SubscriptionDecisionsTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain (by name):</strong> <code>TechieRagBuilder.UseLlmForModel</code> → <code>ModelRouter.Require</code> → <code>ModelRouter.Resolve</code> → <code>LlmConnectorCatalog.Find</code> (explicit <code>connector/model</code>) or the longest-prefix scan over <code>LlmConnectorCatalog.All</code> → <code>TechieRagBuilder.ApplyRoute</code> (writes <code>config.Llm</code>) → at <code>Build()</code>, <code>CreateLlmProviderFromConfig</code> → <code>LlmConnectorCatalog.Find(config.Llm.Connector)</code> → provider constructor for the connector's <code>Source</code>. Outside the builder: <code>LlmProviderFactory.CreateForModel</code> → <code>ModelRouter.Require</code> → <code>LlmProviderFactory.Create</code> → switch on <code>connector.Source</code>. Subscription: <code>LlmProviderFactory.CreateSubscription</code> → checks <code>connector.Subscription.Permitted</code> → <code>new ChatGptSubscriptionLlmProvider(...)</code> or throws <code>CodeNotPermitted</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/LlmConnectorCatalog.cs:156</code></td><td>static initialiser</td><td><code>Connectors</code> tail</td><td><code>SubscriptionConnectorRows.All</code> after the 16 API-key/local rows</td></tr>
+<tr><td><code>src/TechieRag/Llm/SubscriptionConnectorRows.cs:29</code></td><td><code>All</code></td><td><code>Subscription.Permitted</code> for <code>chatgpt-subscription</code></td><td><code>true</code>, <code>BuilderMethod = "UseChatGptSubscriptionLlm"</code> (37); others <code>false</code>, <code>CheckedOn</code> 2026-09-24 (19)</td></tr>
+<tr><td><code>src/TechieRag/Llm/ModelRouter.cs:56</code></td><td><code>Resolve</code></td><td><code>bestPrefixLength</code></td><td>grows only on a longer match; no match → null, <code>Require</code> throws (line 74)</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmProviderFactory.cs:78</code></td><td><code>Create</code></td><td><code>LlmSource.Subscription</code> arm</td><td>throws <code>SubscriptionNeedsSignIn</code> naming the builder method</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmProviderFactory.cs:133</code></td><td><code>CreateSubscription</code></td><td><code>connector.Name</code> switch</td><td>only <code>chatgpt-subscription</code> with <code>Permitted</code>; else <code>CodeNotPermitted</code> with the terms text (148)</td></tr>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:892</code></td><td><code>CreateLlmProviderFromConfig</code></td><td>default switch arm</td><td><code>"Unsupported LLM source: Subscription"</code> (defect below)</td></tr>
+</tbody>
+</table>
+<p>No <code>ModelPrefixes</code> on subscription rows (<code>SubscriptionConnectorRows.cs:12</code>): bare <code>gpt-</code> routes to the API-key <code>openai</code> row; use <code>chatgpt-subscription/&lt;model&gt;</code>.</p>
+<p><strong>Defect noticed:</strong> <code>CreateLlmProviderFromConfig</code> (<code>TechieRagBuilder.cs:851</code>) has no <code>LlmSource.Subscription</code> arm, so <code>Llm.Connector = "chatgpt-subscription"</code> via <code>AddTechieRag(IConfiguration)</code> gets the generic message instead of the <code>SubscriptionNeedsSignIn</code> text at <code>LlmProviderFactory.cs:142</code>. Throwing is right; the message is not.</p>
+<p><strong>REQ-RAG-103 (streaming with sources):</strong> <code>TechieRagClient.AskStreamWithSourcesAsync</code> (<code>src/TechieRag/TechieRagClient.cs:690</code>): <code>SearchAsync</code> (701), <code>FromSources</code> (702), <code>FromToken</code> per token (710), <code>FromCompleted</code> (713).</p>
+<p><strong>Calculations on this service:</strong> <code>ModelRouter.Resolve</code> splits on the first slash only (<code>ModelRouter.cs:37</code>) so <code>openrouter/anthropic/claude-x</code> keeps <code>anthropic/claude-x</code> as the model id; an empty remainder falls back to <code>connector.DefaultModel</code> (line 44).</p>
+<hr>
+<h3 id="configuration-mapping-addtechierag-iconfiguration-and-techieragconfig-techierag">Configuration mapping: <code>AddTechieRag(IConfiguration)</code> and <code>TechieRagConfig</code> (<code>TechieRag</code>)<a class="anchor-link" href="#configuration-mapping-addtechierag-iconfiguration-and-techieragconfig-techierag">#</a></h3>
+<p>REQ-FN-066. Both configuration overloads now go through one internal mapper, <code>TechieRagConfigMapper.Apply</code>, so a field set in <code>appsettings.json</code> and one set on a <code>TechieRagConfig</code> object reach the built instance the same way. Before, each overload dropped <code>VectorStore.ApiKey</code>, embedding <code>Dimensions</code>/<code>ApiFormat</code>/<code>ApiPath</code>/<code>RequestDelayMs</code> and the <code>Prompt</code> section. A reflection test fails if any public settable property does not survive.</p>
+<p><img src="screenshots/TechieRag/settings.png" alt="Sevak's settings screen, July 2026: the values a host writes to the configuration section this mapper reads" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that edited configuration; covered by tests in tests/TechieRag.Tests — <code>DependencyInjection/TechieRagConfigMappingTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>ServiceCollectionExtensions.AddTechieRag(IServiceCollection, IConfiguration)</code> → <code>IConfiguration.Get&lt;TechieRagConfig&gt;()</code> → <code>ServiceCollectionExtensions.AddTechieRag(IServiceCollection, Action&lt;TechieRagBuilder&gt;)</code> → <code>TechieRagConfigMapper.Apply(builder, config)</code> → <code>MapEmbedding</code> / <code>UseVectorStore</code> / <code>WithChunkSize</code> / <code>WithChunking</code> / <code>WithTelemetry</code> / <code>MapLlm</code> / <code>MapUsageTracking</code> / <code>MapPrompt</code> / <code>WithResilience</code> / <code>MapRerank</code> / <code>MapPersistence</code> → <code>services.AddSingleton(builder.GetConfig())</code> → <code>services.AddSingleton&lt;ITechieRag&gt;(sp =&gt; builder.WithLogging(loggerFactory).Build())</code> (lazy, on first resolve). <code>AddTechieRag(IServiceCollection, TechieRagConfig)</code> skips the bind and enters at the same <code>Apply</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:141</code></td><td><code>AddTechieRag(IConfiguration)</code></td><td><code>config</code></td><td>a bound <code>TechieRagConfig</code>; null (missing section) throws <code>InvalidOperationException</code></td></tr>
+<tr><td><code>src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:147</code></td><td><code>AddTechieRag(IConfiguration)</code></td><td>delegate passed on</td><td><code>builder =&gt; TechieRagConfigMapper.Apply(builder, config)</code>; the <code>TechieRagConfig</code> overload (line 179) passes the same lambda</td></tr>
+<tr><td><code>src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:35</code></td><td><code>Apply</code></td><td>third argument of <code>UseVectorStore</code></td><td><code>source.VectorStore.ApiKey</code> — the field the old overloads dropped</td></tr>
+<tr><td><code>src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:52</code></td><td><code>MapEmbedding</code></td><td><code>target.ApiFormat</code>, <code>ApiPath</code>, <code>Dimensions</code>, <code>RequestDelayMs</code></td><td>copied onto <code>builder.GetConfig().Embedding</code> after <code>UseEmbedding</code> (line 49)</td></tr>
+<tr><td><code>src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:95</code></td><td><code>MapPrompt</code></td><td><code>WithPromptTemplate(SystemPrompt, ContextChunkTemplate)</code></td><td>both strings applied; <code>MaxContextChunks</code>, <code>MaxContextTokens</code> copied at lines 98–99</td></tr>
+<tr><td><code>src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:123</code></td><td><code>MapRerank</code></td><td><code>target.Enabled</code></td><td><code>source.Enabled &amp;&amp; IsRerankUsableFromConfiguration(source)</code>; keyless Cohere/Jina or <code>LocalOnnx</code> leaves the stage off instead of throwing at resolve</td></tr>
+</tbody>
+</table>
+<p>The instance is lazy (<code>ServiceCollectionExtensions.cs:72–82</code>): <code>ILoggerFactory</code> comes from the container inside the singleton factory and goes to <code>builder.WithLogging</code> before <code>Build()</code>. <code>MapPersistence</code> (<code>TechieRagConfigMapper.cs:141</code>) calls <code>WithPersistence</code> only when provider and connection string are both present; it always copies <code>DefaultUserId</code>.</p>
+<p><strong>Calculations on this service:</strong> none — every method is a field copy; the only decisions are <code>IsRerankUsableFromConfiguration</code> (<code>TechieRagConfigMapper.cs:132</code>: Cohere/Jina need a non-empty <code>ApiKey</code>, <code>LocalOnnx</code> is always false, anything else true) and the persistence guard above.</p>
+<hr>
+<h3 id="web-ingestion-and-the-ssrf-guard-ingesturlasync-crawlasync-createguardedhandler-techierag">Web ingestion and the SSRF guard: <code>IngestUrlAsync</code>, <code>CrawlAsync</code>, <code>CreateGuardedHandler</code> (<code>TechieRag</code>)<a class="anchor-link" href="#web-ingestion-and-the-ssrf-guard-ingesturlasync-crawlasync-createguardedhandler-techierag">#</a></h3>
+<p>REQ-RAG-074, REQ-RAG-075, REQ-RAG-077. <code>WebIngestionExtensions</code> adds URL and site ingestion as extension methods on <code>ITechieRag</code>; <code>SiteCrawler</code> walks a site breadth-first within <code>WebCrawlOptions</code>; <code>HttpWebContentFetcher</code> fetches one page. Its static <code>CreateGuardedHandler</code> is the SSRF enforcement point: a <code>SocketsHttpHandler</code> whose <code>ConnectCallback</code> resolves the host itself, refuses private, loopback and link-local addresses, and connects only to checked addresses, on every redirect hop. Other host checks are fast-path messages, not the guard.</p>
+<p><img src="screenshots/TechieRag/ingestion.png" alt="Sevak's ingestion screen, July 2026: the file and URL ingestion that these calls serve" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that ingested content; covered by tests in tests/TechieRag.Tests — <code>Web/WebIngestionEndToEndTests.cs</code>, <code>Web/HttpWebContentFetcherGuardTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain (single page):</strong> <code>WebIngestionExtensions.IngestUrlAsync</code> → <code>IWebContentFetcher.FetchAsync</code> (<code>HttpWebContentFetcher.FetchAsync</code>) → <code>RefusePrivateResolutionAsync</code> → <code>HttpClient.GetAsync</code> (through the handler from <code>CreateGuardedHandler</code> → <code>ConnectToPublicAddressAsync</code> → <code>Socket.ConnectAsync</code>) → <code>ReadCappedAsync</code> → <code>WebPageReader.Read</code> → <code>WebIngestionExtensions.IngestPageAsync</code> → <code>ITechieRag.IngestTextAsync</code>.
+<strong>Call chain (site):</strong> <code>WebIngestionExtensions.IngestSiteAsync</code> → <code>SiteCrawler.CrawlAsync</code> → per queued URL <code>IWebContentFetcher.FetchAsync</code> → enqueue <code>page.Links</code> → <code>IngestPageAsync</code> per page with text.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Web/WebIngestionExtensions.cs:137</code></td><td><code>IngestPageAsync</code></td><td>metadata <code>SourceUrl</code>, <code>SourcePath</code></td><td>both <code>page.FinalUrl</code>; <code>SourceType = "web"</code></td></tr>
+<tr><td><code>src/TechieRag/Web/SiteCrawler.cs:71</code></td><td><code>CrawlAsync</code></td><td>loop guard</td><td><code>queue.Count &gt; 0 &amp;&amp; pages.Count &lt; options.MaxPages</code>; defaults <code>MaxDepth = 1</code>, <code>MaxPages = 25</code> (<code>WebCrawlOptions.cs:16,19</code>)</td></tr>
+<tr><td><code>src/TechieRag/Web/SiteCrawler.cs:103</code></td><td><code>CrawlAsync</code></td><td><code>depth &gt;= options.MaxDepth</code></td><td>true stops link discovery; children enqueued at <code>depth + 1</code> (136) after same-host and private-host filters (122, 128)</td></tr>
+<tr><td><code>src/TechieRag/Web/HttpWebContentFetcher.cs:303</code></td><td><code>CreateGuardedHandler</code></td><td><code>handler.ConnectCallback</code></td><td><code>ConnectToPublicAddressAsync</code> when <code>blockPrivateTargets</code> (default true); <code>MaxAutomaticRedirections = 5</code> (296)</td></tr>
+<tr><td><code>src/TechieRag/Web/HttpWebContentFetcher.cs:323</code></td><td><code>ConnectToPublicAddressAsync</code></td><td><code>WebCrawlOptions.IsPrivateNetworkAddress(address)</code> per resolved address</td><td>all false; a private address throws <code>WebFetchException</code> naming it</td></tr>
+<tr><td><code>src/TechieRag/Web/HttpWebContentFetcher.cs:337</code></td><td><code>ConnectToPublicAddressAsync</code></td><td><code>socket.ConnectAsync(addresses, port, …)</code></td><td>the checked address list, never a fresh DNS resolution</td></tr>
+</tbody>
+</table>
+<p><code>FetchAsync</code> also checks the literal host (50), pre-flight DNS (60), the final <code>RequestUri</code> after redirects (100) and an unfollowed 3xx target (91); refuses non-HTML media (109); caps bodies at <code>MaxContentBytes</code> 8 MB (19, 220). <code>IngestSiteAsync</code> reports empty-text pages in <code>WebIngestionResult.Skipped</code> (69).</p>
+<p><strong>Calculations on this service:</strong> <code>SiteCrawler.Normalize</code> (<code>SiteCrawler.cs:152</code>) strips a trailing slash so a page is not ingested twice; the enqueue cap <code>visited.Count &gt;= options.MaxPages * 4</code> (line 112) bounds the queue.</p>
+<hr>
+<h3 id="connectorrunner-and-repositoryconnector-techierag"><code>ConnectorRunner</code> and <code>RepositoryConnector</code> (<code>TechieRag</code>)<a class="anchor-link" href="#connectorrunner-and-repositoryconnector-techierag">#</a></h3>
+<p>REQ-RAG-078, REQ-RAG-079, REQ-RAG-082, REQ-RAG-083. <code>IDataConnector</code> is <code>ListAsync</code> (pages of <code>ConnectorItem</code>) and <code>FetchAsync</code> (one <code>ConnectorDocument</code>). <code>ConnectorRunner</code> drives any connector through a bounded, resumable walk (paging, budgets, incremental sync, per-item failure, consecutive-failure breaker). <code>RepositoryConnector</code> is the GitHub/GitLab implementation with branch and glob filters applied during listing.</p>
+<p><img src="screenshots/TechieRag/ingestion.png" alt="Sevak's ingestion screen, July 2026: documents arrive here the way a connector run delivers them" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that listed ingested documents; covered by tests in tests/TechieRag.Tests — <code>Connectors/ConnectorRunnerTests.cs</code>, <code>Connectors/ConnectorStreamingTests.cs</code>, <code>Connectors/SourceConnectorIngestionTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>ConnectorIngestionExtensions.IngestConnectorAsync</code> → <code>new ConnectorRunner().RunAsync(connector, previousSync, options, onDocument)</code> → <code>ConnectorRunner.RunCoreAsync</code> → loop: <code>IDataConnector.ListAsync</code> → per item <code>previousSync.IsUnchanged</code> / size check / <code>IDataConnector.FetchAsync</code> → <code>onDocument</code> → <code>ITechieRag.IngestTextAsync</code> → record <code>sync.ItemVersions[item.Id]</code> → byte-budget check → next cursor. For a repository: <code>RepositoryConnector.ListAsync</code> → <code>ResolveBranchAsync</code> (GET <code>/repos/{path}</code> or <code>/projects/{path}</code>) → <code>ListGitHubAsync</code> (GET <code>/git/trees/{branch}?recursive=1</code>) or <code>ListGitLabAsync</code> (GET <code>/repository/tree?…&amp;page=</code>) → <code>GlobFilter.IsMatch</code>; <code>RepositoryConnector.FetchAsync</code> → GET blob → <code>DecodeContent</code> (base64, NUL-byte binary check). HTTP goes through <code>HttpConnectorTransport.SendCoreAsync</code> → <code>HttpClient.SendAsync</code> on <code>HttpConnectorTransport.CreateDefaultClient</code> → <code>HttpWebContentFetcher.CreateGuardedHandler</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:240</code></td><td><code>RunCoreAsync</code></td><td><code>onDocument(document, …)</code></td><td>awaited before the next fetch; version recorded after (249), so a handler failure re-fetches next run</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:256</code></td><td><code>RunCoreAsync</code></td><td><code>totalBytes &gt;= options.MaxTotalBytes</code></td><td>true sets <code>limitCode = RunByteBudgetReached</code> (263); default 64 MB (<code>ConnectorRunOptions.cs:48</code>)</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:218</code></td><td><code>RunCoreAsync</code></td><td><code>consecutiveFailures &gt;= options.MaxConsecutiveFailures</code></td><td>25 (<code>ConnectorRunOptions.cs:67</code>) throws <code>ConnectorException</code>; resets on success (229)</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:278</code></td><td><code>RunCoreAsync</code></td><td>prune condition</td><td>stale versions removed only when <code>!reachedLimit &amp;&amp; connector.ListsEntireSource</code></td></tr>
+<tr><td><code>src/TechieRag/Connectors/Repository/RepositoryConnector.cs:129</code></td><td><code>ListGitHubAsync</code></td><td><code>filter.IsMatch(path)</code></td><td>unmatched paths are never listed or fetched; <code>Version</code> is the blob <code>sha</code> (138)</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Http/HttpConnectorTransport.cs:258</code></td><td><code>CreateDefaultClient</code></td><td>handler</td><td><code>HttpWebContentFetcher.CreateGuardedHandler(blockPrivateTargets)</code>; bodies capped at <code>MaxResponseBytes</code> 16 MB (34)</td></tr>
+</tbody>
+</table>
+<p>Limit codes (<code>src/TechieRag/Connectors/ConnectorErrorCodes.cs</code>): <code>RunByteBudgetReached</code> (21), <code>RunItemLimitReached</code> (27), <code>RunPageLimitReached</code> (33) go on <code>ConnectorRunResult.LimitCode</code> (<code>ConnectorRunResult.cs:28</code>); <code>ImapLiteralTooLarge</code> (40), <code>ImapResponseLineTooLong</code> (46) go on <code>ConnectorException.ErrorCode</code> (they fail the run). <code>RepositoryConnector</code> fails on a truncated GitHub tree (148), sends the GitLab token as a <code>PRIVATE-TOKEN</code> header (274), ends the run on 401/403 (303).</p>
+<p><strong>Calculations on this service:</strong> <code>totalBytes</code> is <code>Encoding.UTF8.GetByteCount(document.Text)</code> summed (<code>ConnectorRunner.cs:245</code>), bytes not characters; <code>RepositoryConnector.IsBinary</code> (line 404) scans the first 8 KB for a NUL byte.</p>
+<hr>
+<h3 id="emailconnector-with-imap-and-mbox-transports-techierag"><code>EmailConnector</code> with IMAP and mbox transports (<code>TechieRag</code>)<a class="anchor-link" href="#emailconnector-with-imap-and-mbox-transports-techierag">#</a></h3>
+<p>REQ-RAG-081, REQ-RAG-082. <code>EmailConnector</code> is the mailbox <code>IDataConnector</code>. Folder, date, sender, subject, sent-mail and spam filters apply while listing; out-of-scope mail is never downloaded. Transports behind <code>IMailTransport</code>: <code>ImapMailTransport</code> (TLS; XOAUTH2 or LOGIN) and <code>MboxMailTransport</code> (local export). Attachments are decoded in memory and streamed to an <code>IDocumentProcessor</code>, never to disk.</p>
+<p><img src="screenshots/TechieRag/text-ingestion.png" alt="Sevak's text ingestion screen, July 2026: the plain-text path an email message takes once the connector has trimmed it" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that ingested text; covered by tests in tests/TechieRag.Tests — <code>Connectors/EmailConnectorTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>ConnectorRunner.RunCoreAsync</code> → <code>EmailConnector.ListAsync</code> → <code>ResolveFoldersAsync</code> (<code>IMailTransport.ListFoldersAsync</code> unless <code>Folders</code> set; junk folders dropped) → <code>BuildCriteria(previousSync)</code> → <code>IMailTransport.SearchAsync</code> (IMAP: <code>ImapMailTransport.SearchAsync</code> → <code>UID SEARCH {BuildSearchKeys}</code> → <code>UID FETCH … BODY.PEEK[HEADER]</code>; mbox: <code>MboxMailTransport.SearchAsync</code> → in-memory <code>Matches</code>) → <code>ToItem</code> → <code>EmailConnector.FetchAsync</code> → <code>IMailTransport.FetchAsync</code> (IMAP <code>UID FETCH {uid} (BODY.PEEK[])</code>, mbox <code>byUid</code> lookup) → <code>MimeParser.Parse</code> → <code>ReplyTrimmer.Trim</code> → <code>AppendAttachmentsAsync</code> → <code>IDocumentProcessor.ProcessAsync</code>. IMAP sockets: <code>ImapMailTransport.Create</code> → <code>SocketImapConnection.OpenAsync</code> → <code>TcpClient.ConnectAsync</code> + <code>SslStream.AuthenticateAsClientAsync</code> (TLS 1.2/1.3).</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Connectors/Email/EmailConnector.cs:297</code></td><td><code>BuildCriteria</code></td><td><code>since</code></td><td><code>previousSync.LastRunUtc - 1 day</code> if later than <code>options.SinceUtc</code>; <code>SINCE</code> is day-granular, runner drops duplicates</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Email/EmailConnector.cs:74</code></td><td><code>ListsEntireSource</code></td><td>return value</td><td>always <code>false</code>, so the runner never prunes</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Email/EmailConnector.cs:278</code></td><td><code>ToItem</code></td><td>item id</td><td><code>header.StableId</code> (mbox) or <code>"{Folder}/{UidValidity}/{Uid}"</code>; a UIDVALIDITY reset is never "unchanged"</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Email/ImapMailTransport.cs:425</code></td><td><code>RunAsync</code></td><td><code>RequireNoControlCharacters(command, …)</code></td><td>no <code>char.IsControl</code> character; <code>Quote</code> (616) checks caller values the same way, refusing CRLF injection and the U+0001 XOAUTH2 separator</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Email/ImapMailTransport.cs:470</code></td><td><code>RunAsync</code></td><td><code>length &gt; literalBudget</code></td><td>false; a literal beyond remaining <code>MaxMessageBytes</code> (64 MB, <code>ImapMailboxOptions.cs:55</code>) throws <code>ImapLiteralTooLarge</code> before allocating</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Email/ImapByteReader.cs:102</code></td><td><code>ReadLineAsync</code></td><td><code>line.Count &gt; maxLineBytes</code></td><td>false; an over-long line drops the connection with <code>ImapResponseLineTooLong</code> (108)</td></tr>
+</tbody>
+</table>
+<p>Attachments (<code>EmailConnector.cs:172–225</code>) skip by extension allow-list (177), size (183) or missing processor (189); skips go on <code>AttachmentsSkipped</code> metadata (249), never into indexed text.</p>
+<p><strong>Observation:</strong> <code>SocketImapConnection.OpenAsync</code> (<code>SocketImapConnection.cs:72</code>) opens a plain <code>TcpClient</code> with no private-address check, unlike the HTTP transport. Probably intended (LAN IMAP is normal), but undocumented.</p>
+<p><strong>Calculations on this service:</strong> <code>NextCursor</code> (<code>EmailConnector.cs:343</code>) is <code>"{folderIndex}:{skip + page.Headers.Count}"</code>: it advances by what the server returned, not what survived filtering, so filtered-out messages are never re-requested.</p>
+<hr>
+<h3 id="reranking-and-search-options-searchoptions-rerank-withreranker-techierag-techierag-embedded">Reranking and search options: <code>SearchOptions.Rerank</code>, <code>WithReranker</code> (<code>TechieRag</code>, <code>TechieRag.Embedded</code>)<a class="anchor-link" href="#reranking-and-search-options-searchoptions-rerank-withreranker-techierag-techierag-embedded">#</a></h3>
+<p>REQ-RAG-097, REQ-RAG-098. A reranker scores each candidate chunk against the query and reorders the results. Core ships <code>CohereReranker</code> and <code>JinaReranker</code>; <code>TechieRag.Embedded</code> ships <code>OnnxCrossEncoderReranker</code> behind <code>UseEmbeddedReranker</code>. <code>SearchOptions.Rerank</code> per call wins, else <code>RerankConfig.Enabled</code> (<code>WithRerankEnabledByDefault</code>). The reranker is built whenever a usable source is configured, regardless of <code>Enabled</code>, so per-call opt-in works with the default off. <code>Workspace.RerankEnabled</code> (<code>src/TechieRag/Models/Workspace.cs:57</code>) is stored state the host maps into <code>SearchOptions.Rerank</code>.</p>
+<p><img src="screenshots/TechieRag/chat.png" alt="Sevak's chat screen, July 2026: the sources list whose order reranking changes" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that showed search results; covered by tests in tests/TechieRag.Tests — <code>Reranking/RerankedSearchTests.cs</code>, <code>Reranking/SearchRerankSwitchTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain:</strong> <code>TechieRagBuilder.WithReranker(RerankSource, apiKey, …)</code> or <code>WithReranker(Func&lt;IReranker&gt;, …)</code> (or <code>TechieRagBuilderExtensions.UseEmbeddedReranker</code> → <code>WithReranker(factory)</code>) → <code>WithRerankEnabledByDefault(bool)</code> → <code>Build()</code> → <code>CreateReranker</code> → <code>customRerankerFactory()</code> or <code>CreateApiReranker</code> → <code>TechieRagClient..ctor(reranker)</code>. At query time: <code>TechieRagClient.SearchAsync(query, SearchOptions)</code> → <code>ResolveRerank</code> → <code>IEmbeddingProvider.EmbedAsync</code> → <code>IVectorStore.SearchAsync(fetchCount)</code> → <code>ApplyRerankAsync</code> → <code>IReranker.RerankAsync</code> (Cohere: POST <code>/v2/rerank</code>; ONNX: <code>ScorePair</code> per candidate).</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:557</code></td><td><code>WithReranker(Func&lt;IReranker&gt;, …)</code></td><td><code>config.Rerank.Enabled</code> / <code>Source</code></td><td><code>true</code> / <code>RerankSource.Custom</code>; <code>WithRerankEnabledByDefault(false)</code> afterwards (line 578) flips only <code>Enabled</code></td></tr>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:740</code></td><td><code>CreateReranker</code></td><td><code>LocalOnnx</code> without a factory</td><td>throws only when <code>Enabled</code> is true, else null; the factory branch at line 732 wins first</td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:449</code></td><td><code>ResolveRerank</code></td><td><code>requested</code></td><td><code>options.Rerank ?? config.Rerank.Enabled</code>; no reranker configured logs a warning and returns false (line 452)</td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:420</code></td><td><code>SearchAsync</code></td><td><code>fetchCount</code></td><td><code>Math.Max(topK, config.Rerank.CandidateCount)</code> (default 20) when reranking, else <code>topK</code></td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:468</code></td><td><code>ApplyRerankAsync</code></td><td><code>topN</code></td><td><code>Math.Min(config.Rerank.TopN, topK)</code> when <code>TopN &gt; 0</code>, else <code>topK</code></td></tr>
+<tr><td><code>src/TechieRag.Embedded/OnnxCrossEncoderReranker.cs:251</code></td><td><code>RerankAsync</code></td><td>result order</td><td><code>OrderByDescending(r =&gt; r.Score).Take(min(topN, count))</code>; cross-encoder scores replace vector similarity</td></tr>
+</tbody>
+</table>
+<p><code>SearchOptions</code> (<code>src/TechieRag/Models/SearchOptions.cs:18</code>) carries <code>TopK</code> (5), <code>DocumentFilter</code> and <code>bool? Rerank</code> (line 38); the legacy positional <code>SearchAsync</code> (<code>TechieRagClient.cs:373</code>) leaves <code>Rerank</code> null, so existing callers keep the global default.</p>
+<p><strong>Calculations on this service:</strong> <code>CohereReranker.RerankAsync</code> sends <code>top_n = min(topN, results.Count)</code> (<code>CohereReranker.cs:86</code>) and maps each returned <code>index</code> back to the original chunk with <code>relevance_score</code> as the new <code>Score</code> (line 106); the ONNX reranker scores every candidate with <code>ScorePair(query, chunk.Text)</code> (line 246) then sorts.</p>
+<hr>
+<h3 id="telemetry-packaging-techierag-telemetry-addtechieragtelemetry-the-publish-workflows-techierag-telemetry">Telemetry packaging: <code>TechieRag.Telemetry</code>, <code>AddTechieRagTelemetry</code>, the publish workflows (<code>TechieRag.Telemetry</code>)<a class="anchor-link" href="#telemetry-packaging-techierag-telemetry-addtechieragtelemetry-the-publish-workflows-techierag-telemetry">#</a></h3>
+<p>REQ-FN-065. The OpenTelemetry exporters live in their own opt-in package, so the core package links no exporter. Both publishing workflows now pack and push it at the same version as the other four packages.</p>
+<p><img src="screenshots/TechieRag/token-usage.png" alt="Sevak's token usage screen, July 2026: the usage numbers the telemetry package exports" style="max-width:100%"></p>
+<p>Static-only: the July 2026 Sevak screen that showed usage; covered by tests in tests/TechieRag.Tests — <code>PublishingWorkflowTests.cs</code>.</p>
+<p><strong>Runtime:</strong> static-only (unconfirmed)</p>
+<p><strong>Call chain (runtime):</strong> <code>TechieRagTelemetryServiceCollectionExtensions.AddTechieRagTelemetry(services, configure)</code> → <code>services.AddSingleton(...)</code> → on first resolve: <code>new TechieRagTelemetryOptions()</code> → <code>configure(options)</code> → <code>TechieRagTelemetryPipeline.Create(options)</code> → <code>options.IsExportEnabled</code> (inert pipeline when false) → <code>options.ValidateEndpoint()</code> (OTLP only) → <code>BuildTracerProvider</code> (<code>AddSource(TechieRagTelemetry.ActivitySourceName)</code> + console or OTLP exporter) → <code>BuildMeterProvider</code> (<code>AddMeter(TechieRagTelemetry.MeterName)</code>) → <code>TechieRagTelemetry.Enabled = true</code> → the library's <code>TechieRagTelemetry.Record*</code> calls start emitting → <code>Dispose</code> flips the flag back if this pipeline set it.
+<strong>Call chain (packaging):</strong> <code>.github/workflows/publish-nuget.yml</code> <code>workflow_dispatch</code> → <code>determine-version.sh</code> → <code>dotnet restore/build/pack</code> of <code>TELEMETRY_PROJECT</code> → "Confirm packed version" file check → <code>NuGet/login</code> → <code>dotnet nuget push ./artifacts/*.nupkg</code>; <code>.github/workflows/publish-github-packages.yml</code> push/tag → same restore/build/pack list → upload artifact → <code>publish-github</code> job pushes each <code>.nupkg</code> to GitHub Packages.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Telemetry/TechieRagTelemetryServiceCollectionExtensions.cs:33</code></td><td><code>AddTechieRagTelemetry</code></td><td>registered factory</td><td>one lazy singleton; no <code>configure</code> → <code>IsExportEnabled</code> false, no socket</td></tr>
+<tr><td><code>src/TechieRag.Telemetry/TechieRagTelemetryPipeline.cs:70</code></td><td><code>Create</code></td><td><code>options.IsExportEnabled</code></td><td>false → inert pipeline (<code>IsActive == false</code>, 53); true → <code>ValidateEndpoint</code> (77)</td></tr>
+<tr><td><code>src/TechieRag.Telemetry/TechieRagTelemetryOptions.cs:78</code></td><td><code>ValidateEndpoint</code></td><td><code>Endpoint.IsLoopback || AllowRemoteEndpoint</code></td><td>true; default <code>http://localhost:4318</code> (21); remote without <code>AllowRemoteEndpoint</code> throws</td></tr>
+<tr><td><code>src/TechieRag.Telemetry/TechieRag.Telemetry.csproj:31</code></td><td>package properties</td><td><code>GeneratePackageOnBuild</code>, <code>PublishRepositoryUrl</code>, <code>EmbedUntrackedSources</code>, <code>IncludeSymbols</code>, <code>SymbolPackageFormat</code></td><td><code>false</code>, <code>true</code>, <code>true</code>, <code>true</code>, <code>snupkg</code>; README (26); TFMs <code>net10.0;net8.0</code> (10)</td></tr>
+<tr><td><code>.github/workflows/publish-nuget.yml:59</code></td><td>env</td><td><code>PACKAGE_IDS</code></td><td>includes <code>techierag.telemetry</code>; restored (98), built (110), packed (125), <code>.nupkg</code> asserted (137)</td></tr>
+<tr><td><code>.github/workflows/publish-github-packages.yml:98</code></td><td>Pack step</td><td><code>dotnet pack src/TechieRag.Telemetry/…</code></td><td>present, <code>-p:Version=${{ steps.version.outputs.version }}</code> like the other four (96–100); pushed at 147</td></tr>
+</tbody>
+</table>
+<p><code>publish-github-packages.yml:150–154</code> deliberately has no nuget.org job (REQ-FN-067); nuget.org is reached only by manual <code>publish-nuget.yml</code> dispatch, whose file name is bound to the nuget.org trusted-publishing policy (lines 20–22).</p>
+<p><strong>Calculations on this service:</strong> <code>ConfigureOtlp</code> (<code>TechieRagTelemetryPipeline.cs:156</code>) sets the exporter protocol to HTTP/protobuf and, for metrics, <code>ExportIntervalMilliseconds = (int)options.MetricExportInterval.TotalMilliseconds</code> (148; default 15 s, <code>TechieRagTelemetryOptions.cs:59</code>).</p>
+<h2 id="cross-cutting-flows">Cross-cutting flows<a class="anchor-link" href="#cross-cutting-flows">#</a></h2>
+<p>Phase 1's flows are unchanged and stay in <code>docs/TechieRag-DevGuide.md</code> (data connectors, MCP client, flow orchestration, web ingestion, workspaces and memory, speech, telemetry, resilience). Phase 2 changed three of them; the rest of this section says where.</p>
+<h3 id="configuration">Configuration<a class="anchor-link" href="#configuration">#</a></h3>
+<p><strong>Call chain:</strong> <code>ServiceCollectionExtensions.AddTechieRag(IConfiguration)</code> → <code>TechieRagConfigMapper</code> → <code>TechieRagBuilder.Build()</code>; every field the builder accepts is mapped (entry "Configuration mapping" above). Environment variables the library reads: <code>TECHIERAG_MODEL_ROOT</code>, <code>TECHIERAG_MODEL_BASE_URL</code>, <code>TECHIERAG_RERANKER_BASE_URL</code>, <code>TECHIERAG_PROBE_AUTORUN</code> (probe only).</p>
+<h3 id="model-files-on-disk">Model files on disk<a class="anchor-link" href="#model-files-on-disk">#</a></h3>
+<p><strong>Call chain:</strong> <code>ModelRoot.Current</code> → <code>ModelDownloadService.DownloadAsync</code> → <code>&lt;ModelRoot&gt;/&lt;model&gt;</code> (embedding, reranker) or <code>&lt;ModelRoot&gt;/&lt;model&gt;-&lt;format&gt;</code> (local model, with a <code>.techierag-verified</code> marker); entries "Model root and the phone default", "Download size, decline and resume" and "Terms, download and verification" above.</p>
+<h3 id="platform-build-and-ci">Platform build and CI<a class="anchor-link" href="#platform-build-and-ci">#</a></h3>
+<p><strong>Call chain:</strong> <code>TechieRag.Embedded.targets</code> and <code>TechieRag.Local.targets</code> (imported from <code>buildTransitive/</code>) → the consuming app's MAUI build; <code>.github/workflows/probe.yml</code> → <code>scripts/select-xcode.sh</code> → one <code>dotnet build -f &lt;head&gt; -p:ProbeHead=&lt;head&gt;</code> per job; entries "Native ONNX Runtime wiring" and "CI and the scripts" above.</p>
+<h3 id="logging-and-errors">Logging and errors<a class="anchor-link" href="#logging-and-errors">#</a></h3>
+<p>Unchanged from phase 1: <code>WithLogging(loggerFactory)</code> on the builder; library messages are codes with arguments (<code>FlowMessage</code>, <code>ConnectorErrorCodes</code>, <code>SubscriptionSignInException.Code</code>), never English sentences; <code>TechieRag.Local</code> throws <code>LocalModelTermsNotAcceptedException</code>, <code>LocalModelMemoryException</code> and <code>LocalPromptTooLongException</code> with the numbers a host needs.</p>
+<h2 id="known-issues">Known issues<a class="anchor-link" href="#known-issues">#</a></h2>
+<p>Found while reading the code for this guide on 2026-09-25 and fixed the same day by the build that followed (each fix is the Remark on its checklist row; line numbers below are from before the fix).</p>
+<ul>
+<li>REQ-RAG-015, fixed: the <code>weak</code> hint quoted the cosine threshold even when reranking had classified the result; it now quotes the threshold that was applied (<code>src/TechieRag/Agentic/KnowledgeBaseTools.cs</code>).
+</li>
+<li>REQ-RAG-016, fixed: <code>Sources</code> is raised only after a search grew the turn's search count, as its doc comment says; <code>Retrieval</code> is now on <code>ITechieRagAgent</code> (<code>src/TechieRag.Agents/TechieRagAgent.cs</code>).
+</li>
+<li>REQ-RAG-053, fixed: the comment in <code>src/TechieRag/Models/ModelRoot.cs</code> no longer calls <code>TechieRag.Local</code> "the planned" package.
+</li>
+<li>REQ-RAG-061, fixed: <code>GetTerms()</code> reports the pending bytes, files on disk and <code>.part</code> remainders subtracted, as <code>EnsureAsync</code> does (<code>src/TechieRag.Local/LocalLlmProvider.cs</code>, <code>LocalModelVariant.GetPendingBytes</code>).
+</li>
+<li>REQ-FN-059, fixed: the probe's peak memory is decimal megabytes, the same unit as its download line (<code>samples/TechieRag.Probe/GenerationResult.cs</code>).
+</li>
+<li>REQ-RAG-069, fixed: the <code>ILlmProvider</code> doc comment lists all eight implementations (<code>src/TechieRag/Abstractions/ILlmProvider.cs</code>).
+</li>
+<li>REQ-FN-066, fixed: <code>Llm.Source = Subscription</code> from configuration gives the factory's own sign-in message (<code>src/TechieRag/TechieRagBuilder.cs</code>).
+</li>
+<li>REQ-RAG-082, documented: the IMAP connection deliberately skips the private-address guard because the host names the mail server itself; the rule is in the XML docs of <code>SocketImapConnection</code> and <code>ImapMailboxOptions</code> and in the UsageGuide's Known limitations.
+</li>
+<li>Several XML doc headers cite requirement ids from before the phase-2 renumbering (for example <code>ConnectorRunner</code> names REQ-RAG-032 and BRD-113); cosmetic, not fixed.
+</li>
+<li>ORT-001, ORTGENAI-001, ORTGENAI-002: upstream package gaps, filed in <code>docs/TechieRag-OnnxRuntime-Feedback.md</code> and <code>docs/TechieRag-OnnxRuntimeGenAI-Feedback.md</code>; the two build targets files work around the first two.
+</li>
+</ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

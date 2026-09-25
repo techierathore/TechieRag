@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Business Requirements</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieRag — Business Requirements</h1>
+    <div class="sub">Last rendered: 2026-09-24</div>
+    <div class="group">Contents</div>
+    <ol>
+        <li><a href="#table-of-contents">Table of Contents</a></li>
+        <li><a href="#executive-summary">1. Executive summary</a></li>
+        <li><a href="#business-objectives">2. Business objectives</a></li>
+        <li><a href="#scope">3. Scope</a></li>
+        <li><a href="#development-status">4. Development status</a></li>
+        <li><a href="#stakeholders-users">5. Stakeholders / users</a></li>
+        <li><a href="#context-diagram">6. Context diagram</a></li>
+        <li><a href="#user-journey-primary-use-case">7. User journey — primary use case</a></li>
+        <li><a href="#component-sketch">8. Component sketch</a></li>
+        <li><a href="#feature-catalog">9. Feature catalog</a></li>
+        <li class="h3"><a href="#f-ing-document-ingestion-processing">F-ING: Document ingestion &amp;amp; processing</a></li>
+        <li class="h3"><a href="#f-emb-embedding-providers">F-EMB: Embedding providers</a></li>
+        <li class="h3"><a href="#f-vec-vector-stores">F-VEC: Vector stores</a></li>
+        <li class="h3"><a href="#f-search-semantic-search-retrieval">F-SEARCH: Semantic search &amp;amp; retrieval</a></li>
+        <li class="h3"><a href="#f-cfg-configuration-builder">F-CFG: Configuration &amp;amp; builder</a></li>
+        <li class="h3"><a href="#f-embedded-offline-embedded-embedding">F-EMBEDDED: Offline embedded embedding</a></li>
+        <li class="h3"><a href="#f-platform-techierag-inside-net-maui-apps-on-four-platforms">F-PLATFORM: TechieRag inside .NET MAUI apps on four platforms</a></li>
+        <li class="h3"><a href="#f-llm-llm-provider-integration">F-LLM: LLM provider integration</a></li>
+        <li class="h3"><a href="#f-local-llm-techierag-local-package-in-process-local-language-model">F-LOCAL-LLM: TechieRag.Local package — in-process local language model</a></li>
+        <li class="h3"><a href="#f-rag-auto-rag-generation">F-RAG: Auto-RAG generation</a></li>
+        <li class="h3"><a href="#f-struct-structured-typed-output">F-STRUCT: Structured / typed output</a></li>
+        <li class="h3"><a href="#f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp;amp; agent loop</a></li>
+        <li class="h3"><a href="#f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">F-AGENTS: TechieRag.Agents package — agents on Microsoft Agent Framework</a></li>
+        <li class="h3"><a href="#f-mem-conversation-memory">F-MEM: Conversation memory</a></li>
+        <li class="h3"><a href="#f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp;amp; budgets</a></li>
+        <li class="h3"><a href="#f-resil-resilience-retry">F-RESIL: Resilience &amp;amp; retry</a></li>
+        <li class="h3"><a href="#f-fallback-fallback-llm-provider">F-FALLBACK: Fallback LLM provider</a></li>
+        <li class="h3"><a href="#f-prompt-prompt-templates">F-PROMPT: Prompt templates</a></li>
+        <li class="h3"><a href="#f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution</a></li>
+        <li class="h3"><a href="#f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp;amp; publishing</a></li>
+        <li class="h3"><a href="#f-repo-repository-separation">F-REPO: Repository separation</a></li>
+        <li class="h3"><a href="#f-web-sevak-application-formerly-techiedesk">F-WEB: Sevak application (formerly TechieDesk)</a></li>
+        <li class="h3"><a href="#f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration</a></li>
+        <li><a href="#functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)</a></li>
+        <li><a href="#non-functional-requirements">11. Non-functional requirements</a></li>
+        <li><a href="#constraints-assumptions">12. Constraints &amp;amp; assumptions</a></li>
+        <li><a href="#success-metrics">13. Success metrics</a></li>
+        <li><a href="#risks">14. Risks</a></li>
+        <li><a href="#glossary">15. Glossary</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieRag — Business Requirements</h1>
+    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-BRD.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#table-of-contents">Table of Contents</a></li>
+        <li><a href="#executive-summary">1. Executive summary</a></li>
+        <li><a href="#business-objectives">2. Business objectives</a></li>
+        <li><a href="#scope">3. Scope</a></li>
+        <li><a href="#development-status">4. Development status</a></li>
+        <li><a href="#stakeholders-users">5. Stakeholders / users</a></li>
+        <li><a href="#context-diagram">6. Context diagram</a></li>
+        <li><a href="#user-journey-primary-use-case">7. User journey — primary use case</a></li>
+        <li><a href="#component-sketch">8. Component sketch</a></li>
+        <li><a href="#feature-catalog">9. Feature catalog</a></li>
+        <li class="h3"><a href="#f-ing-document-ingestion-processing">F-ING: Document ingestion &amp;amp; processing</a></li>
+        <li class="h3"><a href="#f-emb-embedding-providers">F-EMB: Embedding providers</a></li>
+        <li class="h3"><a href="#f-vec-vector-stores">F-VEC: Vector stores</a></li>
+        <li class="h3"><a href="#f-search-semantic-search-retrieval">F-SEARCH: Semantic search &amp;amp; retrieval</a></li>
+        <li class="h3"><a href="#f-cfg-configuration-builder">F-CFG: Configuration &amp;amp; builder</a></li>
+        <li class="h3"><a href="#f-embedded-offline-embedded-embedding">F-EMBEDDED: Offline embedded embedding</a></li>
+        <li class="h3"><a href="#f-platform-techierag-inside-net-maui-apps-on-four-platforms">F-PLATFORM: TechieRag inside .NET MAUI apps on four platforms</a></li>
+        <li class="h3"><a href="#f-llm-llm-provider-integration">F-LLM: LLM provider integration</a></li>
+        <li class="h3"><a href="#f-local-llm-techierag-local-package-in-process-local-language-model">F-LOCAL-LLM: TechieRag.Local package — in-process local language model</a></li>
+        <li class="h3"><a href="#f-rag-auto-rag-generation">F-RAG: Auto-RAG generation</a></li>
+        <li class="h3"><a href="#f-struct-structured-typed-output">F-STRUCT: Structured / typed output</a></li>
+        <li class="h3"><a href="#f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp;amp; agent loop</a></li>
+        <li class="h3"><a href="#f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">F-AGENTS: TechieRag.Agents package — agents on Microsoft Agent Framework</a></li>
+        <li class="h3"><a href="#f-mem-conversation-memory">F-MEM: Conversation memory</a></li>
+        <li class="h3"><a href="#f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp;amp; budgets</a></li>
+        <li class="h3"><a href="#f-resil-resilience-retry">F-RESIL: Resilience &amp;amp; retry</a></li>
+        <li class="h3"><a href="#f-fallback-fallback-llm-provider">F-FALLBACK: Fallback LLM provider</a></li>
+        <li class="h3"><a href="#f-prompt-prompt-templates">F-PROMPT: Prompt templates</a></li>
+        <li class="h3"><a href="#f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution</a></li>
+        <li class="h3"><a href="#f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp;amp; publishing</a></li>
+        <li class="h3"><a href="#f-repo-repository-separation">F-REPO: Repository separation</a></li>
+        <li class="h3"><a href="#f-web-sevak-application-formerly-techiedesk">F-WEB: Sevak application (formerly TechieDesk)</a></li>
+        <li class="h3"><a href="#f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration</a></li>
+        <li><a href="#functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)</a></li>
+        <li><a href="#non-functional-requirements">11. Non-functional requirements</a></li>
+        <li><a href="#constraints-assumptions">12. Constraints &amp;amp; assumptions</a></li>
+        <li><a href="#success-metrics">13. Success metrics</a></li>
+        <li><a href="#risks">14. Risks</a></li>
+        <li><a href="#glossary">15. Glossary</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Kind</td><td>library</td></tr>
+<tr><td>Size</td><td>Large</td></tr>
+<tr><td>Stack answer set</td><td>none</td></tr>
+<tr><td>Status</td><td>Approved</td></tr>
+<tr><td>Date</td><td>2026-09-24</td></tr>
+</tbody>
+</table>
+<h2 id="table-of-contents">Table of Contents<a class="anchor-link" href="#table-of-contents">#</a></h2>
+<ol>
+<li><a href="#executive-summary">Executive summary</a>
+</li>
+<li><a href="#business-objectives">Business objectives</a>
+</li>
+<li><a href="#scope">Scope</a>
+</li>
+<li><a href="#development-status">Development status</a>
+</li>
+<li><a href="#stakeholders-users">Stakeholders / users</a>
+</li>
+<li><a href="#context-diagram">Context diagram</a>
+</li>
+<li><a href="#user-journey-primary-use-case">User journey — primary use case</a>
+</li>
+<li><a href="#component-sketch">Component sketch</a>
+</li>
+<li><a href="#feature-catalog">Feature catalog</a>
+<ul>
+<li><a href="#f-ing-document-ingestion-processing">F-ING: Document ingestion &amp; processing</a>
+</li>
+<li><a href="#f-emb-embedding-providers">F-EMB: Embedding providers</a>
+</li>
+<li><a href="#f-vec-vector-stores">F-VEC: Vector stores</a>
+</li>
+<li><a href="#f-search-semantic-search-retrieval">F-SEARCH: Semantic search &amp; retrieval</a>
+</li>
+<li><a href="#f-cfg-configuration-builder">F-CFG: Configuration &amp; builder</a>
+</li>
+<li><a href="#f-embedded-offline-embedded-embedding">F-EMBEDDED: Offline embedded embedding</a>
+</li>
+<li><a href="#f-platform-techierag-inside-net-maui-apps-on-four-platforms">F-PLATFORM: TechieRag inside .NET MAUI apps on four platforms</a>
+</li>
+<li><a href="#f-llm-llm-provider-integration">F-LLM: LLM provider integration</a>
+</li>
+<li><a href="#f-local-llm-techieraglocal-package-in-process-local-language-model">F-LOCAL-LLM: <code>TechieRag.Local</code> package — in-process local language model</a>
+</li>
+<li><a href="#f-rag-auto-rag-generation">F-RAG: Auto-RAG generation</a>
+</li>
+<li><a href="#f-struct-structured-typed-output">F-STRUCT: Structured / typed output</a>
+</li>
+<li><a href="#f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp; agent loop</a>
+</li>
+<li><a href="#f-agents-techieragagents-package-agents-on-microsoft-agent-framework">F-AGENTS: <code>TechieRag.Agents</code> package — agents on Microsoft Agent Framework</a>
+</li>
+<li><a href="#f-mem-conversation-memory">F-MEM: Conversation memory</a>
+</li>
+<li><a href="#f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp; budgets</a>
+</li>
+<li><a href="#f-resil-resilience-retry">F-RESIL: Resilience &amp; retry</a>
+</li>
+<li><a href="#f-fallback-fallback-llm-provider">F-FALLBACK: Fallback LLM provider</a>
+</li>
+<li><a href="#f-prompt-prompt-templates">F-PROMPT: Prompt templates</a>
+</li>
+<li><a href="#f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution</a>
+</li>
+<li><a href="#f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp; publishing</a>
+</li>
+<li><a href="#f-repo-repository-separation">F-REPO: Repository separation</a>
+</li>
+<li><a href="#f-web-sevak-application-formerly-techiedesk">F-WEB: Sevak application (formerly TechieDesk)</a>
+</li>
+<li><a href="#f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration</a>
+</li>
+</ul>
+</li>
+<li><a href="#functional-requirements-brd-ledger">Functional requirements (BRD ledger)</a>
+</li>
+<li><a href="#non-functional-requirements">Non-functional requirements</a>
+</li>
+<li><a href="#constraints-assumptions">Constraints &amp; assumptions</a>
+</li>
+<li><a href="#success-metrics">Success metrics</a>
+</li>
+<li><a href="#risks">Risks</a>
+</li>
+<li><a href="#glossary">Glossary</a>
+</li>
+</ol>
+<h2 id="executive-summary">1. Executive summary<a class="anchor-link" href="#executive-summary">#</a></h2>
+<p><strong>TechieRag</strong> is a configurable Retrieval-Augmented Generation (RAG) library for .NET, shipped as NuGet packages. It lets a .NET developer add document search, retrieval, and LLM-powered question-answering to an application with a few lines of fluent configuration — and switch embedding providers, vector stores, document formats, and LLM backends <strong>by configuration, not code</strong>. The library abstracts six embedding providers, three vector stores, nine document formats, and six LLM providers behind a single <code>ITechieRag</code> surface.</p>
+<p>The product exists to eliminate the repetitive, tightly-coupled RAG plumbing that every .NET team rebuilds, and to offer a genuinely <strong>offline</strong> option (<code>TechieRag.Embedded</code>) using a bundled BGE-M3 ONNX model so data never has to leave the machine. A companion Blazor Server application — <strong>TechieDesk</strong> (formerly <code>TechieRagWeb</code>; renamed 2026-07-17 per BRD-82 / REQ-UI-014) — showcases every capability end-to-end and is being productized as a self-hostable AnythingLLM alternative (BRD-81), and an MSBuild "autodistribution" mechanism ships AI-agent skill files into any consuming repo so tools like Claude Code and OpenCode gain a <code>/techierag</code> assistant automatically.</p>
+<p>As of this snapshot the library is <strong>~96% complete</strong>: the v1.1 core (config, vector stores, processors, embeddings, sample app, Qdrant admin) and the v2 LLM layer (6 providers, auto-RAG, agent loop, token tracking, resilience, memory, 7 new sample pages) are all shipped and validated by manual/integration testing. The remaining work is a formal automated test suite and optional OpenTelemetry exporters. <strong>Repositioned 2026-07-17:</strong> the companion app is now <strong>TechieDesk</strong>, a productized, self-hostable AnythingLLM alternative powered by the TechieRag library; the competitive roadmap lives in <code>docs/TechieRag-CompetitorAnalysis.md</code> (GAP-LIB-<em>/GAP-APP-</em> register), with phase-wise BRD-Ns appended as each phase is scheduled.</p>
+<p><strong>Amended 2026-09-03 (owner decision) — three packages, one separate product.</strong> The library becomes <strong>three NuGet packages</strong>: <code>TechieRag</code> (retrieval, ingestion, providers, the dependency-free agent loop), <code>TechieRag.Embedded</code> (offline embeddings), and the new <strong><code>TechieRag.Agents</code></strong> — an agent layer on <strong>Microsoft Agent Framework (MAF) 1.20</strong> with an agentic retrieval contract that lives in core (BRD-83…86). <strong>TechieDesk leaves this repository</strong> (BRD-87): it becomes a separate product in its own repository that consumes all three packages from NuGet exactly as any customer does, and is the <em>live implementation</em> of their capabilities. Consequently the library's requirements are ledgered <strong>here</strong> again from 2026-09-03 — the 2026-07-17 "single checklist in the TechieDesk BRD" arrangement is reversed — and the TechieDesk BRD keeps app requirements only.</p>
+<p><strong>Amended 2026-09-24 (owner decisions, <code>docs/TechieRag-Update-Brief.md</code>) — the library goes where the app goes, with or without the cloud.</strong> Four demands arrived together and are folded in here. (1) <strong>TechieDesk is renamed Sevak</strong> and the separation happened on 2026-09-24: Sevak is <em>the application showing the full capabilities of TechieRag</em>, freemium with limited rather than gated features, in its own private repository until its v0.1 (BRD-87 amended). (2) <strong>F-PLATFORM</strong> (BRD-88…95): TechieRag and <code>TechieRag.Embedded</code> work inside .NET MAUI apps on Windows, macOS (Mac Catalyst), Android and iOS — writable model folders, packaged native wiring, a small default model on phones, a probe app on all four heads. (3) <strong>F-LOCAL-LLM</strong> (BRD-96…109): a fourth package, <strong><code>TechieRag.Local</code></strong>, runs a language model in-process with no server and no network after one download, closing MyDiary feedback TR-RAG-001; one public <code>UseLocalLlm()</code> over platform-specific runtimes. (4) <strong>F-LLM amendments</strong> (BRD-110…114): streaming that carries tool calls (closing Chatur TR-RAG-002) and browser or device-code <strong>subscription sign-in</strong> to hosted vendors (closing Chatur TR-RAG-001). Plans: <code>/mnt/c/1MyCode/MyAiChats/ClaudeDocs/plans/08-techierag-local-model.md</code> and <code>09-techiedesk-offline-v01.md</code>.</p>
+<h2 id="business-objectives">2. Business objectives<a class="anchor-link" href="#business-objectives">#</a></h2>
+<ul>
+<li>Reduce the cost of adding RAG to a .NET app from "a multi-project integration effort" to "one NuGet reference + fluent config".
+</li>
+<li>Make provider choice (embedding / vector store / LLM) a configuration concern, swappable with zero code changes.
+</li>
+<li>Offer a fully offline, privacy-preserving RAG path for air-gapped / on-premises / edge scenarios.
+</li>
+<li>Support the breadth of real document formats (9) and LLM backends (6) so the library fits existing infrastructure rather than dictating it.
+</li>
+<li>Ship production concerns — logging, telemetry, token budgeting, retry/circuit-breaker, fallback — in the box.
+</li>
+<li>Guarantee backward compatibility (v1 → v2 additive) so upgrades never break consumers.
+</li>
+<li>Run inside the consumer's own app on Windows, macOS, Android and iOS, including a language model that needs no server and no network after one download <em>(added 2026-09-24, F-PLATFORM / F-LOCAL-LLM)</em>.
+</li>
+<li>Let an end user bring their own hosted-vendor subscription to the app through a browser sign-in instead of pasting a pay-per-call API key, wherever the vendor permits it <em>(added 2026-09-24, BRD-112…114)</em>.
+</li>
+</ul>
+<h2 id="scope">3. Scope<a class="anchor-link" href="#scope">#</a></h2>
+<p><strong>In scope:</strong></p>
+<ul>
+<li>The <code>TechieRag</code> core library: ingestion, processing/chunking, embedding, vector storage, semantic search, and (v2) LLM generation, agent loop, memory, token tracking, resilience.
+</li>
+<li>The <code>TechieRag.Embedded</code> package: offline BGE-M3 ONNX embedding.
+</li>
+<li>The <strong><code>TechieRag.Agents</code></strong> package <em>(added 2026-09-03)</em>: agents on Microsoft Agent Framework over TechieRag — fluent builder, agentic retrieval context provider, and public interop adapters at the library's <code>ILlmProvider</code> / <code>IToolHandler</code> / <code>IProgress&lt;AgentStep&gt;</code> / <code>IConversationMemory</code> seams (BRD-84, BRD-85). The agentic retrieval <strong>contract</strong> itself (tool description, schema, structured result, instructions) lives in core with zero packages (BRD-83).
+</li>
+<li><s>The <strong>TechieDesk</strong> Blazor Server application (formerly <code>TechieRagWeb</code>) — demonstrates all library features (incl. Qdrant administration) and is being productized as a self-hostable AnythingLLM alternative (BRD-81/BRD-82; roadmap in <code>docs/TechieRag-CompetitorAnalysis.md</code>).</s> <em>(Transferred 2026-09-03, BRD-87: TechieDesk is a separate product in its own repository and consumes the three packages from NuGet. Its requirements live in the TechieDesk BRD. The delivered F-WEB / F-QDRANT items below stay as historical record.)</em>
+</li>
+<li>NuGet packaging/publishing (three packages, two feeds) and AI-agent skill autodistribution.
+</li>
+<li><strong>Repository separation</strong> <em>(added 2026-09-03, BRD-87; executed 2026-09-24)</em>: this repository holds library and library-test projects only. The application is <strong>Sevak</strong> (TechieDesk renamed), in its own repository.
+</li>
+<li><strong>The <code>TechieRag.Local</code> package</strong> <em>(added 2026-09-24, BRD-96…109)</em>: an in-process local language model behind the same <code>ILlmProvider</code>, on Windows, macOS (Mac Catalyst), Android and iOS. Weights are downloaded once, never packed.
+</li>
+<li><strong>Platform support inside .NET MAUI apps</strong> <em>(added 2026-09-24, BRD-88…95)</em>: writable model folders, packaged native wiring, a small default embedding model on phones, a probe app on all four heads, and a published support matrix.
+</li>
+<li><strong>Subscription sign-in providers</strong> <em>(added 2026-09-24, BRD-112…114)</em>: a browser or device-code sign-in that yields an <code>ILlmProvider</code> billed to the user's own vendor subscription, for every vendor whose terms permit it.
+</li>
+</ul>
+<p><strong>Out of scope (explicit, per v2 spec §1.4; revised 2026-07-17 per CompetitorAnalysis):</strong></p>
+<ul>
+<li>Model fine-tuning / training.
+</li>
+<li>Image / video generation.
+</li>
+<li>Formal RAG-evaluation tooling (precision/recall harnesses).
+</li>
+<li>Model hosting / inference-server provisioning (TechieRag consumes providers, it does not host them). <em>Clarified 2026-09-24:</em> running a model <strong>in-process inside the consumer's app</strong> (<code>TechieRag.Local</code>, F-LOCAL-LLM) is in scope; standing up or managing a model <strong>server</strong> (Ollama, vLLM, LM Studio, a cloud deployment) stays out.
+</li>
+<li>Enforcing a vendor's terms of use on subscription sign-in <em>(added 2026-09-24)</em>: the library records each vendor's stated terms in its connector catalog and offers no method where a vendor offers no flow; whether a given sign-in is personal or team use is decided by who signs in and what licence they hold, in the consuming app.
+</li>
+<li><strong>The Sevak product itself</strong> (TechieDesk until 2026-09-24) <em>(from 2026-09-03)</em>: its screens, app services, packaging and app-side verification are specified and tracked in the Sevak repository. This BRD covers only what Sevak consumes. A Sevak requirement is referenced from here as <code>Sevak#REQ-FN-054</code>; a TechieRag requirement from there as <code>TechieRag#REQ-RAG-054</code> <em>(rule added 2026-09-24)</em>.
+</li>
+</ul>
+<p><strong>Formerly out of scope — moved to the roadmap 2026-07-17</strong> (<code>docs/TechieRag-CompetitorAnalysis.md</code>, Phases 5–6):</p>
+<ul>
+<li>Multi-agent orchestration (graphs / handoffs / guardrails — GAP-LIB-13).
+</li>
+<li>Audio: TTS/STT abstractions and audio-file transcription ingestion (GAP-LIB-10/16).
+</li>
+</ul>
+<h2 id="development-status">4. Development status<a class="anchor-link" href="#development-status">#</a></h2>
+<p>Written by the status gate after every build, verify and handoff; not by hand.</p>
+<p><strong>Snapshot as of 2026-09-24.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
+<table>
+<thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>UI / Pages</td><td>13</td><td>13</td><td>0</td><td>Done</td></tr>
+<tr><td>Non-functional</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
+<tr><td>Functional requirements</td><td>15</td><td>4</td><td>11</td><td>Partial</td></tr>
+<tr><td>RAG / AI requirements (→ /techierag)</td><td>41</td><td>14</td><td>27</td><td>Partial</td></tr>
+</tbody>
+</table>
+<h2 id="stakeholders-users">5. Stakeholders / users<a class="anchor-link" href="#stakeholders-users">#</a></h2>
+<table>
+<thead><tr><th>Role</th><th>Needs</th></tr></thead>
+<tbody>
+<tr><td>.NET application developer</td><td>Add document search / RAG to an app with minimal code; fluent API; DI integration</td></tr>
+<tr><td>Enterprise architect</td><td>A standard RAG solution across projects; offline/privacy option; production reliability</td></tr>
+<tr><td>ML / research engineer</td><td>Quickly compare embedding models and LLM backends without standing up services</td></tr>
+<tr><td>Privacy-conscious / air-gapped team</td><td>Fully offline RAG (embedded ONNX); data never leaves the device</td></tr>
+<tr><td>DevOps / platform engineer</td><td>NuGet packaging, CI publishing, configuration-driven provider switching</td></tr>
+<tr><td>AI-coding-tool user</td><td>A <code>/techierag</code> skill auto-installed into the repo for guided integration</td></tr>
+<tr><td>Agent builder on Microsoft Agent Framework <em>(added 2026-09-03)</em></td><td>An <code>AIAgent</code> over their own documents in a few builder lines; MAF sessions, middleware, workflows and hosting available unchanged; existing TechieRag providers and tools reusable through public adapters</td></tr>
+</tbody>
+</table>
+<p><strong>Primary persona — the integrating .NET developer.</strong> Installs the NuGet package, configures an embedding provider + vector store (and optionally an LLM) via the builder or <code>appsettings.json</code>, ingests documents, then calls <code>SearchAsync</code> (retrieval) or <code>AskAsync</code> (full RAG). The whole library is shaped around making this path short and provider-agnostic.</p>
+<h2 id="context-diagram">6. Context diagram<a class="anchor-link" href="#context-diagram">#</a></h2>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Dev(["Consumer .NET app"]) --&gt; TR["TechieRag (library)"]
+  Dev --&gt; AG["TechieRag.Agents (Microsoft Agent Framework)"]
+  Desk(["TechieDesk — separate repository, consumes the packages"]) -.-&gt; TR
+  Desk -.-&gt; AG
+  AG --&gt; TR
+  AG --&gt; MAF[/"IChatClient — LM Studio / Ollama / OpenAI-compatible, or the configured ILlmProvider"/]
+  TR --&gt; Emb[/"Embedding provider (Ollama / OpenAI / ONNX)"/]
+  TR --&gt; Vec[("Vector store (SQLite-vec / pgvector / Qdrant)")]
+  TR --&gt; Llm[/"LLM provider (Ollama / OpenAI / Azure / Gemini / Anthropic)"/]
+  Docs[("Source documents (PDF / DOCX / MD / …)")] --&gt; TR</pre>
+</div>
+<h2 id="user-journey-primary-use-case">7. User journey — primary use case<a class="anchor-link" href="#user-journey-primary-use-case">#</a></h2>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">sequenceDiagram
+  actor Dev as "Developer"
+  participant B as "TechieRagBuilder"
+  participant R as "ITechieRag"
+  participant V as "Vector store"
+  participant L as "LLM provider"
+  Dev-&gt;&gt;B: UseOllama().UseSqliteVec().UseAnthropicLlm()
+  B--&gt;&gt;R: Build()
+  Dev-&gt;&gt;R: InitializeAsync()
+  Dev-&gt;&gt;R: IngestDirectoryAsync("./docs")
+  R-&gt;&gt;V: store chunks + embeddings
+  Dev-&gt;&gt;R: AskAsync("What does X do?")
+  R-&gt;&gt;V: similarity search (topK)
+  V--&gt;&gt;R: ranked context chunks
+  R-&gt;&gt;L: prompt with context
+  L--&gt;&gt;R: answer + token usage
+  R--&gt;&gt;Dev: RagResponse(answer, sources, usage)</pre>
+</div>
+<h2 id="component-sketch">8. Component sketch<a class="anchor-link" href="#component-sketch">#</a></h2>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart TB
+  App["Consumer app / TechieDesk (via NuGet)"] --&gt; ITR["ITechieRag"]
+  App --&gt; Agent["TechieRag.Agents — ITechieRagAgent over AIAgent"]
+  Agent --&gt; Contract["TechieRag.Agentic — retrieval tool contract (core)"]
+  Contract --&gt; ITR
+  Agent --&gt; Adapt["Seam adapters — ILlmProvider / IToolHandler / AgentStep / IConversationMemory"]
+  ITR --&gt; Proc["Document processors (9)"]
+  ITR --&gt; Emb["Embedding providers (6)"]
+  ITR --&gt; Vec[("Vector stores (3)")]
+  ITR --&gt; Llm["LLM providers (6)"]
+  ITR --&gt; Svc["Services — retry / fallback / memory / tokens / agent loop"]
+  Emb --&gt; Vec</pre>
+</div>
+<h2 id="feature-catalog">9. Feature catalog<a class="anchor-link" href="#feature-catalog">#</a></h2>
+<h3 id="f-ing-document-ingestion-processing">F-ING: Document ingestion &amp; processing<a class="anchor-link" href="#f-ing-document-ingestion-processing">#</a></h3>
+<p><strong>Personas:</strong> .NET developer, knowledge-base builder · <strong>Phase:</strong> v1.1</p>
+<p>Extracts text from nine document formats and splits it into overlapping semantic chunks ready for embedding. Content can be ingested from a single file, a directory (with a glob pattern), or raw text (for database/API content with no file). Each document carries optional metadata for later filtering.</p>
+<table>
+<thead><tr><th>API surface</th><th>Signature</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>Ingest file</td><td><code>IngestAsync(filePath)</code></td><td>Auto-routes by extension to the right processor</td></tr>
+<tr><td>Ingest directory</td><td><code>IngestDirectoryAsync(path, pattern)</code></td><td>Batch ingest with glob</td></tr>
+<tr><td>Ingest text</td><td><code>IngestTextAsync(text, name, metadata?)</code></td><td>No file required</td></tr>
+<tr><td>Chunking</td><td><code>WithChunkSize(size, overlap)</code></td><td>Default 500 / 50 chars</td></tr>
+<tr><td>Lifecycle</td><td><code>ListDocumentsAsync</code>, <code>DeleteDocumentAsync</code>, <code>GetStatsAsync</code>, <code>ClearAsync</code></td><td>Manage ingested corpus</td></tr>
+</tbody>
+</table>
+<p>Processors: PDF (PdfPig), DOCX (OpenXml), Markdown (Markdig), HTML (HtmlAgilityPack), JSON, TOML (Tomlyn), Code (70+ extensions), Text, Generic (binary-detection fallback).</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  In["File / directory / text"] --&gt; Sel{"select processor by extension"}
+  Sel --&gt; Ext["extract text"]
+  Ext --&gt; Chunk["TextChunker (size + overlap)"]
+  Chunk --&gt; Out["List of TextChunk"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-1, BRD-2, BRD-3, BRD-4, BRD-5, BRD-6, BRD-7 (see §10)</p>
+<h3 id="f-emb-embedding-providers">F-EMB: Embedding providers<a class="anchor-link" href="#f-emb-embedding-providers">#</a></h3>
+<p><strong>Personas:</strong> developer, ML engineer · <strong>Phase:</strong> v1.1</p>
+<p>Generates vector embeddings via a single <code>IEmbeddingProvider</code> contract, with batch support for throughput. Six implementations span local and cloud; a custom factory is supported.</p>
+<table>
+<thead><tr><th>Provider</th><th>Builder method</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>Ollama</td><td><code>.UseOllama(endpoint?, model?)</code></td><td>Default localhost:11434, bge-m3</td></tr>
+<tr><td>LM Studio</td><td><code>.UseLmStudio(endpoint?, model?)</code></td><td>Default localhost:1234</td></tr>
+<tr><td>ONNX (local file)</td><td><code>.UseOnnx(modelPath)</code></td><td>Local <code>.onnx</code> inference</td></tr>
+<tr><td>Azure OpenAI</td><td><code>.UseAzureOpenAI(endpoint, apiKey, model)</code></td><td>text-embedding-3-*</td></tr>
+<tr><td>Generic HTTP</td><td><code>.UseHttp(endpoint, format, model, dimensions)</code></td><td>OpenAI/Ollama/Simple formats</td></tr>
+<tr><td>Custom</td><td><code>.UseCustomEmbeddingProvider(factory)</code></td><td>Any <code>IEmbeddingProvider</code></td></tr>
+</tbody>
+</table>
+<p><strong>Requirements:</strong> BRD-8, BRD-9, BRD-10, BRD-11 (see §10)</p>
+<h3 id="f-vec-vector-stores">F-VEC: Vector stores<a class="anchor-link" href="#f-vec-vector-stores">#</a></h3>
+<p><strong>Personas:</strong> developer, infrastructure engineer · <strong>Phase:</strong> v1.1</p>
+<p>Stores and similarity-searches embeddings behind <code>IVectorStore</code>. Three backends cover local-zero-config to distributed-production. All implement full CRUD, batch upsert, document-filtered search, and statistics.</p>
+<table>
+<thead><tr><th>Store</th><th>Builder method</th><th>Best for</th></tr></thead>
+<tbody>
+<tr><td>SQLite-vec</td><td><code>.UseSqliteVec(dbPath?)</code></td><td>Single-machine, dev, embedded apps (zero-config default)</td></tr>
+<tr><td>PostgreSQL / pgvector</td><td><code>.UsePgVector(connectionString)</code></td><td>Production, multi-user, large datasets</td></tr>
+<tr><td>Qdrant</td><td><code>.UseQdrant(endpoint, apiKey?)</code></td><td>High-performance / existing Qdrant infra</td></tr>
+</tbody>
+</table>
+<p><strong>Requirements:</strong> BRD-12, BRD-13, BRD-14, BRD-15 (see §10)</p>
+<h3 id="f-search-semantic-search-retrieval">F-SEARCH: Semantic search &amp; retrieval<a class="anchor-link" href="#f-search-semantic-search-retrieval">#</a></h3>
+<p><strong>Personas:</strong> developer · <strong>Phase:</strong> v1.1</p>
+<p>The core retrieval path: embed the query, similarity-search the vector store, return ranked <code>SearchResult</code>s with relevance scores and full chunk metadata. Optional document-level filter scopes a search; <code>topK</code> bounds results (default 5).</p>
+<p><strong>Requirements:</strong> BRD-16, BRD-17, BRD-18 (see §10)</p>
+<h3 id="f-cfg-configuration-builder">F-CFG: Configuration &amp; builder<a class="anchor-link" href="#f-cfg-configuration-builder">#</a></h3>
+<p><strong>Personas:</strong> developer, DevOps · <strong>Phase:</strong> v1.1</p>
+<p>Four equivalent ways to configure TechieRag: the fluent <code>TechieRagBuilder</code>, <code>appsettings.json</code> binding, the <code>AddTechieRag(...)</code> DI extension, or a hand-built <code>TechieRagConfig</code>. Provider selection, chunking, logging, telemetry, and (v2) all LLM/resilience/budget settings are configurable through every path.</p>
+<table>
+<thead><tr><th>Path</th><th>Entry point</th></tr></thead>
+<tbody>
+<tr><td>Fluent builder</td><td><code>new TechieRagBuilder().Use…().With….Build()</code></td></tr>
+<tr><td>appsettings.json</td><td><code>services.AddTechieRag(Configuration)</code> (binds <code>TechieRag</code> section)</td></tr>
+<tr><td>DI fluent</td><td><code>services.AddTechieRag(rag =&gt; rag.Use…())</code></td></tr>
+<tr><td>Config object</td><td><code>new TechieRagBuilder(config).Build()</code></td></tr>
+</tbody>
+</table>
+<p><strong>Requirements:</strong> BRD-19, BRD-20, BRD-21, BRD-22, BRD-23 (see §10)</p>
+<h3 id="f-embedded-offline-embedded-embedding">F-EMBEDDED: Offline embedded embedding<a class="anchor-link" href="#f-embedded-offline-embedded-embedding">#</a></h3>
+<p><strong>Personas:</strong> privacy-conscious / air-gapped team, edge developer · <strong>Phase:</strong> v1.1</p>
+<p>The <code>TechieRag.Embedded</code> package adds <code>.UseEmbedded()</code> for a fully offline embedding path using a bundled BGE-M3 ONNX model (1024-dim, 100+ languages). On first use the model (~2.3GB) is downloaded once to a platform cache; thereafter it runs with no network. <code>ModelDownloadService.Instance</code> exposes a <code>ProgressChanged</code> event for download UX.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Use[".UseEmbedded()"] --&gt; Init["InitializeAsync()"]
+  Init --&gt; Check{"model cached?"}
+  Check --&gt;|"no"| DL["download BGE-M3 (~2.3GB) once"]
+  Check --&gt;|"yes"| Load["load ONNX session + tokenizer"]
+  DL --&gt; Load
+  Load --&gt; Ready["offline embeddings"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-24, BRD-25, BRD-26 (see §10)</p>
+<h3 id="f-platform-techierag-inside-net-maui-apps-on-four-platforms">F-PLATFORM: TechieRag inside .NET MAUI apps on four platforms<a class="anchor-link" href="#f-platform-techierag-inside-net-maui-apps-on-four-platforms">#</a></h3>
+<p><strong>Personas:</strong> MAUI app developer (MyDiary, Sevak), mobile developer · <strong>Phase:</strong> v5 · <strong>Added:</strong> 2026-09-24 (owner decision; plan 08 step 1)</p>
+<p>The libraries target plain <code>net10.0</code> and load on Android and iOS by fallback, but nothing today makes them <em>work</em> there: model folders default to <code>AppContext.BaseDirectory</code> (read-only on phones), the Mac Catalyst / iOS native ONNX wiring lives only in the app's csproj, the default embedding model is a 2.3 GB download, and <code>SqliteVecStore</code> runs a managed full scan because sqlite-vec is never loaded. F-PLATFORM fixes each of these in the package so every consuming app receives them, and proves it with a probe app built on all four heads. The earlier "mobile app: do not build" line in <code>docs/TechieRag-CompetitorAnalysis.md</code> was about a mobile <strong>application</strong>; a library that works <strong>inside</strong> mobile applications is this feature.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  App["MAUI app: Windows / Mac Catalyst / Android / iOS"] --&gt;|"PackageReference"| Pkg["TechieRag + TechieRag.Embedded"]
+  Pkg --&gt; Targets["buildTransitive targets: native ONNX wiring per platform"]
+  Pkg --&gt; Folder["model + cache root: per-user app data (writable everywhere)"]
+  Pkg --&gt; Small["phone default: 384-dim model; bge-m3 refused with size message"]
+  Probe["samples/TechieRag.Probe: embed 3 texts, store, search, timings"] --&gt; App</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-88, BRD-89, BRD-90, BRD-91, BRD-92, BRD-93, BRD-94, BRD-95 (see §10)</p>
+<h3 id="f-llm-llm-provider-integration">F-LLM: LLM provider integration<a class="anchor-link" href="#f-llm-llm-provider-integration">#</a></h3>
+<p><strong>Personas:</strong> developer, AI engineer · <strong>Phase:</strong> v2</p>
+<p>A unified <code>ILlmProvider</code> contract for text completion, chat, streaming, structured output, and tool calling across six backends, each implemented with raw <code>HttpClient</code> + <code>System.Text.Json</code>. Providers expose capability flags (<code>SupportsToolCalling</code>, <code>SupportsStreaming</code>) and fire <code>OnCompletionCompleted</code> telemetry.</p>
+<table>
+<thead><tr><th>Provider</th><th>Builder method</th><th>Auth / default</th></tr></thead>
+<tbody>
+<tr><td>Ollama</td><td><code>.UseOllamaLlm(endpoint?, model?)</code></td><td>local, llama3.2</td></tr>
+<tr><td>LM Studio</td><td><code>.UseLmStudioLlm(endpoint?, model?)</code></td><td>local</td></tr>
+<tr><td>OpenAI-compatible</td><td><code>.UseOpenAICompatibleLlm(endpoint, apiKey, model)</code></td><td>OpenAI / vLLM / Groq / Together</td></tr>
+<tr><td>Azure AI Foundry</td><td><code>.UseAzureAIFoundryLlm(endpoint, apiKey, model, apiVersion?)</code></td><td>deployment routing</td></tr>
+<tr><td>Google Gemini</td><td><code>.UseGeminiLlm(apiKey, model?)</code></td><td><code>GOOGLE_API_KEY</code></td></tr>
+<tr><td>Anthropic Claude</td><td><code>.UseAnthropicLlm(apiKey, model?)</code></td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+<tr><td>Custom</td><td><code>.UseCustomLlmProvider(factory)</code></td><td>any <code>ILlmProvider</code></td></tr>
+<tr><td>Local, in-process <em>(2026-09-24, F-LOCAL-LLM)</em></td><td><code>.UseLocalLlm()</code> in <code>TechieRag.Local</code></td><td>no key, no server, no network after one download</td></tr>
+<tr><td>Subscription sign-in <em>(2026-09-24, BRD-112…114)</em></td><td>one method per permitting vendor, e.g. <code>.UseChatGptSubscriptionLlm(signInCallback)</code></td><td>browser / device-code flow driven by the host app; billed to the user's own subscription</td></tr>
+</tbody>
+</table>
+<p><strong>Amended 2026-09-24 — two contract additions (owner decisions, <code>docs/TechieRag-Update-Brief.md</code> decisions 8 and 9).</strong> <em>Streaming with tool calls (BRD-110, BRD-111):</em> today a caller must choose between <code>ChatStreamAsync</code> (text only) and <code>ChatAsync</code> (tool calls, no streaming). A new streaming method yields typed events — a text delta, a decided tool call, a final usage record — so a tool-using turn streams. It is additive: <code>ChatStreamAsync</code> stays and is implemented on top of it, so no consumer breaks and no major version is needed. It lands before <code>TechieRag.Local</code> exists, so the seventh provider implements the final contract once. <em>Subscription sign-in (BRD-112…114):</em> the host app drives the browser or device-code step; the library returns the URL and code, waits, and yields an <code>ILlmProvider</code> billed to the user's subscription. Vendor terms are facts recorded in <code>LlmConnectorCatalog</code>, not rules enforced in code: at 2026-09-24 OpenAI permits this in external tools for personal use and Anthropic prohibits it for Free/Pro/Max plans; Google, Groq, xAI and Meta are researched before build (BRD-114).</p>
+<p><strong>Requirements:</strong> BRD-27, BRD-28, BRD-29, BRD-30, BRD-31, BRD-32, BRD-33, BRD-110, BRD-112, BRD-113, BRD-114 (see §10)</p>
+<h3 id="f-local-llm-techierag-local-package-in-process-local-language-model">F-LOCAL-LLM: <code>TechieRag.Local</code> package — in-process local language model<a class="anchor-link" href="#f-local-llm-techierag-local-package-in-process-local-language-model">#</a></h3>
+<p><strong>Personas:</strong> privacy-first app developer (MyDiary: "no cloud inference path at all"), Sevak offline user, edge developer · <strong>Phase:</strong> v5 · <strong>Added:</strong> 2026-09-24 (owner decision; plan 08 step 4; closes MyDiary feedback TR-RAG-001)</p>
+<p>Embeddings already have an offline path (<code>TechieRag.Embedded</code>); completions do not: Ollama and LM Studio need a server process that cannot run inside an iOS or Android sandbox, and the other four providers are cloud APIs. <code>TechieRag.Local</code> is a fourth package, never part of core, that runs a small language model inside the app process. The consumer sees one builder call, <code>UseLocalLlm()</code>, and one <code>ILlmProvider</code> that behaves identically on Windows, macOS (Mac Catalyst), Android and iOS. Underneath, an internal runtime interface has one implementation per platform, chosen after a measured comparison (LLamaSharp / llama.cpp with GGUF models against ONNX Runtime GenAI) recorded in <code>DECISIONS.md</code>; a later backend such as an operating system's built-in model fits behind the same interface. Weights are downloaded once to the per-user app data folder from F-PLATFORM, after the user accepts the model's terms, and are never inside the package or the app bundle. Sevak is the first desktop consumer; MyDiary the first mobile one.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Use[".UseLocalLlm()"] --&gt; Mem{"enough memory for the model?"}
+  Mem --&gt;|"no"| Refuse["clear error, app keeps running"]
+  Mem --&gt;|"yes"| Cached{"weights cached?"}
+  Cached --&gt;|"no"| Terms["terms accepted?"] --&gt; DL["resumable download, SHA-256, progress events"]
+  Cached --&gt;|"yes"| Load["platform runtime loads model"]
+  DL --&gt; Load
+  Load --&gt; Prov["ILlmProvider: complete / chat / typed streaming / JSON mode"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-96, BRD-97, BRD-98, BRD-99, BRD-100, BRD-101, BRD-102, BRD-103, BRD-104, BRD-105, BRD-106, BRD-107, BRD-108, BRD-109 (see §10)</p>
+<h3 id="f-rag-auto-rag-generation">F-RAG: Auto-RAG generation<a class="anchor-link" href="#f-rag-auto-rag-generation">#</a></h3>
+<p><strong>Personas:</strong> developer building chatbots / QA systems · <strong>Phase:</strong> v2</p>
+<p>High-level methods that combine retrieval and generation in one call, returning a <code>RagResponse</code> with the answer, the source chunks, and token usage. Single-turn (<code>AskAsync</code>), streaming (<code>AskStreamAsync</code>), and multi-turn RAG chat (<code>ChatWithRagAsync</code> / <code>…StreamAsync</code>) are provided. When no LLM is configured (<code>LlmSource.None</code>) the library behaves exactly as v1 (retrieval only).</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Q["AskAsync(question)"] --&gt; S["search topK context"]
+  S --&gt; P["build RAG prompt"]
+  P --&gt; G["LLM generate"]
+  G --&gt; R["RagResponse(answer, sources, usage)"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-34, BRD-35, BRD-36, BRD-37, BRD-38 (see §10)</p>
+<h3 id="f-struct-structured-typed-output">F-STRUCT: Structured / typed output<a class="anchor-link" href="#f-struct-structured-typed-output">#</a></h3>
+<p><strong>Personas:</strong> data-extraction developer · <strong>Phase:</strong> v2</p>
+<p><code>CompleteAsync&lt;T&gt;(prompt, options)</code> requests JSON from the LLM and deserializes it into a strongly-typed C# object, enabling type-safe extraction from unstructured responses.</p>
+<p><strong>Requirements:</strong> BRD-39 (see §10)</p>
+<h3 id="f-agent-tool-calling-agent-loop">F-AGENT: Tool calling &amp; agent loop<a class="anchor-link" href="#f-agent-tool-calling-agent-loop">#</a></h3>
+<p><strong>Personas:</strong> agent builder, automation developer · <strong>Phase:</strong> v2</p>
+<p>Lets the LLM request tool/function execution, receive results, and iterate until it produces a final answer. Tools are declared via <code>ToolDefinition</code> (name, description, JSON-schema parameters) and either implemented through <code>IToolHandler</code> or registered as delegates through <code>ToolRegistry</code>. <code>AgentLoopRunner</code> orchestrates the loop with a configurable max-iteration guard (default 10).</p>
+<p><strong>Amended 2026-09-03 — agentic retrieval contract (BRD-83).</strong> Core gains a dependency-free namespace <code>TechieRag.Agentic</code> that makes retrieval <em>agentic</em> for any loop: two tools (<code>search_knowledge_base</code>, <code>list_documents</code>) with a stable, model-facing description and JSON schema; a structured tool result carrying citation refs (S1, S2, …), source document, page, relevance score, a match status of <code>strong</code> / <code>weak</code> / <code>none</code> / <code>limit_reached</code> and a next-step hint; a per-turn search budget; and default retrieve-first instructions (<code>AgenticInstructions.Default</code>). <code>IRetrievalSource</code> abstracts what is searched (an <code>ITechieRag</code>, or a delegate such as a workspace-scoped search). <code>ToolRegistry.RegisterKnowledgeBase(...)</code> binds it to this loop; <code>TechieRag.Agents</code> binds the same contract to Microsoft Agent Framework, so both loops retrieve, re-search and cite identically. Model-facing strings are invariant English by policy. Full text: <code>docs/TechieRag.Agents-Proposal.md</code> §3.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Q["User question"] --&gt; M["Model"]
+  M --&gt;|"search_knowledge_base(query, top_k, document_id)"| T["Tool: IRetrievalSource.SearchAsync"]
+  T --&gt; R["Result: refs + scores + status + hint"]
+  R --&gt; D{"status?"}
+  D --&gt;|"strong"| A["Answer with [S1] citations"]
+  D --&gt;|"weak / none"| M2["Rephrase, narrow by document, or raise top_k"]
+  M2 --&gt; M
+  D --&gt;|"limit_reached"| G["Answer with what was found; state the gaps"]</pre>
+</div>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Ask["Ask with tools"] --&gt; Llm["LLM"]
+  Llm --&gt; D{"tool calls?"}
+  D --&gt;|"yes"| Ex["execute tools"]
+  Ex --&gt; Llm
+  D --&gt;|"no"| Ans["final answer"]</pre>
+</div>
+<p><strong>Amended 2026-09-24 (BRD-111).</strong> <code>AgentLoopRunner</code> gains a streaming path over the typed streaming events of BRD-110, so a tool-using turn shows its assistant text as it arrives and still runs every tool through the registry; <code>TechieRag.Agents</code> exposes the same through its <code>IChatClient</code> adapter's streaming method.</p>
+<p><strong>Requirements:</strong> BRD-40, BRD-41, BRD-42, BRD-43, BRD-83, BRD-111 (see §10)</p>
+<h3 id="f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">F-AGENTS: <code>TechieRag.Agents</code> package — agents on Microsoft Agent Framework<a class="anchor-link" href="#f-agents-techierag-agents-package-agents-on-microsoft-agent-framework">#</a></h3>
+<p><strong>Personas:</strong> agent builder, .NET application developer, TechieDesk (as a package consumer) · <strong>Phase:</strong> v4 · <strong>Added:</strong> 2026-09-03 (owner decision) · <strong>Design:</strong> <code>docs/TechieRag.Agents-Proposal.md</code></p>
+<p>A third NuGet package that puts a <strong>Microsoft Agent Framework (MAF) 1.20</strong> <code>ChatClientAgent</code> over TechieRag. It exists so that a consumer gets MAF's ecosystem — <code>AgentSession</code> persistence, middleware, tool approval, workflows, hosting, agent-as-tool — while TechieRag core stays dependency-free (Architecture ADR-003). Verified against the live MAF docs on 2026-09-03: current stable is <code>Microsoft.Agents.AI</code> <strong>1.20.0</strong> over <code>Microsoft.Extensions.AI</code> <strong>10.9.0</strong>; conversation state is <code>AgentSession</code> (there is no <code>AgentThread</code>); any <code>IChatClient</code> backs a <code>ChatClientAgent</code>; tools are <code>AIFunction</code>s; <code>ChatClientAgent</code> wraps the client in <code>FunctionInvokingChatClient</code> automatically.</p>
+<p><strong>Shape.</strong> <code>new TechieRagAgentBuilder(rag)</code> reads like the core builder: <code>UseLmStudio(endpoint, model)</code> (primary local target, Chat Completions at <code>/v1</code>), <code>UseOllama</code>, <code>UseOpenAI</code>, <code>UseOpenAICompatible</code>, <code>UseConfiguredLlm()</code> (the LLM core already has, through the <code>ILlmProvider</code> adapter), <code>UseCustomChatClient(...)</code>, <code>WithRetrieval(...)</code>, <code>WithToolHandler(IToolHandler)</code>, <code>WithTools(AITool[])</code>, <code>WithInstructions</code> / <code>WithAdditionalInstructions</code>, <code>WithMaxToolIterations</code>, <code>WithTrace(IProgress&lt;AgentStep&gt;)</code>, <code>WithPrefetch()</code>, <code>Build()</code> → <code>ITechieRagAgent { AIAgent Agent; ITechieRag Rag; CreateSessionAsync; AskAsync; AskStreamAsync }</code>. MAF types are exposed, not wrapped. DI: <code>services.AddTechieRagAgent(...)</code>.</p>
+<p><strong>Seam adapters (BRD-85) are public API</strong>, because a package consumer such as TechieDesk must keep one provider configuration, one tool catalogue, one egress gate and one trace renderer:</p>
+<table>
+<thead><tr><th>Seam</th><th>Adapter</th><th>Direction</th></tr></thead>
+<tbody>
+<tr><td>Model</td><td><code>ILlmProvider</code> → <code>IChatClient</code> (<code>LlmProviderChatClient</code>)</td><td>all six providers, routing, retry, fallback, token events preserved</td></tr>
+<tr><td>Tools</td><td><code>IToolHandler</code> → <code>IList&lt;AITool&gt;</code> (raw JSON schema, <code>RequiresConfirmation</code> → <code>ApprovalRequiredAIFunction</code>) and <code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code></td><td>both directions, so MAF agents can be flow nodes</td></tr>
+<tr><td>Trace</td><td>MAF agent-run + function middleware → <code>IProgress&lt;AgentStep&gt;</code></td><td>the existing four <code>AgentStepKind</code>s only; never a forked format</td></tr>
+<tr><td>Memory</td><td><code>IConversationMemory</code> → <code>ChatHistoryProvider</code></td><td>on demand</td></tr>
+</tbody>
+</table>
+<p><strong>Constraints carried from the product:</strong> no <code>HarnessAgent</code> (it adds a hosted web-search tool and file memory by default), no MAF exporters, sessions persisted locally only, model-facing strings invariant English. Package: <code>net10.0;net8.0</code>; references <code>Microsoft.Agents.AI</code> 1.20.0, <code>Microsoft.Extensions.AI</code> 10.9.0, <code>Microsoft.Extensions.AI.OpenAI</code> 10.9.0; <strong>no</strong> MSBuild targets of its own (core's already write into consumer repos).</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart TB
+  B["TechieRagAgentBuilder(rag)"] --&gt; CC["IChatClient — OpenAI-compatible route, or ILlmProvider adapter"]
+  B --&gt; CP["RetrievalContextProvider — tools over TechieRag.Agentic"]
+  B --&gt; TH["IToolHandler adapter — skills, MCP tools, egress gate below it"]
+  CC --&gt; A["ChatClientAgent (AIAgent)"]
+  CP --&gt; A
+  TH --&gt; A
+  A --&gt; S["AgentSession"]
+  A --&gt; TR["Trace adapter → IProgress&lt;AgentStep&gt;"]
+  A --&gt; R["AgentRagResponse — Answer, Sources (SearchResult), Searches, Raw"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-84, BRD-85 (see §10)</p>
+<h3 id="f-mem-conversation-memory">F-MEM: Conversation memory<a class="anchor-link" href="#f-mem-conversation-memory">#</a></h3>
+<p><strong>Personas:</strong> chatbot developer · <strong>Phase:</strong> v2</p>
+<p>Optional multi-turn history via <code>IConversationMemory</code>, with automatic context-window trimming to a token budget (keeps the system message + most recent turns). <code>InMemoryConversationMemory</code> is the default per-session implementation; custom implementations are supported.</p>
+<p><strong>Requirements:</strong> BRD-44, BRD-45, BRD-46 (see §10)</p>
+<h3 id="f-token-token-tracking-budgets">F-TOKEN: Token tracking &amp; budgets<a class="anchor-link" href="#f-token-token-tracking-budgets">#</a></h3>
+<p><strong>Personas:</strong> cost-conscious developer, SaaS operator · <strong>Phase:</strong> v2</p>
+<p>Centralized token counting and cost estimation across all LLM operations via <code>ITokenTracker</code>, with per-model breakdown, a configurable pricing table, budget ceilings (<code>MaxTotalTokens</code>, <code>MaxCostUsd</code>), an alert threshold (default 80%), optional blocking on exceed, and <code>OnBudgetAlert</code> / <code>OnUsageRecorded</code> events.</p>
+<p><strong>Requirements:</strong> BRD-47, BRD-48, BRD-49, BRD-50 (see §10)</p>
+<h3 id="f-resil-resilience-retry">F-RESIL: Resilience &amp; retry<a class="anchor-link" href="#f-resil-resilience-retry">#</a></h3>
+<p><strong>Personas:</strong> production engineer · <strong>Phase:</strong> v2</p>
+<p><code>RetryHandler</code> decorates <code>ILlmProvider</code> with exponential backoff (1s→30s, ×2), HTTP-429 detection with <code>Retry-After</code> parsing, a circuit breaker (open after 5 failures, 30s recovery), and a request timeout (default 120s) — applied automatically to all LLM calls.</p>
+<p><strong>Requirements:</strong> BRD-51, BRD-52, BRD-53 (see §10)</p>
+<h3 id="f-fallback-fallback-llm-provider">F-FALLBACK: Fallback LLM provider<a class="anchor-link" href="#f-fallback-fallback-llm-provider">#</a></h3>
+<p><strong>Personas:</strong> reliability engineer · <strong>Phase:</strong> v2</p>
+<p><code>FallbackLlmHandler</code> adds a secondary provider that automatically takes over when the primary fails after retries, configured via <code>.WithFallbackLlm(...)</code> or the <code>LlmFallback</code> config section.</p>
+<p><strong>Requirements:</strong> BRD-54 (see §10)</p>
+<h3 id="f-prompt-prompt-templates">F-PROMPT: Prompt templates<a class="anchor-link" href="#f-prompt-prompt-templates">#</a></h3>
+<p><strong>Personas:</strong> prompt engineer, domain-app builder · <strong>Phase:</strong> v2</p>
+<p>Customizable RAG prompt construction via <code>IPromptTemplate</code> — controls how context chunks are formatted and injected, the system prompt, and context limits (<code>MaxContextChunks</code>, <code>MaxContextTokens</code>). <code>PromptTemplateEngine</code> is the default; <code>.WithPromptTemplate(...)</code> and <code>.WithCustomPromptTemplate(...)</code> customize or replace it.</p>
+<p><strong>Requirements:</strong> BRD-55, BRD-56 (see §10)</p>
+<h3 id="f-autodist-ai-agent-autodistribution">F-AUTODIST: AI-agent autodistribution<a class="anchor-link" href="#f-autodist-ai-agent-autodistribution">#</a></h3>
+<p><strong>Personas:</strong> consumer developer, AI-coding-tool user · <strong>Phase:</strong> v1.1</p>
+<p>When a consumer installs the TechieRag NuGet and builds, <code>TechieRag.targets</code> auto-copies AI skill files into the consuming repo — <code>.techierag/TechieRag-AI-Reference.md</code>, <code>.claude/commands/techierag.md</code>, <code>.opencode/command/techierag.md</code> — so <code>/techierag</code> is available with zero manual setup, and stays current on package updates.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Add["dotnet add package TechieRag"] --&gt; Bld["dotnet build"]
+  Bld --&gt; Tgt["TechieRag.targets (After Build)"]
+  Tgt --&gt; Skill["skill files copied into consumer repo"]</pre>
+</div>
+<p><strong>Requirements:</strong> BRD-57, BRD-58 (see §10)</p>
+<h3 id="f-pkg-nuget-packaging-publishing">F-PKG: NuGet packaging &amp; publishing<a class="anchor-link" href="#f-pkg-nuget-packaging-publishing">#</a></h3>
+<p><strong>Personas:</strong> maintainer, DevOps · <strong>Phase:</strong> v1.1</p>
+<p>Both packages are built and published through GitHub Actions (<code>publish-nuget.yml</code>): restore → build (Release) → test → pack → publish to GitHub Packages (always) and NuGet.org (gated on a secret). Versioning is semantic, overridden at pack time from a <code>v*</code> tag or the run number. <code>TechieRag.Embedded</code> packs its ONNX runtime assets.</p>
+<p><strong>Amended 2026-09-03.</strong> Three packages (<code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Agents</code>) ship together at the same version (BRD-86). The shipped process, per <code>DECISIONS.md</code> 2026-08-09 / 2026-09-03: <code>publish-github-packages.yml</code> feeds <strong>GitHub Packages</strong> automatically on push to <code>main</code> and on release tags (pre-release feed); <code>publish-nuget.yml</code> publishes to <strong>nuget.org</strong> by <strong>manual dispatch only</strong>, selecting the release tag, with the version derived from that tag and trusted publishing (OIDC) — no stored API key. This is also the mechanism the separated TechieDesk repository consumes (BRD-87).</p>
+<p><strong>Requirements:</strong> BRD-59, BRD-60, BRD-61, BRD-86 (see §10)</p>
+<h3 id="f-repo-repository-separation">F-REPO: Repository separation<a class="anchor-link" href="#f-repo-repository-separation">#</a></h3>
+<p><strong>Personas:</strong> maintainer, Sevak developer · <strong>Phase:</strong> v4 · <strong>Added:</strong> 2026-09-03 (owner decision) · <strong>Plan:</strong> <code>docs/TechieRag.Agents-Proposal.md</code> §10 · <strong>Executed:</strong> 2026-09-24 (<code>docs/TechieRag-Split-Goal.md</code>, Sevak <code>docs/Sevak-Split-Goal.md</code>)</p>
+<p><strong>Amended 2026-09-24 (owner decisions 1–6, <code>docs/TechieRag-Update-Brief.md</code>).</strong> The application repository is <strong>Sevak</strong>: TechieDesk renamed in full (repository, projects, namespaces, bundle id, artefacts, documents) at the moment of the split, so there is one product and one name. Sevak is <em>the application showing the full capabilities of TechieRag</em> and stays the library's test bed; it is freemium, with features <strong>limited, never gated</strong>. Its repository is private until its v0.1 (<code>docs/OldDocs/Sevak-Decision-Request.md</code> D1). On 2026-09-24 the app paths were copied into the Sevak repository (build output excluded) and its package-consumption goal (<code>Sevak#REQ-FN-054</code>) started; the deletion here (<code>REQ-FN-006</code>) follows once Sevak builds and tests green from the published 1.0.7 packages. Cross-repository references carry the repository name: <code>Sevak#REQ-FN-054</code>, <code>TechieRag#REQ-RAG-054</code>. The paragraph below is the 2026-09-03 plan and reads "TechieDesk" for what is now Sevak.</p>
+<p>TechieDesk moves to its own repository and consumes the three packages from NuGet, the way every customer does. This repository keeps library and library-test projects only. What moves: <code>apps/*</code> (five projects), <code>tests/TechieDesk.Tests</code>, <code>tests/appium</code>, <code>tests/verify</code> + <code>playwright.config.ts</code>, <code>.github/workflows/publish-desktop.yml</code>, <code>docs/TechieDesk-*</code>, <code>docs/devguides</code>, <code>docs/mockups</code>, <code>docs/screenshots/TechieDesk</code>, <code>uiIssues/</code>, and a copy of <code>.tfcore/</code> configured for an app. What stays: <code>src/*</code>, <code>tests/TechieRag.Tests</code>, the two library workflows and their scripts, library docs, <code>README.md</code> (its sample-application section becomes a link). Verified precondition: no app project uses library internals (<code>InternalsVisibleTo</code> names only <code>TechieRag.Tests</code>), so <code>PackageReference</code> is a drop-in for <code>ProjectReference</code>.</p>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Lib["TechieRag repository — src/*, tests/TechieRag.Tests"] --&gt;|"release → tag"| GHP["GitHub Packages (pre-release)"]
+  Lib --&gt;|"manual dispatch"| NO["nuget.org (public)"]
+  Lib --&gt;|"dotnet pack -o local-feed (same-day iteration)"| LF["local folder feed"]
+  GHP --&gt; Desk["TechieDesk repository — apps/*, app tests, app docs, Appium/Playwright"]
+  NO --&gt; Desk
+  LF --&gt; Desk</pre>
+</div>
+<p><strong>Governance consequence:</strong> library requirements are ledgered in this BRD and <code>docs/TechieRag-Checklist.md</code> again from 2026-09-03; the TechieDesk BRD keeps app requirements and names library dependencies as package versions. Open library rows migrate from the TechieDesk checklist with their status and remarks preserved.</p>
+<p><strong>Requirements:</strong> BRD-87 (see §10)</p>
+<h3 id="f-web-sevak-application-formerly-techiedesk">F-WEB: Sevak application (formerly TechieDesk)<a class="anchor-link" href="#f-web-sevak-application-formerly-techiedesk">#</a></h3>
+<p><strong>Personas:</strong> new user, reference-implementation seeker, self-hosting end user · <strong>Phase:</strong> v1.1 + v2 (repositioned v3, 2026-07-17)</p>
+<p><strong>Transferred 2026-09-03 (BRD-87).</strong> TechieDesk is now a separate product in its own repository and consumes <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Agents</code> from NuGet; its requirements live in the TechieDesk BRD. The delivered items below (BRD-62…70, BRD-82) are retained as historical record and no further requirements are added under F-WEB here. <strong>Renamed 2026-09-24:</strong> the product is <strong>Sevak</strong> (BRD-81, BRD-87 amended); its BRD, checklist and repository carry that name. Every item below stays as written, as history.</p>
+<p><strong>TechieDesk</strong> (formerly <code>TechieRagWeb</code>; renamed 2026-07-17 per BRD-82 / REQ-UI-014) is a Blazor Server application built with TrBlazeUI components and Lucide icons. Originally the capability-demonstration sample, it is now positioned as a <strong>productized, self-hostable AnythingLLM alternative</strong> powered by the TechieRag library (BRD-81) — the competitive roadmap (workspaces, multi-user, persistent history, connectors, developer API, agents) is tracked as the GAP-APP-<em>/GAP-LIB-</em> register in <code>docs/TechieRag-CompetitorAnalysis.md</code>. Ten routed pages cover configuration, ingestion, RAG chat, direct LLM playground, tool demo, token dashboard, and Qdrant admin.</p>
+<table>
+<thead><tr><th>Screen</th><th>Route</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>Home</td><td><code>/</code></td><td>Landing + navigation</td></tr>
+<tr><td>Settings</td><td><code>/settings</code></td><td>Embedding + vector store config</td></tr>
+<tr><td>LLM Settings</td><td><code>/llm-settings</code></td><td>Provider / fallback / usage / resilience / prompts tabs</td></tr>
+<tr><td>Ingestion</td><td><code>/ingestion</code></td><td>File upload + document management</td></tr>
+<tr><td>Text Ingestion</td><td><code>/text-ingestion</code></td><td>Raw-text ingestion</td></tr>
+<tr><td>Chat</td><td><code>/chat</code></td><td>LLM-powered RAG chat (streaming, sources, top-K, filter)</td></tr>
+<tr><td>LLM Playground</td><td><code>/llm-playground</code></td><td>Direct completion / structured output / chat</td></tr>
+<tr><td>Tool Demo</td><td><code>/tool-demo</code></td><td>Agent loop with built-in + custom tools, execution trace</td></tr>
+<tr><td>Token Usage</td><td><code>/token-usage</code></td><td>Usage dashboard, budget status, per-model breakdown</td></tr>
+<tr><td>Qdrant Admin</td><td><code>/qdrant-admin</code></td><td>Collection + vector management (see F-QDRANT)</td></tr>
+</tbody>
+</table>
+<p><strong>Requirements:</strong> BRD-62, BRD-63, BRD-64, BRD-65, BRD-66, BRD-67, BRD-68, BRD-69, BRD-70, BRD-81, BRD-82 (see §10)</p>
+<h3 id="f-qdrant-qdrant-database-administration">F-QDRANT: Qdrant database administration<a class="anchor-link" href="#f-qdrant-qdrant-database-administration">#</a></h3>
+<p><strong>Personas:</strong> DevOps, vector-DB operator · <strong>Phase:</strong> v1.1</p>
+<p>In TechieDesk, programmatic Docker container lifecycle management plus a Qdrant admin UI: connection status, create/start/stop/remove container, collection CRUD, paginated vector browsing/search, vector detail (payload + chunk + source), bulk delete, and cluster info.</p>
+<p><strong>Transferred 2026-09-03 (BRD-87):</strong> this is TechieDesk UI and moves with it; retained here as historical record.</p>
+<p><strong>Requirements:</strong> BRD-71, BRD-72, BRD-73 (see §10)</p>
+<h2 id="functional-requirements-brd-ledger">10. Functional requirements (BRD ledger)<a class="anchor-link" href="#functional-requirements-brd-ledger">#</a></h2>
+<p><strong>F-ING — Document ingestion &amp; processing (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-1</strong> — A developer can ingest a single file via <code>IngestAsync(filePath)</code> with auto processor selection by extension <em>(F-ING)</em>
+</li>
+<li><strong>BRD-2</strong> — A developer can batch-ingest a directory with a glob pattern via <code>IngestDirectoryAsync</code> <em>(F-ING)</em>
+</li>
+<li><strong>BRD-3</strong> — A developer can ingest raw text (no file) with optional metadata via <code>IngestTextAsync</code> <em>(F-ING)</em>
+</li>
+<li><strong>BRD-4</strong> — The system shall extract text from PDF, DOCX, Markdown, HTML, JSON, TOML, code, plain-text, and generic formats <em>(F-ING)</em>
+</li>
+<li><strong>BRD-5</strong> — The system shall split content into overlapping chunks with configurable size/overlap via <code>WithChunkSize</code> <em>(F-ING)</em>
+</li>
+<li><strong>BRD-6</strong> — A developer can attach per-document metadata for later filtering and context <em>(F-ING)</em>
+</li>
+<li><strong>BRD-7</strong> — A developer can list, delete, clear, and get statistics for ingested documents <em>(F-ING)</em>
+</li>
+</ul>
+<p><strong>F-EMB — Embedding providers (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-8</strong> — The system shall generate single and batch embeddings behind <code>IEmbeddingProvider</code> <em>(F-EMB)</em>
+</li>
+<li><strong>BRD-9</strong> — A developer can select a local embedding provider (Ollama, LM Studio, ONNX) <em>(F-EMB)</em>
+</li>
+<li><strong>BRD-10</strong> — A developer can select a cloud/generic embedding provider (Azure OpenAI, HTTP-compatible) <em>(F-EMB)</em>
+</li>
+<li><strong>BRD-11</strong> — A developer can supply a custom embedding provider via factory <em>(F-EMB)</em>
+</li>
+</ul>
+<p><strong>F-VEC — Vector stores (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-12</strong> — A developer can use SQLite-vec as a zero-config local vector store <em>(F-VEC)</em>
+</li>
+<li><strong>BRD-13</strong> — A developer can use PostgreSQL/pgvector as a production vector store <em>(F-VEC)</em>
+</li>
+<li><strong>BRD-14</strong> — A developer can use Qdrant as a vector store <em>(F-VEC)</em>
+</li>
+<li><strong>BRD-15</strong> — The system shall provide full CRUD, batch upsert, document-filtered search, and statistics across all vector stores <em>(F-VEC)</em>
+</li>
+</ul>
+<p><strong>F-SEARCH — Semantic search &amp; retrieval (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-16</strong> — A developer can run a semantic similarity search via <code>SearchAsync(query, topK, documentFilter?)</code> <em>(F-SEARCH)</em>
+</li>
+<li><strong>BRD-17</strong> — The system shall return ranked results with a 0–1 relevance score and full chunk metadata <em>(F-SEARCH)</em>
+</li>
+<li><strong>BRD-18</strong> — A developer can scope a search to a single document/collection via a filter <em>(F-SEARCH)</em>
+</li>
+</ul>
+<p><strong>F-CFG — Configuration &amp; builder (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-19</strong> — A developer can configure TechieRag via the fluent <code>TechieRagBuilder</code> <em>(F-CFG)</em>
+</li>
+<li><strong>BRD-20</strong> — A developer can configure TechieRag from <code>appsettings.json</code> (<code>TechieRag</code> section binding) <em>(F-CFG)</em>
+</li>
+<li><strong>BRD-21</strong> — A developer can register TechieRag in DI via <code>AddTechieRag(...)</code> (builder and <code>IConfiguration</code> overloads) <em>(F-CFG)</em>
+</li>
+<li><strong>BRD-22</strong> — A developer can configure TechieRag from a hand-built <code>TechieRagConfig</code> object <em>(F-CFG)</em>
+</li>
+<li><strong>BRD-23</strong> — A developer can switch any provider with no code change, only configuration <em>(F-CFG)</em>
+</li>
+</ul>
+<p><strong>F-EMBEDDED — Offline embedded embedding (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-24</strong> — A developer can enable fully offline embedding via <code>.UseEmbedded()</code> (bundled BGE-M3 ONNX) <em>(F-EMBEDDED)</em>
+</li>
+<li><strong>BRD-25</strong> — The system shall download the embedded model once to a platform cache and run offline thereafter <em>(F-EMBEDDED)</em>
+</li>
+<li><strong>BRD-26</strong> — A developer can monitor model-download progress via <code>ModelDownloadService.ProgressChanged</code> <em>(F-EMBEDDED)</em>
+</li>
+</ul>
+<p><strong>F-PLATFORM — TechieRag inside .NET MAUI apps on four platforms (Phase v5; added 2026-09-24)</strong></p>
+<ul>
+<li><strong>BRD-88</strong> — The BRD and the UsageGuide shall carry a platform support matrix stating, per package (<code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Agents</code>, <code>TechieRag.Local</code>) and per platform (Windows, macOS / Mac Catalyst, Android, iOS), whether it is supported, tested on a named device, or not supported; a cell is never "supported" without a recorded run <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-89</strong> — Model and cache folders shall no longer default to <code>AppContext.BaseDirectory</code>; the default root is the per-user application data folder (<code>Environment.SpecialFolder.LocalApplicationData</code>), writable on all four platforms, the host can override it, and the embedding model, the reranker and the local language model share that root <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-90</strong> — <code>TechieRag.Embedded</code> shall ship <code>buildTransitive</code> MSBuild targets that give a consuming app the correct native ONNX Runtime wiring on Mac Catalyst and iOS (the static xcframework <code>NativeReference</code>, <code>ForceLoad</code>, the CoreML weak framework, the Debug custom-ops stub and the interpreter setting hand-written today in the app csproj) and on Android (arm64-v8a and x86_64), so no consuming app writes native wiring by hand; Sevak's csproj then removes its copy <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-91</strong> — On Android and iOS, <code>UseEmbedded()</code> with no explicit model shall use a small 384-dimension model (<code>UseMiniLM</code> / <code>UseBgeSmall</code> class) and shall refuse bge-m3 with a clear message naming its 2.3 GB size; desktop defaults are unchanged <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-92</strong> — Every model download shall report its total size before starting so the host can ask for Wi-Fi or decline, and shall expose progress through the existing <code>ModelDownloadService</code> event shape <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-93</strong> — <code>SqliteVecStore</code>'s managed similarity search shall be made efficient (vectorised cosine similarity) and documented as the supported path on all platforms; the dead sqlite-vec loading code is removed or marked not implemented; search time for 1,000, 10,000 and 50,000 chunks is measured and recorded in the UsageGuide <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-94</strong> — A sample app <code>samples/TechieRag.Probe</code> (.NET MAUI; Windows, Mac Catalyst, Android and iOS heads) shall have one screen and one button that embeds three texts, stores them, searches, and shows the top result with timings; it is the four-platform proof for every package <em>(F-PLATFORM)</em>
+</li>
+<li><strong>BRD-95</strong> — CI shall build the probe for all four heads on every push (macOS runner for Catalyst and iOS) and run the probe's button on an Android emulator where CI allows; a head that cannot be built in CI is reported as such, never skipped silently <em>(F-PLATFORM)</em>
+</li>
+</ul>
+<p><strong>F-LLM — LLM provider integration (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-27</strong> — The system shall provide a unified <code>ILlmProvider</code> for completion, chat, streaming, and tool calling <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-28</strong> — A developer can use Ollama or LM Studio as a local LLM provider <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-29</strong> — A developer can use an OpenAI-compatible LLM provider (OpenAI, vLLM, Groq, Together, LocalAI) <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-30</strong> — A developer can use Azure AI Foundry as an LLM provider <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-31</strong> — A developer can use Google Gemini as an LLM provider <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-32</strong> — A developer can use Anthropic Claude as an LLM provider <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-33</strong> — A developer can supply a custom LLM provider via factory, and read provider capability flags <em>(F-LLM)</em>
+</li>
+<li><strong>BRD-110</strong> — <code>ILlmProvider</code> shall gain an additive streaming method that yields typed events — a text delta, a decided tool call (name, arguments, id), and a final record with usage and finish reason — so one turn can stream assistant text and still surface tool calls; <code>ChatStreamAsync</code> and <code>CompleteStreamAsync</code> stay unchanged and are implemented over it; all six shipped providers implement it (providers whose vendor streams tool-call deltas assemble them; the others emit the tool call as one event after the text); <code>SupportsStreaming</code> keeps its meaning; closes Chatur feedback TR-RAG-002 <em>(F-LLM; added 2026-09-24)</em>
+</li>
+<li><strong>BRD-112</strong> — A developer can add a subscription-billed hosted LLM through a browser or device-code sign-in, one builder method per vendor whose terms permit it (first: OpenAI, <code>.UseChatGptSubscriptionLlm(signInCallback)</code>), where the library returns the sign-in URL and user code to the callback, the host app opens the browser, the library waits for completion and yields an <code>ILlmProvider</code>; the resulting session can be persisted and restored by the host through a documented seam so a user signs in once <em>(F-LLM; added 2026-09-24; closes Chatur TR-RAG-001)</em>
+</li>
+<li><strong>BRD-113</strong> — <code>LlmSource</code> shall gain a subscription member, <code>LlmProviderFactory</code> an arm, and <code>LlmConnectorCatalog</code> one row per subscription vendor carrying the vendor's stated terms as text ("personal use only", "not permitted for third-party tools", or the vendor's own words) and the date checked, so <code>ModelRouter</code> resolves a subscription model name and a host can show the terms before sign-in; a vendor with no permitted flow has no method and a catalog row saying so <em>(F-LLM; added 2026-09-24)</em>
+</li>
+<li><strong>BRD-114</strong> — Before BRD-112 is built, the current sign-in policy and flow of each vendor (OpenAI, Anthropic, Google, Groq, xAI, Meta) shall be checked against the vendor's live documentation and recorded in <code>DECISIONS.md</code> with the date; known at 2026-09-24: OpenAI permits its sign-in in external tools for personal use, Anthropic prohibits subscription tokens outside its own clients <em>(F-LLM; added 2026-09-24)</em>
+</li>
+</ul>
+<p><strong>F-LOCAL-LLM — <code>TechieRag.Local</code> package, in-process local language model (Phase v5; added 2026-09-24; closes MyDiary TR-RAG-001)</strong></p>
+<ul>
+<li><strong>BRD-96</strong> — A developer can add an in-process local language model by referencing <code>TechieRag.Local</code> and calling <code>.UseLocalLlm()</code>, registered through <code>UseCustomLlmProvider</code>, with a platform-appropriate default model (small on Android and iOS, larger allowed on desktop) and overloads for a model id or a local folder; nothing of it enters the core package <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-97</strong> — The package shall have one public provider and an internal runtime interface with one implementation per platform, chosen per the recorded comparison in <code>DECISIONS.md</code>; the provider's behaviour is identical on every platform and the consuming app never sees which runtime is used <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-98</strong> — The provider shall fully implement <code>ILlmProvider</code> including the typed streaming method of BRD-110, apply the model's chat template, honour <code>Temperature</code>, <code>MaxTokens</code>, <code>TopP</code>, <code>StopSequences</code>, <code>Seed</code> and cancellation, and refuse a prompt longer than the model context with a clear error <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-99</strong> — Before loading, the provider shall check available memory against the model's needs and refuse with a clear message rather than let the operating system kill the app <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-100</strong> — Weights shall be downloaded once to the application data root of BRD-89, resumable, honouring <code>TECHIERAG_MODEL_BASE_URL</code>, SHA-256 verified, size reported before starting, progress events in the <code>ModelDownloadService</code> shape <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-101</strong> — Download shall require explicit acceptance of the model's terms of use, surfaced to the host so it can show a dialog; weights are never inside the package or the app bundle <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-102</strong> — The package shall ship <code>buildTransitive</code> targets so a consuming MAUI app gets the right native runtime libraries on all four platforms with no hand-written csproj changes <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-103</strong> — <code>CompleteAsync&lt;T&gt;</code> and JSON mode shall return valid JSON for the requested schema (grammar- or schema-constrained where the runtime allows); <code>SupportsToolCalling</code> reports false until a test proves otherwise <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-104</strong> — <code>LlmSource</code> shall gain a <code>Local</code> member, <code>LlmProviderFactory</code> an arm and <code>LlmConnectorCatalog</code> a row so <code>ModelRouter</code> resolves <code>local/&lt;model&gt;</code>; configuration needs no endpoint and no key <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-105</strong> — <code>EstimateTokenCount</code> shall use the model's real tokenizer <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-106</strong> — The probe app of BRD-94 shall gain a second button that generates one sentence from the local model and shows time to first token and tokens per second <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-107</strong> — Live tests shall be gated by a <code>LiveLocalLlmFactAttribute</code> in a non-parallel collection and skip with a reason when no model is present <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-108</strong> — Tokens per second, time to first token and peak memory shall be measured and recorded per platform on named devices in the support matrix of BRD-88 <em>(F-LOCAL-LLM)</em>
+</li>
+<li><strong>BRD-109</strong> — The UsageGuide shall gain a <code>TechieRag.Local</code> section, the platform matrix is updated, and every "offline" or "air-gapped" claim across the docs is corrected to "downloads once, then works offline" <em>(F-LOCAL-LLM)</em>
+</li>
+</ul>
+<p><strong>F-RAG — Auto-RAG generation (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-34</strong> — A developer can ask a single-turn RAG question via <code>AskAsync</code> returning answer + sources + usage <em>(F-RAG)</em>
+</li>
+<li><strong>BRD-35</strong> — A developer can stream a RAG answer token-by-token via <code>AskStreamAsync</code> <em>(F-RAG)</em>
+</li>
+<li><strong>BRD-36</strong> — A developer can run multi-turn RAG chat via <code>ChatWithRagAsync</code> with conversation history <em>(F-RAG)</em>
+</li>
+<li><strong>BRD-37</strong> — A developer can stream multi-turn RAG chat via <code>ChatWithRagStreamAsync</code> <em>(F-RAG)</em>
+</li>
+<li><strong>BRD-38</strong> — The system shall behave identically to v1 (retrieval only) when no LLM is configured <em>(F-RAG)</em>
+</li>
+</ul>
+<p><strong>F-STRUCT — Structured / typed output (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-39</strong> — A developer can request typed JSON output deserialized to <code>T</code> via <code>CompleteAsync&lt;T&gt;</code> <em>(F-STRUCT)</em>
+</li>
+</ul>
+<p><strong>F-AGENT — Tool calling &amp; agent loop (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-40</strong> — A developer can declare tools via <code>ToolDefinition</code> (name, description, JSON-schema parameters) <em>(F-AGENT)</em>
+</li>
+<li><strong>BRD-41</strong> — A developer can register tools as delegates via <code>ToolRegistry</code> or implement <code>IToolHandler</code> <em>(F-AGENT)</em>
+</li>
+<li><strong>BRD-42</strong> — The system shall run an agent loop that executes tools and iterates until a final answer <em>(F-AGENT)</em>
+</li>
+<li><strong>BRD-43</strong> — The system shall cap agent-loop iterations (default 10) to prevent infinite loops <em>(F-AGENT)</em>
+</li>
+<li><strong>BRD-83</strong> — The library shall provide, in core with no new package dependencies, an agentic retrieval contract (<code>TechieRag.Agentic</code>): <code>search_knowledge_base</code> and <code>list_documents</code> tools with a stable model-facing description and JSON schema; a structured tool result carrying citation refs, source document, page, relevance score, a <code>strong</code> / <code>weak</code> / <code>none</code> / <code>limit_reached</code> status and a next-step hint; a per-turn search budget; and default retrieve-first, re-search-on-weak, cite-by-ref instructions — bindable to <code>ToolRegistry</code> / <code>IToolHandler</code> and to <code>TechieRag.Agents</code>, over an <code>IRetrievalSource</code> that may be an <code>ITechieRag</code> or a delegate <em>(F-AGENT; added 2026-09-03)</em>
+</li>
+<li><strong>BRD-111</strong> — <code>AgentLoopRunner</code> shall offer a streaming run over the typed events of BRD-110 that yields assistant text as it arrives and executes every tool call through <code>ToolRegistry</code> exactly as the non-streaming loop does; <code>TechieRag.Agents</code>' <code>IChatClient</code> adapter exposes the same through its streaming method <em>(F-AGENT; added 2026-09-24; closes Chatur TR-RAG-002 for agent turns)</em>
+</li>
+</ul>
+<p><strong>F-AGENTS — <code>TechieRag.Agents</code> package on Microsoft Agent Framework (Phase v4; added 2026-09-03)</strong></p>
+<ul>
+<li><strong>BRD-84</strong> — A developer can add a Microsoft Agent Framework 1.20 agent over TechieRag by referencing <code>TechieRag.Agents</code> and using <code>TechieRagAgentBuilder</code> in the existing fluent style — <code>UseLmStudio(endpoint, model)</code> as the primary local target, <code>UseOllama</code>, <code>UseOpenAI</code>, <code>UseOpenAICompatible</code>, <code>UseConfiguredLlm()</code>, <code>UseCustomChatClient(...)</code> — obtaining an <code>ITechieRagAgent</code> that exposes the MAF <code>AIAgent</code>, creates <code>AgentSession</code>s, answers with typed <code>SearchResult</code> sources and retrieval traces, streams <code>RagStreamEvent</code>s, and registers through <code>AddTechieRagAgent(...)</code>; the package targets <code>net10.0;net8.0</code>, ships no MSBuild targets, never uses <code>HarnessAgent</code> or MAF hosted tools, and keeps model-facing strings invariant English <em>(F-AGENTS)</em>
+</li>
+<li><strong>BRD-85</strong> — <code>TechieRag.Agents</code> shall expose public interop adapters at the library's seams so a package consumer keeps one provider configuration, one tool catalogue, one egress gate and one trace: <code>ILlmProvider</code> → <code>IChatClient</code> (all providers, routing, retry, fallback and token events preserved); <code>IToolHandler</code> → <code>AITool</code> (raw JSON schema, <code>RequiresConfirmation</code> → approval-required) and <code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code> (so a MAF agent can be a flow node); MAF middleware → <code>IProgress&lt;AgentStep&gt;</code> emitting only the existing four <code>AgentStepKind</code>s; <code>IConversationMemory</code> → <code>ChatHistoryProvider</code> <em>(F-AGENTS)</em>
+</li>
+</ul>
+<p><strong>F-MEM — Conversation memory (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-44</strong> — A developer can enable in-memory conversation history via <code>.WithConversationMemory()</code> <em>(F-MEM)</em>
+</li>
+<li><strong>BRD-45</strong> — The system shall trim history to a token budget, keeping the system message and recent turns <em>(F-MEM)</em>
+</li>
+<li><strong>BRD-46</strong> — A developer can supply a custom <code>IConversationMemory</code> implementation <em>(F-MEM)</em>
+</li>
+</ul>
+<p><strong>F-TOKEN — Token tracking &amp; budgets (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-47</strong> — The system shall track token usage and estimated cost per operation and per session via <code>ITokenTracker</code> <em>(F-TOKEN)</em>
+</li>
+<li><strong>BRD-48</strong> — The system shall break down usage by model using a configurable pricing table <em>(F-TOKEN)</em>
+</li>
+<li><strong>BRD-49</strong> — A developer can set budget ceilings (max tokens, max USD) and an alert threshold <em>(F-TOKEN)</em>
+</li>
+<li><strong>BRD-50</strong> — The system shall fire budget-alert and usage-recorded events, and optionally block on exceed <em>(F-TOKEN)</em>
+</li>
+</ul>
+<p><strong>F-RESIL — Resilience &amp; retry (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-51</strong> — The system shall retry transient LLM failures with exponential backoff and timeout <em>(F-RESIL)</em>
+</li>
+<li><strong>BRD-52</strong> — The system shall detect HTTP 429 and honor <code>Retry-After</code> <em>(F-RESIL)</em>
+</li>
+<li><strong>BRD-53</strong> — The system shall apply a circuit breaker (open after N failures, recovery window) <em>(F-RESIL)</em>
+</li>
+</ul>
+<p><strong>F-FALLBACK — Fallback LLM provider (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-54</strong> — A developer can configure a fallback LLM that takes over automatically when the primary fails <em>(F-FALLBACK)</em>
+</li>
+</ul>
+<p><strong>F-PROMPT — Prompt templates (Phase v2)</strong></p>
+<ul>
+<li><strong>BRD-55</strong> — A developer can customize the RAG prompt (system prompt, context template, context limits) <em>(F-PROMPT)</em>
+</li>
+<li><strong>BRD-56</strong> — A developer can replace the prompt template entirely via a custom <code>IPromptTemplate</code> <em>(F-PROMPT)</em>
+</li>
+</ul>
+<p><strong>F-AUTODIST — AI-agent autodistribution (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-57</strong> — The system shall auto-deploy AI skill files into a consumer repo on build via MSBuild targets <em>(F-AUTODIST)</em>
+</li>
+<li><strong>BRD-58</strong> — The system shall refresh the deployed skill files on each package update without manual steps <em>(F-AUTODIST)</em>
+</li>
+</ul>
+<p><strong>F-PKG — NuGet packaging &amp; publishing (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-59</strong> — The system shall build and pack <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Agents</code> via GitHub Actions <em>(F-PKG; amended 2026-09-03: was two packages)</em>
+</li>
+<li><strong>BRD-60</strong> — The system shall publish to GitHub Packages automatically (push to <code>main</code>, release tags) and to NuGet.org by manual dispatch against a release tag using trusted publishing <em>(F-PKG; amended 2026-09-03 to the shipped process per DECISIONS.md — was "when a secret is present")</em>
+</li>
+<li><strong>BRD-61</strong> — The system shall version packages semantically, overridden at pack time from tag/run number <em>(F-PKG)</em>
+</li>
+<li><strong>BRD-86</strong> — <code>TechieRag.Agents</code> shall be packed and published alongside the other two packages on both feeds at the same version, with the same SourceLink, symbol and README metadata <em>(F-PKG; added 2026-09-03)</em>
+</li>
+</ul>
+<p><strong>F-REPO — Repository separation (Phase v4; added 2026-09-03)</strong></p>
+<ul>
+<li><strong>BRD-87</strong> — TechieDesk shall move to its own repository: <code>apps/*</code>, <code>tests/TechieDesk.Tests</code>, <code>tests/appium</code>, <code>tests/verify</code>, <code>playwright.config.ts</code>, <code>publish-desktop.yml</code>, the TechieDesk docs, mockups, screenshots, <code>uiIssues/</code> and an app-configured <code>.tfcore/</code> leave this repository; the solution keeps <code>src/*</code> and <code>tests/TechieRag.Tests</code> only; the README's sample-application section links to the TechieDesk repository; TechieDesk consumes the three packages from NuGet at pinned versions; and library requirements are ledgered in this BRD and checklist from 2026-09-03 <em>(F-REPO)</em> — <strong>amended 2026-09-24:</strong> the new repository is <strong>Sevak</strong> (TechieDesk renamed in full at the split: repository, projects, namespaces, bundle id, artefacts, documents; requirement ids keep their numbers); the app paths were copied there on 2026-09-24 and its package-consumption goal <code>Sevak#REQ-FN-054</code> started; the deletion here waits for Sevak to build and test green from the published 1.0.7 packages; the README links to the Sevak repository, which is private until Sevak v0.1; cross-repository references carry the repository name (<code>Sevak#REQ-FN-054</code>, <code>TechieRag#REQ-RAG-054</code>)
+</li>
+</ul>
+<p><strong>F-WEB — TechieDesk application (Phase v1.1 + v2; repositioned v3, 2026-07-17)</strong></p>
+<ul>
+<li><strong>BRD-62</strong> — A user can configure the embedding source and vector store on the Settings page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-63</strong> — A user can configure LLM provider, fallback, usage, resilience, and prompts on the LLM Settings page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-64</strong> — A user can upload and manage documents on the Ingestion page and ingest raw text on the Text Ingestion page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-65</strong> — A user can run RAG chat with streaming, source display, top-K, and document filter on the Chat page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-66</strong> — A user can test direct LLM completion, structured output, and chat on the LLM Playground page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-67</strong> — A user can exercise the agent loop with built-in and custom tools on the Tool Demo page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-68</strong> — A user can view token usage, budget status, and per-model breakdown on the Token Usage page <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-69</strong> — A user can test the LLM connection before running queries <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-70</strong> — The app shall render all pages with TrBlazeUI components and Lucide icons <em>(F-WEB)</em>
+</li>
+<li><strong>BRD-81</strong> — TechieDesk product mandate: the companion app shall be a productized, self-hostable AnythingLLM-alternative application powered by the TechieRag library; the competitive roadmap is the GAP-LIB-<em>/GAP-APP-</em> register in <code>docs/TechieRag-CompetitorAnalysis.md</code>, with phase-wise BRD-Ns appended (append-only) as each phase is scheduled <em>(F-WEB; added 2026-07-17)</em> — <strong>amended 2026-09-03:</strong> TechieDesk is a separate product in its own repository (BRD-87) that consumes <code>TechieRag</code>, <code>TechieRag.Embedded</code> and <code>TechieRag.Agents</code> as NuGet packages and is the live implementation of their capabilities; its roadmap and requirements live in the TechieDesk BRD, and no product BRD-Ns are appended here — <strong>amended 2026-09-24:</strong> the product is <strong>Sevak</strong>, <em>the application showing the full capabilities of TechieRag</em>: every library capability is expected to have a visible home in Sevak (a library requirement that needs UI proof gets a matching Sevak requirement referenced by repository and id); Sevak is <strong>freemium with limited, never gated, features</strong> (limits set in a later Sevak revision); it is the first desktop consumer of <code>TechieRag.Local</code> (F-LOCAL-LLM), MyDiary the first mobile one
+</li>
+<li><strong>BRD-82</strong> — The application shall be renamed <code>TechieRagWeb</code> → <code>TechieDesk</code>: project folder <code>samples/TechieRagWeb</code> → <code>apps/TechieDesk</code>, csproj / RootNamespace / AssemblyName, <code>TechieRag.slnx</code> entry, namespaces and <code>@using</code>s, in-app branding (page titles, Home page), config/log file naming, and Playwright/verify references <em>(F-WEB; added 2026-07-17)</em>
+</li>
+</ul>
+<p><strong>F-QDRANT — Qdrant database administration (Phase v1.1)</strong></p>
+<ul>
+<li><strong>BRD-71</strong> — A user can detect Docker status and create/start/stop/remove a Qdrant container from the admin page <em>(F-QDRANT)</em>
+</li>
+<li><strong>BRD-72</strong> — A user can create, list, inspect, and delete Qdrant collections <em>(F-QDRANT)</em>
+</li>
+<li><strong>BRD-73</strong> — A user can browse, search, view detail of, and bulk-delete vectors in a collection <em>(F-QDRANT)</em>
+</li>
+</ul>
+<h2 id="non-functional-requirements">11. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
+<ul>
+<li><strong>BRD-74</strong> — Performance: token estimation is immediate (~chars/4); streaming yields tokens in real time with no buffering; batch embedding is supported for throughput.
+</li>
+</ul>
+<table>
+<thead><tr><th>Concern</th><th>Target</th></tr></thead>
+<tbody>
+<tr><td>Retry backoff cap</td><td>30,000 ms (×2 multiplier, default 3 retries, initial 1,000 ms)</td></tr>
+<tr><td>Circuit breaker</td><td>open after 5 consecutive failures; 30 s recovery</td></tr>
+<tr><td>Request timeout</td><td>120 s default, configurable</td></tr>
+<tr><td>Agent loop cap</td><td>10 iterations default</td></tr>
+<tr><td>Context window</td><td>trimmed to <code>MaxContextTokens</code> (default 4,000)</td></tr>
+</tbody>
+</table>
+<ul>
+<li><strong>BRD-75</strong> — Reliability: transient LLM failures are absorbed by retry + circuit breaker; an optional fallback provider preserves service continuity.
+</li>
+<li><strong>BRD-76</strong> — Scalability: budgets scale from 0 (unlimited) to <code>long.MaxValue</code>; usage tracking supports arbitrary model counts; conversation history grows unbounded with automatic windowing.
+</li>
+<li><strong>BRD-77</strong> — Security: API keys are configuration strings (consumer should use a secrets manager); all endpoints support HTTPS; tool execution validates tool names against registered definitions; all public inputs are null-checked; budget blocking prevents runaway spend.
+</li>
+<li><strong>BRD-78</strong> — Observability: every provider fires a completion event with model, duration, and token counts; full <code>ILoggerFactory</code> integration with <code>NullLogger</code> fallback.
+</li>
+<li><strong>BRD-79</strong> — Accessibility / portability: 9 document formats, 100+ languages via BGE-M3, a uniform <code>ILlmProvider</code> API across all 6 backends, and both builder and config-file paths.
+</li>
+<li><strong>BRD-80</strong> — Compatibility: all v2 additions are backward-compatible; v1 methods and configuration remain valid and unchanged; <code>TechieRag.Embedded</code> is unchanged from v1.
+</li>
+</ul>
+<h2 id="constraints-assumptions">12. Constraints &amp; assumptions<a class="anchor-link" href="#constraints-assumptions">#</a></h2>
+<ul>
+<li>Target runtimes are <code>net10.0</code> and <code>net8.0</code> for <code>TechieRag</code>, <code>TechieRag.Telemetry</code> and <code>TechieRag.Agents</code>; <code>TechieRag.Embedded</code> is <code>net10.0</code> only <em>(amended 2026-09-03; was "net10.0")</em>.
+</li>
+<li>Local providers (Ollama, LM Studio) and external stores (PostgreSQL, Qdrant) must be reachable when selected; cloud providers require the consumer's own API keys.
+</li>
+<li>The embedded model requires a one-time ~2.3GB download and sufficient local disk + CPU/GPU for ONNX inference.
+</li>
+<li><s>The TechieDesk app (folder <code>apps/TechieDesk</code>, renamed per BRD-82) depends on <code>TrBlazeUI.*</code> from GitHub Packages, which requires an authenticated <code>nuget.config</code> token to restore.</s> <em>(Moved with TechieDesk 2026-09-03, BRD-87. The library packages restore from nuget.org alone.)</em>
+</li>
+<li><code>TechieRag.Agents</code> depends on <code>Microsoft.Agents.AI</code> 1.20.0, <code>Microsoft.Extensions.AI</code> 10.9.0 and <code>Microsoft.Extensions.AI.OpenAI</code> 10.9.0; the last pins the <code>OpenAI</code> SDK to 2.12.x, which restores cleanly beside core's <code>Azure.AI.OpenAI</code> 2.1.0 (open upper bound) but unifies the SDK version in any consumer that references both packages <em>(added 2026-09-03)</em>.
+</li>
+<li>Model-facing text in the library (tool descriptions, agent instructions) is invariant English by policy; consumers localize only user-facing output <em>(added 2026-09-03)</em>.
+</li>
+<li>The codebase uses standard Microsoft camelCase naming (no <code>obj</code>/<code>a</code>/<code>v</code> prefixes, no underscores) — recorded in Coding-Standards.
+</li>
+<li><code>TechieRag.Local</code> depends on a native inference runtime chosen per platform after a measured comparison (LLamaSharp / llama.cpp or ONNX Runtime GenAI, or one of each); the choice is recorded in <code>DECISIONS.md</code> with the numbers before the provider is built, and is costly to reverse <em>(added 2026-09-24)</em>.
+</li>
+<li>On Android and iOS the app bundle is read-only and memory is limited: model and cache files live in the per-user application data folder, default embedding models are small, and a model that does not fit is refused rather than loaded <em>(added 2026-09-24)</em>.
+</li>
+<li>Subscription sign-in depends on each vendor's policy, which vendors change; the connector catalog records the policy and the date it was checked, and the library never asserts a permission it has not verified against live documentation <em>(added 2026-09-24)</em>.
+</li>
+<li>Real-device runs (a Mac, an Android phone, an iPhone) are the owner's; simulators hide memory limits and native-library problems, so a platform cell in the support matrix counts as tested only from a named device <em>(added 2026-09-24)</em>.
+</li>
+</ul>
+<h2 id="success-metrics">13. Success metrics<a class="anchor-link" href="#success-metrics">#</a></h2>
+<ul>
+<li>Time-to-first-search for a new consumer: minutes (one NuGet reference + a few builder lines).
+</li>
+<li>Provider switch (embedding / vector store / LLM) requires zero code changes.
+</li>
+<li>Offline path works with no network after first model download.
+</li>
+<li>Backward compatibility: 100% of v1 consumers upgrade to v2 without code changes.
+</li>
+<li>Breadth: 6 embedding providers, 3 vector stores, 9 formats, 6 LLM providers supported.
+</li>
+<li>Four platforms <em>(added 2026-09-24)</em>: the probe app embeds, stores, searches and generates one sentence from the local model on Windows, macOS, an Android phone and an iPhone, with the network off after the one-time download.
+</li>
+<li>A tool-using chat turn streams its assistant text token by token <em>(added 2026-09-24, BRD-110/111)</em>.
+</li>
+<li>A user with a permitting vendor subscription signs in once through the browser and never pastes an API key <em>(added 2026-09-24, BRD-112)</em>.
+</li>
+</ul>
+<h2 id="risks">14. Risks<a class="anchor-link" href="#risks">#</a></h2>
+<table>
+<thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>No formal automated test suite</td><td>High</td><td>Medium</td><td>Manual/integration validation done (21 scenarios); add xUnit suite (v2 Phase 7)</td></tr>
+<tr><td><s>TechieDesk build blocked on TrBlazeUI GitHub Packages auth</s></td><td>—</td><td>—</td><td>Moved with TechieDesk 2026-09-03 (BRD-87)</td></tr>
+<tr><td>Microsoft Agent Framework ships monthly; API renames have happened (e.g. <code>AgentThread</code> → <code>AgentSession</code>)</td><td>Medium</td><td>Medium</td><td>Pin <code>Microsoft.Agents.AI</code> exactly; expose MAF types rather than wrapping them so upgrades are mechanical; verify against live docs before each bump (added 2026-09-03)</td></tr>
+<tr><td><code>OpenAI</code> SDK version unification (2.12.x via <code>Microsoft.Extensions.AI.OpenAI</code>) beside core's <code>Azure.AI.OpenAI</code> 2.1.0</td><td>Low</td><td>Medium</td><td>Test in <code>TechieRag.Agents.Tests</code> that core's Azure OpenAI embedding provider constructs under the unified SDK (added 2026-09-03)</td></tr>
+<tr><td>Local models without native tool support return tool-call text instead of a tool-call array (LM Studio)</td><td>Medium</td><td>Medium</td><td>Live smoke asserts a real <code>FunctionCallContent</code>; <code>WithPrefetch()</code> for reluctant models; document tool-capable models (added 2026-09-03)</td></tr>
+<tr><td>A library fix is invisible to Sevak (TechieDesk until 2026-09-24) until a package exists (two repositories)</td><td>Medium</td><td>Low</td><td>Local folder feed for same-day iteration; GitHub Packages pre-release on push to <code>main</code>; a nightly Sevak build against the latest TechieRag prerelease (added 2026-09-03; Sevak canary added 2026-09-24)</td></tr>
+<tr><td>Neither candidate local runtime is proven on all four platforms from .NET (added 2026-09-24)</td><td>Medium</td><td>High</td><td>One public provider over an internal per-platform runtime interface (BRD-97); the comparison is measured on named devices before the decision; a platform that fails gets a second backend, not a redesign</td></tr>
+<tr><td>iOS or Android kills the app for memory while a model runs (added 2026-09-24)</td><td>Medium</td><td>Medium</td><td>Memory check before load (BRD-99); small default models on phones (BRD-91, BRD-96); per-device limits recorded in the matrix (BRD-108)</td></tr>
+<tr><td>A vendor changes or withdraws its subscription sign-in policy (added 2026-09-24)</td><td>Medium</td><td>Medium</td><td>Policy and date recorded per vendor in the catalog (BRD-113); live-docs check before build (BRD-114); the host app, not the library, decides what to show</td></tr>
+<tr><td>The typed streaming contract is implemented differently by six providers (added 2026-09-24)</td><td>Medium</td><td>Medium</td><td>One shared event model and one conformance test run against every provider, including <code>TechieRag.Local</code> (BRD-110, BRD-98)</td></tr>
+<tr><td>Provider API drift (LLM vendors change endpoints)</td><td>Medium</td><td>Medium</td><td>Raw HttpClient providers are small and isolated; update per provider</td></tr>
+<tr><td>Token-count estimates ±10% for providers without tokenizer detail</td><td>Medium</td><td>Low</td><td>Documented; exact counts where the provider returns them</td></tr>
+<tr><td>SQLite multi-process locking</td><td>Low</td><td>Medium</td><td>Documented; recommend single-instance or server-backed store for multi-user</td></tr>
+<tr><td>Structured-output JSON reliability varies by model</td><td>Medium</td><td>Low</td><td>Cloud providers most reliable; documented limitation</td></tr>
+</tbody>
+</table>
+<h2 id="glossary">15. Glossary<a class="anchor-link" href="#glossary">#</a></h2>
+<ul>
+<li><strong>RAG</strong> — Retrieval-Augmented Generation: retrieve relevant context, then generate an answer with an LLM.
+</li>
+<li><strong>Sevak</strong> — The application showing the full capabilities of TechieRag; TechieDesk renamed on 2026-09-24, in its own repository.
+</li>
+<li><strong>In-process local model</strong> — A language model executed inside the consuming app's own process by <code>TechieRag.Local</code>, with no server and no network after a one-time download <em>(added 2026-09-24)</em>.
+</li>
+<li><strong>GGUF / ONNX Runtime GenAI</strong> — The two model-file-and-runtime families compared for <code>TechieRag.Local</code>: GGUF files run by llama.cpp (LLamaSharp in .NET); ONNX files run by Microsoft's ONNX Runtime GenAI <em>(added 2026-09-24)</em>.
+</li>
+<li><strong>Device-code sign-in</strong> — A browser sign-in where the library shows a URL and a short code, the user signs in on the vendor's site, and the library receives a token billed to the user's subscription <em>(added 2026-09-24)</em>.
+</li>
+<li><strong>Typed streaming event</strong> — One piece of a streamed reply: a text delta, a decided tool call, or the final usage record (BRD-110) <em>(added 2026-09-24)</em>.
+</li>
+<li><strong>TechieRag</strong> — this library; the core NuGet package.
+</li>
+<li><strong>TechieRag.Embedded</strong> — the offline variant bundling a BGE-M3 ONNX embedding model.
+</li>
+<li><strong>TechieDesk</strong> — the desktop product (formerly <code>TechieRagWeb</code>): since 2026-09-03 a separate repository that consumes the three TechieRag packages and is the live implementation of their capabilities (BRD-81/82/87).
+</li>
+<li><strong>TechieRag.Agents</strong> — the third package: agents on Microsoft Agent Framework over TechieRag, with seam adapters (BRD-84/85).
+</li>
+<li><strong>MAF</strong> — Microsoft Agent Framework (<code>Microsoft.Agents.AI</code>), the successor to Semantic Kernel Agents and AutoGen; <code>ChatClientAgent</code>, <code>AgentSession</code>, <code>AIContextProvider</code>.
+</li>
+<li><strong>MEAI</strong> — <code>Microsoft.Extensions.AI</code>: <code>IChatClient</code>, <code>AITool</code> / <code>AIFunction</code>, <code>FunctionInvokingChatClient</code>; the abstractions MAF is built on.
+</li>
+<li><strong>TrBlazeUI</strong> — the Blazor UI component library used by TechieDesk.
+</li>
+<li><strong>Embedding</strong> — a vector representation of text used for similarity search.
+</li>
+<li><strong>Vector store</strong> — a database that indexes and similarity-searches embeddings (SQLite-vec / pgvector / Qdrant).
+</li>
+<li><strong>REQ-UI-/REQ-FN-/REQ-RAG-/REQ-NFR-</strong> — implementation requirement IDs derived from BRD-N in the split checklists.
+</li>
+</ul>
+<hr>
+<p>Last updated: 2026-06-25
+Last amended: 2026-07-17 — TechieDesk repositioning: app renamed TechieRagWeb → TechieDesk (BRD-82) and productized as an AnythingLLM alternative (BRD-81); multi-agent orchestration + audio moved from out-of-scope to the roadmap (docs/TechieRag-CompetitorAnalysis.md)
+Last amended: 2026-09-03 — Three packages and a separate product: added BRD-83 (agentic retrieval contract in core), BRD-84/85 (F-AGENTS: <code>TechieRag.Agents</code> on Microsoft Agent Framework + public seam adapters), BRD-86 (three-package publishing), BRD-87 (F-REPO: TechieDesk moves to its own repository; library requirements ledgered here again); amended BRD-59/60/81; F-WEB / F-QDRANT annotated as transferred (no IDs struck). Design: docs/TechieRag.Agents-Proposal.md
+Highest BRD ID: BRD-87
+Sources harvested: docs/techierag-v2-llm-implementation-spec.md, docs/trrag-refactoring-roadmap.md, docs/TechieRag-AI-Reference.md, docs/TechieRag-UserGuide.md, docs/TechieRag.Embedded-UserGuide.md, docs/ai-agent-autodistribution-guide.md, docs/brainstorming-session-results.md, docs/SETUP-AND-TESTING-GUIDE.md, docs/integration-testing-guide.md, docs/NUGET-PUBLISHING-GUIDE.md, docs/EMBEDDED-PACKAGE-GUIDE.md, docs/Coding-Standards.md, README.md
+Custom instructions applied: none
+Drafted from reverse-doc — review and edit. New BRDs may be added (append-only); do not renumber.</p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

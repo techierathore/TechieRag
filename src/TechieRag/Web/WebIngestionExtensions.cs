@@ -3,7 +3,7 @@ using TechieRag.Abstractions;
 namespace TechieRag.Web;
 
 /// <summary>
-/// Ingests web content into a TechieRag instance (REQ-RAG-016/017/018, BRD-60/61/62).
+/// Ingests web content into a TechieRag instance (REQ-RAG-016/017, BRD-60/61).
 /// </summary>
 /// <remarks>
 /// Extension methods over <see cref="ITechieRag"/> rather than new members on it, deliberately: the
@@ -78,43 +78,8 @@ public static class WebIngestionExtensions
         return new WebIngestionResult(ingested, skipped);
     }
 
-    /// <summary>Ingests a YouTube video's transcript (REQ-RAG-018 / BRD-62).</summary>
-    /// <param name="rag">The RAG instance.</param>
-    /// <param name="urlOrVideoId">A YouTube URL in any recognised shape, or a bare video id.</param>
-    /// <param name="reader">Transcript reader.</param>
-    /// <param name="preferredLanguage">BCP-47 prefix to prefer, e.g. "en".</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The ingested document's id.</returns>
-    public static async Task<string> IngestYouTubeAsync(
-        this ITechieRag rag,
-        string urlOrVideoId,
-        YouTubeTranscriptReader reader,
-        string? preferredLanguage = "en",
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(rag);
-        ArgumentNullException.ThrowIfNull(reader);
-
-        var transcript = await reader
-            .ReadAsync(urlOrVideoId, preferredLanguage, cancellationToken)
-            .ConfigureAwait(false);
-
-        return await rag.IngestTextAsync(
-            transcript.Text,
-            transcript.Title,
-            new Dictionary<string, object>
-            {
-                ["SourceUrl"] = transcript.Url,
-                ["SourcePath"] = transcript.Url,
-                ["SourceType"] = "youtube",
-                ["VideoId"] = transcript.VideoId,
-                ["IngestedAtUtc"] = DateTimeOffset.UtcNow.ToString("O"),
-            },
-            cancellationToken).ConfigureAwait(false);
-    }
-
     /// <summary>
-    /// Reads the source URL of a document that was ingested from the web (REQ-RAG-016/017/018).
+    /// Reads the source URL of a document that was ingested from the web (REQ-RAG-016/017).
     /// </summary>
     /// <param name="document">A document from <see cref="ITechieRag.ListDocumentsAsync"/>.</param>
     /// <returns>Where the document was read from, or an empty string when it did not come from the web.</returns>

@@ -17,4 +17,24 @@ public interface IConnectorTransport
     /// <returns>The status, body and headers. Non-2xx statuses are returned, not thrown, because connectors map them to different meanings.</returns>
     /// <exception cref="ConnectorException">The host could not be reached at all.</exception>
     Task<ConnectorHttpResponse> GetAsync(ConnectorHttpRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Performs one request with the method and body the request names (REQ-RAG-083 / BRD-127,
+    /// TR-RAG-021).
+    /// </summary>
+    /// <param name="request">The URL, headers, method and body to send.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The status, body and headers. Non-2xx statuses are returned, not thrown.</returns>
+    /// <exception cref="ConnectorException">The host could not be reached at all.</exception>
+    /// <exception cref="NotSupportedException">
+    /// The default implementation, kept so an existing transport keeps compiling, supports GET only.
+    /// </exception>
+    Task<ConnectorHttpResponse> SendAsync(ConnectorHttpRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return string.Equals(request.Method, "GET", StringComparison.OrdinalIgnoreCase)
+            ? GetAsync(request, cancellationToken)
+            : throw new NotSupportedException($"{GetType().Name} supports GET only; '{request.Method}' needs SendAsync implemented.");
+    }
 }

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieDesk — Product Guide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+/* product-guide screenshots — content images fit the column */
+main img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin:10px 0;display:block}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">☾ Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieDesk — Product Guide</h1>
+    <div class="subtitle">End-user manual · how to use TechieDesk, screen by screen</div>
+<blockquote><p><strong>Audience: end users (not developers).</strong> This is the how-to-use-the-app manual for <strong>TechieDesk</strong> — task-oriented, screenshot-illustrated, plain language. It explains <em>what each screen is for</em> and <em>how to do each thing</em>. For how the code works, see the Developer Guide instead.</p></blockquote>
+<div class="toc-inline">
+  <div>Contents</div>
+  <ol>
+    <li><a href="#welcome">Welcome</a></li>
+    <li><a href="#getting-started">Getting started</a></li>
+    <li><a href="#who-its-for">Who it's for</a></li>
+    <li><a href="#using-techiedesk">Using TechieDesk</a>
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#settings">Settings</a></li>
+        <li><a href="#llm-settings">LLM Settings</a></li>
+        <li><a href="#file-ingestion">File Ingestion</a></li>
+        <li><a href="#text-ingestion">Text Ingestion</a></li>
+        <li><a href="#rag-chat">RAG Chat</a></li>
+        <li><a href="#llm-playground">LLM Playground</a></li>
+        <li><a href="#tool-demo">Tool Demo</a></li>
+        <li><a href="#token-usage">Token Usage</a></li>
+        <li><a href="#qdrant-admin">Qdrant Admin</a></li>
+      </ul>
+    </li>
+  </ol>
+</div>
+
+<h2 id="welcome">Welcome<a class="anchor-link" href="#welcome">#</a></h2>
+<p><strong>TechieDesk</strong> is a self-hostable workspace for building and using your own private document-question-answering assistant. You point it at your documents, it reads and indexes them, and then you can chat with an AI that answers using <em>your</em> content as the source — with the passages it drew from shown alongside each answer.</p>
+<p>Everything runs on infrastructure you control. You choose where the AI "brains" come from — a model running locally on your own machine (fully offline and private) or a cloud provider you supply a key for — and you choose where your indexed documents are stored. Nothing has to leave your environment unless you decide it should.</p>
+<p>TechieDesk is powered by the TechieRag engine and is positioned as a self-hostable alternative to hosted document-chat products.</p>
+
+<h2 id="getting-started">Getting started<a class="anchor-link" href="#getting-started">#</a></h2>
+<p>TechieDesk is a <strong>single-user app with no login</strong> — there are no accounts or passwords to manage. To start using it:</p>
+<ol>
+<li>Start TechieDesk (your administrator or setup guide will have it running at a web address such as <code>http://localhost:5099</code>).</li>
+<li>Open that address in any modern web browser.</li>
+<li>You'll land on the <strong>Home</strong> screen, which links to every feature. The menu on the left is always available to move between screens.</li>
+</ol>
+<img src="./screenshots/TechieRag/home.png" alt="The TechieDesk home screen">
+<p><strong>First-time setup, in order:</strong> before you can chat with your documents you'll do three quick things — (1) tell TechieDesk how to turn text into searchable data and where to store it on the <strong>Settings</strong> screen, (2) tell it which AI model to use for answers on the <strong>LLM Settings</strong> screen, and (3) add some documents on the <strong>File</strong> or <strong>Text Ingestion</strong> screens. Then head to <strong>RAG Chat</strong>. Each step is covered below.</p>
+
+<h2 id="who-its-for">Who it's for<a class="anchor-link" href="#who-its-for">#</a></h2>
+<p>TechieDesk is a single-user application — everyone who opens it has full access to every screen. There are no roles or permission levels.</p>
+<table><thead><tr><th>You are…</th><th>What you can do</th></tr></thead><tbody>
+<tr><td>A TechieDesk user</td><td>Configure the app, add documents, chat with your content, experiment with AI directly, watch your usage, and manage the optional Qdrant vector database — all from the left-hand menu.</td></tr>
+</tbody></table>
+
+<h2 id="using-techiedesk">Using TechieDesk<a class="anchor-link" href="#using-techiedesk">#</a></h2>
+<p>The screens below are listed in the order you'll naturally use them. The left sidebar groups them the same way: <strong>Configuration</strong>, <strong>Data</strong>, <strong>AI Features</strong>, <strong>Monitoring</strong>, and <strong>Admin</strong>.</p>
+
+<h3 id="home">Home<a class="anchor-link" href="#home">#</a></h3>
+<p><strong>What it's for:</strong> Your starting point — a dashboard of shortcut cards that describe each feature and jump you straight to it.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Open TechieDesk in your browser.</li>
+<li>Read the cards to see what each area does.</li>
+<li>Click a card (or use the left menu) to open that feature.</li>
+</ol>
+<img src="./screenshots/TechieRag/home.png" alt="Home">
+<p><strong>Tips &amp; notes:</strong> The left sidebar is available on every screen, so you never have to return here to navigate — Home is just a friendly overview.</p>
+
+<h3 id="settings">Settings<a class="anchor-link" href="#settings">#</a></h3>
+<p><strong>What it's for:</strong> This is where you tell TechieDesk <strong>how to understand your documents</strong> and <strong>where to keep the searchable index</strong>. "Understanding" means turning text into a numeric form the app can search by meaning; "where to keep it" is your storage choice.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Choose an <strong>embedding source</strong> — the component that reads your text. The built-in offline option needs no setup and keeps everything on your machine; other options connect to a local or cloud service you run.</li>
+<li>Choose a <strong>vector store</strong> — where the indexed documents live (a simple local file works out of the box; larger setups can use a dedicated database).</li>
+<li>Click <strong>Save</strong> to keep your choices, then <strong>Initialize</strong> to make them active.</li>
+</ol>
+<img src="./screenshots/TechieRag/settings.png" alt="Settings">
+<p><strong>Tips &amp; notes:</strong> A success message confirms your settings were saved. If you change these later, save again so the app picks up the new configuration. The built-in offline option is the simplest way to get started with full privacy.</p>
+
+<h3 id="llm-settings">LLM Settings<a class="anchor-link" href="#llm-settings">#</a></h3>
+<p><strong>What it's for:</strong> Choose and tune the <strong>AI model</strong> that writes the answers. This screen has tabs for the main model, a backup model, spending limits, reliability behavior, and the wording of prompts.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>On the <strong>Provider</strong> tab, pick where your AI model comes from (a local model, or a cloud provider you have a key for) and enter its address/key.</li>
+<li>Optionally set a <strong>Fallback</strong> model that takes over automatically if the main one is unavailable.</li>
+<li>Use <strong>Usage</strong> to set a spending budget, and <strong>Resilience</strong> / <strong>Prompts</strong> to fine-tune retries and answer style.</li>
+<li>Click <strong>Save</strong>, then use <strong>Test LLM Connection</strong> to confirm the model responds.</li>
+</ol>
+<img src="./screenshots/TechieRag/llm-settings.png" alt="LLM Settings">
+<p><strong>Tips &amp; notes:</strong> Always <strong>Save before testing</strong> — the connection test uses your last saved settings. If a model works but the estimated cost shows <code>$0.00</code>, that just means the model isn't in the built-in price list; your usage is still being counted. TechieDesk works without any AI model configured too — you just won't get written answers until one is set.</p>
+
+<h3 id="file-ingestion">File Ingestion<a class="anchor-link" href="#file-ingestion">#</a></h3>
+<p><strong>What it's for:</strong> Add documents to TechieDesk by pointing it at files, so their content becomes searchable and available to the chat.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Choose the folder or files you want to add and set any file-type pattern.</li>
+<li>Start the ingest — TechieDesk reads each document, splits it into passages, and indexes them.</li>
+<li>Watch the statistics update: total documents, total passages, and storage used. Your added documents appear in the list.</li>
+</ol>
+<img src="./screenshots/TechieRag/ingestion.png" alt="File Ingestion">
+<p><strong>Tips &amp; notes:</strong> TechieDesk handles many common document formats. Larger documents are split into smaller passages automatically so the AI can find the most relevant parts. You can clear or remove documents from here if you need to start over.</p>
+
+<h3 id="text-ingestion">Text Ingestion<a class="anchor-link" href="#text-ingestion">#</a></h3>
+<p><strong>What it's for:</strong> Add content by <strong>pasting text directly</strong> — handy for notes, snippets, or anything not saved as a file.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Paste or type your text into the box.</li>
+<li>Optionally add a title or other metadata so you can recognize it later.</li>
+<li>Submit — the text is indexed just like a file, and live character/word counters show its size as you type.</li>
+</ol>
+<img src="./screenshots/TechieRag/text-ingestion.png" alt="Text Ingestion">
+<p><strong>Tips &amp; notes:</strong> This is the quickest way to test TechieDesk — paste a paragraph, then ask about it on the RAG Chat screen. Pasted text shows up in the same document list as ingested files.</p>
+
+<h3 id="rag-chat">RAG Chat<a class="anchor-link" href="#rag-chat">#</a></h3>
+<p><strong>What it's for:</strong> The main event — <strong>ask questions and get AI answers grounded in your documents</strong>, with the source passages shown so you can trust and verify each answer.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Type your question and send it.</li>
+<li>Choose your <strong>mode</strong> (answer from your documents, or talk to the AI directly), and optionally set how many passages to consider (<strong>Top-K</strong>), filter to specific documents, and turn <strong>streaming</strong> on to watch the answer appear word by word.</li>
+<li>Read the answer; open the <strong>Sources</strong> panel to see which passages it used and how relevant each one was.</li>
+</ol>
+<img src="./screenshots/TechieRag/chat.png" alt="RAG Chat">
+<p><strong>Tips &amp; notes:</strong> For document-grounded answers, add documents first (Settings → Ingestion). The relevance scores next to each source help you judge how well your content matched the question. Use <strong>New Conversation</strong> to start fresh, or <strong>Clear Chat</strong> to wipe the current thread.</p>
+
+<h3 id="llm-playground">LLM Playground<a class="anchor-link" href="#llm-playground">#</a></h3>
+<p><strong>What it's for:</strong> Experiment with the AI model <strong>directly, without your documents</strong> — useful for testing prompts, trying structured (form-like) answers, or just seeing how the model responds.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Pick a tab: <strong>Completion</strong> (free-form text), <strong>Structured Output</strong> (get answers as tidy fields), or <strong>Chat</strong>.</li>
+<li>Enter a system and/or user prompt, and adjust <strong>Temperature</strong> (creativity) and <strong>Max Tokens</strong> (answer length) if you like.</li>
+<li>Click <strong>Generate</strong> — for Structured Output you'll get neatly parsed fields; token counts show how much was used.</li>
+</ol>
+<img src="./screenshots/TechieRag/llm-playground.png" alt="LLM Playground">
+<p><strong>Tips &amp; notes:</strong> This screen doesn't touch your documents — it's a direct line to the model. It's the fastest way to check that your LLM Settings are working and to feel out a model's style before using it in chat.</p>
+
+<h3 id="tool-demo">Tool Demo<a class="anchor-link" href="#tool-demo">#</a></h3>
+<p><strong>What it's for:</strong> See the AI <strong>use tools to get things done</strong> — for example fetching the weather or doing a calculation — and watch each step it takes, laid out as a live trace.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Review the built-in tools listed in the table (and add a custom one if you wish).</li>
+<li>Type a request that would need a tool, e.g. "What's the weather in Tokyo?"</li>
+<li>Run the agent and watch the <strong>Execution Trace</strong>: which tool the AI chose, what it sent, the result it got back, and the final answer built from that result.</li>
+</ol>
+<img src="./screenshots/TechieRag/tool-demo.png" alt="Tool Demo">
+<p><strong>Tips &amp; notes:</strong> This shows the AI doing real work rather than guessing — the trace makes each decision visible. It needs a capable AI model configured in LLM Settings to drive the tool calls.</p>
+
+<h3 id="token-usage">Token Usage<a class="anchor-link" href="#token-usage">#</a></h3>
+<p><strong>What it's for:</strong> A <strong>dashboard of how much you've used</strong> — total tokens, a breakdown per model, recent operations, and estimated cost — so there are no surprises.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Open the screen to see running totals for the current session.</li>
+<li>Review the per-model table to see where usage is going.</li>
+<li>Use <strong>Reset Session</strong> to start the counters over.</li>
+</ol>
+<img src="./screenshots/TechieRag/token-usage.png" alt="Token Usage">
+<p><strong>Tips &amp; notes:</strong> Numbers start at zero and grow as you use the AI. If a model shows real token counts but <code>$0.00</code> cost, that model simply isn't in the built-in price list — the usage is still tracked accurately.</p>
+
+<h3 id="qdrant-admin">Qdrant Admin<a class="anchor-link" href="#qdrant-admin">#</a></h3>
+<p><strong>What it's for:</strong> An optional console for managing <strong>Qdrant</strong>, a dedicated database some users choose for storing their indexed documents. You only need this if you've opted to use Qdrant.</p>
+<p><strong>How to use it:</strong></p>
+<ol>
+<li>Check the status indicators (whether the database service is running and reachable), and connect using its address and key.</li>
+<li>Manage <strong>collections</strong> — create, inspect, or delete the containers that hold your indexed documents.</li>
+<li>Browse, search, view, and delete individual indexed entries, paging through them as needed.</li>
+</ol>
+<img src="./screenshots/TechieRag/qdrant-admin.png" alt="Qdrant Admin">
+<p><strong>Tips &amp; notes:</strong> Most people starting out don't need this — the built-in local storage option (chosen on the Settings screen) works without any database to run. Reach for Qdrant Admin only when you've deliberately switched to Qdrant. Deleting a collection or entries here is permanent.</p>
+
+<hr>
+<p><em>TechieDesk is powered by the TechieRag engine. This guide covers the app as of the 2026-07-17 release. Screens and options may expand as new features land.</em></p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+</script>
+</body>
+</html>

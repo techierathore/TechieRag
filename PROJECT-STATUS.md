@@ -1,88 +1,76 @@
 ---
 project: TechieRag
-stack: .NET 10 class library (NuGet) + TechieRag.Embedded (ONNX BGE-M3) + TechieRag.Telemetry (opt-in OTel) + TechieDesk desktop app (MAUI Blazor Hybrid — macOS + Windows, TrBlazeUI, apps/TechieDesk)
-last_updated: 2026-09-03
-current_phase: Build — TechieRag 0 open (publishing fix verified; owner tag push pending); TechieDesk 106 open
+last_updated: 2026-09-25
+current_phase: Phase 2 of 2 · UAT — handoff done, 84 of 84 verified, 1 not applicable
 last_verified_build: PASS
-last_verified_date: 2026-09-03
+last_verified_date: 2026-09-25
 ---
 
 # TechieRag — Status
 
-Configurable .NET 10 RAG library (NuGet) + TechieDesk product app. **This file is the dashboard only** —
-per-REQ evidence lives in `docs/TechieRag-Checklist.md` (library) and `docs/TechieDesk-Checklist.md` (app),
-Requirements Status tables; library defects in the per-library feedback files.
-
 ## Where I am
 
-**Library (`docs/TechieRag-Checklist.md`):** the 2026-09-03 owner UAT report is closed. Triage reopened
-`REQ-FN-003` (the public `publish-nuget.yml` never took its version from the `v*` tag — nuget.org sat at
-`1.0.0` while tags reached `v1.0.6`) and logged `REQ-FN-004` (install docs led with GitHub Packages + PAT
-though both packages are public). Both are fixed and the chained verify pass graded them `Verified`: tag-push
-trigger + tag-derived version with a duplicate/non-increment guard (replayed 9/9 incl. live nuget.org), and a
-stranger walk from a nuget.org-only feed reached a working search in 36 s. Library tests 723 pass / 0 fail.
-`DECISIONS.md` 2026-09-03 records both, plus the owner's same-day decision to keep the public workflow
-**manual dispatch only** (GitHub Release → GitHub Packages automatically → dispatch nuget.org by hand).
-The hosted run itself still needs the owner's next release.
-**App (`docs/TechieDesk-Checklist.md`):** unchanged since 2026-08-05 — 106 open of 179.
+Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 84 rows Verified. The four document misses from 2026-09-24 are closed: the Architecture no longer says stores are fixed at 1024 dimensions, two BRD items are reworded, one acceptance line is corrected, and both platform matrices agree. The library waits on your test pass. Product Guide generated 2026-09-25: docs/TechieRag-ProductGuide.md (+ .html); 14 tasks, 12 screenshots.
 
 ## Next command to run
 
+Manual UAT: open `docs/TechieRag-UsageGuide.md` and work through "How to test, screen by screen"; when it passes, change the phase line at the top of this file from UAT to Released by hand. No agent command is next.
+
+Claude Code:
 ```
-(owner-run) GitHub → Releases → new release, tag v1.0.7  →  Actions → "Publish to NuGet.org (Trusted Publishing)" → Run workflow, ref = v1.0.7
+(owner) set current_phase to Released after UAT — no agent command
 ```
-That first dispatch is the live proof of `REQ-FN-003` on the hosted runner; after it, the app resumes with `/TechieFlow:agents:flow-master *build-phase TechieDesk` (OpenCode: `/flow-master *build-phase TechieDesk`).
+OpenCode:
+```
+(owner) set current_phase to Released after UAT — no agent command
+```
+Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-P2-Checklist.md.
 
 ## Open requirements
 
-- **TechieRag: 0 open** of 38 — all `Verified` / `Done (pre-existing)`. `REQ-FN-003` and `REQ-FN-004`
-  closed 2026-09-03 (owner-found, fixed, verified same day).
-- **TechieDesk: 106 open** of 179 — 73 terminal (55 `Verified` + 18 `N/A`), 0 `FAIL`. Open: 44 `Implemented`,
-  44 `Needs re-verify`, 9 `Blocked`, 4 `PARTIAL`, 2 `Planned`, 2 `Not Started`, 1 `In Progress`.
-  Per-REQ detail in that checklist's Requirements Status table.
+| Status | Count |
+|---|---|
+| Not Started | 0 |
+| In Progress | 0 |
+| Implemented | 0 |
+| Needs re-verify | 0 |
+| Blocked | 0 |
+
+- None
 
 ## Known blockers
 
-- 🔶 **`REQ-FN-003` — hosted run unexecuted** (owner): the version logic is proven by replaying the exact
-  CI script locally and against live nuget.org; the first real dispatch against `v1.0.7` is the owner's to make.
-- 🔶 **TechieDesk `REQ-RAG-052` — RE-INGEST THE WHOLE CORPUS** (owner): vectors embedded before
-  2026-08-04 are in a different space; the document library banner names the stale count.
-- 🔶 **TechieDesk verification endpoints** (owner): `.tfcore/core-config.yaml → runtimeVerification.services`
-  ships every key commented out; filling it unblocks the 44 `Needs re-verify` rows (`docs/VERIFICATION-ENDPOINTS.md`).
-- 🔴 **TechieDesk `REQ-FN-053`** — not reproduced through the service layer; needs the running Catalyst head.
-- 🔴 Owner-only: **`REQ-FN-043`** Apple signing identity; **`REQ-FN-035`** Windows platform sources;
-  **TechieDesk `REQ-NFR-001`** TrBlazeUI PAT still untracked-and-unrotated.
+- 🔶 **iPhone run (REQ-FN-060):** the iPhone 17 Pro is connected and its device build passes, but Developer Mode is off on the phone and no Apple ID is signed in to Xcode. Steps: `docs/TechieRag-iPhone-Setup.md`. Then paste `record the iPhone probe run for REQ-FN-060`.
+- 🔶 **Owner git:** commit today's work.
 
 ## Verification log
 
+Last five passes; older passes live in `docs/metrics/gates.jsonl`.
+
 | Date | Phase | Result | Status table |
-|------|-------|--------|--------------|
-| 2026-09-03 | `*triage-issues` → `*fix-issues` → verify chained (TechieRag REQ-FN-003, REQ-FN-004) | ✅ 2/2 Verified; 723 lib tests pass; version rules 9/9 (incl. live nuget.org); stranger walk 36 s; 3 misses opened + closed | [table](docs/TechieRag-Checklist.md#requirements-status) |
-| 2026-08-05 | `*build-phase` — TechieDesk REQ-RAG-052 banner (owner-scoped), no verify run | ✅ 2,308 pass / 0 fail; banner proven on screen; REQ-FN-053 not started (stated) | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-04 | `*verify` ×6 (second run, consent granted) | ✅ 2,306 pass; 0 promoted, REQ-RAG-052 demoted 95% → `Needs re-verify` 80% | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-04 | `*build-phase` — REQ-UI-058 + REQ-UI-059 | ✅ 2,306 pass (+24); both to `Implemented`, nothing on screen | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-04 | `*verify REQ-RAG-025,044,049,051,052` | ✅ 2,282 pass; 1 promoted (REQ-RAG-025), 4 held, no screen driven | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-04 | `*build-phase` — RAG cluster | ✅ 2,282 pass (+57); BRD-106 reranker live; TR-RAG-044/045 fixed | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-02 | `*build-phase` (5 clusters) → `*verify all` | ✅ 2,225 pass; 23/23 screens clean in Hindi; REQ-UI-059 found by §4b | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-02 | `*build-phase` (6 clusters) → `*verify all` | ✅ 2,180 pass; service-layer English 569 → 330 | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-02 | `*build-phase` (2 clusters) → `*verify all` | ✅ 2,073 pass; REQ-UI-054 root cause proven | [table](docs/TechieDesk-Checklist.md#requirements-status) |
-| 2026-08-01 | `*build-phase` (4 clusters) → `*verify all` | ✅ 2,055 pass; markup localization 100% | [table](docs/TechieDesk-Checklist.md#requirements-status) |
+|---|---|---|---|
+| 2026-09-25 | handoff-phase | 83/83 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-09-25 | log-miss | 83/84 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-09-25 | build-phase | 84/84 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-09-25 | amend-docs | 84/84 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-09-25 | amend-docs | 84/84 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
-- **TrBlazeUI — 28 entries.** TR-024 closed-with-workaround; TR-039, TR-038 open — `docs/TechieRag-TrBlazeUI-Feedback.md`.
-- **TechieRag — 45 entries.** TR-RAG-042/043 open; TR-RAG-037/044/045 closed 2026-08-04/05 — `docs/TechieRag-TechieRag-Feedback.md`.
+- OnnxRuntime: 1 open · 0 closed — docs/TechieRag-OnnxRuntime-Feedback.md
+- OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
 
 ## Standards compliance
 
-- Build 0 errors; library 723 tests pass / 41 skipped at `-p:Version=1.0.7` (2026-09-03); app 2,282 tests pass 2026-08-05, 36 skipped — 5 are gated live-Postgres tests that skip with a reason.
-- Harness guards 8/8; markup localization 100%; greps clean (no `a`/`v`/`obj` prefixes, no underscore fields, no underscored test names).
-- ⚠ Pre-existing: `MauiProgram.cs` `SCREAMING_SNAKE_CASE` env var; ~14 CS1591 in `TechieRagManager.cs`; NU5129 (`buildTransitive/` .targets path) on pack.
+- Last check 2026-09-25: 0 findings, see the checklist Remarks.
 
 ## Deferred / future
 
-- **`REQ-RAG-045/046`** (BRD-deferred by owner); **`REQ-RAG-044`**'s `PgVectorStore` test needs Docker installed, not merely started.
-- `AgentToolHandler` / `EgressGate` audience split at the render seam (now `REQ-UI-059`); `Models.AgentStep` / `ToolResult` code carriers.
-- A `drv.py` revive-and-retry wrapper (WDA drops the session between commands); `run_sweep` sidebar selectors only work at 1600×1240.
-- Joint `TechieRag*` + `TrBlazeUI*` nuget.org ID-prefix reservation once both families are live (NUGET-PUBLISHING.md §7).
-- The csproj `<Version>` (1.0.0) is a dev-only number now; consider aligning it with the latest tag after each release to keep local packs unambiguous.
+- The physical iPhone row of the UsageGuide's measured-per-platform table, after the owner's two steps.
+- OS built-in models (Apple, Android Gemini Nano) as a later `ILocalLlmRuntime`.
+- LLamaSharp with Metal on the Mac, behind the same provider (decision 2 option B).
+- Hugging Face tokens for gated models in `LocalModel.FromHuggingFace`.
+- `REQ-RAG-046` deferred endpoints; `TechieRag.Agents` phase D items (proposal §7).
+- Ollama and Gemini multi-turn tool use.
+- Rename TechieDesk to Sevak in about 15 XML doc comments under `src/TechieRag`.
+- Update the Android emulator in Visual Studio's SDK (31.2.10 is older than its system image).

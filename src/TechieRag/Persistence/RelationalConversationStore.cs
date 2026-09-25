@@ -1,13 +1,12 @@
 using System.Data.Common;
 using System.Text.Json;
-using Dapper;
 using TechieRag.Abstractions;
 using TechieRag.Models;
 
 namespace TechieRag.Persistence;
 
 /// <summary>
-/// Shared Dapper-based implementation of <see cref="IConversationStore"/> for relational
+/// Shared plain ADO.NET implementation of <see cref="IConversationStore"/> for relational
 /// databases. Owns and self-creates the TrThread and TrMessage tables.
 /// </summary>
 /// <remarks>
@@ -16,6 +15,9 @@ namespace TechieRag.Persistence;
 /// <para><b>Schema:</b> Idempotent <c>CREATE TABLE IF NOT EXISTS</c> statements using
 /// PascalCase singular names with no underscores, portable across SQLite and PostgreSQL.
 /// Timestamps are stored as ISO-8601 text for portability.</para>
+/// <para><b>No Reflection.Emit (REQ-FN-056).</b> Parameters and rows are mapped by hand through
+/// <see cref="DbCommandExtensions"/>, so the store works in an ahead-of-time compiled iOS or
+/// Mac Catalyst Release build.</para>
 /// </remarks>
 public abstract class RelationalConversationStore : IConversationStore
 {
@@ -54,7 +56,7 @@ public abstract class RelationalConversationStore : IConversationStore
                     CreatedAt TEXT NOT NULL,
                     UpdatedAt TEXT NOT NULL
                 )
-                """).ConfigureAwait(false);
+                """, cancellationToken).ConfigureAwait(false);
 
             await connection.ExecuteAsync("""
                 CREATE TABLE IF NOT EXISTS TrMessage (
@@ -66,14 +68,14 @@ public abstract class RelationalConversationStore : IConversationStore
                     SourcesJson TEXT,
                     CreatedAt TEXT NOT NULL
                 )
-                """).ConfigureAwait(false);
+                """, cancellationToken).ConfigureAwait(false);
 
-            await AddContentJsonColumnAsync(connection).ConfigureAwait(false);
+            await AddContentJsonColumnAsync(connection, cancellationToken).ConfigureAwait(false);
 
             await connection.ExecuteAsync(
-                "CREATE INDEX IF NOT EXISTS IxTrThreadUserId ON TrThread(UserId)").ConfigureAwait(false);
+                "CREATE INDEX IF NOT EXISTS IxTrThreadUserId ON TrThread(UserId)", cancellationToken).ConfigureAwait(false);
             await connection.ExecuteAsync(
-                "CREATE INDEX IF NOT EXISTS IxTrMessageThreadId ON TrMessage(ThreadId)").ConfigureAwait(false);
+                "CREATE INDEX IF NOT EXISTS IxTrMessageThreadId ON TrMessage(ThreadId)", cancellationToken).ConfigureAwait(false);
 
             initialized = true;
         }
@@ -87,6 +89,7 @@ public abstract class RelationalConversationStore : IConversationStore
     /// Adds <c>TrMessage.ContentJson</c> to a database created before that column existed.
     /// </summary>
     /// <param name="connection">The open connection.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>A task that completes once the column is present.</returns>
     /// <remarks>
     /// <para><b>Why an <c>ALTER</c> and not just the <c>CREATE TABLE</c> above.</b>
@@ -99,11 +102,11 @@ public abstract class RelationalConversationStore : IConversationStore
     /// Postgres equivalent. Running the plain <c>ALTER</c> and swallowing the duplicate-column error
     /// is the one form that is correct on both and idempotent on every start.</para>
     /// </remarks>
-    private static async Task AddContentJsonColumnAsync(DbConnection connection)
+    private static async Task AddContentJsonColumnAsync(DbConnection connection, CancellationToken cancellationToken)
     {
         try
         {
-            await connection.ExecuteAsync("ALTER TABLE TrMessage ADD COLUMN ContentJson TEXT")
+            await connection.ExecuteAsync("ALTER TABLE TrMessage ADD COLUMN ContentJson TEXT", cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (DbException)
@@ -135,15 +138,13 @@ public abstract class RelationalConversationStore : IConversationStore
             INSERT INTO TrThread (ThreadId, UserId, WorkspaceId, Title, CreatedAt, UpdatedAt)
             VALUES (@ThreadId, @UserId, @WorkspaceId, @Title, @CreatedAt, @UpdatedAt)
             """,
-            new
-            {
-                thread.ThreadId,
-                thread.UserId,
-                thread.WorkspaceId,
-                thread.Title,
-                CreatedAt = thread.CreatedAt.ToString("o"),
-                UpdatedAt = thread.UpdatedAt.ToString("o")
-            }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("ThreadId", thread.ThreadId),
+            DbParam.Text("UserId", thread.UserId),
+            DbParam.Text("WorkspaceId", thread.WorkspaceId),
+            DbParam.Text("Title", thread.Title),
+            DbParam.Text("CreatedAt", thread.CreatedAt.ToString("o")),
+            DbParam.Text("UpdatedAt", thread.UpdatedAt.ToString("o"))).ConfigureAwait(false);
 
         return thread;
     }
@@ -158,12 +159,18 @@ public abstract class RelationalConversationStore : IConversationStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var sql = workspaceId is null
-            ? "SELECT ThreadId, UserId, WorkspaceId, Title, CreatedAt, UpdatedAt FROM TrThread WHERE UserId = @UserId ORDER BY UpdatedAt DESC"
-            : "SELECT ThreadId, UserId, WorkspaceId, Title, CreatedAt, UpdatedAt FROM TrThread WHERE UserId = @UserId AND WorkspaceId = @WorkspaceId ORDER BY UpdatedAt DESC";
-
-        var rows = await connection.QueryAsync<ThreadRow>(sql, new { UserId = userId, WorkspaceId = workspaceId })
-            .ConfigureAwait(false);
+        var rows = workspaceId is null
+            ? await connection.QueryAsync(
+                "SELECT ThreadId, UserId, WorkspaceId, Title, CreatedAt, UpdatedAt FROM TrThread WHERE UserId = @UserId ORDER BY UpdatedAt DESC",
+                ThreadRow.Read,
+                cancellationToken,
+                DbParam.Text("UserId", userId)).ConfigureAwait(false)
+            : await connection.QueryAsync(
+                "SELECT ThreadId, UserId, WorkspaceId, Title, CreatedAt, UpdatedAt FROM TrThread WHERE UserId = @UserId AND WorkspaceId = @WorkspaceId ORDER BY UpdatedAt DESC",
+                ThreadRow.Read,
+                cancellationToken,
+                DbParam.Text("UserId", userId),
+                DbParam.Text("WorkspaceId", workspaceId)).ConfigureAwait(false);
         return rows.Select(MapThread).ToList();
     }
 
@@ -174,9 +181,11 @@ public abstract class RelationalConversationStore : IConversationStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var row = await connection.QuerySingleOrDefaultAsync<ThreadRow>(
+        var row = await connection.QuerySingleOrDefaultAsync(
             "SELECT ThreadId, UserId, WorkspaceId, Title, CreatedAt, UpdatedAt FROM TrThread WHERE ThreadId = @ThreadId",
-            new { ThreadId = threadId }).ConfigureAwait(false);
+            ThreadRow.Read,
+            cancellationToken,
+            DbParam.Text("ThreadId", threadId)).ConfigureAwait(false);
 
         return row is null ? null : MapThread(row);
     }
@@ -191,8 +200,10 @@ public abstract class RelationalConversationStore : IConversationStore
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "UPDATE TrThread SET Title = @Title, UpdatedAt = @UpdatedAt WHERE ThreadId = @ThreadId",
-            new { ThreadId = threadId, Title = title, UpdatedAt = DateTime.UtcNow.ToString("o") })
-            .ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("ThreadId", threadId),
+            DbParam.Text("Title", title),
+            DbParam.Text("UpdatedAt", DateTime.UtcNow.ToString("o"))).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -203,9 +214,13 @@ public abstract class RelationalConversationStore : IConversationStore
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
-            "DELETE FROM TrMessage WHERE ThreadId = @ThreadId", new { ThreadId = threadId }).ConfigureAwait(false);
+            "DELETE FROM TrMessage WHERE ThreadId = @ThreadId",
+            cancellationToken,
+            DbParam.Text("ThreadId", threadId)).ConfigureAwait(false);
         await connection.ExecuteAsync(
-            "DELETE FROM TrThread WHERE ThreadId = @ThreadId", new { ThreadId = threadId }).ConfigureAwait(false);
+            "DELETE FROM TrThread WHERE ThreadId = @ThreadId",
+            cancellationToken,
+            DbParam.Text("ThreadId", threadId)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -217,9 +232,12 @@ public abstract class RelationalConversationStore : IConversationStore
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "DELETE FROM TrMessage WHERE ThreadId IN (SELECT ThreadId FROM TrThread WHERE UserId = @UserId)",
-            new { UserId = userId }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("UserId", userId)).ConfigureAwait(false);
         await connection.ExecuteAsync(
-            "DELETE FROM TrThread WHERE UserId = @UserId", new { UserId = userId }).ConfigureAwait(false);
+            "DELETE FROM TrThread WHERE UserId = @UserId",
+            cancellationToken,
+            DbParam.Text("UserId", userId)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -251,20 +269,20 @@ public abstract class RelationalConversationStore : IConversationStore
             INSERT INTO TrMessage (MessageId, ThreadId, Role, Content, ContentJson, SourcesJson, CreatedAt)
             VALUES (@MessageId, @ThreadId, @Role, @Content, @ContentJson, @SourcesJson, @CreatedAt)
             """,
-            new
-            {
-                stored.MessageId,
-                stored.ThreadId,
-                stored.Role,
-                stored.Content,
-                ContentJson = contentJson,
-                SourcesJson = sourcesJson,
-                CreatedAt = stored.CreatedAt.ToString("o")
-            }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("MessageId", stored.MessageId),
+            DbParam.Text("ThreadId", stored.ThreadId),
+            DbParam.Text("Role", stored.Role),
+            DbParam.Text("Content", stored.Content),
+            DbParam.Text("ContentJson", contentJson),
+            DbParam.Text("SourcesJson", sourcesJson),
+            DbParam.Text("CreatedAt", stored.CreatedAt.ToString("o"))).ConfigureAwait(false);
 
         await connection.ExecuteAsync(
             "UPDATE TrThread SET UpdatedAt = @UpdatedAt WHERE ThreadId = @ThreadId",
-            new { ThreadId = threadId, UpdatedAt = DateTime.UtcNow.ToString("o") }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("ThreadId", threadId),
+            DbParam.Text("UpdatedAt", DateTime.UtcNow.ToString("o"))).ConfigureAwait(false);
 
         return stored;
     }
@@ -278,9 +296,11 @@ public abstract class RelationalConversationStore : IConversationStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<MessageRow>(
+        var rows = await connection.QueryAsync(
             "SELECT MessageId, ThreadId, Role, Content, ContentJson, SourcesJson, CreatedAt FROM TrMessage WHERE ThreadId = @ThreadId ORDER BY CreatedAt, MessageId",
-            new { ThreadId = threadId }).ConfigureAwait(false);
+            MessageRow.Read,
+            cancellationToken,
+            DbParam.Text("ThreadId", threadId)).ConfigureAwait(false);
 
         return rows.Select(MapMessage).ToList();
     }
@@ -360,6 +380,17 @@ public abstract class RelationalConversationStore : IConversationStore
         public string Title { get; set; } = string.Empty;
         public string CreatedAt { get; set; } = string.Empty;
         public string UpdatedAt { get; set; } = string.Empty;
+
+        /// <summary>Maps the current row of a query selecting the columns in declaration order.</summary>
+        public static ThreadRow Read(DbDataReader reader) => new()
+        {
+            ThreadId = reader.GetNullableString(0) ?? string.Empty,
+            UserId = reader.GetNullableString(1) ?? string.Empty,
+            WorkspaceId = reader.GetNullableString(2),
+            Title = reader.GetNullableString(3) ?? string.Empty,
+            CreatedAt = reader.GetNullableString(4) ?? string.Empty,
+            UpdatedAt = reader.GetNullableString(5) ?? string.Empty
+        };
     }
 
     private sealed class MessageRow
@@ -372,5 +403,17 @@ public abstract class RelationalConversationStore : IConversationStore
 
         public string? SourcesJson { get; set; }
         public string CreatedAt { get; set; } = string.Empty;
+
+        /// <summary>Maps the current row of a query selecting the columns in declaration order.</summary>
+        public static MessageRow Read(DbDataReader reader) => new()
+        {
+            MessageId = reader.GetNullableString(0) ?? string.Empty,
+            ThreadId = reader.GetNullableString(1) ?? string.Empty,
+            Role = reader.GetNullableString(2) ?? string.Empty,
+            Content = reader.GetNullableString(3),
+            ContentJson = reader.GetNullableString(4),
+            SourcesJson = reader.GetNullableString(5),
+            CreatedAt = reader.GetNullableString(6) ?? string.Empty
+        };
     }
 }

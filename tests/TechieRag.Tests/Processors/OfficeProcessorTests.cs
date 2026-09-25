@@ -15,7 +15,7 @@ namespace TechieRag.Tests.Processors;
 public sealed class OfficeProcessorTests
 {
     /// <summary>An XLSX workbook yields sheet-name headings plus every cell value.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-072 IngestsXlsxWorkbook")]
     public async Task IngestsXlsxWorkbook()
     {
         using var stream = XlsxFixture.Build();
@@ -33,7 +33,7 @@ public sealed class OfficeProcessorTests
     }
 
     /// <summary>A PPTX deck yields slide headings, body text and speaker notes in slide order.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-072 IngestsPptxDeck")]
     public async Task IngestsPptxDeck()
     {
         using var stream = PptxFixture.Build();
@@ -49,7 +49,7 @@ public sealed class OfficeProcessorTests
     }
 
     /// <summary>A CSV file renders each data row with its column names attached.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-072 IngestsCsvWithHeaderAwareRows")]
     public async Task IngestsCsvWithHeaderAwareRows()
     {
         const string csv = "Name,Role,City\nAda Lovelace,Analyst,London\nGrace Hopper,Admiral,New York\n";

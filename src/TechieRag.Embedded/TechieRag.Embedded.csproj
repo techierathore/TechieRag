@@ -13,7 +13,7 @@
     <Version>1.0.0</Version>
     <Authors>Techie Rathor</Authors>
     <Company>TechieRathor</Company>
-    <Description>Self-contained TechieRag package with embedded BGE-M3 ONNX model (1024 dimensions, multilingual). Run RAG completely offline - no downloads, no external services, just works! Perfect for air-gapped environments and edge deployments.</Description>
+    <Description>Offline embeddings and reranking for TechieRag on ONNX Runtime: BGE-M3 (1024 dimensions, multilingual) on desktops, all-MiniLM-L6-v2 (384 dimensions) on Android and iOS, downloaded once into the per-user application data folder. Ships the native ONNX Runtime wiring for .NET MAUI heads (Windows, Mac Catalyst, Android, iOS).</Description>
     <PackageTags>RAG;AI;Embeddings;ONNX;Offline;SelfContained;LocalAI;BGE-M3;Multilingual;EdgeAI</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
@@ -34,19 +34,32 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="TechieRag.Tests" />
+  </ItemGroup>
+
+  <!-- REQ-FN-055 / BRD-90: native ONNX Runtime wiring for Mac Catalyst, iOS and Android MAUI heads,
+       applied to every consuming app (direct or transitive) so none writes it by hand. A project
+       that references this one by ProjectReference (samples/TechieRag.Probe) imports the targets
+       file itself, since NuGet build assets do not flow over a ProjectReference. -->
+  <ItemGroup>
+    <None Include="buildTransitive\TechieRag.Embedded.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="buildTransitive\onnx-customops-stub.c" Pack="true" PackagePath="buildTransitive\" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <!-- ONNX Runtime for running embedding models locally -->
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.30.0" />
 
     <!-- Tokenizers for text preprocessing -->
     <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
   </ItemGroup>
 
-  <!-- BGE-M3 model is 2.3GB - too large for embedded resources -->
-  <!-- Model is auto-downloaded on first use and cached locally -->
+  <!-- Model weights are never packed (ADR-004): they are downloaded on first use into the model
+       root, <LocalApplicationData>/TechieRag/models (REQ-RAG-053). -->
 
 </Project>

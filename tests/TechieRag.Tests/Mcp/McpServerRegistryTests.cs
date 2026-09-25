@@ -32,7 +32,7 @@ public class McpServerRegistryTests
     }
 
     /// <summary>A configuration the trust policy forbids is refused at registration, not at use.</summary>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-085 PolicyViolatingConfigurationIsRefusedAtRegistration")]
     public async Task PolicyViolatingConfigurationIsRefusedAtRegistration()
     {
         var registry = new InMemoryMcpServerRegistry();
@@ -103,7 +103,7 @@ public class McpServerRegistryTests
     /// reproduces a real tightening of host policy — and exercises the partial-failure path without
     /// needing a network or a server.
     /// </remarks>
-    [Fact]
+    [Fact(DisplayName = "REQ-RAG-085 ServerRefusedAtBuildTimeIsReportedWithoutCostingOtherTools")]
     public async Task ServerRefusedAtBuildTimeIsReportedWithoutCostingOtherTools()
     {
         var permissive = new McpTrustPolicy { AllowPlaintextHttp = true };

@@ -1,0 +1,174 @@
+# REQ-FN-057 / BRD-95: build the four-platform probe (samples/TechieRag.Probe) for all four heads on
+# every push, and press its button on an Android emulator.
+#
+# Every head is its own job so the run page shows each one as built or failed; the final "report"
+# job always runs and writes a table - built / failed / not run - for Windows, Android, Mac Catalyst
+# and iOS, plus the emulator result. A head that cannot be built fails its job and the run; nothing
+# is skipped silently. Mac Catalyst and iOS need the macOS runner (Apple linker). iOS builds for the
+# simulator so no signing identity is needed; a device build is the owner's runbook step
+# (UsageGuide, Platform notes).
+#
+# -p:ProbeHead restores only the head being built (TechieRag.Probe.csproj): without it a Linux
+# runner needs the iOS SDK and a macOS runner the Android workload just to restore.
+#
+# The Apple heads run on macos-26 and select the Xcode their .NET SDK asks for (scripts/select-xcode.sh,
+# after the workload install): .NET for iOS 26.5 builds only under Xcode 26.5, which macos-15 does not
+# carry (its newest is 26.3; run 36148218069 failed both heads on that). A failed build's first error
+# lines are written as run-page annotations, readable without signing in.
+#
+# Separate from the publish-*.yml workflows on purpose: the probe is a sample, never packed.
+name: Probe (four heads)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  PROBE: samples/TechieRag.Probe/TechieRag.Probe.csproj
+
+jobs:
+  windows:
+    name: Windows head
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install MAUI workload
+        run: dotnet workload install maui-windows
+      - name: Build Windows head
+        run: dotnet build ${{ env.PROBE }} -f net10.0-windows10.0.19041.0 -p:ProbeHead=net10.0-windows10.0.19041.0 -c Debug
+      - name: Press the button (UI Automation bound to the probe's own window)
+        shell: pwsh
+        run: >
+          ./samples/TechieRag.Probe/scripts/Invoke-ProbeWindows.ps1
+          -Exe samples/TechieRag.Probe/bin/Debug/net10.0-windows10.0.19041.0/win-x64/TechieRag.Probe.exe
+          -OutDir probe-artifacts
+        continue-on-error: true
+        id: run
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-windows
+          path: probe-artifacts
+          if-no-files-found: ignore
+    outputs:
+      run: ${{ steps.run.outcome }}
+
+  android:
+    name: Android head
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: '17'
+      - name: Install MAUI workload
+        run: dotnet workload install maui-android
+      - name: Build Android head
+        run: dotnet build ${{ env.PROBE }} -f net10.0-android -p:ProbeHead=net10.0-android -c Debug
+      - name: Locate APK
+        id: apk
+        run: echo "path=$(find samples/TechieRag.Probe/bin/Debug/net10.0-android -name '*-Signed.apk' | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Press the button on an Android emulator (x86_64)
+        id: emulator
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash samples/TechieRag.Probe/scripts/run-android-emulator.sh "${{ steps.apk.outputs.path }}" probe-artifacts 1500
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-android
+          path: |
+            probe-artifacts
+            ${{ steps.apk.outputs.path }}
+          if-no-files-found: ignore
+    outputs:
+      emulator: ${{ steps.emulator.outcome }}
+
+  maccatalyst:
+    name: Mac Catalyst head
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install MAUI workload
+        run: dotnet workload install maui-maccatalyst
+      - name: Select the Xcode this .NET for Mac Catalyst asks for
+        run: bash samples/TechieRag.Probe/scripts/select-xcode.sh maccatalyst
+      - name: Build Mac Catalyst head
+        run: dotnet build ${{ env.PROBE }} -f net10.0-maccatalyst -p:ProbeHead=net10.0-maccatalyst -c Debug $PROBE_BUILD_FLAGS 2>&1 | tee build-maccatalyst.log
+      - name: Show the build errors on the run page
+        if: failure()
+        run: grep -E ' error ' build-maccatalyst.log | sort -u | head -5 | sed 's/^/::error::/'
+
+  ios:
+    name: iOS head (simulator)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install MAUI workload
+        run: dotnet workload install maui-ios
+      - name: Select the Xcode this .NET for iOS asks for
+        run: bash samples/TechieRag.Probe/scripts/select-xcode.sh ios
+      - name: Build iOS head for the simulator
+        run: dotnet build ${{ env.PROBE }} -f net10.0-ios -p:ProbeHead=net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64 $PROBE_BUILD_FLAGS 2>&1 | tee build-ios.log
+      - name: Show the build errors on the run page
+        if: failure()
+        run: grep -E ' error ' build-ios.log | sort -u | head -5 | sed 's/^/::error::/'
+
+  report:
+    name: Probe heads report
+    runs-on: ubuntu-latest
+    needs: [windows, android, maccatalyst, ios]
+    if: always()
+    steps:
+      - name: Write the head table
+        env:
+          WINDOWS: ${{ needs.windows.result }}
+          WINDOWS_RUN: ${{ needs.windows.outputs.run }}
+          ANDROID: ${{ needs.android.result }}
+          EMULATOR: ${{ needs.android.outputs.emulator }}
+          MACCATALYST: ${{ needs.maccatalyst.result }}
+          IOS: ${{ needs.ios.result }}
+        run: |
+          state() { case "$1" in success) echo built ;; failure) echo failed ;; *) echo "not run ($1)" ;; esac; }
+          run() { case "$1" in success) echo "button pressed, result OK" ;; failure) echo "button pressed, FAILED" ;; *) echo "not run" ;; esac; }
+          {
+            echo "## Probe heads"
+            echo ""
+            echo "| Head | Build | Button |"
+            echo "|---|---|---|"
+            echo "| Windows | $(state "$WINDOWS") | $(run "$WINDOWS_RUN") (UI Automation, windows-latest) |"
+            echo "| Android | $(state "$ANDROID") | $(run "$EMULATOR") (emulator API 34 x86_64) |"
+            echo "| Mac Catalyst | $(state "$MACCATALYST") | not run in CI (owner's Mac, UsageGuide runbook) |"
+            echo "| iOS | $(state "$IOS") | not run in CI (owner's iPhone, UsageGuide runbook) |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          for r in "$WINDOWS" "$ANDROID" "$MACCATALYST" "$IOS"; do [[ "$r" == success ]] || exit 1; done

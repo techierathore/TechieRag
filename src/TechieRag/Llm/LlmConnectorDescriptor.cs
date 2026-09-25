@@ -39,4 +39,10 @@ public sealed record LlmConnectorDescriptor
     /// <summary>Gets whether an API key is required to use this service.</summary>
     /// <remarks>False for local runtimes such as Ollama and LM Studio.</remarks>
     public bool RequiresApiKey { get; init; } = true;
+
+    /// <summary>
+    /// Gets the vendor's stated terms for subscription sign-in and the date they were checked, or null
+    /// for a connector that is not a <see cref="LlmSource.Subscription"/> connector (REQ-RAG-070 / BRD-113).
+    /// </summary>
+    public SubscriptionTerms? Subscription { get; init; }
 }
