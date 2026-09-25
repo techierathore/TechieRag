@@ -86,6 +86,55 @@ public class ProbeWorkflowTests
         Assert.True(File.Exists(Path.Combine(LibraryRepoFiles.Root(), "samples/TechieRag.Probe/scripts/run-android-emulator.sh")));
     }
 
+    /// <summary>
+    /// REQ-FN-057: the two Apple head jobs run on an image that carries the Xcode their .NET SDK
+    /// asks for (macos-26; macos-15 tops out at Xcode 26.3 while .NET for iOS 26.5 builds only under
+    /// Xcode 26.5, which failed run 36148218069), select that Xcode with
+    /// <c>scripts/select-xcode.sh</c> after the workload install and before the build, append the
+    /// flags the script hands back, and write a failed build's first error lines to the run page as
+    /// annotations, so the reason is readable without signing in.
+    /// </summary>
+    [Theory(DisplayName = "REQ-FN-057 AppleJobsSelectTheXcodeTheirSdkAsksFor")]
+    [InlineData("maccatalyst", "maui-maccatalyst")]
+    [InlineData("ios", "maui-ios")]
+    public void AppleJobsSelectTheXcodeTheirSdkAsksFor(string job, string workload)
+    {
+        var body = Job(LibraryRepoFiles.Read(Workflow), job);
+
+        Assert.Contains("runs-on: macos-26", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Xcode_*.app", body, StringComparison.Ordinal);
+
+        var install = body.IndexOf($"dotnet workload install {workload}", StringComparison.Ordinal);
+        var select = body.IndexOf($"bash samples/TechieRag.Probe/scripts/select-xcode.sh {job}", StringComparison.Ordinal);
+        var build = body.IndexOf("dotnet build ${{ env.PROBE }}", StringComparison.Ordinal);
+        Assert.True(install >= 0 && select > install && build > select, $"'{job}' must install the workload, then select Xcode, then build.");
+
+        Assert.Contains("$PROBE_BUILD_FLAGS", body, StringComparison.Ordinal);
+        Assert.Contains("if: failure()", body, StringComparison.Ordinal);
+        Assert.Contains("sed 's/^/::error::/'", body, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(LibraryRepoFiles.Root(), "samples/TechieRag.Probe/scripts/select-xcode.sh")));
+    }
+
+    /// <summary>
+    /// REQ-FN-057: the Xcode selection script reads the wanted version from the installed SDK pack
+    /// (never a hard-coded number), falls back to <c>-p:ValidateXcodeVersion=false</c> when that
+    /// Xcode is absent instead of failing, and hands the flags to the workflow through
+    /// <c>GITHUB_ENV</c>.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-057 SelectXcodeScriptReadsTheWantedVersionFromTheSdkPack")]
+    public void SelectXcodeScriptReadsTheWantedVersionFromTheSdkPack()
+    {
+        var script = LibraryRepoFiles.Read("samples/TechieRag.Probe/scripts/select-xcode.sh");
+
+        Assert.Contains("Microsoft.iOS.Sdk", script, StringComparison.Ordinal);
+        Assert.Contains("Microsoft.MacCatalyst.Sdk", script, StringComparison.Ordinal);
+        Assert.Contains("packs/\"$PACK\".net10.0_*", script, StringComparison.Ordinal);
+        Assert.Contains("-p:ValidateXcodeVersion=false", script, StringComparison.Ordinal);
+        Assert.Contains("\"$GITHUB_ENV\"", script, StringComparison.Ordinal);
+        Assert.Contains("::notice::", script, StringComparison.Ordinal);
+        Assert.DoesNotMatch(new Regex(@"Xcode_2\d\.\d"), script);
+    }
+
     /// <summary>Returns one job's block: from its two-space-indented key to the next job's key.</summary>
     private static string Job(string yaml, string name) =>
         Regex.Match(yaml, $@"^  {Regex.Escape(name)}:\n(.*?)(?=^  [a-z_]+:\n|\z)", RegexOptions.Multiline | RegexOptions.Singleline).Groups[1].Value;

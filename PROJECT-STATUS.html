@@ -149,7 +149,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). 81 of 83 rows Verified. The phone model now downloads by default from the owner's Hugging Face repository, pinned to one commit. <code>PgVectorStore</code> is proven against the WinPostgre container. The local model is proven on Windows and the Android emulator. CI's restore failure is fixed, pending a push; the Galaxy S23 ran the local model; an iPhone remains.</p>
+<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). 81 of 83 rows Verified. CI run 36148218069 built the Windows and Android heads and pressed both buttons; the two Apple heads failed on the runner's Xcode and are fixed for the next push. The iPhone is connected and its device build passes; deploying waits on the phone's Developer Mode and an Apple ID in Xcode.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
 <pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag</code></pre>
@@ -176,13 +176,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>🔶 <strong>REQ-FN-057:</strong> the restore failure in CI run 36134404881 is fixed (<code>ProbeHead</code>); it needs the run page of your next push.
+<li>🔶 <strong>REQ-FN-057:</strong> CI run 36148218069 built Windows and Android and both buttons passed; Mac Catalyst and iOS failed because the macos-15 runner has no Xcode 26.5. Fixed (Apple jobs on macos-26, <code>scripts/select-xcode.sh</code>); it needs the run page of your next push.
 </li>
-<li>🔶 <strong>REQ-FN-060:</strong> the Android phone (Galaxy S23) is recorded; only a physical iPhone run on the Mac remains.
+<li>🔶 <strong>REQ-FN-060:</strong> the iPhone 17 Pro is connected and its device build passes, but two one-time steps are yours: on the phone turn on Developer Mode (Settings, Privacy and Security, Developer Mode, then restart), and on this Mac sign Xcode in to your Apple ID (Xcode, Settings, Accounts). Then run <code>*build-phase TechieRag</code> again.
 </li>
 <li>🔶 <strong>BRD §9 platform matrix:</strong> the Windows <code>TechieRag.Local</code> cell should now say "tested", as the UsageGuide does. Fix with the analyst's <code>*amend-docs</code>.
 </li>
-<li>🔶 <strong>Owner git:</strong> commit today's work.
+<li>🔶 <strong>Owner git:</strong> commit today's work and push, so CI runs the fixed Apple jobs.
 </li>
 </ul>
 <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
@@ -190,10 +190,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-09-03</td><td><code>*amend-docs</code> TechieRag + TechieDesk (BRD-83…87; governance reversal)</td><td>📝 docs only</td><td><a href="docs/TechieRag-P2-Checklist.md#requirements-status">P2</a></td></tr>
 <tr><td>2026-09-03</td><td><code>*triage-issues</code> → <code>*fix-issues</code> → verify (REQ-FN-003, REQ-FN-004)</td><td>✅ 2/2 Verified; 723 lib tests pass; version rules 9/9</td><td><a href="docs/TechieRag-Checklist.md#requirements-status">P1</a></td></tr>
 <tr><td>2026-09-25</td><td>build-phase</td><td>77/82 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-09-25</td><td>build-phase</td><td>78/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-09-25</td><td>build-phase</td><td>81/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-09-25</td><td>build-phase</td><td>81/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>

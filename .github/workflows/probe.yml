@@ -11,6 +11,11 @@
 # -p:ProbeHead restores only the head being built (TechieRag.Probe.csproj): without it a Linux
 # runner needs the iOS SDK and a macOS runner the Android workload just to restore.
 #
+# The Apple heads run on macos-26 and select the Xcode their .NET SDK asks for (scripts/select-xcode.sh,
+# after the workload install): .NET for iOS 26.5 builds only under Xcode 26.5, which macos-15 does not
+# carry (its newest is 26.3; run 36148218069 failed both heads on that). A failed build's first error
+# lines are written as run-page annotations, readable without signing in.
+#
 # Separate from the publish-*.yml workflows on purpose: the probe is a sample, never packed.
 name: Probe (four heads)
 
@@ -105,33 +110,39 @@ jobs:
 
   maccatalyst:
     name: Mac Catalyst head
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Select the newest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)" && xcodebuild -version
       - name: Install MAUI workload
         run: dotnet workload install maui-maccatalyst
+      - name: Select the Xcode this .NET for Mac Catalyst asks for
+        run: bash samples/TechieRag.Probe/scripts/select-xcode.sh maccatalyst
       - name: Build Mac Catalyst head
-        run: dotnet build ${{ env.PROBE }} -f net10.0-maccatalyst -p:ProbeHead=net10.0-maccatalyst -c Debug
+        run: dotnet build ${{ env.PROBE }} -f net10.0-maccatalyst -p:ProbeHead=net10.0-maccatalyst -c Debug $PROBE_BUILD_FLAGS 2>&1 | tee build-maccatalyst.log
+      - name: Show the build errors on the run page
+        if: failure()
+        run: grep -E ' error ' build-maccatalyst.log | sort -u | head -5 | sed 's/^/::error::/'
 
   ios:
     name: iOS head (simulator)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Select the newest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)" && xcodebuild -version
       - name: Install MAUI workload
         run: dotnet workload install maui-ios
+      - name: Select the Xcode this .NET for iOS asks for
+        run: bash samples/TechieRag.Probe/scripts/select-xcode.sh ios
       - name: Build iOS head for the simulator
-        run: dotnet build ${{ env.PROBE }} -f net10.0-ios -p:ProbeHead=net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64
+        run: dotnet build ${{ env.PROBE }} -f net10.0-ios -p:ProbeHead=net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64 $PROBE_BUILD_FLAGS 2>&1 | tee build-ios.log
+      - name: Show the build errors on the run page
+        if: failure()
+        run: grep -E ' error ' build-ios.log | sort -u | head -5 | sed 's/^/::error::/'
 
   report:
     name: Probe heads report

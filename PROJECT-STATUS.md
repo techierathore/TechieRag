@@ -10,7 +10,7 @@ last_verified_date: 2026-09-25
 
 ## Where I am
 
-Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). 81 of 83 rows Verified. The phone model now downloads by default from the owner's Hugging Face repository, pinned to one commit. `PgVectorStore` is proven against the WinPostgre container. The local model is proven on Windows and the Android emulator. CI's restore failure is fixed, pending a push; the Galaxy S23 ran the local model; an iPhone remains.
+Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). 81 of 83 rows Verified. CI run 36148218069 built the Windows and Android heads and pressed both buttons; the two Apple heads failed on the runner's Xcode and are fixed for the next push. The iPhone is connected and its device build passes; deploying waits on the phone's Developer Mode and an Apple ID in Xcode.
 
 ## Next command to run
 
@@ -40,10 +40,10 @@ Why: 2 rows are not built yet: REQ-FN-057, REQ-FN-060; working docs/TechieRag-P2
 
 ## Known blockers
 
-- 🔶 **REQ-FN-057:** the restore failure in CI run 36134404881 is fixed (`ProbeHead`); it needs the run page of your next push.
-- 🔶 **REQ-FN-060:** the Android phone (Galaxy S23) is recorded; only a physical iPhone run on the Mac remains.
+- 🔶 **REQ-FN-057:** CI run 36148218069 built Windows and Android and both buttons passed; Mac Catalyst and iOS failed because the macos-15 runner has no Xcode 26.5. Fixed (Apple jobs on macos-26, `scripts/select-xcode.sh`); it needs the run page of your next push.
+- 🔶 **REQ-FN-060:** the iPhone 17 Pro is connected and its device build passes, but two one-time steps are yours: on the phone turn on Developer Mode (Settings, Privacy and Security, Developer Mode, then restart), and on this Mac sign Xcode in to your Apple ID (Xcode, Settings, Accounts). Then run `*build-phase TechieRag` again.
 - 🔶 **BRD §9 platform matrix:** the Windows `TechieRag.Local` cell should now say "tested", as the UsageGuide does. Fix with the analyst's `*amend-docs`.
-- 🔶 **Owner git:** commit today's work.
+- 🔶 **Owner git:** commit today's work and push, so CI runs the fixed Apple jobs.
 
 ## Verification log
 
@@ -51,10 +51,10 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-09-03 | `*amend-docs` TechieRag + TechieDesk (BRD-83…87; governance reversal) | 📝 docs only | [P2](docs/TechieRag-P2-Checklist.md#requirements-status) |
 | 2026-09-03 | `*triage-issues` → `*fix-issues` → verify (REQ-FN-003, REQ-FN-004) | ✅ 2/2 Verified; 723 lib tests pass; version rules 9/9 | [P1](docs/TechieRag-Checklist.md#requirements-status) |
 | 2026-09-25 | build-phase | 77/82 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 | 2026-09-25 | build-phase | 78/83 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-09-25 | build-phase | 81/83 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 | 2026-09-25 | build-phase | 81/83 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 
 ## Library feedback summary
