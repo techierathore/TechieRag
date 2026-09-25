@@ -82,10 +82,10 @@ public sealed class LocalModel
     /// official release <c>Qwen/Qwen2.5-0.5B-Instruct</c> at commit
     /// <c>7ae557604adf67be50417f59c2c2f167def9a775</c>, converted with ONNX Runtime GenAI 0.16.0's model
     /// builder, <c>python -m onnxruntime_genai.models.builder -p int4 -e cpu --extra_options
-    /// int4_block_size=32</c> (about 322 MB). They are served from the owner's mirror, whose address is
-    /// not recorded yet: until it is, the download needs <c>TECHIERAG_MODEL_BASE_URL</c> pointing at a
-    /// mirror laid out as <c>&lt;mirror&gt;/qwen2.5-0.5b-instruct-onnx/&lt;file&gt;</c>, and fails before
-    /// any request without it.
+    /// int4_block_size=32</c> (about 322 MB). They are published on the owner's Hugging Face repository
+    /// <c>techierathore/Qwen2.5-0.5B-Instruct-onnx-genai</c> and pinned to commit
+    /// <c>c056eda7447d7df98eba0950ffabd1f95d7aab55</c>; <c>TECHIERAG_MODEL_BASE_URL</c> still redirects
+    /// them to <c>&lt;mirror&gt;/qwen2.5-0.5b-instruct-onnx/&lt;file&gt;</c>.
     /// </remarks>
     public static LocalModel Qwen25Instruct05B { get; } = new(
         "qwen2.5-0.5b-instruct",
@@ -101,7 +101,7 @@ public sealed class LocalModel
             new LocalModelVariant(
                 LocalModelFormat.OnnxGenAi,
                 "qwen2.5-0.5b-instruct-onnx",
-                DefaultBaseUrl: null,
+                "https://huggingface.co/techierathore/Qwen2.5-0.5B-Instruct-onnx-genai/resolve/c056eda7447d7df98eba0950ffabd1f95d7aab55",
                 [
                     new("chat_template.jinja", "chat_template.jinja", 2_507, "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f"),
                     new("genai_config.json", "genai_config.json", 1_581, "a023918fb6dfdf680b0267bdb4ead00083a954194d8178d8fb1af7a0d9adbe63"),

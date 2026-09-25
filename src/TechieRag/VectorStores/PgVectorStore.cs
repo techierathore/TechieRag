@@ -107,6 +107,10 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
                 ex);
         }
 
+        // Npgsql read the server's types when this connection opened, which on a new database was
+        // before the extension existed; reload so the data source can write the 'vector' type.
+        await connection.ReloadTypesAsync(cancellationToken);
+
         // Create Documents table
         await using var docCmd = connection.CreateCommand();
         docCmd.CommandText = """

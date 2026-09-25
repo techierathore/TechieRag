@@ -299,12 +299,12 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
 | Surface: Agents package | 3 | 3 | 0 | Done |
-| Surface: Packaging and quality follow-ups | 9 | 8 | 1 | Partial |
+| Surface: Packaging and quality follow-ups | 9 | 9 | 0 | Done |
 | Surface: Repository separation | 1 | 1 | 0 | Done |
 | Surface: Flow orchestration | 6 | 6 | 0 | Done |
 | Surface: Provider breadth | 10 | 10 | 0 | Done |
 | Surface: Platform groundwork | 9 | 8 | 1 | Partial |
-| Surface: Local model | 15 | 12 | 3 | Partial |
+| Surface: Local model | 15 | 14 | 1 | Partial |
 | Surface: Typed streaming | 2 | 2 | 0 | Done |
 | Surface: Subscription sign-in | 3 | 3 | 0 | Done |
 | Surface: Ingestion breadth | 7 | 7 | 0 | Done |

@@ -38,14 +38,16 @@ public sealed partial class LocalModelCatalogTests
 
     /// <summary>
     /// The phone model is the owner's own conversion: its file list is the six files the ONNX Runtime
-    /// GenAI 0.16.0 builder wrote, and it has no default address until the owner's mirror is known.
+    /// GenAI 0.16.0 builder wrote, served from the owner's Hugging Face repository at a pinned commit.
     /// </summary>
     [Fact(DisplayName = "REQ-RAG-057 PhoneModelIsOwnConversion")]
     public void PhoneModelIsOwnConversion()
     {
         var variant = Assert.Single(LocalModel.Qwen25Instruct05B.Variants);
 
-        Assert.Null(variant.DefaultBaseUrl);
+        Assert.Equal(
+            "https://huggingface.co/techierathore/Qwen2.5-0.5B-Instruct-onnx-genai/resolve/c056eda7447d7df98eba0950ffabd1f95d7aab55",
+            variant.DefaultBaseUrl);
         Assert.Equal(
             ["chat_template.jinja", "genai_config.json", "model.onnx", "model.onnx.data", "tokenizer.json", "tokenizer_config.json"],
             variant.Files.Select(f => f.FileName));

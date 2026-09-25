@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 12 logged: 5 open, 7 fixed, 0 will not fix |
+| Count | 13 logged: 5 open, 8 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
 | Updated | 2026-09-25 |
 
@@ -19,10 +19,11 @@
 | MISS-TechieRag-20260924-03 (REQ-FN-054) | 2026-09-24 by agent-review | not sorted | BRD-88 names a BRD section 9 that only exists in the phase-1 BRD and forbids supported cells without a recorded run, while the acceptance line allows supported. |
 | MISS-TechieRag-20260924-02 (REQ-RAG-106) | 2026-09-24 by agent-review | not sorted | The Architecture document still says every vector store is fixed at 1024 dimensions, which is wrong now that the builder passes the embedder dimensions through. |
 
-## Fixed (7)
+## Fixed (8)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20260925-01 (REQ-RAG-044) | 2026-09-25 by self-smoke | 2026-09-25 by build-phase | the check was too weak | PgVectorStore failed its first save on a new PostgreSQL database because it did not reload the server's types after creating the vector extension, and the mocked tests could not see it. |
 | MISS-TechieRag-20260924-09 (REQ-FN-056) | 2026-09-24 by self-smoke | 2026-09-25 by build-phase | the app's spec | The SQLite stores use Dapper, which generates code at run time, so a Release build of a Mac or iPhone app fails the first time it saves; no requirement said the stores must work in a Release build on Apple platforms. |
 | MISS-TechieRag-20260924-08 (REQ-RAG-082) | 2026-09-24 by agent-review | 2026-09-24 by build-phase | not sorted | A connector run that hits its byte limit stops without an error code the host can check. |
 | MISS-TechieRag-20260924-07 (REQ-RAG-071) | 2026-09-24 by agent-review | 2026-09-24 by build-phase | not sorted | Ingesting a markdown file with the markdown chunking strategy gave one chunk for the whole file instead of one per heading. |

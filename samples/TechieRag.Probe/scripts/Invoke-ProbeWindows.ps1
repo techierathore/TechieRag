@@ -21,7 +21,9 @@ param(
     [string] $ButtonId = 'RunEmbedButton',
     [string] $StatusId = 'StatusLabel',
     [string] $ResultName = 'windows-result',
-    [string] $ShotName = 'windows-probe'
+    [string] $ShotName = 'windows-probe',
+    # REQ-RAG-062: accept the local model's terms dialog (by its AutomationId) when it appears.
+    [switch] $AcceptTerms
 )
 
 $ErrorActionPreference = 'Stop'
@@ -68,15 +70,26 @@ $started = Get-Date
 $button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
 
 $status = ''
+$termsNote = 'no terms dialog'
 $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
 do {
     Start-Sleep -Seconds 2
+    # REQ-RAG-062: a first local-model run shows the model's terms in a dialog inside the probe's own
+    # window (WinUI ContentDialog, primary button AutomationId PrimaryButton, text "Accept"). Accept it
+    # through UI Automation by that AutomationId, never by skipping it.
+    if ($AcceptTerms -and $termsNote -eq 'no terms dialog') {
+        $accept = Find-ById $window 'PrimaryButton'
+        if ($accept -and $accept.Current.Name -eq 'Accept') {
+            $termsNote = "terms dialog accepted by AutomationId PrimaryButton at $(Get-Date -Format 'HH:mm:ss')"
+            $accept.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+        }
+    }
     $status = (Find-ById $window $StatusId).Current.Name
 } while ($status -notmatch '^(Done|Error)' -and (Get-Date) -lt $deadline)
 
 $labels = 'PlatformLabel', 'ModelLabel', 'ModelRootLabel', 'StatusLabel', 'DownloadLabel', 'TopResultLabel', 'TimingsLabel', 'ResultLineLabel', 'GenerateStatusLabel', 'GeneratedSentenceLabel', 'GenerationTimingsLabel'
 $lines = @("TechieRag probe, Windows head, $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss zzz') on $env:COMPUTERNAME",
-           "Driven by UI Automation bound to pid $($process.Id); button invoked by AutomationId; wall time $([int]((Get-Date) - $started).TotalSeconds) s")
+           "Driven by UI Automation bound to pid $($process.Id); button invoked by AutomationId; $termsNote; wall time $([int]((Get-Date) - $started).TotalSeconds) s")
 foreach ($id in $labels) { $lines += "${id}: $((Find-ById $window $id).Current.Name)" }
 $resultFile = Join-Path $OutDir "$ResultName.txt"
 $lines | Set-Content -Path $resultFile -Encoding UTF8

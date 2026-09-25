@@ -103,6 +103,33 @@ public class LocalPackagingTests
     }
 
     /// <summary>
+    /// The two heads the targets add nothing for get their engine from GenAI's own package: Windows as the
+    /// <c>runtimes/win-x64</c> and <c>win-arm64</c> native runtime assets, Android as the <c>.aar</c> with
+    /// <c>libonnxruntime-genai.so</c> for arm64-v8a (phones) and x86_64 (emulators). Proven by the probe on
+    /// both heads on 2026-09-25; a GenAI upgrade that drops either shows here before a device run.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-058 RestoredGenAiPackageCarriesWindowsAndAndroidEngines")]
+    public void RestoredGenAiPackageCarriesWindowsAndAndroidEngines()
+    {
+        var version = XDocument.Load(RepoFiles.Locate(TargetsPath)).Descendants("TechieRagOnnxRuntimeGenAIVersion").Single().Value;
+        var packages = Environment.GetEnvironmentVariable("NUGET_PACKAGES");
+        if (string.IsNullOrWhiteSpace(packages))
+        {
+            packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages");
+        }
+
+        var root = Path.Combine(packages, "microsoft.ml.onnxruntimegenai", version);
+        Assert.True(Directory.Exists(root), $"Microsoft.ML.OnnxRuntimeGenAI {version} is not restored at {root}.");
+
+        Assert.True(File.Exists(Path.Combine(root, "runtimes", "win-x64", "native", "onnxruntime-genai.dll")), "win-x64 onnxruntime-genai.dll is missing.");
+        Assert.True(File.Exists(Path.Combine(root, "runtimes", "win-arm64", "native", "onnxruntime-genai.dll")), "win-arm64 onnxruntime-genai.dll is missing.");
+
+        using var aar = ZipFile.OpenRead(Path.Combine(root, "runtimes", "android", "native", "onnxruntime-genai.aar"));
+        Assert.Contains(aar.Entries, e => e.FullName == "jni/arm64-v8a/libonnxruntime-genai.so");
+        Assert.Contains(aar.Entries, e => e.FullName == "jni/x86_64/libonnxruntime-genai.so");
+    }
+
+    /// <summary>
     /// The probe writes no GenAI wiring of its own: no <c>NativeReference</c>, no <c>AndroidLibrary</c>,
     /// no GenAI package reference; it imports <c>TechieRag.Local.targets</c> by path only because a
     /// ProjectReference carries no NuGet build assets.

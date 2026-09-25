@@ -171,21 +171,20 @@ public sealed class LocalModelStoreTests : IDisposable
     }
 
     /// <summary>
-    /// The phone model has no default address yet: without TECHIERAG_MODEL_BASE_URL its download fails
-    /// with a message naming the variable and the mirror layout.
+    /// Without TECHIERAG_MODEL_BASE_URL the phone model downloads every file from the owner's Hugging
+    /// Face repository at its pinned commit.
     /// </summary>
-    [Fact(DisplayName = "REQ-RAG-057 QwenWithoutMirrorNamesTheVariable")]
-    public void QwenWithoutMirrorNamesTheVariable()
+    [Fact(DisplayName = "REQ-RAG-057 QwenWithoutMirrorUsesOwnerRepository")]
+    public void QwenWithoutMirrorUsesOwnerRepository()
     {
         var variant = LocalModel.Qwen25Instruct05B.Variants.Single();
 
-        var error = Assert.Throws<InvalidOperationException>(() => variant.GetDownloadFiles(null));
+        var files = variant.GetDownloadFiles(null);
 
-        Assert.Equal(
-            "The local model files 'qwen2.5-0.5b-instruct-onnx' have no default download address. Set the "
-            + "TECHIERAG_MODEL_BASE_URL environment variable to a mirror that serves them as "
-            + "<mirror>/qwen2.5-0.5b-instruct-onnx/<file>, or place the files in the model folder yourself.",
-            error.Message);
+        Assert.All(files, f => Assert.Equal(
+            "https://huggingface.co/techierathore/Qwen2.5-0.5B-Instruct-onnx-genai/resolve/c056eda7447d7df98eba0950ffabd1f95d7aab55/"
+            + f.FileName,
+            f.Url.ToString()));
     }
 
     /// <summary>
