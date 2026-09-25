@@ -274,7 +274,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>To watch it happen, call <code>RunStreamAsync(messages)</code> and loop over the events: text as it is written, then <code>ToolCallRequested</code> and <code>ToolExecuted</code> (carrying your function's result), then the answer, then <code>Completed</code> with the tokens used across the whole run.
 </li>
-<li>To use a tool server that speaks MCP, call <code>builder.WithTools(t =&gt; t.AddMcpServer(...))</code> with the command that starts the server. Its tools appear next to your own and run in the same loop.
+<li>To use a tool server that speaks MCP, create a client for it with <code>McpClient.Create</code> (the command that starts the server and your trust policy), wrap one or more clients with <code>McpToolHandler.CreateAsync</code>, and hand the result to <code>WithToolHandler</code>. Its tools appear next to your own and run in the same loop.
 </li>
 </ol>
 <p><img src="screenshots/TechieRag/tool-demo.png" alt="Give the model tools and let it act" style="max-width:100%"></p>

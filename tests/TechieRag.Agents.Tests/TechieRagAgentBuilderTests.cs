@@ -93,6 +93,40 @@ public class TechieRagAgentBuilderTests
         Assert.Equal("Thirty days [S1].", events[^1].Answer);
     }
 
+    /// <summary>
+    /// A streamed turn whose only tool call is list_documents raises no Sources event: the event follows
+    /// a search, not any tool result.
+    /// </summary>
+    [Fact]
+    public async Task StreamedListCallRaisesNoSourcesEvent()
+    {
+        var model = new ScriptedChatClient(
+            ScriptedChatClient.ToolCall("c1", "list_documents", new()),
+            ScriptedChatClient.Answer("One document."));
+        var agent = new TechieRagAgentBuilder(AgentTestRag.Create()).UseCustomChatClient(() => model).Build();
+
+        var events = new List<RagStreamEvent>();
+        await foreach (var streamEvent in agent.AskStreamAsync("What is there?")) events.Add(streamEvent);
+
+        Assert.DoesNotContain(events, e => e.Type == RagStreamEventType.Sources);
+        Assert.Equal("One document.", events[^1].Answer);
+    }
+
+    /// <summary>The interface exposes the retrieval provider, so a host reads a session's search traces without casting.</summary>
+    [Fact]
+    public async Task InterfaceExposesRetrievalProvider()
+    {
+        var model = new ScriptedChatClient(
+            ScriptedChatClient.ToolCall("c1", "search_knowledge_base", new() { ["query"] = "refund" }),
+            ScriptedChatClient.Answer("30 days [S1]."));
+        ITechieRagAgent agent = new TechieRagAgentBuilder(AgentTestRag.Create()).UseCustomChatClient(() => model).Build();
+        var session = await agent.CreateSessionAsync();
+
+        await agent.AskAsync("Return window?", session);
+
+        Assert.Single(agent.Retrieval.GetState(session).Searches);
+    }
+
     /// <summary>A session keeps refs across turns: the same passage found again keeps S1.</summary>
     [Fact]
     public async Task SessionKeepsRefsAcrossTurns()

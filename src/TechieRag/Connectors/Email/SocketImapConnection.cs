@@ -21,6 +21,12 @@ namespace TechieRag.Connectors.Email;
 /// callback here, no accept-all, and no option to install one — the host name the caller configured
 /// is the name the certificate is checked against, and that is the whole of this connector's defence
 /// against being pointed somewhere else.</para>
+/// <para><b>Private addresses are allowed here, unlike for a fetched URL.</b> The HTTP transports
+/// connect through the SSRF guard because a URL to fetch can come from content the library did not
+/// choose (a page, a feed, a redirect). An IMAP server is named by the host in
+/// <see cref="ImapMailboxOptions.Host"/> and never taken from content, and a mail server on a LAN or
+/// at a loopback address is a legitimate target, so the socket below opens without a
+/// private-address check (REQ-RAG-082).</para>
 /// <para><b>Timeouts are enforced, not merely configured.</b>
 /// <see cref="TcpClient.ReceiveTimeout"/> has no effect on an asynchronous read, so every connect,
 /// handshake, read and write below is bounded by an explicit deadline. Without one, a server that

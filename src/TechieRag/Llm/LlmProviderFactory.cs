@@ -139,7 +139,15 @@ public static class LlmProviderFactory
         };
     }
 
-    private static Exception SubscriptionNeedsSignIn(LlmConnectorDescriptor connector) =>
+    /// <summary>
+    /// The exception for a <see cref="LlmSource.Subscription"/> connector reached without the host's
+    /// sign-in callback: an <see cref="InvalidOperationException"/> naming the builder method when the
+    /// vendor permits sign-in, otherwise the coded not-permitted exception carrying the vendor's terms.
+    /// Shared with <c>TechieRagBuilder</c> so configuration and the factory give the same message (REQ-FN-066).
+    /// </summary>
+    /// <param name="connector">The subscription connector.</param>
+    /// <returns>The exception to throw.</returns>
+    internal static Exception SubscriptionNeedsSignIn(LlmConnectorDescriptor connector) =>
         connector.Subscription is { Permitted: true, BuilderMethod: { } method }
             ? new InvalidOperationException(
                 $"Connector '{connector.Name}' is a subscription and needs a sign-in callback: use {method} or LlmProviderFactory.CreateSubscription.")

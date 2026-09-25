@@ -711,25 +711,25 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <h3 id="logging-and-errors">Logging and errors<a class="anchor-link" href="#logging-and-errors">#</a></h3>
 <p>Unchanged from phase 1: <code>WithLogging(loggerFactory)</code> on the builder; library messages are codes with arguments (<code>FlowMessage</code>, <code>ConnectorErrorCodes</code>, <code>SubscriptionSignInException.Code</code>), never English sentences; <code>TechieRag.Local</code> throws <code>LocalModelTermsNotAcceptedException</code>, <code>LocalModelMemoryException</code> and <code>LocalPromptTooLongException</code> with the numbers a host needs.</p>
 <h2 id="known-issues">Known issues<a class="anchor-link" href="#known-issues">#</a></h2>
-<p>Found while reading the code for this guide on 2026-09-25; each is also a dated Remark on its checklist row. None changes a verdict.</p>
+<p>Found while reading the code for this guide on 2026-09-25 and fixed the same day by the build that followed (each fix is the Remark on its checklist row; line numbers below are from before the fix).</p>
 <ul>
-<li>REQ-RAG-015: the <code>weak</code> hint always quotes the cosine threshold, even when reranking classified the result with the rerank threshold (<code>src/TechieRag/Agentic/KnowledgeBaseTools.cs:218</code>).
+<li>REQ-RAG-015, fixed: the <code>weak</code> hint quoted the cosine threshold even when reranking had classified the result; it now quotes the threshold that was applied (<code>src/TechieRag/Agentic/KnowledgeBaseTools.cs</code>).
 </li>
-<li>REQ-RAG-016: <code>Sources</code> fires on any tool result, not only after a search, unlike its doc comment (<code>src/TechieRag.Agents/TechieRagAgent.cs:77</code>); <code>TechieRagAgent.Retrieval</code> is public but not on <code>ITechieRagAgent</code> (<code>TechieRagAgent.cs:34</code>).
+<li>REQ-RAG-016, fixed: <code>Sources</code> is raised only after a search grew the turn's search count, as its doc comment says; <code>Retrieval</code> is now on <code>ITechieRagAgent</code> (<code>src/TechieRag.Agents/TechieRagAgent.cs</code>).
 </li>
-<li>REQ-RAG-053: a comment still calls <code>TechieRag.Local</code> "the planned" package (<code>src/TechieRag/Models/ModelRoot.cs:18</code>).
+<li>REQ-RAG-053, fixed: the comment in <code>src/TechieRag/Models/ModelRoot.cs</code> no longer calls <code>TechieRag.Local</code> "the planned" package.
 </li>
-<li>REQ-RAG-061: <code>GetTerms()</code> reports the variant's full size while a resumed download transfers only the pending bytes (<code>src/TechieRag.Local/LocalLlmProvider.cs:131</code>).
+<li>REQ-RAG-061, fixed: <code>GetTerms()</code> reports the pending bytes, files on disk and <code>.part</code> remainders subtracted, as <code>EnsureAsync</code> does (<code>src/TechieRag.Local/LocalLlmProvider.cs</code>, <code>LocalModelVariant.GetPendingBytes</code>).
 </li>
-<li>REQ-FN-059: the probe labels peak memory "MB" but computes binary MiB, while its download line uses decimal MB (<code>samples/TechieRag.Probe/GenerationResult.cs:26</code>).
+<li>REQ-FN-059, fixed: the probe's peak memory is decimal megabytes, the same unit as its download line (<code>samples/TechieRag.Probe/GenerationResult.cs</code>).
 </li>
-<li>REQ-RAG-069: the <code>ILlmProvider</code> doc comment lists six implementations; the subscription provider is a seventh (<code>src/TechieRag/Abstractions/ILlmProvider.cs:12</code>).
+<li>REQ-RAG-069, fixed: the <code>ILlmProvider</code> doc comment lists all eight implementations (<code>src/TechieRag/Abstractions/ILlmProvider.cs</code>).
 </li>
-<li>REQ-FN-066: <code>Llm.Source = Subscription</code> from configuration throws the generic "Unsupported LLM source" instead of the factory's <code>SubscriptionNeedsSignIn</code> message (<code>src/TechieRag/TechieRagBuilder.cs:851</code>).
+<li>REQ-FN-066, fixed: <code>Llm.Source = Subscription</code> from configuration gives the factory's own sign-in message (<code>src/TechieRag/TechieRagBuilder.cs</code>).
 </li>
-<li>REQ-RAG-082: the IMAP connection opens a plain socket with no private-address check, unlike the HTTP transport; likely intended for LAN mail servers, but undocumented (<code>src/TechieRag/Connectors/Email/SocketImapConnection.cs:72</code>).
+<li>REQ-RAG-082, documented: the IMAP connection deliberately skips the private-address guard because the host names the mail server itself; the rule is in the XML docs of <code>SocketImapConnection</code> and <code>ImapMailboxOptions</code> and in the UsageGuide's Known limitations.
 </li>
-<li>Several XML doc headers cite requirement ids from before the phase-2 renumbering (for example <code>ConnectorRunner</code> names REQ-RAG-032 and BRD-113); cosmetic.
+<li>Several XML doc headers cite requirement ids from before the phase-2 renumbering (for example <code>ConnectorRunner</code> names REQ-RAG-032 and BRD-113); cosmetic, not fixed.
 </li>
 <li>ORT-001, ORTGENAI-001, ORTGENAI-002: upstream package gaps, filed in <code>docs/TechieRag-OnnxRuntime-Feedback.md</code> and <code>docs/TechieRag-OnnxRuntimeGenAI-Feedback.md</code>; the two build targets files work around the first two.
 </li>

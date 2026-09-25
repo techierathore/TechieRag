@@ -121,14 +121,16 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     public bool SupportsStreaming => true;
 
     /// <summary>
-    /// Gets the terms the user accepts before the model downloads, with the download size when this
-    /// platform's file set is known (REQ-RAG-062).
+    /// Gets the terms the user accepts before the model downloads, with the bytes the download would
+    /// transfer when this platform's file set is known (REQ-RAG-062): a file already in the model folder
+    /// costs nothing and an interrupted download's <c>.part</c> file only its remainder, so the figure
+    /// matches what <see cref="LoadAsync"/> then reports before its first byte (REQ-RAG-061).
     /// </summary>
     /// <returns>The terms.</returns>
     public LocalModelTerms GetTerms()
     {
         var variant = runtime is null ? null : Model.FindVariant(runtime.Format);
-        return Model.GetTerms() with { DownloadBytes = variant?.DownloadBytes ?? 0 };
+        return Model.GetTerms() with { DownloadBytes = variant?.GetPendingBytes(Model.GetDirectory(variant)) ?? 0 };
     }
 
     /// <summary>

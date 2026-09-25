@@ -14,9 +14,9 @@ namespace TechieRag.Models;
 /// <see cref="EnvironmentVariable"/> environment variable; then <see cref="DefaultPath"/>, which is
 /// <c>&lt;LocalApplicationData&gt;/TechieRag/models</c>. Each model gets its own sub-folder
 /// (<see cref="GetModelDirectory"/>).</para>
-/// <para><b>One root, shared.</b> <c>TechieRag.Embedded</c> (embedding model and reranker) and the
-/// planned <c>TechieRag.Local</c> read this class, so a host that moves the root moves every model
-/// at once.</para>
+/// <para><b>One root, shared.</b> <c>TechieRag.Embedded</c> (embedding model and reranker) and
+/// <c>TechieRag.Local</c> (the language model) read this class, so a host that moves the root moves
+/// every model at once.</para>
 /// </remarks>
 public static class ModelRoot
 {

@@ -117,7 +117,7 @@ A tool is a small function you own that the model may call on its own initiative
 2. Take the model you configured (`rag.GetLlmProvider()`) and create `new AgentLoopRunner(provider, registry)`.
 3. Call `RunAsync("What is the weather in Pune?")`. The model decides it needs `get_weather`, TechieRag runs your function, and you get back an answer that uses the result.
 4. To watch it happen, call `RunStreamAsync(messages)` and loop over the events: text as it is written, then `ToolCallRequested` and `ToolExecuted` (carrying your function's result), then the answer, then `Completed` with the tokens used across the whole run.
-5. To use a tool server that speaks MCP, call `builder.WithTools(t => t.AddMcpServer(...))` with the command that starts the server. Its tools appear next to your own and run in the same loop.
+5. To use a tool server that speaks MCP, create a client for it with `McpClient.Create` (the command that starts the server and your trust policy), wrap one or more clients with `McpToolHandler.CreateAsync`, and hand the result to `WithToolHandler`. Its tools appear next to your own and run in the same loop.
 
 ![Give the model tools and let it act](screenshots/TechieRag/tool-demo.png)
 

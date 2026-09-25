@@ -19,7 +19,9 @@ public class LocalProbeTests
 
     /// <summary>
     /// REQ-FN-059: the screen has the second button and shows the sentence and the generation timings,
-    /// each under an AutomationId; the timings name the first token, tokens per second and peak memory.
+    /// each under an AutomationId; the timings name the first token, tokens per second and peak memory,
+    /// and peak memory is in decimal megabytes (1,000,000 bytes) so it agrees with the download line
+    /// on the same screen (<c>ModelDownloadService.FormatBytes</c>), not binary MiB.
     /// </summary>
     [Fact(DisplayName = "REQ-FN-059 ProbeSecondButtonShowsSentenceAndTimings")]
     public void ProbeSecondButtonShowsSentenceAndTimings()
@@ -34,7 +36,11 @@ public class LocalProbeTests
         var timings = Regex.Match(result, @"public string Timings =>.*?;", RegexOptions.Singleline).Value;
         Assert.Contains("first token {TimeToFirstTokenMs", timings, StringComparison.Ordinal);
         Assert.Contains("{TokensPerSecond:F1} tokens/s", timings, StringComparison.Ordinal);
-        Assert.Contains("peak {PeakMemoryBytes", timings, StringComparison.Ordinal);
+        Assert.Contains("peak {PeakMemoryMb:F0} MB", timings, StringComparison.Ordinal);
+
+        Assert.Contains("BytesPerMegabyte = 1_000_000d", result, StringComparison.Ordinal);
+        Assert.DoesNotContain("1_048_576", result, StringComparison.Ordinal);
+        Assert.Contains("peakMb={PeakMemoryMb:F0}", result, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -215,12 +215,19 @@ public static class KnowledgeBaseTools
     private static string Hint(string status, RetrievalToolOptions options) => status switch
     {
         StatusStrong => "Answer from these passages and cite them by ref. Search again only if the question has a part these passages do not cover.",
-        StatusWeak => "No passage scored above " + options.WeakScoreThreshold.ToString("0.##", CultureInfo.InvariantCulture)
+        StatusWeak => "No passage scored above " + WeakThreshold(options).ToString("0.##", CultureInfo.InvariantCulture)
             + ". Search again with different terminology, or narrow to a single document from list_documents. Do not answer from memory.",
         StatusLimitReached => "You have used all " + options.MaxSearchesPerTurn.ToString(CultureInfo.InvariantCulture)
             + " searches for this turn. Answer now from the passages already retrieved, and state clearly which parts of the question you could not find support for.",
         _ => "Nothing relevant was found. Try one more query using different words. If that also finds nothing, tell the user the documents do not appear to cover this and say what you searched for."
     };
+
+    /// <summary>
+    /// The threshold <see cref="Classify"/> applied when it said weak, so the hint quotes the same number:
+    /// the rerank threshold when reranking, else the cosine one.
+    /// </summary>
+    private static float WeakThreshold(RetrievalToolOptions options) =>
+        options.Rerank && options.RerankWeakThreshold is { } rerankThreshold ? rerankThreshold : options.WeakScoreThreshold;
 
     private static string DocumentName(TextChunk chunk)
     {

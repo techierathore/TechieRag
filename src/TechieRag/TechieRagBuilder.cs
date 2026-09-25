@@ -889,9 +889,23 @@ public class TechieRagBuilder
                 llmConfig.MaxTokens,
                 config.LoggerFactory?.CreateLogger<AnthropicLlmProvider>()),
 
+            // REQ-FN-066: a subscription cannot come from configuration alone; it needs the host's
+            // sign-in callback. Same exception as LlmProviderFactory.Create gives for the connector.
+            LlmSource.Subscription => throw LlmProviderFactory.SubscriptionNeedsSignIn(SubscriptionConnectorFor(connector)),
+
             _ => throw new InvalidOperationException($"Unsupported LLM source: {llmConfig.Source}")
         };
     }
+
+    /// <summary>
+    /// The subscription connector a configuration-only <see cref="LlmSource.Subscription"/> refers to:
+    /// the named connector when it is a subscription row, otherwise the ChatGPT row, the one vendor with
+    /// a builder method today.
+    /// </summary>
+    private static LlmConnectorDescriptor SubscriptionConnectorFor(LlmConnectorDescriptor? connector) =>
+        connector is { Source: LlmSource.Subscription }
+            ? connector
+            : LlmConnectorCatalog.Require(SubscriptionConnectorRows.ChatGptName);
 
     /// <summary>
     /// Creates the configured vector store sized to the embedding provider's vector width

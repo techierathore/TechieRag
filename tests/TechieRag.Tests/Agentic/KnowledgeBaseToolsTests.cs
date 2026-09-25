@@ -66,6 +66,19 @@ public class KnowledgeBaseToolsTests
         Assert.StartsWith("No passage scored above 0.55.", json.GetProperty("hint").GetString());
     }
 
+    /// <summary>
+    /// When reranking classified the result as weak against the rerank threshold, the hint quotes that
+    /// threshold, not the cosine one (0.55) that was never applied.
+    /// </summary>
+    [Fact]
+    public async Task RerankedWeakHintQuotesRerankThreshold()
+    {
+        var json = await SearchAsync(Source(Result("d1", "tangential", 0.3f)), new RetrievalToolOptions { Rerank = true, RerankWeakThreshold = 0.5f });
+
+        Assert.Equal("weak", json.GetProperty("status").GetString());
+        Assert.StartsWith("No passage scored above 0.5.", json.GetProperty("hint").GetString());
+    }
+
     /// <summary>A best score under the none threshold, or no results at all, is none.</summary>
     [Fact]
     public async Task LowScoreOrNoResultsGiveNone()

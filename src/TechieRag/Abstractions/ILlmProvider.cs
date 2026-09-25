@@ -11,7 +11,9 @@ namespace TechieRag.Abstractions;
 /// streaming responses, and tool calling across different LLM providers.</para>
 /// <para><b>Implementations:</b> OllamaLlmProvider, LmStudioLlmProvider,
 /// OpenAICompatibleLlmProvider, AzureAIFoundryLlmProvider, GoogleGeminiLlmProvider,
-/// AnthropicLlmProvider</para>
+/// AnthropicLlmProvider, ChatGptSubscriptionLlmProvider (REQ-RAG-069) in this package, and
+/// LocalLlmProvider in <c>TechieRag.Local</c>. RetryHandler and FallbackLlmHandler wrap one or more
+/// of them.</para>
 /// </remarks>
 public interface ILlmProvider
 {
@@ -65,7 +67,7 @@ public interface ILlmProvider
     /// method existed keeps compiling. The default calls <see cref="ChatAsync"/> when tools are
     /// supplied or streaming is unsupported (text arrives as one delta, then the tool calls), and
     /// otherwise projects <see cref="ChatStreamAsync"/> into text deltas with estimated usage.</para>
-    /// <para>All six built-in providers override it with a real streaming implementation, and
+    /// <para>All eight built-in providers override it with a real streaming implementation, and
     /// their <see cref="ChatStreamAsync"/> is the text-only projection of it. A custom provider that
     /// does the same must override this method too, or the two defaults call each other.</para>
     /// </remarks>

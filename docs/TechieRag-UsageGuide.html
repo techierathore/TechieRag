@@ -190,7 +190,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="test-users">Test users<a class="anchor-link" href="#test-users">#</a></h2>
-<p>The library has no users of its own. Tests and smoke runs use credentials from the environment, never accounts.</p>
+<p>The library has no users of its own; tests use credentials from the environment.</p>
 <table>
 <thead><tr><th>#</th><th>User</th><th>Password source</th><th>Role</th><th>Exists</th></tr></thead>
 <tbody>
@@ -411,23 +411,25 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 1,097 xUnit tests across the three test projects (930 core, 141 local model, 26 agents); 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-25 through the build ladder.</p>
 <h2 id="known-limitations">Known limitations<a class="anchor-link" href="#known-limitations">#</a></h2>
 <ul>
-<li>SQLite search is an exact managed scan by design (no sqlite-vec, no approximate index): about 0.24 s at 50,000 chunks of 1024 dimensions on a desktop (Platform notes). Past a few hundred thousand chunks use pgvector or Qdrant.
+<li>SQLite search is an exact managed scan by design (no sqlite-vec, no approximate index): 0.24 s at 50,000 chunks of 1024 dimensions on a desktop (Platform notes). Past a few hundred thousand chunks, use pgvector or Qdrant.
 </li>
 <li>ONNX Runtime's and ONNX Runtime GenAI's NuGet packages link nothing on Mac Catalyst; TechieRag's own build targets add the link (ORT-001, ORTGENAI-001, <code>docs/TechieRag-OnnxRuntime-Feedback.md</code>, <code>docs/TechieRag-OnnxRuntimeGenAI-Feedback.md</code>).
 </li>
-<li>GenAI's Android library <code>libmat.so</code> is not aligned for 16 KB pages; a store release for Android 15+ waits on GenAI's fix (ORTGENAI-002).
+<li>GenAI's Android library <code>libmat.so</code> is not 16 KB page aligned; a store release for Android 15+ waits on GenAI's fix (ORTGENAI-002).
 </li>
 <li>Web page and site-crawl ingestion are the web routes; transcript ingestion was removed by owner decision on 2026-09-24 (REQ-RAG-076 N/A, code deleted under BRD-164).
 </li>
-<li>The email connector has only been exercised against mbox files, not a live IMAP server (REQ-RAG-081).
+<li>The email connector has only run against mbox files, not a live IMAP server (REQ-RAG-081).
 </li>
-<li>The probe's Mac Catalyst and iOS heads ran on 2026-09-25 on the owner's Mac (Mac Catalyst and the iPhone 17 Pro simulator), and the Android head on the owner's Galaxy S23 the same day; a physical iPhone has not run it yet (runbook step 1 is the owner's).
+<li>IMAP connects to the server you name, LAN or loopback included: the SSRF guard covers fetched URLs, which can come from content, not a configured mail server (REQ-RAG-082).
 </li>
-<li><code>TechieRag.Local</code> has no engine on an Intel Mac (GenAI ships none) and throws <code>PlatformNotSupportedException</code>. Subscription sign-in: REQ-RAG-069 and REQ-RAG-070.
+<li>The probe ran on 2026-09-25 on the owner's Mac (Mac Catalyst head and the iPhone 17 Pro simulator) and Galaxy S23 (Android head); a physical iPhone has not run it yet (runbook step 1 is the owner's).
 </li>
-<li><code>TechieRag.Agents</code>: a session's citation refs live in memory against the <code>AgentSession</code> object, so a serialized and restored session restarts at S1; a traced agent (<code>WithTrace</code>) should run one turn at a time; MAF approval requests (<code>PendingApprovals</code>) are surfaced but TechieRag does not resume them for you.
+<li><code>TechieRag.Local</code> has no engine on an Intel Mac (GenAI ships none): <code>PlatformNotSupportedException</code>. Subscription sign-in: REQ-RAG-069 and REQ-RAG-070.
 </li>
-<li>Ollama's request mapping sends no <code>tool_calls</code> on assistant messages and Gemini's sends tool results as a <code>tool</code> role rather than <code>functionResponse</code>; multi-turn tool use on those two providers relies on the server tolerating that (unchanged by REQ-RAG-067).
+<li><code>TechieRag.Agents</code>: citation refs live in memory against the <code>AgentSession</code> object, so a serialized and restored session restarts at S1; a traced agent (<code>WithTrace</code>) runs one turn at a time; MAF approval requests (<code>PendingApprovals</code>) are surfaced, not resumed for you.
+</li>
+<li>Ollama's request mapping sends no <code>tool_calls</code> on assistant messages and Gemini's sends tool results as a <code>tool</code> role, not <code>functionResponse</code>; multi-turn tool use there relies on the server tolerating that (unchanged by REQ-RAG-067).
 </li>
 </ul>
 <h2 id="platform-notes">Platform notes<a class="anchor-link" href="#platform-notes">#</a></h2>
@@ -438,34 +440,34 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 <tbody>
 <tr><td><code>TechieRag</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24)</td><td>tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, 2026-09-25)</td><td>tested (Galaxy S23, probe, 2026-09-25)</td><td>supported</td></tr>
 <tr><td><code>TechieRag.Embedded</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24)</td><td>tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, bge-m3, 2026-09-25)</td><td>tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25)</td><td>supported</td></tr>
-<tr><td><code>TechieRag.Agents</code></td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td></tr>
+<tr><td><code>TechieRag.Agents</code></td><td>supported ²</td><td>supported ²</td><td>supported ²</td><td>supported ²</td></tr>
 <tr><td><code>TechieRag.Local</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³</td><td>tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25)</td><td>tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³</td><td>supported ³</td></tr>
 </tbody>
 </table>
 <ol>
-<li>Being built (REQ-RAG-045).
+<li>Shipped 2026-09-24 (REQ-RAG-016); plain .NET, no native code; the probe does not exercise it.
 </li>
 <li>ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native <code>dotnet test</code>) and the probe generated (2026-09-25). Android: the probe generated on the owner's Galaxy S23, downloading from the default Hugging Face address (all six fingerprints matched); the xUnit suite does not run on Android. iOS ran on a <strong>simulator</strong> only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
 </li>
 </ol>
 <h3 id="local-model-measured-per-platform-req-fn-060-brd-108">Local model: measured per platform (REQ-FN-060, BRD-108)<a class="anchor-link" href="#local-model-measured-per-platform-req-fn-060-brd-108">#</a></h3>
-<p>One real measurement per row, with device and date; change a row only from a recorded run (the runbook's step "Record").</p>
+<p>One recorded run per row (device, date); change a row only from another (runbook step "Record").</p>
 <table>
 <thead><tr><th>Platform</th><th>Device</th><th>Date</th><th>Model</th><th>How measured</th><th>First token (s)</th><th>Tokens per second</th><th>Peak memory</th></tr></thead>
 <tbody>
-<tr><td>Windows 11</td><td>Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB)</td><td>2026-09-24</td><td>Qwen2.5 0.5B (an earlier third-party ONNX copy, not TechieRag's conversion)</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>0.2–0.4</td><td>45–52</td><td>555 MB</td></tr>
-<tr><td>Windows 11</td><td>Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB)</td><td>2026-09-24</td><td>Phi-3 mini 4k (desktop default)</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>not recorded</td><td>7.5</td><td>3.0–3.3 GB</td></tr>
-<tr><td>macOS</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (TechieRag's conversion)</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>0.03</td><td>329–359</td><td>610 MB</td></tr>
-<tr><td>macOS</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>0.12</td><td>61–69</td><td>2.7 GB</td></tr>
-<tr><td>Mac Catalyst</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k (Catalyst default)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code>; two runs</td><td>0.11–0.52</td><td>65–73</td><td>1.96–2.17 GB</td></tr>
-<tr><td>iOS (simulator)</td><td>iPhone 17 Pro simulator, iOS 26.1, on the owner's Mac (a simulator, not a device)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default, TechieRag's conversion)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code></td><td>0.10</td><td>301</td><td>460 MB</td></tr>
-<tr><td>Windows 11</td><td>Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB)</td><td>2026-09-25</td><td>Phi-3 mini 4k (desktop default)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code>; a run just after the 2.7 GB download and a fresh launch</td><td>0.26–0.32</td><td>7.4–12.9</td><td>3.41–3.44 GB</td></tr>
+<tr><td>Windows 11</td><td>Mi NoteBook Pro (Core i5-11300H, 16 GB)</td><td>2026-09-24</td><td>Qwen2.5 0.5B (earlier third-party ONNX copy, not TechieRag's conversion)</td><td>GenAI 0.16.0 directly, plain process</td><td>0.2–0.4</td><td>45–52</td><td>555 MB</td></tr>
+<tr><td>Windows 11</td><td>Mi NoteBook Pro (Core i5-11300H, 16 GB)</td><td>2026-09-24</td><td>Phi-3 mini 4k (desktop default)</td><td>GenAI 0.16.0 directly, plain process</td><td>not recorded</td><td>7.5</td><td>3.0–3.3 GB</td></tr>
+<tr><td>macOS</td><td>owner's Apple M4 Max (36 GB, macOS 27)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (TechieRag's conversion)</td><td>GenAI 0.16.0 directly, plain process</td><td>0.03</td><td>329–359</td><td>610 MB</td></tr>
+<tr><td>macOS</td><td>owner's Apple M4 Max (36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k</td><td>GenAI 0.16.0 directly, plain process</td><td>0.12</td><td>61–69</td><td>2.7 GB</td></tr>
+<tr><td>Mac Catalyst</td><td>owner's Apple M4 Max (36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k (Catalyst default)</td><td>probe, second button, Debug, through <code>TechieRag.Local</code>; two runs</td><td>0.11–0.52</td><td>65–73</td><td>1.96–2.17 GB</td></tr>
+<tr><td>iOS (simulator)</td><td>iPhone 17 Pro simulator (iOS 26.1) on the owner's Mac, not a device</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default, TechieRag's conversion)</td><td>probe, second button, Debug, through <code>TechieRag.Local</code></td><td>0.10</td><td>301</td><td>460 MB</td></tr>
+<tr><td>Windows 11</td><td>Mi NoteBook Pro (Core i5-11300H, 16 GB)</td><td>2026-09-25</td><td>Phi-3 mini 4k (desktop default)</td><td>probe, second button, Debug, through <code>TechieRag.Local</code>; after the 2.7 GB download and a fresh launch</td><td>0.26–0.32</td><td>7.4–12.9</td><td>3.41–3.44 GB</td></tr>
 <tr><td>Android (emulator)</td><td>emulator <code>pixel_5_-_api_32</code> (Android 12, x86_64, 2 GB) on the Windows 11 laptop</td><td>2026-09-25</td><td>Qwen2.5 0.5B</td><td>probe, second button, Debug; after the download and a fresh launch</td><td>0.41</td><td>22.5–43.2</td><td>737–775 MB</td></tr>
 <tr><td>Android</td><td>owner's Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2, 8 GB, Android 16)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default)</td><td>probe, second button, Debug; after the 333 MB download and two fresh launches</td><td>0.06–0.10</td><td>112–114</td><td>703–763 MB</td></tr>
 <tr><td>iOS</td><td>owner's iPhone</td><td>not yet run</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
 </tbody>
 </table>
-<p>Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Catalyst and iOS, the probe's peak physical footprint (matches <code>footprint &lt;pid&gt;</code>, what the iOS limit counts). First token includes reading the prompt. Ranges span a run after the download and a fresh launch; the laptop and its emulator share one host, so speeds vary with load. Evidence: <code>tests/.artifacts/probe/</code> (per head) and <code>tests/.artifacts/local-llm-bench/</code>.</p>
+<p>Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Catalyst and iOS, the probe's peak physical footprint (matches <code>footprint &lt;pid&gt;</code>, what the iOS limit counts). Probe peak memory figures recorded up to 2026-09-25 are binary megabytes (labelled MB until that day's fix), about 5 percent under the decimal figure shown now. First token includes reading the prompt. Ranges: a run after the download and a fresh launch; the laptop and its emulator share a host, so speeds vary with load. Evidence: <code>tests/.artifacts/probe/</code> (per head) and <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <h3 id="local-model-engine-comparison-on-the-windows-laptop-2026-09-24">Local model: engine comparison on the Windows laptop (2026-09-24)<a class="anchor-link" href="#local-model-engine-comparison-on-the-windows-laptop-2026-09-24">#</a></h3>
 <p>Both engines on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB) before the owner chose one (<code>DECISIONS.md</code> 2026-09-25). Same prompt, greedy, 128 tokens, three runs per row. Raw JSON: <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <table>
@@ -626,11 +628,11 @@ services.AddTechieRag(configuration.GetSection("TechieRag"));   // or the appset
 <tr><td>Agents (Microsoft Agent Framework)</td><td><code>dotnet add package TechieRag.Agents</code> then <code>var agent = new TechieRagAgentBuilder(rag).UseLmStudio("http://localhost:1234", "qwen3-8b").Build(); var r = await agent.AskAsync("question"); // r.Answer, r.Sources, r.Searches</code></td></tr>
 <tr><td>Agents over TechieRag's own LLM, tools and trace</td><td><code>new TechieRagAgentBuilder(rag).UseConfiguredLlm().WithToolHandler(registry).WithTrace(progress).WithChatHistoryProvider(new ConversationMemoryChatHistoryProvider(memory)).Build();</code> or <code>services.AddTechieRagAgent(b =&gt; b.UseConfiguredLlm());</code></td></tr>
 <tr><td>Seam adapters</td><td><code>IChatClient c = new LlmProviderChatClient(provider); IList&lt;AITool&gt; t = ToolHandlerFunctions.From(handler); IToolHandler h = AIToolHandler.FromAgent(agent.Agent); aiAgent.WithAgentSteps(progress);</code></td></tr>
-<tr><td>MCP tool servers</td><td><code>builder.WithTools(t =&gt; t.AddMcpServer(new McpServerConfig { Command = "npx", Args = … }));</code></td></tr>
-<tr><td>Flows</td><td><code>var flow = FlowSerializer.Deserialize(json); await new FlowRunner(runtime).RunAsync(flow, input);</code></td></tr>
+<tr><td>MCP tool servers</td><td><code>var client = McpClient.Create(new McpServerConfig { Command = "npx", Arguments = […] }, policy); builder.WithToolHandler(await McpToolHandler.CreateAsync([client], policy));</code></td></tr>
+<tr><td>Flows</td><td><code>var flow = FlowSerializer.FromJson(json); await new FlowRunner(runtime).RunAsync(flow, input);</code></td></tr>
 <tr><td>Workspaces and threads</td><td><code>builder.WithPersistence(StoreProvider.Sqlite, "Data Source=ws.db"); var ws = rag.GetWorkspaceManager()!;</code></td></tr>
 <tr><td>Reranking</td><td><code>builder.WithReranker(RerankSource.LocalOnnx); await rag.SearchAsync("q", new SearchOptions { Rerank = true });</code></td></tr>
-<tr><td>Connectors</td><td><code>await ConnectorRunner.RunAsync(new RepositoryConnector(options), rag, runOptions);</code></td></tr>
+<tr><td>Connectors</td><td><code>var result = await rag.IngestConnectorAsync(new RepositoryConnector(options), previousSync: null, runOptions);</code></td></tr>
 <tr><td>Web ingestion</td><td><code>var fetcher = new HttpWebContentFetcher(); await rag.IngestUrlAsync("https://…", fetcher); await rag.IngestSiteAsync("https://…", fetcher, new WebCrawlOptions { MaxDepth = 1 });</code></td></tr>
 <tr><td>Token tracking</td><td><code>var status = rag.GetTokenTracker().GetBudgetStatus();</code></td></tr>
 <tr><td>Telemetry</td><td><code>services.AddTechieRagTelemetry(o =&gt; { o.EnableTracing = true; o.Endpoint = "http://localhost:4318"; });</code></td></tr>

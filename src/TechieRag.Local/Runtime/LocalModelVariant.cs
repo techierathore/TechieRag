@@ -43,6 +43,19 @@ internal sealed record LocalModelVariant(
         });
 
     /// <summary>
+    /// Gets the bytes a download into a folder would still transfer, by the rule
+    /// <see cref="ModelDownloadService"/> reports before its first byte: a file already there at its
+    /// pinned size costs nothing and an interrupted download's <c>.part</c> file counts only for its
+    /// remainder (REQ-RAG-061). No address is needed, so it works for a mirror-only file set too.
+    /// </summary>
+    /// <param name="directory">The model folder; it need not exist.</param>
+    /// <returns>The bytes still to transfer; 0 when every file is on disk.</returns>
+    public long GetPendingBytes(string directory) =>
+        ModelDownloadService.GetPendingBytes(
+            directory,
+            Files.Select(f => new ModelDownloadFile(f.FileName, new Uri(f.RemotePath, UriKind.Relative), f.Bytes)).ToList());
+
+    /// <summary>
     /// Gets the files a download fetches, redirected to a mirror when one is given:
     /// <c>&lt;mirror&gt;/&lt;FolderName&gt;/&lt;file&gt;</c>, the convention every non-bge model uses.
     /// </summary>

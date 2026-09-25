@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TechieRag.Abstractions;
 using TechieRag.DependencyInjection;
+using TechieRag.Llm;
 using TechieRag.Models;
 using TechieRag.VectorStores;
 using Xunit;
@@ -106,6 +107,56 @@ public class TechieRagConfigMappingTests
         Assert.IsType<QdrantStore>(PrivateField<IVectorStore>(client, "vectorStore"));
         Assert.Equal("qdrant-key-from-appsettings", clientConfig.VectorStore.ApiKey);
         Assert.Contains("You answer only from the Sevak handbook.", prompt[0].Content);
+    }
+
+    /// <summary>
+    /// <c>Llm.Source = Subscription</c> set in appsettings cannot build a provider on its own: resolving
+    /// the instance throws the same exception <see cref="LlmProviderFactory.Create"/> gives for the
+    /// ChatGPT subscription connector, naming <c>UseChatGptSubscriptionLlm</c> as the fix, instead of the
+    /// generic "Unsupported LLM source" it threw before.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-066 AppSettingsSubscriptionSourcePointsAtSignIn")]
+    public void AppSettingsSubscriptionSourcePointsAtSignIn()
+    {
+        var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["VectorStore:Type"] = "Qdrant",
+            ["VectorStore:ConnectionString"] = "http://localhost:6334",
+            ["Llm:Source"] = "Subscription"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddTechieRag(section);
+        using var provider = services.BuildServiceProvider();
+
+        var failure = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<ITechieRag>());
+
+        var expected = Assert.Throws<InvalidOperationException>(
+            () => LlmProviderFactory.Create(ModelRouter.Require("chatgpt-subscription/gpt-6-luna"), apiKey: null));
+        Assert.Equal(expected.Message, failure.Message);
+        Assert.Contains("UseChatGptSubscriptionLlm", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Unsupported LLM source", failure.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The connector spelled out as <c>chatgpt-subscription</c> in appsettings gets the same answer.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-066 AppSettingsSubscriptionConnectorPointsAtSignIn")]
+    public void AppSettingsSubscriptionConnectorPointsAtSignIn()
+    {
+        var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["VectorStore:Type"] = "Qdrant",
+            ["VectorStore:ConnectionString"] = "http://localhost:6334",
+            ["Llm:Source"] = "OpenAICompatible",
+            ["Llm:Connector"] = "chatgpt-subscription"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddTechieRag(section);
+        using var provider = services.BuildServiceProvider();
+
+        var failure = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<ITechieRag>());
+
+        Assert.Contains("UseChatGptSubscriptionLlm", failure.Message, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -11,8 +11,9 @@ namespace TechieRag.Local;
 public sealed record LocalModelTerms(string ModelId, string DisplayName, string LicenceName, Uri? TermsUrl)
 {
     /// <summary>
-    /// Gets the bytes the download will transfer, known before the first byte; 0 until the provider
-    /// has worked out which file set its platform loads.
+    /// Gets the bytes the download will transfer, known before the first byte: a file already in the
+    /// model folder costs nothing and an interrupted download's <c>.part</c> file only its remainder
+    /// (REQ-RAG-061); 0 until the provider has worked out which file set its platform loads.
     /// </summary>
     public long DownloadBytes { get; init; }
 }

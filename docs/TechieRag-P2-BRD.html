@@ -145,7 +145,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-165. BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-167 (BRD-166 and BRD-167 added on 2026-09-25). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
 <h2 id="screens-and-flow">2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -153,6 +153,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tbody>
 <tr><td>Agents package</td><td><code>TechieRag.Agentic</code>, <code>TechieRag.Agents</code>: <code>TechieRagAgentBuilder</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>search_knowledge_base, list_documents, seam adapters</td></tr>
 <tr><td>Packaging and quality follow-ups</td><td><code>TechieRag.Telemetry</code>, <code>publish-*.yml</code>, <code>TechieRagBuilder.Build()</code></td><td>Maintainer</td><td>— (library, no mockup)</td><td>Telemetry package, dimensions, config mapping, one publish path</td></tr>
+<tr><td>Installed agent files</td><td><code>build/TechieRag.targets</code>, <code>build/content/</code> (installed as <code>.techierag/TechieRag-AI-Reference.md</code>, <code>.claude/commands/techierag.md</code>, <code>.opencode/command/techierag.md</code>)</td><td>Consuming developer's AI agent</td><td>— (library, no mockup)</td><td>AI reference, two persona command files, one call example per feature</td></tr>
 <tr><td>Repository separation</td><td><code>TechieRag.slnx</code>, Sevak repository</td><td>Maintainer</td><td>— (library, no mockup)</td><td>src/, tests/, packages 1.0.7</td></tr>
 <tr><td>Platform groundwork</td><td><code>ModelPaths</code>, <code>TechieRag.Embedded.targets</code>, <code>samples/TechieRag.Probe</code></td><td>MAUI app developer</td><td>— (library, no mockup)</td><td>app-data root, native wiring, 384-dim default, matrix</td></tr>
 <tr><td>Local model</td><td><code>TechieRag.Local</code>: <code>UseLocalLlm()</code></td><td>App developer</td><td>— (library, no mockup)</td><td>model id, folder, memory gate, terms, download</td></tr>
@@ -257,6 +258,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-167</strong> — The AI reference and the two persona command files the package installs into a consumer's repository (BRD-57, BRD-58) shall describe every package and builder method this phase adds, with one call example each: <code>TechieRag.Local</code>, <code>TechieRag.Agents</code>, <code>TechieRag.Telemetry</code>, typed streaming, the local model and Hugging Face models by name, embedding on phones, agentic retrieval, subscription sign-in, provider routing, connectors and web ingestion, reranking, workspaces, MCP tools, flows and the configuration fields; a structural test fails the build when a shipped method is missing from them, so the files are refreshed in the same phase as the features they describe <em>(F-AUTODIST; added 2026-09-25 from the owner's report that the installed <code>/techierag</code> agent still described v2)</em> <em>Screen:</em> Installed agent files
+<ul>
+<li><em>Acceptance:</em> When a consumer builds with the new package and opens the installed AI reference, then every phase-2 package and builder method is described with one call example.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="repository-separation">Repository separation<a class="anchor-link" href="#repository-separation">#</a></h3>
 <p>This repository holds the library only; the application consumes the packages.</p>
@@ -271,7 +278,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <h3 id="platform-groundwork">Platform groundwork<a class="anchor-link" href="#platform-groundwork">#</a></h3>
 <p>Makes the packages work inside .NET MAUI apps on Windows, macOS, Android and iOS.</p>
 <ul>
-<li><strong>BRD-88</strong> — The BRD and the UsageGuide shall carry a platform support matrix stating, per package (<code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Agents</code>, <code>TechieRag.Local</code>) and per platform (Windows, macOS / Mac Catalyst, Android, iOS), whether it is supported, tested on a named device, or not supported; a cell is never "supported" without a recorded run <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<li><strong>BRD-88</strong> — The BRD and the UsageGuide shall carry a platform support matrix stating, per package (<code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Agents</code>, <code>TechieRag.Local</code>) and per platform (Windows, macOS / Mac Catalyst, Android, iOS), whether it is supported, tested on a named device, or not supported. The matrix lives in the phase-1 BRD's "Constraints and assumptions" section and in the UsageGuide's Platform notes, and the two are changed together. "Supported" means the package is built for that platform and no run is recorded there yet; "tested" is written only from a recorded probe run and names the device and the date; "not supported" means the package cannot run there <em>(F-PLATFORM; wording corrected 2026-09-25)</em> <em>Screen:</em> Platform groundwork
 <ul>
 <li><em>Acceptance:</em> When a reader opens the UsageGuide's platform matrix, then every package × platform cell reads supported, tested (device and date) or not supported.
 </li>
@@ -283,7 +290,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
-<li><strong>BRD-90</strong> — <code>TechieRag.Embedded</code> shall ship <code>buildTransitive</code> MSBuild targets that give a consuming app the correct native ONNX Runtime wiring on Mac Catalyst and iOS (the static xcframework <code>NativeReference</code>, <code>ForceLoad</code>, the CoreML weak framework, the Debug custom-ops stub and the interpreter setting hand-written today in the app csproj) and on Android (arm64-v8a and x86_64), so no consuming app writes native wiring by hand; Sevak's csproj then removes its copy <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
+<li><strong>BRD-90</strong> — <code>TechieRag.Embedded</code> shall ship <code>buildTransitive</code> MSBuild targets that give a consuming app the correct native ONNX Runtime wiring on Mac Catalyst and iOS (the static xcframework <code>NativeReference</code>, <code>ForceLoad</code>, the CoreML weak framework and the Debug custom-ops stub hand-written today in the app csproj; Sevak's interpreter setting belongs to Docker.DotNet and stays in the app) and on Android (arm64-v8a and x86_64), so no consuming app writes native wiring by hand; Sevak's csproj then removes its copy <em>(F-PLATFORM)</em> <em>Screen:</em> Platform groundwork
 <ul>
 <li><em>Acceptance:</em> When a developer builds the probe app for Mac Catalyst, iOS or Android with no native wiring in its csproj, then ONNX Runtime loads and embeds.
 </li>
@@ -766,7 +773,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Surface: MCP tools</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Workspaces and memory</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Reranking</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
-<tr><td>Autodistribution</td><td>1</td><td>0</td><td>1</td><td>Planned</td></tr>
+<tr><td>Installed agent files</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
 <h2 id="where-the-rest-lives">6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>

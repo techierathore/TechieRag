@@ -702,15 +702,15 @@ Unchanged from phase 1: `WithLogging(loggerFactory)` on the builder; library mes
 
 ## Known issues
 
-Found while reading the code for this guide on 2026-09-25; each is also a dated Remark on its checklist row. None changes a verdict.
+Found while reading the code for this guide on 2026-09-25 and fixed the same day by the build that followed (each fix is the Remark on its checklist row; line numbers below are from before the fix).
 
-- REQ-RAG-015: the `weak` hint always quotes the cosine threshold, even when reranking classified the result with the rerank threshold (`src/TechieRag/Agentic/KnowledgeBaseTools.cs:218`).
-- REQ-RAG-016: `Sources` fires on any tool result, not only after a search, unlike its doc comment (`src/TechieRag.Agents/TechieRagAgent.cs:77`); `TechieRagAgent.Retrieval` is public but not on `ITechieRagAgent` (`TechieRagAgent.cs:34`).
-- REQ-RAG-053: a comment still calls `TechieRag.Local` "the planned" package (`src/TechieRag/Models/ModelRoot.cs:18`).
-- REQ-RAG-061: `GetTerms()` reports the variant's full size while a resumed download transfers only the pending bytes (`src/TechieRag.Local/LocalLlmProvider.cs:131`).
-- REQ-FN-059: the probe labels peak memory "MB" but computes binary MiB, while its download line uses decimal MB (`samples/TechieRag.Probe/GenerationResult.cs:26`).
-- REQ-RAG-069: the `ILlmProvider` doc comment lists six implementations; the subscription provider is a seventh (`src/TechieRag/Abstractions/ILlmProvider.cs:12`).
-- REQ-FN-066: `Llm.Source = Subscription` from configuration throws the generic "Unsupported LLM source" instead of the factory's `SubscriptionNeedsSignIn` message (`src/TechieRag/TechieRagBuilder.cs:851`).
-- REQ-RAG-082: the IMAP connection opens a plain socket with no private-address check, unlike the HTTP transport; likely intended for LAN mail servers, but undocumented (`src/TechieRag/Connectors/Email/SocketImapConnection.cs:72`).
-- Several XML doc headers cite requirement ids from before the phase-2 renumbering (for example `ConnectorRunner` names REQ-RAG-032 and BRD-113); cosmetic.
+- REQ-RAG-015, fixed: the `weak` hint quoted the cosine threshold even when reranking had classified the result; it now quotes the threshold that was applied (`src/TechieRag/Agentic/KnowledgeBaseTools.cs`).
+- REQ-RAG-016, fixed: `Sources` is raised only after a search grew the turn's search count, as its doc comment says; `Retrieval` is now on `ITechieRagAgent` (`src/TechieRag.Agents/TechieRagAgent.cs`).
+- REQ-RAG-053, fixed: the comment in `src/TechieRag/Models/ModelRoot.cs` no longer calls `TechieRag.Local` "the planned" package.
+- REQ-RAG-061, fixed: `GetTerms()` reports the pending bytes, files on disk and `.part` remainders subtracted, as `EnsureAsync` does (`src/TechieRag.Local/LocalLlmProvider.cs`, `LocalModelVariant.GetPendingBytes`).
+- REQ-FN-059, fixed: the probe's peak memory is decimal megabytes, the same unit as its download line (`samples/TechieRag.Probe/GenerationResult.cs`).
+- REQ-RAG-069, fixed: the `ILlmProvider` doc comment lists all eight implementations (`src/TechieRag/Abstractions/ILlmProvider.cs`).
+- REQ-FN-066, fixed: `Llm.Source = Subscription` from configuration gives the factory's own sign-in message (`src/TechieRag/TechieRagBuilder.cs`).
+- REQ-RAG-082, documented: the IMAP connection deliberately skips the private-address guard because the host names the mail server itself; the rule is in the XML docs of `SocketImapConnection` and `ImapMailboxOptions` and in the UsageGuide's Known limitations.
+- Several XML doc headers cite requirement ids from before the phase-2 renumbering (for example `ConnectorRunner` names REQ-RAG-032 and BRD-113); cosmetic, not fixed.
 - ORT-001, ORTGENAI-001, ORTGENAI-002: upstream package gaps, filed in `docs/TechieRag-OnnxRuntime-Feedback.md` and `docs/TechieRag-OnnxRuntimeGenAI-Feedback.md`; the two build targets files work around the first two.

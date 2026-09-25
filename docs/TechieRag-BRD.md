@@ -392,18 +392,18 @@ flowchart LR
 
 ### Platform support matrix (BRD-88, REQ-FN-054)
 
-Each cell reads **supported** (built for it, no recorded run on that platform yet), **tested** (the probe app ran there: device and date), or **not supported**. A cell moves to tested only when the owner records a probe run (UsageGuide, Platform notes, the runbook). Last updated 2026-09-24.
+Each cell reads **supported** (built for it, no recorded run on that platform yet), **tested** (the probe app ran there: device and date), or **not supported**. A cell moves to tested only when the owner records a probe run (UsageGuide, Platform notes, the runbook). Last updated 2026-09-25.
 
 | Package | Windows | macOS / Mac Catalyst | Android | iOS |
 |---|---|---|---|---|
-| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | supported | supported ¹ | supported |
-| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | supported | supported ¹ | supported |
-| `TechieRag.Agents` | not supported ² | not supported ² | not supported ² | not supported ² |
-| `TechieRag.Local` | supported ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | supported ³ | supported ³ |
+| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, 2026-09-25) | tested (Galaxy S23, probe, 2026-09-25) | supported ¹ |
+| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, bge-m3, 2026-09-25) | tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25) | supported ¹ |
+| `TechieRag.Agents` | supported ² | supported ² | supported ² | supported ² |
+| `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³ | supported ¹ ³ |
 
-1. The probe ran on an Android emulator (Pixel 5 profile, Android 12, x86_64) on 2026-09-24: all-MiniLM-L6-v2 selected by default, top result correct. An emulator is not a device, so the cell stays supported until a phone run is recorded.
-2. The package is being built (REQ-RAG-045); the cells change when it ships and the probe exercises it.
-3. Runs on ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25); `TechieRag.Local.targets` wires the Mac Catalyst library GenAI's own package leaves out (REQ-FN-058). Windows: the engine was measured on the Windows 11 laptop on 2026-09-24, but not yet through `TechieRag.Local` in the probe. iOS: the probe's second button ran on the iPhone 17 Pro simulator (iOS 26.1) on 2026-09-25; a simulator is not a phone, so the cell waits for the owner's iPhone. Android: built, not yet run. Numbers per platform: UsageGuide, Platform notes, "Local model: measured per platform". Last synced with the UsageGuide 2026-09-25.
+1. iOS: the probe ran on the iPhone 17 Pro simulator (iOS 26.1) on 2026-09-25, both buttons; a simulator is not a phone, so the cells wait for the owner's iPhone (UsageGuide, iPhone setup guide).
+2. Shipped 2026-09-24 (REQ-RAG-016): plain .NET with no native code, built for `net10.0` and `net8.0`; the probe does not exercise it, so no run is recorded.
+3. Runs on ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25); `TechieRag.Local.targets` wires the Mac Catalyst library GenAI's own package leaves out (REQ-FN-058). Windows and Android ran through `TechieRag.Local` in the probe on 2026-09-25 (Android from the default Hugging Face address, every fingerprint matched). Numbers per platform: UsageGuide, Platform notes, "Local model: measured per platform". Last synced with the UsageGuide 2026-09-25.
 
 ## 10. Risks
 

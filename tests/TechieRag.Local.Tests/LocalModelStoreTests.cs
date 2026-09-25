@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using TechieRag.Embedded;
 using TechieRag.Local.Runtime;
 using TechieRag.Local.Tests.TestDoubles;
+using TechieRag.Models;
 using Xunit;
 
 namespace TechieRag.Local.Tests;
@@ -112,6 +113,51 @@ public sealed class LocalModelStoreTests : IDisposable
         Assert.True(error is null, $"{error?.Message} Server: {string.Join("; ", server.Errors)}");
         Assert.Contains(server.Requests, r => r.Path.EndsWith("first.bin", StringComparison.Ordinal) && r.Range == "bytes=120000-");
         Assert.Equal(first, await File.ReadAllBytesAsync(Path.Combine(directory, "first.bin")));
+    }
+
+    /// <summary>
+    /// The pending size of a file set counts a complete file as nothing and a partial file as its
+    /// remainder only, without any address: the figure a resumed download will transfer.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-061 PendingBytesSubtractFilesOnDiskAndPartRemainders")]
+    public async Task PendingBytesSubtractFilesOnDiskAndPartRemainders()
+    {
+        var (_, variant) = TestModel();
+        Directory.CreateDirectory(directory);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "first.bin"), first);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "second.bin.part"), second[..20_000]);
+
+        var pending = variant.GetPendingBytes(directory);
+
+        Assert.Equal(second.Length - 20_000, pending);
+    }
+
+    /// <summary>
+    /// The terms a host shows before a resumed download carry the bytes that download will transfer, not
+    /// the file set's full size: the provider's GetTerms agrees with what EnsureAsync then reports.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-061 ProviderTermsReportPendingBytesBeforeResume")]
+    public async Task ProviderTermsReportPendingBytesBeforeResume()
+    {
+        var (model, variant) = TestModel();
+        var modelDirectory = Path.Combine(directory, variant.FolderName);
+        Directory.CreateDirectory(modelDirectory);
+        await File.WriteAllBytesAsync(Path.Combine(modelDirectory, "first.bin"), first);
+        await File.WriteAllBytesAsync(Path.Combine(modelDirectory, "second.bin.part"), second[..20_000]);
+        ModelRoot.Set(directory);
+        try
+        {
+            using var provider = new LocalLlmProvider(
+                new LocalLlmOptions { Model = model }, null, new FakeLocalLlmRuntime(), new MemoryGate(() => null), LocalModelStore.Shared, isPhone: false);
+
+            var terms = provider.GetTerms();
+
+            Assert.Equal(second.Length - 20_000, terms.DownloadBytes);
+        }
+        finally
+        {
+            ModelRoot.Set(null);
+        }
     }
 
     /// <summary>The size is reported through ModelDownloadService before the first byte is requested.</summary>

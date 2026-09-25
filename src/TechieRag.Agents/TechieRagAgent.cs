@@ -30,7 +30,7 @@ public sealed class TechieRagAgent : ITechieRagAgent
     /// <inheritdoc/>
     public ITechieRag Rag { get; }
 
-    /// <summary>Gets the retrieval provider, for a host that reads the session state directly.</summary>
+    /// <inheritdoc/>
     public RetrievalContextProvider Retrieval => retrieval;
 
     /// <inheritdoc/>
@@ -72,10 +72,15 @@ public sealed class TechieRagAgent : ITechieRagAgent
         var state = retrieval.GetState(session);
         var answer = new StringBuilder();
 
+        // The provider starts a new turn (searches cleared) before the first update, so a tool result
+        // is a search's exactly when the turn's search count has grown since the last Sources event;
+        // list_documents and any host tool leave it unchanged and raise none.
+        var searchesReported = 0;
         await foreach (var update in Agent.RunStreamingAsync(question, session, null, cancellationToken).ConfigureAwait(false))
         {
-            if (update.Contents.OfType<FunctionResultContent>().Any())
+            if (update.Contents.OfType<FunctionResultContent>().Any() && state.Searches.Count > searchesReported)
             {
+                searchesReported = state.Searches.Count;
                 yield return RagStreamEvent.FromSources(state.Collected);
             }
 

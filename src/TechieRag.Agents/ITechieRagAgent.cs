@@ -1,4 +1,5 @@
 using Microsoft.Agents.AI;
+using TechieRag.Agents.Retrieval;
 using TechieRag.Models;
 using MeaiChatMessage = Microsoft.Extensions.AI.ChatMessage;
 
@@ -16,6 +17,12 @@ public interface ITechieRagAgent
 
     /// <summary>Gets the TechieRag instance the agent answers from.</summary>
     ITechieRag Rag { get; }
+
+    /// <summary>
+    /// Gets the retrieval provider the agent was built with, for a host that reads a session's retrieval
+    /// state (<see cref="RetrievalContextProvider.GetState"/>) or the tool options without casting.
+    /// </summary>
+    RetrievalContextProvider Retrieval { get; }
 
     /// <summary>Creates a conversation session.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -40,7 +47,8 @@ public interface ITechieRagAgent
     /// <param name="question">The user's question.</param>
     /// <param name="session">The conversation, or null for a one-off turn.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="RagStreamEventType.Sources"/> event after each search (the turn's sources so far),
-    /// <see cref="RagStreamEventType.Token"/> events as text arrives, and one <see cref="RagStreamEventType.Completed"/> last.</returns>
+    /// <returns>A <see cref="RagStreamEventType.Sources"/> event after each <c>search_knowledge_base</c> call
+    /// (the turn's sources so far; no other tool call raises one), <see cref="RagStreamEventType.Token"/> events
+    /// as text arrives, and one <see cref="RagStreamEventType.Completed"/> last.</returns>
     IAsyncEnumerable<RagStreamEvent> AskStreamAsync(string question, AgentSession? session = null, CancellationToken cancellationToken = default);
 }

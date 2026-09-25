@@ -88,8 +88,9 @@ internal sealed class LocalModelStore
     }
 
     /// <summary>
-    /// Gets a model's terms with the size of the file set a runtime loads; a Hugging Face model is
-    /// resolved first (<see cref="PrepareAsync"/>).
+    /// Gets a model's terms with the bytes a download of the file set a runtime loads would still
+    /// transfer (files on disk and <c>.part</c> remainders subtracted, as <see cref="EnsureAsync"/>
+    /// reports them); a Hugging Face model is resolved first (<see cref="PrepareAsync"/>).
     /// </summary>
     /// <param name="model">The model.</param>
     /// <param name="format">The runtime's format.</param>
@@ -98,7 +99,8 @@ internal sealed class LocalModelStore
     public async Task<LocalModelTerms> GetTermsAsync(LocalModel model, LocalModelFormat format, CancellationToken cancellationToken)
     {
         await PrepareAsync(model, cancellationToken).ConfigureAwait(false);
-        return model.GetTerms() with { DownloadBytes = model.FindVariant(format)?.DownloadBytes ?? 0 };
+        var variant = model.FindVariant(format);
+        return model.GetTerms() with { DownloadBytes = variant?.GetPendingBytes(model.GetDirectory(variant)) ?? 0 };
     }
 
     /// <summary>

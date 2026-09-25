@@ -21,12 +21,21 @@ public sealed record GenerationResult(
     int OutputTokens,
     long PeakMemoryBytes)
 {
+    /// <summary>
+    /// Bytes per megabyte: decimal, the same unit <c>ModelDownloadService.FormatBytes</c> uses for the
+    /// download line on the same screen (before 2026-09-25 this was binary, 1,048,576).
+    /// </summary>
+    private const double BytesPerMegabyte = 1_000_000d;
+
+    /// <summary>Peak memory in decimal megabytes, as shown on screen and in the result line.</summary>
+    public double PeakMemoryMb => PeakMemoryBytes / BytesPerMegabyte;
+
     /// <summary>The timings as shown on screen.</summary>
     public string Timings => string.Create(CultureInfo.InvariantCulture,
-        $"load {LoadMs:F0} ms · first token {TimeToFirstTokenMs:F0} ms · {TokensPerSecond:F1} tokens/s · peak {PeakMemoryBytes / 1_048_576d:F0} MB");
+        $"load {LoadMs:F0} ms · first token {TimeToFirstTokenMs:F0} ms · {TokensPerSecond:F1} tokens/s · peak {PeakMemoryMb:F0} MB");
 
     /// <summary>One line for logs and automation.</summary>
     /// <returns>The line, without the prefix.</returns>
     public string ToLine() => string.Create(CultureInfo.InvariantCulture,
-        $"OK generate model={ModelName} sentence=\"{Sentence}\" loadMs={LoadMs:F0} ttftMs={TimeToFirstTokenMs:F0} tokensPerSecond={TokensPerSecond:F1} outputTokens={OutputTokens} peakMb={PeakMemoryBytes / 1_048_576d:F0}");
+        $"OK generate model={ModelName} sentence=\"{Sentence}\" loadMs={LoadMs:F0} ttftMs={TimeToFirstTokenMs:F0} tokensPerSecond={TokensPerSecond:F1} outputTokens={OutputTokens} peakMb={PeakMemoryMb:F0}");
 }
