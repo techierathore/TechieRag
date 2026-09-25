@@ -13,8 +13,9 @@ namespace TechieRag.Local.Tests.Conformance;
 /// <remarks>
 /// <para>Runtime-neutral on purpose: each test states something an app can observe through
 /// <see cref="ILlmProvider"/> and nothing about how a runtime gets there, so the same suite runs
-/// against the scripted runtime today (<see cref="FakeRuntimeConformanceTests"/>) and against each
-/// platform's real runtime once the owner has chosen it — one subclass per runtime, gated live.</para>
+/// against the scripted runtime (<see cref="FakeRuntimeConformanceTests"/>) and against the real
+/// engine with a real model (<see cref="OnnxGenAiConformanceTests"/>, gated live through
+/// <see cref="RealRuntimeAttribute"/>) — one subclass per runtime.</para>
 /// <para>A subclass supplies the provider and three hooks: an answer to expect for a JSON request,
 /// a long answer for the length and cancellation tests, and the exact token count of a text.</para>
 /// </remarks>
@@ -55,7 +56,7 @@ public abstract class LocalLlmConformanceTests
     /// A chat call answers with text, a finish reason, the model's name and usage from the model's
     /// own tokenizer for both prompt and answer.
     /// </summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-057 ChatAnswersWithUsage")]
     public async Task ChatAnswersWithUsage()
     {
         using var provider = CreateProvider();
@@ -71,7 +72,7 @@ public abstract class LocalLlmConformanceTests
     /// The typed stream is text deltas, then exactly one completed event, last, carrying usage, a
     /// finish reason and the model name (the BRD-110 contract).
     /// </summary>
-    [Fact(DisplayName = "REQ-RAG-059 StreamEventsArriveInContractOrder")]
+    [ConformanceFact(DisplayName = "REQ-RAG-059 StreamEventsArriveInContractOrder")]
     public async Task StreamEventsArriveInContractOrder()
     {
         using var provider = CreateProvider();
@@ -94,7 +95,7 @@ public abstract class LocalLlmConformanceTests
     /// The text stream is the text of the typed stream, and both equal the non-streamed answer at
     /// temperature 0.
     /// </summary>
-    [Fact]
+    [ConformanceFact]
     public async Task TextStreamMatchesChatAnswer()
     {
         using var provider = CreateProvider();
@@ -108,7 +109,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>The single-prompt methods answer the same way as the chat methods.</summary>
-    [Fact]
+    [ConformanceFact]
     public async Task CompleteStreamMatchesComplete()
     {
         using var provider = CreateProvider();
@@ -124,7 +125,7 @@ public abstract class LocalLlmConformanceTests
     /// A prompt longer than the model's context throws a clear error naming both lengths, before any
     /// inference runs.
     /// </summary>
-    [Fact(DisplayName = "REQ-RAG-059 OverLongPromptThrowsBeforeInference")]
+    [ConformanceFact(DisplayName = "REQ-RAG-059 OverLongPromptThrowsBeforeInference")]
     public async Task OverLongPromptThrowsBeforeInference()
     {
         using var provider = CreateProvider(o => o.ContextSize = 64);
@@ -138,7 +139,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>MaxTokens bounds the answer and the finish reason says the length ran out.</summary>
-    [Fact]
+    [ConformanceFact]
     public async Task MaxTokensLimitsTheAnswer()
     {
         using var provider = CreateProvider();
@@ -151,7 +152,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>Cancelling the token mid-stream stops generation with an OperationCanceledException.</summary>
-    [Fact]
+    [ConformanceFact]
     public async Task CancellationStopsTheStream()
     {
         using var provider = CreateProvider();
@@ -168,7 +169,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>CompleteAsync&lt;T&gt; parses a flat object schema into T.</summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-063 TypedAnswerParsesFlatSchema")]
     public async Task TypedAnswerParsesFlatSchema()
     {
         using var provider = CreateProvider();
@@ -181,7 +182,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>CompleteAsync&lt;T&gt; parses a schema with a nested object into T.</summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-063 TypedAnswerParsesNestedSchema")]
     public async Task TypedAnswerParsesNestedSchema()
     {
         using var provider = CreateProvider();
@@ -195,7 +196,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>CompleteAsync&lt;T&gt; parses a schema with an array and a boolean into T.</summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-063 TypedAnswerParsesListSchema")]
     public async Task TypedAnswerParsesListSchema()
     {
         using var provider = CreateProvider();
@@ -207,7 +208,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>EstimateTokenCount equals the runtime tokenizer's count on the fixed test strings.</summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-065 EstimateTokenCountUsesModelTokenizer")]
     public async Task EstimateTokenCountUsesModelTokenizer()
     {
         using var provider = CreateProvider();
@@ -220,7 +221,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>OnCompletionCompleted fires once per call with the call's usage.</summary>
-    [Fact]
+    [ConformanceFact]
     public async Task CompletionEventRaisedOncePerCall()
     {
         using var provider = CreateProvider();
@@ -235,7 +236,7 @@ public abstract class LocalLlmConformanceTests
     }
 
     /// <summary>Tool calling reports false, and a request carrying tools is refused rather than silently ignored.</summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-063 ToolsAreRefused")]
     public async Task ToolsAreRefused()
     {
         using var provider = CreateProvider();
@@ -252,7 +253,7 @@ public abstract class LocalLlmConformanceTests
     /// The app cannot observe which runtime is in use: the provider's name is "Local" and no public
     /// member exposes a runtime type or name.
     /// </summary>
-    [Fact]
+    [ConformanceFact(DisplayName = "REQ-RAG-058 RuntimeIsNotObservable")]
     public void RuntimeIsNotObservable()
     {
         using var provider = CreateProvider();

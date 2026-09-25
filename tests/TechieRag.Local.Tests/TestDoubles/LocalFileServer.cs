@@ -13,6 +13,7 @@ internal sealed class LocalFileServer : IDisposable
     private readonly HttpListener listener = new();
     private readonly ConcurrentDictionary<string, byte[]> files = new(StringComparer.Ordinal);
     private readonly Task loop;
+    private bool disposed;
 
     /// <summary>Starts the server on a free loopback port.</summary>
     public LocalFileServer()
@@ -45,6 +46,12 @@ internal sealed class LocalFileServer : IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
         listener.Stop();
         listener.Close();
         try

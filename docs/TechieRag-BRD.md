@@ -337,7 +337,7 @@ No `perf-budget:` line is written: the owner has stated no numeric budget. The l
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-09-24.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
+**Snapshot as of 2026-09-25.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -399,11 +399,11 @@ Each cell reads **supported** (built for it, no recorded run on that platform ye
 | `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | supported | supported ¹ | supported |
 | `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | supported | supported ¹ | supported |
 | `TechieRag.Agents` | not supported ² | not supported ² | not supported ² | not supported ² |
-| `TechieRag.Local` | not supported ³ | not supported ³ | not supported ³ | not supported ³ |
+| `TechieRag.Local` | supported ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | supported ³ | supported ³ |
 
 1. The probe ran on an Android emulator (Pixel 5 profile, Android 12, x86_64) on 2026-09-24: all-MiniLM-L6-v2 selected by default, top result correct. An emulator is not a device, so the cell stays supported until a phone run is recorded.
 2. The package is being built (REQ-RAG-045); the cells change when it ships and the probe exercises it.
-3. The package is built up to its inference runtime (2026-09-24); every cell stays not supported until the owner chooses the runtime per platform (`docs/TechieRag-Decision-Request.md`). Engines shipped today: ONNX Runtime GenAI for Windows, Android and iOS (not Mac Catalyst), LLamaSharp for Windows and Android (not iOS or Mac Catalyst). Desktop engine numbers: UsageGuide, Platform notes, "Local model: runtime comparison"; the probe's second button (BRD-106) records per-device numbers.
+3. Runs on ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25); `TechieRag.Local.targets` wires the Mac Catalyst library GenAI's own package leaves out (REQ-FN-058). Windows: the engine was measured on the Windows 11 laptop on 2026-09-24, but not yet through `TechieRag.Local` in the probe. iOS: the probe's second button ran on the iPhone 17 Pro simulator (iOS 26.1) on 2026-09-25; a simulator is not a phone, so the cell waits for the owner's iPhone. Android: built, not yet run. Numbers per platform: UsageGuide, Platform notes, "Local model: measured per platform". Last synced with the UsageGuide 2026-09-25.
 
 ## 10. Risks
 

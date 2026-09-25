@@ -40,6 +40,15 @@
     <InternalsVisibleTo Include="TechieRag.Local.Tests" />
   </ItemGroup>
 
+  <!-- REQ-FN-058 / BRD-102: native ONNX Runtime GenAI wiring for MAUI heads (the Mac Catalyst
+       NativeReference GenAI's own package leaves out, the Android .aar check), applied to every
+       consuming app, direct or transitive. A project that references this one by ProjectReference
+       (samples/TechieRag.Probe) imports the targets file itself, since NuGet build assets do not flow
+       over a ProjectReference. -->
+  <ItemGroup>
+    <None Include="buildTransitive\TechieRag.Local.targets" Pack="true" PackagePath="buildTransitive\" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
     <!-- ModelDownloadService (size before the first byte, progress events, resume) and the
@@ -47,10 +56,13 @@
     <ProjectReference Include="..\TechieRag.Embedded\TechieRag.Embedded.csproj" />
   </ItemGroup>
 
-  <!-- No inference runtime is referenced yet. The runtime behind ILocalLlmRuntime (LLamaSharp or
-       ONNX Runtime GenAI, per platform) is the owner's decision after the measured comparison
-       (DECISIONS.md 2026-09-24 item 3; docs/TechieRag-Decision-Request.md). Its package reference and
-       the buildTransitive native wiring (REQ-FN-058) land with that decision.
-       Model weights are never packed (ADR-004, BRD-101). -->
+  <ItemGroup>
+    <!-- REQ-RAG-058: the one inference engine behind ILocalLlmRuntime on Windows, macOS, Linux, Android,
+         iOS and Mac Catalyst (DECISIONS.md 2026-09-25 decisions 1-2, measured against LLamaSharp 0.27.0).
+         0.16.0 pulls Microsoft.ML.OnnxRuntime 1.30.0, the version TechieRag.Embedded shares. The Mac
+         Catalyst NativeReference lives in buildTransitive (REQ-FN-058).
+         Model weights are never packed (ADR-004, BRD-101). -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntimeGenAI" Version="0.16.0" />
+  </ItemGroup>
 
 </Project>

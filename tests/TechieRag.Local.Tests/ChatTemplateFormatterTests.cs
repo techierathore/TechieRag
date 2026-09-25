@@ -50,6 +50,6 @@ public sealed class ChatTemplateFormatterTests
     [Fact]
     public void EndOfTurnMarkersMatchTheFormats() =>
         Assert.Equal(
-            ["<|im_end|>", "<|end|>", "<|eot_id|>", "<end_of_turn>"],
+            ["<|im_end|>", "<|end|>", "<|eot_id|>", "<end_of_turn>", null],
             Enum.GetValues<LocalChatTemplate>().Select(ChatTemplateFormatter.EndOfTurn));
 }

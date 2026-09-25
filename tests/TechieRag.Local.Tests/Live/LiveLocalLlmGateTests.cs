@@ -43,6 +43,14 @@ public sealed class LiveLocalLlmGateTests
             Assert.True(hostReason.Length > "Live local-model test.".Length + 10, "The skip reason must say what is missing.");
         }
 
+        var realRuntimeClasses = typeof(LiveLocalLlmGateTests).Assembly.GetTypes()
+            .Where(type => type.GetCustomAttribute<Conformance.RealRuntimeAttribute>() is not null)
+            .ToList();
+        Assert.NotEmpty(realRuntimeClasses);
+        Assert.All(realRuntimeClasses, type => Assert.Equal(
+            LiveLocalLlmCollection.Name,
+            type.GetCustomAttributesData().Single(data => data.AttributeType == typeof(CollectionAttribute)).ConstructorArguments[0].Value));
+
         var definition = typeof(LiveLocalLlmCollection).GetCustomAttribute<CollectionDefinitionAttribute>();
         Assert.NotNull(definition);
         Assert.True(definition.DisableParallelization);

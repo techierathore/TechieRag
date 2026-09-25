@@ -23,7 +23,7 @@ public sealed class LiveLocalLlmTests
     };
 
     /// <summary>The platform's local model answers a prompt with text.</summary>
-    [LiveLocalLlmFact]
+    [LiveLocalLlmFact(DisplayName = "REQ-RAG-057 LiveAnswersOnePrompt")]
     public async Task LiveAnswersOnePrompt()
     {
         using var provider = CreateProvider();

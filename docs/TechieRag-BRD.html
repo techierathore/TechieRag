@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Business Requirements</h1>
-    <div class="sub">Last rendered: 2026-09-24</div>
+    <div class="sub">Last rendered: 2026-09-25</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#summary">1. Summary</a></li>
@@ -143,7 +143,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Business Requirements</h1>
-    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -811,7 +811,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <p>No <code>perf-budget:</code> line is written: the owner has stated no numeric budget. The logging requirement records the Stack answer set's Serilog default as overridden for a package: the library takes an <code>ILoggerFactory</code> and pins no sink.</p>
 <h2 id="development-status">7. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-09-24.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-09-25.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -888,7 +888,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td><code>TechieRag</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
 <tr><td><code>TechieRag.Embedded</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
 <tr><td><code>TechieRag.Agents</code></td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td></tr>
-<tr><td><code>TechieRag.Local</code></td><td>not supported ³</td><td>not supported ³</td><td>not supported ³</td><td>not supported ³</td></tr>
+<tr><td><code>TechieRag.Local</code></td><td>supported ³</td><td>tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25)</td><td>supported ³</td><td>supported ³</td></tr>
 </tbody>
 </table>
 <ol>
@@ -896,7 +896,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>The package is being built (REQ-RAG-045); the cells change when it ships and the probe exercises it.
 </li>
-<li>The package is built up to its inference runtime (2026-09-24); every cell stays not supported until the owner chooses the runtime per platform (<code>docs/TechieRag-Decision-Request.md</code>). Engines shipped today: ONNX Runtime GenAI for Windows, Android and iOS (not Mac Catalyst), LLamaSharp for Windows and Android (not iOS or Mac Catalyst). Desktop engine numbers: UsageGuide, Platform notes, "Local model: runtime comparison"; the probe's second button (BRD-106) records per-device numbers.
+<li>Runs on ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> wires the Mac Catalyst library GenAI's own package leaves out (REQ-FN-058). Windows: the engine was measured on the Windows 11 laptop on 2026-09-24, but not yet through <code>TechieRag.Local</code> in the probe. iOS: the probe's second button ran on the iPhone 17 Pro simulator (iOS 26.1) on 2026-09-25; a simulator is not a phone, so the cell waits for the owner's iPhone. Android: built, not yet run. Numbers per platform: UsageGuide, Platform notes, "Local model: measured per platform". Last synced with the UsageGuide 2026-09-25.
 </li>
 </ol>
 <h2 id="risks">10. Risks<a class="anchor-link" href="#risks">#</a></h2>

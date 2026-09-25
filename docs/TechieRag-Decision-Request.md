@@ -3,86 +3,59 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Written | 2026-09-24 |
-| Waiting on | 4 decisions. Nothing has been changed yet (decision 4 keeps what is built today). |
+| Written | 2026-09-25 (decisions 1–4 of the same day are answered and recorded in `DECISIONS.md`) |
+| Waiting on | Nothing. Answered 2026-09-25: both option A, recorded in `DECISIONS.md` and BRD-166. |
 
 ## What happened
 
-I built the new `TechieRag.Local` package up to the point where a real inference engine plugs in: the one public provider, the model list, the terms-first download with its SHA-256 check, the memory check, the chat formats, the refusal of over-long prompts, and the hook that lets `local/<model>` work from configuration. All of it is tested against a stand-in engine.
+You asked why the phone model has to be published under your account, and whether that ties the library down. It does, in one way: `TechieRag.Local` today offers only its two built-in models, or a model the app has already placed in a folder. It cannot download "any ONNX model from Hugging Face by name", as LM Studio can. Separately, `UseLocalLlm()` with no model named needs a default to download on phones; that default is the only reason anything must be published.
 
-The decision log says the engine for each platform (LLamaSharp or ONNX Runtime GenAI) is chosen from measured numbers before the real engine goes in, and the status page says that choice is yours. So I measured both on your Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB), in Windows and in its Linux subsystem, with the same two models in each engine's own format, and checked on nuget.org which platforms each engine actually ships for. Phones and the Mac need your devices. The raw numbers are in `tests/.artifacts/local-llm-bench/`.
+I checked what already exists and measured it on the M4 Max Mac. Microsoft and the ONNX Runtime team publish nothing phone-sized in this engine's format. onnx-community's Qwen 0.5B is in a format this engine cannot load. Arm publishes Gemma 3 1B and Llama 3.2 1B in exactly this format, tuned for Android phones, free to download. Hugging Face lists a fingerprint for every file, so a download by name can still be checked.
 
 ## What I need you to decide
 
-### 1. Which engine runs the local model on Windows, Android and iPhone
-
-On this laptop ONNX Runtime GenAI 0.16.0 answered faster than LLamaSharp 0.27.0 with both models. Small phone model (Qwen2.5 0.5B, a 128-token answer; a token is a word or piece of a word): Windows 45–52 against 25–31 tokens per second, first token after 0.2–0.4 s against 0.4–0.8 s; Linux best runs 86 against 64. Desktop model (Phi-3 mini): Windows 7.5 against 5.9, Linux 8.4 against 6.7. LLamaSharp loads 2–4 times faster (0.4–1.5 s against 1.1–3.3 s for the small model) and used 510 MB against 555 MB for the small model, but 3.6 GB against 3.0–3.3 GB for Phi-3. Both engines count tokens identically on every test sentence. LLamaSharp ships nothing for iPhone; ONNX Runtime GenAI ships for Windows, Android and iPhone.
+### 1. Let apps download any ONNX Runtime GenAI model from Hugging Face by name
 
 | Option | What happens | What it costs |
 |---|---|---|
-| **A — ONNX Runtime GenAI everywhere it ships** | One engine for Windows, Android and iPhone; it shares ONNX Runtime with the embedding package | The embedding package's ONNX Runtime moves from 1.24.1 to 1.30.0; downloads are 0.9 GB and 2.7 GB |
-| **B — LLamaSharp on Windows and Android, ONNX Runtime GenAI on iPhone** | Faster loading and smaller downloads (0.5 GB and 2.4 GB) where LLamaSharp ships | Two engines to keep working; slower answers on this laptop |
+| **A — Add it** | An app writes `UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))` (optionally a folder inside the repository and an exact version). The library lists the files, shows the model's licence for acceptance first, downloads to the app's data folder, and checks each file against the fingerprint Hugging Face publishes | One new requirement and about one build session; the app developer is responsible for the model they name |
+| **B — Keep the fixed list** | Apps use the built-in models or a folder they fill themselves | Every other model needs the app to download it by its own code |
 
-**My recommendation: A** — it is faster where it matters (answer speed), covers three platforms with one engine, and is the only one that runs on an iPhone.
+**My recommendation: A** — it removes the tie you describe, the same way LM Studio lets you pull any model, and it keeps the tamper check.
 
-### 2. What the Mac app does about the local model
+### 2. Which model a phone downloads when the app names none
 
-Neither engine ships a build for Mac Catalyst, the way a MAUI app runs on a Mac: ONNX Runtime GenAI's package holds an empty placeholder there, LLamaSharp has nothing. I will not build one by hand.
+Measured on the M4 Max Mac, 2026-09-25, a 128-token answer and eight short factual questions:
+
+| | Our own Qwen2.5 0.5B | Arm's Gemma 3 1B |
+|---|---|---|
+| Download | 317 MB | 866 MB |
+| Answer speed | 330–360 tokens/s | 150–157 tokens/s |
+| Memory at peak | 0.5 GB | 1.7 GB |
+| Eight questions | 7 right (says Mars is the largest planet) | 7 right (says 17 × 23 = 491); stray "▁" marks in its JSON spacing that the library would clean |
+| Licence | Apache-2.0 | Gemma terms (use restrictions the user accepts) |
+| Needs publishing by you | Yes, once | No |
 
 | Option | What happens | What it costs |
 |---|---|---|
-| **A — Not supported on the Mac for now** | The support table says "not supported"; the Mac app uses a server model such as LM Studio; I file the gap with ONNX Runtime GenAI | Mac users get no in-app model until the vendor ships one |
-| **B — Wait on the Mac before shipping anywhere** | Nothing ships until a Mac build exists | Windows, Android and iPhone wait too |
+| **A — Our Qwen, published once on your Hugging Face account** | Smallest, fastest, lightest default; steps in `docs/MODEL-PUBLISHING-GUIDE.md` | 15 minutes of yours, once |
+| **B — Arm's Gemma 3 1B** | Nothing to publish; a known publisher | Almost three times the download and memory, half the speed, Gemma's licence terms shown to every user; older phones with 3–4 GB may refuse it |
+| **C — No default on phones** | An app must name a model (by name, with 1A, or a folder) | `UseLocalLlm()` with nothing named fails on phones with a message saying so |
 
-**My recommendation: A** — the other three platforms should not wait on a vendor.
-
-### 3. Where the small model's ONNX files come from
-
-Qwen publishes the small model's LLamaSharp file itself (Apache-2.0). Its ONNX Runtime GenAI version exists only as a copy made by one person (`xiaoyao9184`), with no licence tag on the copy. I pinned the exact files and their fingerprints, so nothing can change under us, but the source is a stranger.
-
-| Option | What happens | What it costs |
-|---|---|---|
-| **A — Host your own copy** | I convert the model with Microsoft's own tool and you put the files on your download mirror (`TECHIERAG_MODEL_BASE_URL`, or a new default address) | About an hour of work, plus somewhere to host 0.9 GB |
-| **B — Keep the pinned copy** | Works today; fingerprints stop a swapped file | The files come from someone we do not know |
-
-**My recommendation: A** — the default download on every phone should come from a source you control.
-
-### 4. Which sign-in id the ChatGPT subscription sign-in uses
-
-`UseChatGptSubscriptionLlm` is built and tested against a stand-in OpenAI server. To sign in, OpenAI's server needs an id that says which program is asking. OpenAI gives these ids to no outside developer. The only one that exists is the id of OpenAI's own Codex tool, and OpenAI staff have said in public that other tools may sign in with it (sources in `DECISIONS.md`, 2026-09-24 research entry). The library uses that id by default, and a host can set its own through `ChatGptSubscriptionOptions.ClientId`. It does not pretend to be Codex in any other way: it names itself `techierag` on every call.
-
-| Option | What happens | What it costs |
-|---|---|---|
-| **A — Keep the Codex id as the default** | ChatGPT sign-in works for any app that uses the library | It rests on public statements by OpenAI staff, not on a written term; if OpenAI changes its mind, sign-in stops working until you change the id |
-| **B — No default id** | Each host app must supply an id itself | In practice nobody can, since OpenAI issues none, so the feature is unusable |
-| **C — Remove the ChatGPT sign-in** | Only API-key providers remain | The Chatur request (TR-RAG-001) is not met |
-
-**My recommendation: A** — it is the only option that works today, it is what OpenAI has said other tools may do, and the id can be changed in one line.
+**My recommendation: A** — this is also what Ollama and LM Studio do for their recommended models (they publish their own copies), while 1A lets anyone choose something else.
 
 ## What I do when you answer
 
-1. Write your choices, with these numbers, into `DECISIONS.md` as the recorded comparison.
-2. Add the chosen engine's package to `TechieRag.Local`, one runtime class per platform, and its native wiring for each app head (the `buildTransitive` targets).
-3. Point the small model's ONNX files at your mirror, if you chose that.
-4. Run the conformance suite and the live tests against the real engine here, then the probe's second button on Windows and the Android emulator; you run it on your phone, iPhone and Mac.
-5. Update the support table with the per-device numbers.
-
-About one working session for steps 1 to 4 on Windows and Android.
+1. Record both choices in `DECISIONS.md`, and fold 1A into the BRD and checklist as a new requirement (`*amend-docs`).
+2. Build `LocalModel.FromHuggingFace`, with tests against a stand-in server and one live download of Arm's Gemma on this Mac, the Mac app and the iPhone simulator.
+3. For 2A: wait for your published address, then pin it. For 2B: pin Arm's files at their current version. For 2C: make the phone default refuse clearly.
 
 ## Copy this back to me
 
 ```
-TechieRag: decision 1 — go with option A. Use ONNX Runtime GenAI for the local model on Windows, Android and iPhone.
+TechieRag: decision 1 — go with option A. Let apps download any ONNX Runtime GenAI model from Hugging Face by name, with its licence shown first and every file checked.
 ```
 
 ```
-TechieRag: decision 2 — go with option A. The local model is not supported on the Mac for now; file the gap with ONNX Runtime GenAI.
-```
-
-```
-TechieRag: decision 3 — go with option A. Convert the small model to ONNX yourself and I will host the files on my mirror.
-```
-
-```
-TechieRag: decision 4 — go with option A. Keep the Codex sign-in id as the default for the ChatGPT sign-in.
+TechieRag: decision 2 — go with option A. The phone default stays our own Qwen conversion; I will publish it on my Hugging Face account.
 ```

@@ -4,11 +4,12 @@ namespace TechieRag.Local.Runtime;
 /// The on-disk format a local runtime loads. Internal on purpose: the app picks a model, never a
 /// runtime or a format (REQ-RAG-058 / BRD-97).
 /// </summary>
+/// <remarks>
+/// One format per model: ONNX Runtime GenAI is the only engine on every platform (DECISIONS.md
+/// 2026-09-25), so GGUF left the catalogue with LLamaSharp.
+/// </remarks>
 internal enum LocalModelFormat
 {
-    /// <summary>A single GGUF file, as llama.cpp (LLamaSharp) loads it.</summary>
-    Gguf,
-
     /// <summary>A folder with <c>genai_config.json</c>, as ONNX Runtime GenAI loads it.</summary>
     OnnxGenAi,
 

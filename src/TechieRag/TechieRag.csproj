@@ -62,8 +62,10 @@
     <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="build\content\" />
   </ItemGroup>
 
+  <!-- REQ-FN-056: no Dapper. Its Reflection.Emit mappers throw in every AOT-compiled iOS and
+       Mac Catalyst Release build; the SQLite and relational stores use plain ADO.NET
+       (Persistence/DbCommandExtensions.cs). DataAccessIsAotSafeTests fails if it comes back. -->
   <ItemGroup>
-    <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.4.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
     <PackageReference Include="Markdig" Version="0.45.0" />

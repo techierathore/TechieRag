@@ -161,27 +161,93 @@ public sealed class LocalModelStoreTests : IDisposable
     [Fact]
     public void MirrorRedirectsEveryFile()
     {
-        var variant = LocalModel.Qwen25Instruct05B.Variants.Single(v => v.Format == LocalModelFormat.Gguf);
+        var variant = LocalModel.Qwen25Instruct05B.Variants.Single(v => v.Format == LocalModelFormat.OnnxGenAi);
 
         var files = variant.GetDownloadFiles("https://mirror.example/models/");
 
+        Assert.All(files, f => Assert.Equal(
+            "https://mirror.example/models/qwen2.5-0.5b-instruct-onnx/" + f.FileName,
+            f.Url.ToString()));
+    }
+
+    /// <summary>
+    /// The phone model has no default address yet: without TECHIERAG_MODEL_BASE_URL its download fails
+    /// with a message naming the variable and the mirror layout.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-057 QwenWithoutMirrorNamesTheVariable")]
+    public void QwenWithoutMirrorNamesTheVariable()
+    {
+        var variant = LocalModel.Qwen25Instruct05B.Variants.Single();
+
+        var error = Assert.Throws<InvalidOperationException>(() => variant.GetDownloadFiles(null));
+
         Assert.Equal(
-            "https://mirror.example/models/qwen2.5-0.5b-instruct-gguf/qwen2.5-0.5b-instruct-q4_k_m.gguf",
-            files.Single().Url.ToString());
+            "The local model files 'qwen2.5-0.5b-instruct-onnx' have no default download address. Set the "
+            + "TECHIERAG_MODEL_BASE_URL environment variable to a mirror that serves them as "
+            + "<mirror>/qwen2.5-0.5b-instruct-onnx/<file>, or place the files in the model folder yourself.",
+            error.Message);
+    }
+
+    /// <summary>
+    /// A file set with no default address and no mirror fails before any byte: no request is sent and
+    /// the host's terms dialog is never shown.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-057 NoMirrorFailsBeforeAnyByte")]
+    public async Task NoMirrorFailsBeforeAnyByte()
+    {
+        var (model, variant) = TestModel(defaultBaseUrl: null);
+        var termsShown = false;
+        var options = new LocalLlmOptions { ConfirmTermsAsync = (_, _) => Task.FromResult(termsShown = true) };
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => LocalModelStore.Shared.EnsureAsync(model, variant, directory, options, null, CancellationToken.None));
+
+        Assert.Contains("TECHIERAG_MODEL_BASE_URL", error.Message, StringComparison.Ordinal);
+        Assert.Contains("<mirror>/test-model/<file>", error.Message, StringComparison.Ordinal);
+        Assert.Empty(server.Requests);
+        Assert.False(termsShown);
+    }
+
+    /// <summary>A mirror-only file set downloads and verifies through the mirror.</summary>
+    [Fact]
+    public async Task MirrorOnlyFileSetDownloadsThroughMirror()
+    {
+        var (model, variant) = TestModel(defaultBaseUrl: null);
+        server.Add("test-model/first.bin", first);
+        server.Add("test-model/second.bin", second);
+
+        await LocalModelStore.Shared.EnsureAsync(model, variant, directory, Accepted(), server.BaseUrl, CancellationToken.None);
+
+        Assert.Equal(second, await File.ReadAllBytesAsync(Path.Combine(directory, "second.bin")));
+        Assert.All(server.Requests, r => Assert.StartsWith("test-model/", r.Path, StringComparison.Ordinal));
+    }
+
+    /// <summary>A mirror-only file set already on disk loads without a mirror: nothing is requested.</summary>
+    [Fact]
+    public async Task MirrorOnlyFileSetOnDiskNeedsNoMirror()
+    {
+        var (model, variant) = TestModel(defaultBaseUrl: null);
+        Directory.CreateDirectory(directory);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "first.bin"), first);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "second.bin"), second);
+
+        await LocalModelStore.Shared.EnsureAsync(model, variant, directory, new LocalLlmOptions(), null, CancellationToken.None);
+
+        Assert.Empty(server.Requests);
     }
 
     private static LocalLlmOptions Accepted() => new() { TermsAccepted = true };
 
     private static string Sha(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
-    private (LocalModel Model, LocalModelVariant Variant) TestModel(string? secondSha = null)
+    private (LocalModel Model, LocalModelVariant Variant) TestModel(string? secondSha = null, string? defaultBaseUrl = "m")
     {
         server.Add("m/first.bin", first);
         server.Add("m/second.bin", second);
         var variant = new LocalModelVariant(
             LocalModelFormat.Test,
             "test-model",
-            server.BaseUrl + "m",
+            defaultBaseUrl is null ? null : server.BaseUrl + defaultBaseUrl,
             [
                 new LocalModelFileSpec("first.bin", "first.bin", first.Length, Sha(first)),
                 new LocalModelFileSpec("second.bin", "second.bin", second.Length, secondSha ?? Sha(second))

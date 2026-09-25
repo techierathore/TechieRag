@@ -6,7 +6,8 @@ namespace TechieRag.Probe;
 
 /// <summary>
 /// Android head's activity. The boolean intent extra <c>autorun</c> presses the probe's button once
-/// the page appears (REQ-FN-057, the CI emulator run). The Java name is fixed so
+/// the page appears (REQ-FN-057, the CI emulator run); <c>autorunlocal</c> presses the local-model
+/// button (REQ-FN-059). The Java name is fixed so
 /// <c>adb shell am start -n com.techierathore.techierag.probe/.MainActivity</c> is stable.
 /// </summary>
 [Activity(
@@ -23,6 +24,11 @@ public class MainActivity : MauiAppCompatActivity
         if (Intent?.GetBooleanExtra("autorun", false) == true)
         {
             ProbeLaunch.AutoRun = true;
+        }
+
+        if (Intent?.GetBooleanExtra("autorunlocal", false) == true)
+        {
+            ProbeLaunch.AutoRunLocal = true;
         }
 
         base.OnCreate(savedInstanceState);

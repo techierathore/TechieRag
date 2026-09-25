@@ -5,6 +5,78 @@ what was decided and, where it is not obvious, why — so that a future reader d
 
 ---
 
+## 2026-09-25 (later) — Any Hugging Face model by name; the phone default stays our own conversion (owner decisions 1–2)
+
+Source: `docs/TechieRag-Decision-Request.md` (second request of the day, both option A). BRD-166 / REQ-RAG-108.
+
+**Why it came up.** The owner asked why the phone model must be published under his account and whether that ties
+the library down. It did in one way: `TechieRag.Local` offered only its two built-in models or a folder the app
+filled itself, with no way to name any other model, as LM Studio allows.
+
+**1. `LocalModel.FromHuggingFace(repository, folder, version)`.** Any ONNX Runtime GenAI model on Hugging Face,
+by name. Files are listed through Hugging Face's public API; the model card's licence is shown for acceptance
+before any download (BRD-101 unchanged); every file is checked against the fingerprint Hugging Face publishes
+(SHA-256 for large files, the git checksum for small ones); an unpinned name is resolved to one version and
+recorded, so a later change on the page never reaches an installed app. The app developer answers for the model
+they name.
+
+**2. The built-in phone default stays our own Qwen2.5 0.5B conversion**, published once on the owner's Hugging
+Face account and pinned by version (steps: `docs/MODEL-PUBLISHING-GUIDE.md`). Measured alternative on the M4 Max
+the same day, Arm's `gemma-3-1b-instruct-onnx-genai-int4-emb-int8` (the only phone-sized model in this format from
+a known publisher; Microsoft and the ONNX Runtime team publish nothing that small, onnx-community's Qwen is in a
+format this engine cannot load): 866 MB against 317 MB, 150–157 against 330–360 tokens/s, 1.7 GB against 0.5 GB
+peak memory, Gemma terms against Apache-2.0, equal score on eight factual questions. A curated default hosted by
+the maker is also how Ollama (its own registry) and LM Studio (its `lmstudio-community` organisation) do it.
+
+---
+
+## 2026-09-25 — Local model engine, Mac support, phone model source, ChatGPT client id (owner decisions 1–4)
+
+Source: `docs/TechieRag-Decision-Request.md` (answered 2026-09-25, all four option A). This is the measured
+comparison entry 2026-09-24 point 3 asked for. Blocks REQ-RAG-057, 058, 063, 065, REQ-FN-058, 059 lifted.
+
+**Measurement.** LLamaSharp 0.27.0 against ONNX Runtime GenAI 0.16.0, the same two models in each engine's
+format (Qwen2.5-0.5B-Instruct; Phi-3-mini-4k-instruct), every file SHA-256 pinned, a 128-token greedy answer,
+three runs each. Raw data: `tests/.artifacts/local-llm-bench/` on each machine (not committed).
+
+| Machine, date | Model | ONNX Runtime GenAI | LLamaSharp |
+|---|---|---|---|
+| Windows 11, Core i5-11300H, 16 GB, 2026-09-24 | Qwen 0.5B | 45–52 tok/s, first token 0.2–0.4 s, load 1.1–3.3 s, 555 MB | 25–31 tok/s, 0.4–0.8 s, 0.4–1.5 s, 510 MB |
+| same | Phi-3 mini | 7.5 tok/s, 3.0–3.3 GB | 5.9 tok/s, 3.6 GB |
+| same, WSL Linux | Qwen / Phi-3 best | 86 / 8.4 tok/s | 64 / 6.7 tok/s |
+| macOS 27, Apple M4 Max, 36 GB, 2026-09-25 | Qwen 0.5B | 307–331 tok/s, 0.03 s, 0.2 s, 506 MB | CPU 295–298 tok/s, 0.05–0.07 s, 803 MB; Metal 191–225 |
+| same | Phi-3 mini | 61–69 tok/s, 0.12 s, 0.7 s, 2.7 GB | CPU 61–73, 6.1 GB; Metal 96–112, 3.9 GB |
+| same, inside a Mac Catalyst app | Qwen / Phi-3 | 360–398 / 73 tok/s | Phi-3 Metal 102–107 (loader workaround) |
+
+Both engines tokenize identically on every test sentence. Platform availability on nuget.org: ONNX Runtime
+GenAI ships Windows, Android, iOS and — inside its iOS xcframework — an `ios-arm64_x86_64-maccatalyst` slice
+(its `maccatalyst` build folder is an empty `_._`); LLamaSharp ships nothing for iOS or Mac Catalyst.
+
+**1. ONNX Runtime GenAI is the local engine on Windows, Android and iOS.** Faster answers on Windows, lowest
+memory everywhere, the only one of the two on iOS, and it shares ONNX Runtime with `TechieRag.Embedded`,
+whose `Microsoft.ML.OnnxRuntime` moves 1.24.1 → 1.30.0 (the version GenAI 0.16.0 requires).
+
+**2. The same engine on Mac Catalyst.** `TechieRag.Local`'s buildTransitive targets declare the GenAI
+xcframework's Mac Catalyst slice as a static `NativeReference`, as `TechieRag.Embedded` already does for ONNX
+Runtime (REQ-FN-055). Rejected: LLamaSharp with Metal on the Mac only (about 40% faster on Phi-3, but a second
+engine, a bypassed library loader, and loose macOS-platform dylibs in a Catalyst bundle whose App Store
+acceptance is unknown); "not supported on the Mac". The missing Mac wiring is filed with ONNX Runtime GenAI.
+LLamaSharp and GGUF leave the catalogue: one format per model.
+
+**3. The phone model's ONNX files are our own conversion, hosted on the owner's mirror.** Converted from
+Qwen's official release (`Qwen/Qwen2.5-0.5B-Instruct` commit `7ae557604adf67be50417f59c2c2f167def9a775`,
+Apache-2.0) with `onnxruntime_genai.models.builder` 0.16.0, `-p int4 -e cpu`, `int4_block_size=32`. Result
+317 MB against 837 MB for the third-party copy (`xiaoyao9184`, no licence tag) it replaces, same token
+counts, same answers on eight factual questions, speed equal or better, about 100 MB more working memory.
+The default download address is the owner's mirror; the file list and fingerprints are pinned in
+`LocalModel.Qwen25Instruct05B`.
+
+**4. The ChatGPT sign-in keeps Codex's public client id as its default.** Unchanged from the build: it rests on
+OpenAI staff's public statements (entry below); a host overrides it with `ChatGptSubscriptionOptions.ClientId`,
+and the library names itself `techierag` on every call.
+
+---
+
 ## 2026-09-24 (later) — Subscription sign-in: vendor policy and flow, checked live (research findings, REQ-FN-062 / BRD-114)
 
 **This entry records facts with their sources, not a new product decision.** It is the check BRD-114 requires

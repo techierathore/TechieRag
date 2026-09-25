@@ -46,7 +46,7 @@ public static class LocalLlmBuilderExtensions
     /// Uses a model the host has already placed in a folder; nothing is downloaded and no terms are asked.
     /// </summary>
     /// <param name="builder">The builder.</param>
-    /// <param name="modelFolder">The folder: a GGUF file, or an ONNX Runtime GenAI model.</param>
+    /// <param name="modelFolder">The folder of an ONNX Runtime GenAI model (<c>genai_config.json</c>, the ONNX files and the tokenizer).</param>
     /// <param name="chatTemplate">The chat format the model was trained on.</param>
     /// <param name="contextLength">The longest context the model supports, in tokens.</param>
     /// <param name="configure">Optional settings.</param>

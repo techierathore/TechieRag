@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 2: Agents, platforms, local model, and the harvested v3 library</h1>
-    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-P2-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-P2-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -410,6 +410,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-109</strong> — The UsageGuide shall gain a <code>TechieRag.Local</code> section, the platform matrix is updated, and every "offline" or "air-gapped" claim across the docs is corrected to "downloads once, then works offline" <em>(F-LOCAL-LLM)</em> <em>Screen:</em> Local model
 <ul>
 <li><em>Acceptance:</em> When a reader opens the UsageGuide, then a <code>TechieRag.Local</code> section exists and no page claims offline without saying downloads once first.
+</li>
+</ul>
+</li>
+<li><strong>BRD-166</strong> — A developer can run any ONNX Runtime GenAI model published on Hugging Face by naming it: <code>LocalModel.FromHuggingFace(repository, folder inside it, exact version)</code> lists the files through Hugging Face's public API, shows the model card's licence for acceptance before any download (BRD-101), downloads to the model root (BRD-89) through <code>ModelDownloadService</code>, and checks every file against the fingerprint Hugging Face publishes (SHA-256 for large files, the git checksum for small ones); an unpinned name is resolved to its current version once and recorded, so later changes on the page never reach an installed app. The built-in phone default stays the library's own Qwen2.5 0.5B conversion, published on the owner's Hugging Face account <em>(added 2026-09-25, owner decisions 1 and 2)</em> <em>Screen:</em> Local model
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))</code> and the host accepts the shown licence, then the files download, every fingerprint is checked, and the provider answers a prompt.
 </li>
 </ul>
 </li>
@@ -742,7 +748,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </table>
 <h2 id="development-status">5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-09-24.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-09-25.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -751,8 +757,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Surface: Repository separation</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Flow orchestration</td><td>6</td><td>6</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Provider breadth</td><td>10</td><td>10</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Platform groundwork</td><td>9</td><td>5</td><td>4</td><td>Partial</td></tr>
-<tr><td>Surface: Local model</td><td>14</td><td>7</td><td>7</td><td>Partial</td></tr>
+<tr><td>Surface: Platform groundwork</td><td>9</td><td>8</td><td>1</td><td>Partial</td></tr>
+<tr><td>Surface: Local model</td><td>15</td><td>12</td><td>3</td><td>Partial</td></tr>
 <tr><td>Surface: Typed streaming</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Subscription sign-in</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Ingestion breadth</td><td>7</td><td>7</td><td>0</td><td>Done</td></tr>

@@ -9,6 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Test-only: LegacySqliteSimilaritySearch, the pre-REQ-RAG-056 reference search, still reads
+         with Dapper. The library itself no longer references it (REQ-FN-056). -->
+    <PackageReference Include="Dapper" Version="2.1.66" />
     <PackageReference Include="coverlet.collector" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

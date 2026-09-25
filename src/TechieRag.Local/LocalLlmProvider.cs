@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Schema;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using TechieRag.Abstractions;
@@ -42,6 +41,7 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     private readonly LocalModelStore store;
     private readonly SemaphoreSlim loadGate = new(1, 1);
     private readonly SemaphoreSlim generateGate = new(1, 1);
+    private readonly bool isPhone;
     private ILocalLlmModel? loaded;
     private ILocalTokenizer? tokenizer;
     private bool disposed;
@@ -79,9 +79,9 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
         this.runtime = runtime;
         this.memoryGate = memoryGate;
         this.store = store;
+        this.isPhone = isPhone;
         Model = options.Model ?? LocalModel.DefaultFor(isPhone);
         Model.EnsureSupported(isPhone);
-        ContextSize = Math.Min(Model.ContextLength, options.ContextSize ?? Model.DefaultContextSize(isPhone));
     }
 
     /// <inheritdoc/>
@@ -90,8 +90,19 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     /// <summary>Gets the model this provider runs.</summary>
     public LocalModel Model { get; }
 
-    /// <summary>Gets the context size, in tokens, the model is loaded with.</summary>
-    public int ContextSize { get; }
+    /// <summary>
+    /// Gets the context size, in tokens, the model is loaded with: <see cref="LocalLlmOptions.ContextSize"/>
+    /// or the platform's default, never more than the model supports. For a Hugging Face model the limit is
+    /// known once its <c>genai_config.json</c> is on disk.
+    /// </summary>
+    public int ContextSize
+    {
+        get
+        {
+            var requested = options.ContextSize ?? Model.DefaultContextSize(isPhone);
+            return Model.ContextLength > 0 ? Math.Min(Model.ContextLength, requested) : requested;
+        }
+    }
 
     /// <summary>Gets whether the model is loaded and ready to answer.</summary>
     public bool IsLoaded => loaded is not null;
@@ -121,6 +132,18 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     }
 
     /// <summary>
+    /// Gets the terms the user accepts before the model downloads, with the download size. For a model
+    /// named on Hugging Face this reads its licence and file list through Hugging Face's API first (no
+    /// model file is requested), so the terms are complete (REQ-RAG-108).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The terms.</returns>
+    /// <exception cref="InvalidOperationException">A Hugging Face model is gated, private, missing, or not in ONNX Runtime GenAI's format.</exception>
+    /// <exception cref="HttpRequestException">Hugging Face could not be reached.</exception>
+    public Task<LocalModelTerms> GetTermsAsync(CancellationToken cancellationToken = default) =>
+        store.GetTermsAsync(Model, runtime?.Format ?? LocalModelFormat.OnnxGenAi, cancellationToken);
+
+    /// <summary>
     /// Accepts the terms (through <see cref="LocalLlmOptions"/>), downloads and verifies the model and
     /// loads it, so the first answer does not wait for any of it. Safe to call more than once.
     /// </summary>
@@ -128,8 +151,13 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     /// <returns>A task that completes when the model is loaded.</returns>
     /// <exception cref="PlatformNotSupportedException">No runtime is available for this platform.</exception>
     /// <exception cref="LocalModelTermsNotAcceptedException">The download needs terms acceptance.</exception>
-    /// <exception cref="LocalModelIntegrityException">A downloaded file failed its SHA-256 check.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The files must be downloaded, the model has no default address and <c>TECHIERAG_MODEL_BASE_URL</c>
+    /// is not set; nothing was requested.
+    /// </exception>
+    /// <exception cref="LocalModelIntegrityException">A downloaded file failed its hash check.</exception>
     /// <exception cref="LocalModelMemoryException">The device has too little free memory.</exception>
+    /// <exception cref="HttpRequestException">A Hugging Face model's metadata could not be fetched.</exception>
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
@@ -146,11 +174,13 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
                 return;
             }
 
+            await store.PrepareAsync(Model, cancellationToken).ConfigureAwait(false);
             var (resolvedRuntime, variant, directory) = Resolve();
             if (variant is not null)
             {
-                await store.EnsureAsync(Model, variant, directory, options, LocalModelStore.Mirror, cancellationToken)
-                    .ConfigureAwait(false);
+                // TECHIERAG_MODEL_BASE_URL is for the built-in catalogue; a Hugging Face name is its own source.
+                var mirror = Model.HuggingFace is null ? LocalModelStore.Mirror : null;
+                await store.EnsureAsync(Model, variant, directory, options, mirror, cancellationToken).ConfigureAwait(false);
             }
 
             var weightBytes = variant?.DownloadBytes ?? FolderBytes(directory);
@@ -230,8 +260,9 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The JSON schema of <typeparamref name="T"/> is sent with the call so a runtime that can
-    /// constrain output to a schema does (REQ-RAG-063); the answer is parsed strictly.
+    /// The strict JSON schema of <typeparamref name="T"/> (<see cref="TypedAnswerSchema"/>: root never
+    /// null, every property required, no others) is sent with the call and the runtime constrains decoding to it (REQ-RAG-063: ONNX Runtime GenAI's <c>json_schema</c>
+    /// guidance); the answer is parsed strictly.
     /// </remarks>
     /// <exception cref="InvalidOperationException">The answer is not JSON that parses into <typeparamref name="T"/>.</exception>
     public async Task<T> CompleteAsync<T>(
@@ -239,7 +270,7 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
         LlmCompletionOptions? options = null,
         CancellationToken cancellationToken = default) where T : class
     {
-        var schema = JsonSchemaExporter.GetJsonSchemaAsNode(JsonSerializerOptions.Default, typeof(T)).ToJsonString();
+        var schema = TypedAnswerSchema.For(typeof(T));
         var call = new LlmCompletionOptions
         {
             Temperature = options?.Temperature ?? 0f,
@@ -310,7 +341,10 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
         await LoadAsync(cancellationToken).ConfigureAwait(false);
         var model = loaded!;
 
-        var prompt = ChatTemplateFormatter.Format(Model.ChatTemplate, PrepareConversation(messages, callOptions));
+        var conversation = PrepareConversation(messages, callOptions);
+        var prompt = Model.ChatTemplate == LocalChatTemplate.ModelDefined
+            ? model.ApplyChatTemplate(ChatTemplateFormatter.ToMessagesJson(conversation))
+            : ChatTemplateFormatter.Format(Model.ChatTemplate, conversation);
         var promptTokens = model.CountTokens(prompt);
         if (promptTokens >= ContextSize)
         {
@@ -410,7 +444,9 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
         Seed = callOptions?.Seed,
         FrequencyPenalty = callOptions?.FrequencyPenalty,
         PresencePenalty = callOptions?.PresencePenalty,
-        StopSequences = [.. callOptions?.StopSequences ?? [], ChatTemplateFormatter.EndOfTurn(Model.ChatTemplate)],
+        StopSequences = ChatTemplateFormatter.EndOfTurn(Model.ChatTemplate) is { } endOfTurn
+            ? [.. callOptions?.StopSequences ?? [], endOfTurn]
+            : [.. callOptions?.StopSequences ?? []],
         JsonMode = callOptions?.JsonMode ?? false,
         JsonSchema = callOptions?.JsonSchema
     };

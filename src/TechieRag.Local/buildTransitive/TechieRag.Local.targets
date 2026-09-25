@@ -1,0 +1,78 @@
+<Project>
+  <!--
+    TechieRag.Local native ONNX Runtime GenAI wiring for MAUI heads (REQ-FN-058 / BRD-102).
+
+    A consuming app writes NO native wiring of its own. The local model runs on ONNX Runtime GenAI
+    (DECISIONS.md 2026-09-25), which sits on ONNX Runtime; ONNX Runtime itself is wired by
+    TechieRag.Embedded.targets, which every TechieRag.Local consumer gets through its dependency on
+    TechieRag.Embedded. What Microsoft.ML.OnnxRuntimeGenAI already does, and what this file adds, per
+    platform (checked against the restored 0.16.0 package, 2026-09-25):
+
+      Android      GenAI's own buildTransitive/net9.0-android31.0 adds
+                   runtimes/android/native/onnxruntime-genai.aar as an AndroidLibrary (jni/arm64-v8a
+                   and jni/x86_64). This file checks it arrived and adds it itself when it did not.
+      iOS          GenAI's own buildTransitive/net9.0-ios15.4 adds the static
+                   onnxruntime-genai.xcframework NativeReference (ForceLoad, -lc++, CoreML weak), with
+                   the ios-arm64 and ios-arm64_x86_64-simulator slices. Nothing added here.
+      Mac Catalyst GenAI ships an EMPTY placeholder (_._) under build/ and buildTransitive/
+                   net9.0-maccatalyst14.0, so no native library is linked while the Catalyst managed
+                   assembly imports "__Internal"; the first call fails. The same xcframework carries an
+                   ios-arm64_x86_64-maccatalyst slice, so this file declares the NativeReference GenAI
+                   declares for iOS (reported upstream: docs/TechieRag-OnnxRuntimeGenAI-Feedback.md,
+                   ORTGENAI-001).
+      Windows      runtimes/win-x64 and win-arm64/native/onnxruntime-genai.dll are runtime assets,
+                   which NuGet copies into the app over any number of references. Nothing added here.
+      macOS, Linux (plain net10.0) the same: runtimes/osx-arm64, linux-x64, linux-arm64 native.
+                   No Intel macOS library is shipped (LocalRuntimeSelector returns no runtime there).
+
+    Knobs a consuming app may set:
+      TechieRagOnnxRuntimeGenAIVersion    the Microsoft.ML.OnnxRuntimeGenAI version the app restores
+                                          when it overrides the one TechieRag.Local references
+                                          (default below)
+      TechieRagDisableLocalNativeWiring   true to switch everything in this file off
+  -->
+  <PropertyGroup>
+    <!-- Keep in step with the Microsoft.ML.OnnxRuntimeGenAI PackageReference in TechieRag.Local.csproj;
+         LocalPackagingTests asserts they match. -->
+    <TechieRagOnnxRuntimeGenAIVersion Condition="'$(TechieRagOnnxRuntimeGenAIVersion)' == ''">0.16.0</TechieRagOnnxRuntimeGenAIVersion>
+    <TechieRagOnnxRuntimeGenAIPackageRoot Condition="'$(TechieRagOnnxRuntimeGenAIPackageRoot)' == ''">$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))microsoft.ml.onnxruntimegenai/$(TechieRagOnnxRuntimeGenAIVersion)/</TechieRagOnnxRuntimeGenAIPackageRoot>
+    <_TechieRagLocalTargetPlatform>$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))</_TechieRagLocalTargetPlatform>
+    <_TechieRagLocalIsApp Condition="'$(OutputType)' != 'Library' OR '$(IsAppExtension)' == 'True'">true</_TechieRagLocalIsApp>
+    <_TechieRagWireGenAi Condition="'$(TechieRagDisableLocalNativeWiring)' != 'true' AND '$(_TechieRagLocalIsApp)' == 'true'">true</_TechieRagWireGenAi>
+    <_TechieRagGenAiXcframework>$(TechieRagOnnxRuntimeGenAIPackageRoot)runtimes/ios/native/onnxruntime-genai.xcframework.zip</_TechieRagGenAiXcframework>
+    <_TechieRagGenAiAar>$(TechieRagOnnxRuntimeGenAIPackageRoot)runtimes/android/native/onnxruntime-genai.aar</_TechieRagGenAiAar>
+  </PropertyGroup>
+
+  <!-- Mac Catalyst: the static library GenAI never wires up. -->
+  <ItemGroup Condition="'$(_TechieRagWireGenAi)' == 'true' AND '$(_TechieRagLocalTargetPlatform)' == 'maccatalyst'">
+    <NativeReference Include="$(_TechieRagGenAiXcframework)">
+      <Kind>Static</Kind>
+      <IsCxx>True</IsCxx>
+      <SmartLink>True</SmartLink>
+      <ForceLoad>True</ForceLoad>
+      <LinkerFlags>-lc++</LinkerFlags>
+      <WeakFrameworks>CoreML</WeakFrameworks>
+    </NativeReference>
+  </ItemGroup>
+
+  <Target Name="TechieRagCheckGenAiXcframework"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(_TechieRagWireGenAi)' == 'true' AND '$(_TechieRagLocalTargetPlatform)' == 'maccatalyst'">
+    <Error Condition="!Exists('$(_TechieRagGenAiXcframework)')"
+           Text="TechieRag.Local: ONNX Runtime GenAI's xcframework was not found at '$(_TechieRagGenAiXcframework)'. Set the MSBuild property TechieRagOnnxRuntimeGenAIVersion to the Microsoft.ML.OnnxRuntimeGenAI version this app restores." />
+  </Target>
+
+  <!-- Android: make sure GenAI's .aar (arm64-v8a, x86_64) reached the app. -->
+  <Target Name="TechieRagEnsureGenAiAndroidLibrary"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(_TechieRagWireGenAi)' == 'true' AND '$(_TechieRagLocalTargetPlatform)' == 'android'">
+    <ItemGroup>
+      <_TechieRagGenAiAarItem Include="@(AndroidLibrary)" Condition="'%(Filename)%(Extension)' == 'onnxruntime-genai.aar'" />
+    </ItemGroup>
+    <Error Condition="'@(_TechieRagGenAiAarItem)' == '' AND !Exists('$(_TechieRagGenAiAar)')"
+           Text="TechieRag.Local: ONNX Runtime GenAI's Android library was not found at '$(_TechieRagGenAiAar)'. Set the MSBuild property TechieRagOnnxRuntimeGenAIVersion to the Microsoft.ML.OnnxRuntimeGenAI version this app restores." />
+    <ItemGroup Condition="'@(_TechieRagGenAiAarItem)' == ''">
+      <AndroidLibrary Include="$(_TechieRagGenAiAar)" Bind="false" />
+    </ItemGroup>
+  </Target>
+</Project>

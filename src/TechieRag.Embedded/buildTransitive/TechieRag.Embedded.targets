@@ -37,7 +37,7 @@
   <PropertyGroup>
     <!-- Keep in step with the Microsoft.ML.OnnxRuntime PackageReference in TechieRag.Embedded.csproj;
          EmbeddedPackagingTests asserts they match. -->
-    <TechieRagOnnxRuntimeVersion Condition="'$(TechieRagOnnxRuntimeVersion)' == ''">1.24.1</TechieRagOnnxRuntimeVersion>
+    <TechieRagOnnxRuntimeVersion Condition="'$(TechieRagOnnxRuntimeVersion)' == ''">1.30.0</TechieRagOnnxRuntimeVersion>
     <TechieRagOnnxRuntimePackageRoot Condition="'$(TechieRagOnnxRuntimePackageRoot)' == ''">$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))microsoft.ml.onnxruntime/$(TechieRagOnnxRuntimeVersion)/</TechieRagOnnxRuntimePackageRoot>
     <_TechieRagTargetPlatform>$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)'))</_TechieRagTargetPlatform>
     <_TechieRagIsApp Condition="'$(OutputType)' != 'Library' OR '$(IsAppExtension)' == 'True'">true</_TechieRagIsApp>

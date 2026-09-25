@@ -5,8 +5,9 @@ namespace TechieRag.Local;
 /// (REQ-RAG-059 / BRD-98).
 /// </summary>
 /// <remarks>
-/// The template is applied by the provider in managed code, not by the runtime, so every platform
-/// feeds the model exactly the same text whatever runtime is underneath (REQ-RAG-058).
+/// The four fixed templates are applied by the provider in managed code, so every platform feeds the
+/// model exactly the same text (REQ-RAG-058). <see cref="ModelDefined"/> hands the conversation to the
+/// model's own template instead, through ONNX Runtime GenAI, the one engine on every platform.
 /// </remarks>
 public enum LocalChatTemplate
 {
@@ -20,5 +21,14 @@ public enum LocalChatTemplate
     Llama3,
 
     /// <summary>Gemma: <c>&lt;start_of_turn&gt;user\n…&lt;end_of_turn&gt;</c>; a system message is folded into the first user turn.</summary>
-    Gemma
+    Gemma,
+
+    /// <summary>
+    /// The model's own template, from its <c>chat_template.jinja</c> or <c>tokenizer_config.json</c>, applied
+    /// by ONNX Runtime GenAI's tokenizer: the start marker (Gemma's <c>&lt;bos&gt;</c>), the roles and the
+    /// turn markers exactly as the model's publisher wrote them. Every <see cref="LocalModel.FromHuggingFace(string, string?, string?)"/>
+    /// model uses it (REQ-RAG-108). A system message is sent as the first message; consecutive messages of
+    /// one role are joined, since many templates require alternating turns.
+    /// </summary>
+    ModelDefined
 }

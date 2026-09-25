@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Nodes;
 using TechieRag.Models;
 
 namespace TechieRag.Local;
@@ -49,15 +50,64 @@ internal static class ChatTemplateFormatter
 
     /// <summary>Gets the marker that ends a turn, which is also a stop sequence.</summary>
     /// <param name="template">The model's chat format.</param>
-    /// <returns>The end-of-turn marker.</returns>
-    public static string EndOfTurn(LocalChatTemplate template) => template switch
+    /// <returns>
+    /// The end-of-turn marker; null for <see cref="LocalChatTemplate.ModelDefined"/>, whose end-of-turn token
+    /// is among the end tokens of the model's own <c>genai_config.json</c>, where the engine stops on it.
+    /// </returns>
+    public static string? EndOfTurn(LocalChatTemplate template) => template switch
     {
         LocalChatTemplate.ChatMl => "<|im_end|>",
         LocalChatTemplate.Phi3 => "<|end|>",
         LocalChatTemplate.Llama3 => "<|eot_id|>",
         LocalChatTemplate.Gemma => "<end_of_turn>",
+        LocalChatTemplate.ModelDefined => null,
         _ => throw new ArgumentOutOfRangeException(nameof(template))
     };
+
+    /// <summary>
+    /// Turns a conversation into the messages a model's own chat template takes
+    /// (<see cref="LocalChatTemplate.ModelDefined"/>, REQ-RAG-108): every system message joined into one
+    /// first message, a tool result sent as a user turn, and consecutive messages of one role joined,
+    /// because templates such as Gemma's refuse a conversation whose turns do not alternate.
+    /// </summary>
+    /// <param name="messages">The conversation.</param>
+    /// <returns>A JSON array of <c>{"role", "content"}</c> objects.</returns>
+    public static string ToMessagesJson(IReadOnlyList<ChatMessage> messages)
+    {
+        ArgumentNullException.ThrowIfNull(messages);
+        var turns = new List<(string Role, string Text)>();
+        if (SystemText(messages) is { } system)
+        {
+            turns.Add(("system", system));
+        }
+
+        foreach (var message in messages)
+        {
+            var role = NormaliseRole(message.Role);
+            if (role == "system")
+            {
+                continue;
+            }
+
+            var text = TextOf(message);
+            if (turns.Count > 0 && turns[^1].Role == role)
+            {
+                turns[^1] = (role, turns[^1].Text + "\n\n" + text);
+            }
+            else
+            {
+                turns.Add((role, text));
+            }
+        }
+
+        var array = new JsonArray();
+        foreach (var (role, text) in turns)
+        {
+            array.Add(new JsonObject { ["role"] = role, ["content"] = text });
+        }
+
+        return array.ToJsonString();
+    }
 
     private static void AppendTurn(StringBuilder builder, LocalChatTemplate template, string role, string text)
     {

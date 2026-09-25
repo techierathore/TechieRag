@@ -1,4 +1,3 @@
-using TechieRag.Embedded;
 using TechieRag.Local.Runtime;
 using Xunit;
 
@@ -49,7 +48,7 @@ public sealed class LiveLocalLlmFactAttribute : FactAttribute
         }
 
         var directory = model.GetDirectory(variant);
-        return ModelDownloadService.IsComplete(directory, variant.GetDownloadFiles(null))
+        return variant.IsOnDisk(directory)
             ? null
             : $"Live local-model test. '{model.Id}' is not downloaded at {directory}. Download it once (UseLocalLlm with terms accepted) "
               + $"or set {ModelVariable} to a model that is, then run the suite again.";

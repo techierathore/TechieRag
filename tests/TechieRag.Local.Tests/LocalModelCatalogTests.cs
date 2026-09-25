@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using TechieRag.Local.Runtime;
 using Xunit;
 
 namespace TechieRag.Local.Tests;
@@ -10,18 +11,45 @@ namespace TechieRag.Local.Tests;
 /// </summary>
 public sealed partial class LocalModelCatalogTests
 {
-    /// <summary>Every file of every shipped model is pinned to a repository commit, sized and SHA-256 hashed.</summary>
+    /// <summary>
+    /// Every file of every shipped model is sized and SHA-256 hashed, and its default source is either
+    /// pinned to a repository commit or absent (a mirror-only file set, the owner's own conversion).
+    /// </summary>
     [Fact]
     public void CatalogFilesArePinnedAndHashed()
     {
         var variants = LocalModel.All.SelectMany(m => m.Variants).ToList();
 
-        Assert.All(variants, v => Assert.Matches(PinnedCommit(), v.DefaultBaseUrl));
+        Assert.All(variants.Where(v => v.DefaultBaseUrl is not null), v => Assert.Matches(PinnedCommit(), v.DefaultBaseUrl!));
         Assert.All(variants.SelectMany(v => v.Files), f =>
         {
-            Assert.Matches(Sha256(), f.Sha256);
+            Assert.Matches(Sha256(), f.Hash);
             Assert.True(f.Bytes > 0);
         });
+    }
+
+    /// <summary>
+    /// One format per model: every shipped model has exactly one file set, in ONNX Runtime GenAI's
+    /// format, the engine every platform runs (DECISIONS.md 2026-09-25).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-058 EveryModelHasOneOnnxFileSet")]
+    public void EveryModelHasOneOnnxFileSet() =>
+        Assert.All(LocalModel.All, m => Assert.Equal(LocalModelFormat.OnnxGenAi, Assert.Single(m.Variants).Format));
+
+    /// <summary>
+    /// The phone model is the owner's own conversion: its file list is the six files the ONNX Runtime
+    /// GenAI 0.16.0 builder wrote, and it has no default address until the owner's mirror is known.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-057 PhoneModelIsOwnConversion")]
+    public void PhoneModelIsOwnConversion()
+    {
+        var variant = Assert.Single(LocalModel.Qwen25Instruct05B.Variants);
+
+        Assert.Null(variant.DefaultBaseUrl);
+        Assert.Equal(
+            ["chat_template.jinja", "genai_config.json", "model.onnx", "model.onnx.data", "tokenizer.json", "tokenizer_config.json"],
+            variant.Files.Select(f => f.FileName));
+        Assert.Equal(332_589_148, variant.DownloadBytes);
     }
 
     /// <summary>Every shipped model carries a licence name and a terms URL the host can show.</summary>

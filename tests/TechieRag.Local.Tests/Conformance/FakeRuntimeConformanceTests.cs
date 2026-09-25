@@ -4,8 +4,8 @@ using Xunit;
 namespace TechieRag.Local.Tests.Conformance;
 
 /// <summary>
-/// Runs the runtime-neutral conformance suite against the scripted runtime (REQ-RAG-058). When the
-/// owner has chosen a runtime per platform, a sibling class runs the same suite against it.
+/// Runs the runtime-neutral conformance suite against the scripted runtime (REQ-RAG-058);
+/// <see cref="OnnxGenAiConformanceTests"/> runs the same suite against the real engine.
 /// </summary>
 public sealed class FakeRuntimeConformanceTests : LocalLlmConformanceTests
 {

@@ -89,4 +89,25 @@ public class ModelRootTests
         Assert.Equal(Path.Combine("/home/u", ".local", "share", "TechieRag", "models"), ModelRoot.ComputeDefault("", "/home/u", temp));
         Assert.Equal(Path.Combine(temp, "TechieRag", "models"), ModelRoot.ComputeDefault(null, null, temp));
     }
+
+    /// <summary>
+    /// REQ-RAG-053: on iOS and Mac Catalyst, where .NET reports <c>Documents</c> as the local
+    /// application data folder, the root is <c>&lt;home&gt;/Library/Application Support/TechieRag/models</c>,
+    /// Apple's per-user application data folder; elsewhere the reported folder is kept.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-053 AppleRootIsApplicationSupportNotDocuments")]
+    public void AppleRootIsApplicationSupportNotDocuments()
+    {
+        var temp = Path.GetTempPath();
+
+        Assert.Equal(
+            Path.Combine("/Users/u", "Library", "Application Support", "TechieRag", "models"),
+            ModelRoot.ComputeDefault("/Users/u/Documents", "/Users/u", temp, isAppleUiKit: true));
+        Assert.Equal(
+            Path.Combine("/Users/u/Documents", "TechieRag", "models"),
+            ModelRoot.ComputeDefault("/Users/u/Documents", "/Users/u", temp, isAppleUiKit: false));
+        Assert.Equal(
+            Path.Combine("/Users/u/Documents", "TechieRag", "models"),
+            ModelRoot.ComputeDefault("/Users/u/Documents", "", temp, isAppleUiKit: true));
+    }
 }

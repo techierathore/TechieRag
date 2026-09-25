@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Usage Guide</h1>
-    <div class="sub">Last rendered: 2026-09-24</div>
+    <div class="sub">Last rendered: 2026-09-25</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#test-users">Test users</a></li>
@@ -133,7 +133,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li><a href="#known-limitations">Known limitations</a></li>
         <li><a href="#platform-notes">Platform notes</a></li>
         <li class="h3"><a href="#platform-support-matrix-req-fn-054-brd-88">Platform support matrix (REQ-FN-054, BRD-88)</a></li>
-        <li class="h3"><a href="#local-model-runtime-comparison-req-fn-060-brd-108">Local model: runtime comparison (REQ-FN-060, BRD-108)</a></li>
+        <li class="h3"><a href="#local-model-measured-per-platform-req-fn-060-brd-108">Local model: measured per platform (REQ-FN-060, BRD-108)</a></li>
+        <li class="h3"><a href="#local-model-engine-comparison-on-the-windows-laptop-2026-09-24">Local model: engine comparison on the Windows laptop (2026-09-24)</a></li>
         <li class="h3"><a href="#what-the-packages-do-per-platform">What the packages do per platform</a></li>
         <li class="h3"><a href="#the-probe-app-req-fn-056">The probe app (REQ-FN-056)</a></li>
         <li class="h3"><a href="#owner-s-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165">Owner&#x27;s runbook: build, deploy, run and record the probe (REQ-FN-069, BRD-165)</a></li>
@@ -142,7 +143,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Usage Guide</h1>
-    <div class="subtitle">Rendered 2026-09-24 &middot; source <code>TechieRag-UsageGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-UsageGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -171,7 +172,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li><a href="#known-limitations">Known limitations</a></li>
         <li><a href="#platform-notes">Platform notes</a></li>
         <li class="h3"><a href="#platform-support-matrix-req-fn-054-brd-88">Platform support matrix (REQ-FN-054, BRD-88)</a></li>
-        <li class="h3"><a href="#local-model-runtime-comparison-req-fn-060-brd-108">Local model: runtime comparison (REQ-FN-060, BRD-108)</a></li>
+        <li class="h3"><a href="#local-model-measured-per-platform-req-fn-060-brd-108">Local model: measured per platform (REQ-FN-060, BRD-108)</a></li>
+        <li class="h3"><a href="#local-model-engine-comparison-on-the-windows-laptop-2026-09-24">Local model: engine comparison on the Windows laptop (2026-09-24)</a></li>
         <li class="h3"><a href="#what-the-packages-do-per-platform">What the packages do per platform</a></li>
         <li class="h3"><a href="#the-probe-app-req-fn-056">The probe app (REQ-FN-056)</a></li>
         <li class="h3"><a href="#owner-s-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165">Owner&#x27;s runbook: build, deploy, run and record the probe (REQ-FN-069, BRD-165)</a></li>
@@ -280,7 +282,7 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 </li>
 <li><strong>Steps:</strong> 1) iterate <code>GetLlmProvider()!.ChatStreamEventsAsync(...)</code>, then <code>CompleteAsync&lt;MyDto&gt;(...)</code> 2) send a prompt longer than the context 3) on a device with little free memory, call <code>LoadAsync()</code>
 </li>
-<li><strong>Expected:</strong> 1) text deltas, then one <code>Completed</code> with usage from the model's own tokenizer; the DTO parses; 2) <code>LocalPromptTooLongException</code> naming both lengths, nothing generated; 3) <code>LocalModelMemoryException</code> naming the shortfall, the app keeps running. <strong>Today</strong> the first load throws <code>PlatformNotSupportedException</code> until the owner chooses the runtime per platform (<code>docs/TechieRag-Decision-Request.md</code>); the conformance suite covers these against a scripted runtime.
+<li><strong>Expected:</strong> 1) text deltas, then one <code>Completed</code> with usage from the model's own tokenizer; the DTO parses; 2) <code>LocalPromptTooLongException</code> naming both lengths, nothing generated; 3) <code>LocalModelMemoryException</code> naming the shortfall, the app keeps running. The engine is ONNX Runtime GenAI on every platform (<code>DECISIONS.md</code> 2026-09-25); the conformance suite runs these against the real engine with both models when a model is present, and against a scripted runtime otherwise.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-058, REQ-RAG-059, REQ-RAG-060, REQ-RAG-063, REQ-RAG-065
 </li>
@@ -402,7 +404,8 @@ TechieRagTestPostgres="Host=localhost;Database=techierag;Username=postgres;Passw
 bash .tfcore/utils/tf-build.sh test tests/TechieRag.Agents.Tests/TechieRag.Agents.Tests.csproj
 TechieRagLiveLmStudioModel=qwen3-8b dotnet test tests/TechieRag.Agents.Tests --filter "Category=LiveLmStudio"   # optional TechieRagLiveLmStudioEndpoint
 bash .tfcore/utils/tf-build.sh test tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj
-TechieRagLiveLocalModel=qwen2.5-0.5b-instruct dotnet test tests/TechieRag.Local.Tests --filter LiveLocalLlmTests</code></pre>
+TechieRagLiveLocalModel=qwen2.5-0.5b-instruct dotnet test tests/TechieRag.Local.Tests --filter LiveLocalLlmTests
+TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter LiveHuggingFaceTests   # downloads about 900 MB</code></pre>
 <p><code>TechieRag.Local.Tests</code> runs the runtime-neutral conformance suite (<code>LocalLlmConformanceTests</code>) against a scripted runtime, plus the provider, template, stop-sequence, memory, registration and catalog tests, and the download tests against a loopback HTTP server. Its three live tests (<code>LiveLocalLlmTests</code>, collection <code>LiveLocalLlm</code>, one at a time) skip with a printed reason until the platform has a runtime and the model is downloaded; they never download.
 <code>TechieRag.Agents.Tests</code> (28 methods on 2026-09-24) runs the Agent Framework builder and the four seam adapters against a scripted <code>IChatClient</code> and a real <code>TechieRagClient</code>; its two LM Studio tests skip with a reason unless <code>TechieRagLiveLmStudioModel</code> names a loaded tool-capable model.
 About 634 xUnit test methods across processors, providers, stores, agent loop, orchestration, MCP, connectors, web, persistence, reranking, telemetry and packaging; 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-24 through the build ladder.</p>
@@ -422,9 +425,9 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 </li>
 <li><code>PgVectorStore</code> has never run against a real PostgreSQL (REQ-RAG-044).
 </li>
-<li>Mac Catalyst and iOS heads of the probe have not been built or run yet: they need a Mac (the owner's runbook below). Their native ONNX wiring (<code>TechieRag.Embedded.targets</code>) is unproven until then.
+<li>The probe's Mac Catalyst and iOS heads ran on 2026-09-25 on the owner's Mac (Mac Catalyst and the iPhone 17 Pro simulator); a physical iPhone and an Android phone have not run it yet.
 </li>
-<li>No in-process language model runs yet: <code>TechieRag.Local</code> is built up to its runtime, which waits for the owner's per-platform choice (REQ-RAG-058, <code>docs/TechieRag-Decision-Request.md</code>); until then a load throws <code>PlatformNotSupportedException</code>. Subscription sign-in: REQ-RAG-069 and REQ-RAG-070. Typed streaming (REQ-RAG-067) and the streaming agent loop (REQ-RAG-068) exist since 2026-09-24.
+<li>The in-process language model (<code>TechieRag.Local</code>, ONNX Runtime GenAI) has no default download address for the phone model (Qwen2.5 0.5B) until the owner's mirror is published: set <code>TECHIERAG_MODEL_BASE_URL</code>, or the first load names that variable and downloads nothing. An Intel Mac has no engine (the package ships none) and throws <code>PlatformNotSupportedException</code>. Subscription sign-in: REQ-RAG-069 and REQ-RAG-070. Typed streaming (REQ-RAG-067) and the streaming agent loop (REQ-RAG-068) exist since 2026-09-24.
 </li>
 <li><code>TechieRag.Agents</code>: a session's citation refs live in memory against the <code>AgentSession</code> object, so a serialized and restored session restarts at S1; a traced agent (<code>WithTrace</code>) should run one turn at a time; MAF approval requests (<code>PendingApprovals</code>) are surfaced but TechieRag does not resume them for you.
 </li>
@@ -440,7 +443,7 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 <tr><td><code>TechieRag</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
 <tr><td><code>TechieRag.Embedded</code></td><td>tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24)</td><td>supported</td><td>supported ¹</td><td>supported</td></tr>
 <tr><td><code>TechieRag.Agents</code></td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td><td>not supported ²</td></tr>
-<tr><td><code>TechieRag.Local</code></td><td>not supported ³</td><td>not supported ³</td><td>not supported ³</td><td>not supported ³</td></tr>
+<tr><td><code>TechieRag.Local</code></td><td>supported ³</td><td>tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25)</td><td>supported ³</td><td>supported ³</td></tr>
 </tbody>
 </table>
 <ol>
@@ -448,11 +451,27 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 </li>
 <li>Being built (REQ-RAG-045).
 </li>
-<li>Built up to its inference runtime on 2026-09-24 (REQ-RAG-057 to REQ-RAG-066); every platform stays not supported until the owner chooses the runtime per platform (<code>docs/TechieRag-Decision-Request.md</code>). Shipped by the engines today (nuget.org, 2026-09-24): ONNX Runtime GenAI 0.16.0 for Windows, Android and iOS, not Mac Catalyst; LLamaSharp 0.27.0 for Windows and Android, not iOS or Mac Catalyst. Engine numbers measured on the Windows laptop are under "Local model: runtime comparison" below; the probe's second button (REQ-FN-059) records the per-device numbers.
+<li>Runs on ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> wires the Mac Catalyst library GenAI's own package leaves out (REQ-FN-058). Windows: the engine was measured on the Windows 11 laptop on 2026-09-24, but not yet through <code>TechieRag.Local</code> in the probe. iOS: the probe's second button ran on the iPhone 17 Pro <strong>simulator</strong> (iOS 26.1) on 2026-09-25; a simulator is not a phone, so the cell waits for the owner's iPhone. Android: built, not yet run. Numbers per platform are under "Local model: measured per platform" below.
 </li>
 </ol>
-<h3 id="local-model-runtime-comparison-req-fn-060-brd-108">Local model: runtime comparison (REQ-FN-060, BRD-108)<a class="anchor-link" href="#local-model-runtime-comparison-req-fn-060-brd-108">#</a></h3>
-<p>Measured 2026-09-24 on the Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 4 cores / 8 threads, 16 GB; WSL gets 7.6 GB) with the two candidate engines directly (harness and raw JSON: <code>tests/.artifacts/local-llm-bench/</code>), not yet through <code>TechieRag.Local</code>, which has no engine until the owner decides. Same templated prompt for both engines, greedy, a 128-token answer, three runs per row, each engine in its own process; the host was shared with other builds, so the ranges are wide and the better runs are the fairer ones. Time to first token includes reading the prompt; peak memory is the process peak.</p>
+<h3 id="local-model-measured-per-platform-req-fn-060-brd-108">Local model: measured per platform (REQ-FN-060, BRD-108)<a class="anchor-link" href="#local-model-measured-per-platform-req-fn-060-brd-108">#</a></h3>
+<p>Time to first token, tokens per second and peak memory of the platform's default local model (or both models where both were measured), with the device and the date. Each row is one real measurement; a platform not yet run says so. Change a row only from a recorded run (the runbook's step "Record").</p>
+<table>
+<thead><tr><th>Platform</th><th>Device</th><th>Date</th><th>Model</th><th>How measured</th><th>First token (s)</th><th>Tokens per second</th><th>Peak memory</th></tr></thead>
+<tbody>
+<tr><td>Windows 11</td><td>Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB)</td><td>2026-09-24</td><td>Qwen2.5 0.5B (an earlier third-party ONNX copy, not TechieRag's conversion)</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>0.2–0.4</td><td>45–52</td><td>555 MB</td></tr>
+<tr><td>Windows 11</td><td>Windows 11 laptop (Mi NoteBook Pro, Core i5-11300H, 16 GB)</td><td>2026-09-24</td><td>Phi-3 mini 4k (desktop default)</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>not recorded</td><td>7.5</td><td>3.0–3.3 GB</td></tr>
+<tr><td>macOS</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (TechieRag's conversion)</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>0.03</td><td>329–359</td><td>610 MB</td></tr>
+<tr><td>macOS</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k</td><td>ONNX Runtime GenAI 0.16.0 directly, plain process</td><td>0.12</td><td>61–69</td><td>2.7 GB</td></tr>
+<tr><td>Mac Catalyst</td><td>owner's Mac (Apple M4 Max, 36 GB, macOS 27)</td><td>2026-09-25</td><td>Phi-3 mini 4k (Catalyst default)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code>; two runs</td><td>0.11–0.52</td><td>65–73</td><td>1.96–2.17 GB</td></tr>
+<tr><td>iOS (simulator)</td><td>iPhone 17 Pro simulator, iOS 26.1, on the owner's Mac (a simulator, not a device)</td><td>2026-09-25</td><td>Qwen2.5 0.5B (phone default, TechieRag's conversion)</td><td>probe app, second button, Debug build, through <code>TechieRag.Local</code></td><td>0.10</td><td>301</td><td>460 MB</td></tr>
+<tr><td>Android</td><td>owner's Android phone</td><td>not yet run</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>iOS</td><td>owner's iPhone</td><td>not yet run</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+<p>Peak memory: Windows, the peak working set; macOS plain process, the peak resident set (<code>/usr/bin/time -l</code>); Mac Catalyst and the iOS simulator, the peak physical footprint the probe shows, which matches <code>footprint &lt;pid&gt;</code> and is what the iOS memory limit counts. Time to first token includes reading the prompt; tokens per second counts the tokens after the first. The Catalyst range spans a run just after the download and a fresh launch. Raw lines and screenshots: <code>tests/.artifacts/probe/maccatalyst/generate-phi3-*</code>, <code>tests/.artifacts/probe/ios/generate-qwen*</code>; plain-process JSON: <code>tests/.artifacts/local-llm-bench/</code>.</p>
+<h3 id="local-model-engine-comparison-on-the-windows-laptop-2026-09-24">Local model: engine comparison on the Windows laptop (2026-09-24)<a class="anchor-link" href="#local-model-engine-comparison-on-the-windows-laptop-2026-09-24">#</a></h3>
+<p>Both engines directly on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB), before <code>TechieRag.Local</code> had one; with the M4 Max repeat it is what the owner chose from (<code>DECISIONS.md</code> 2026-09-25). Same prompt, greedy, 128-token answer, three runs per row; a shared host, so the better runs are the fairer ones. Raw JSON: <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <table>
 <thead><tr><th>Platform</th><th>Model</th><th>Engine</th><th>Load (s)</th><th>First token (s)</th><th>Tokens per second</th><th>Peak memory</th></tr></thead>
 <tbody>
@@ -464,13 +483,12 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 <tr><td>WSL2 Ubuntu</td><td>Qwen2.5 0.5B</td><td>LLamaSharp 0.27.0</td><td>0.4–0.6</td><td>0.12–0.23</td><td>58–64 (contended runs 10–34)</td><td>612 MB</td></tr>
 <tr><td>WSL2 Ubuntu</td><td>Phi-3 mini 4k</td><td>ONNX Runtime GenAI 0.16.0</td><td>5.3–6.1</td><td>0.52–1.44</td><td>6.1–8.4</td><td>3.1–3.3 GB</td></tr>
 <tr><td>WSL2 Ubuntu</td><td>Phi-3 mini 4k</td><td>LLamaSharp 0.27.0</td><td>2.2–2.7</td><td>0.67–2.0</td><td>4.6–6.7</td><td>3.7 GB</td></tr>
-<tr><td>Android phone, iPhone, Mac</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>owner's devices, not run</td></tr>
 </tbody>
 </table>
-<p>Token counts of three fixed sentences agree exactly between the two engines for both models (Qwen2.5 10 / 13 / 12, Phi-3 12 / 14 / 13, no beginning-of-text token), so <code>EstimateTokenCount</code> will not change with the engine choice.</p>
+<p>Both engines count three fixed sentences identically (Qwen2.5 10 / 13 / 12, Phi-3 12 / 14 / 13).</p>
 <h3 id="what-the-packages-do-per-platform">What the packages do per platform<a class="anchor-link" href="#what-the-packages-do-per-platform">#</a></h3>
 <ul>
-<li><strong>Model root (REQ-RAG-053).</strong> Every model (embedding model, reranker, later the local model) is downloaded to <code>&lt;LocalApplicationData&gt;/TechieRag/models/&lt;model&gt;</code>: <code>%LOCALAPPDATA%\TechieRag\models</code> on Windows, the app container's application-support folder on Mac Catalyst, the app's private <code>files</code> folder on Android (<code>/data/user/0/&lt;package&gt;/files/TechieRag/models</code>), the app's <code>Library</code> area on iOS. Move it with <code>builder.UseModelRoot(path)</code> (or <code>ModelRoot.Set(path)</code>, or the <code>TECHIERAG_MODEL_ROOT</code> environment variable) before the first model loads. A complete copy an older version left next to the assembly is still used, so upgrading does not download again.
+<li><strong>Model root (REQ-RAG-053).</strong> Every model (embedding model, reranker, later the local model) is downloaded to <code>&lt;LocalApplicationData&gt;/TechieRag/models/&lt;model&gt;</code>: <code>%LOCALAPPDATA%\TechieRag\models</code> on Windows; <code>~/Library/Application Support/TechieRag/models</code> on Mac Catalyst (inside the app's container when it is sandboxed) and plain macOS; the app's private <code>files</code> folder on Android (<code>/data/user/0/&lt;package&gt;/files/TechieRag/models</code>); <code>&lt;app container&gt;/Library/Application Support/TechieRag/models</code> on iOS. On iOS and Mac Catalyst .NET reports <code>Documents</code> as <code>LocalApplicationData</code>, so TechieRag uses <code>&lt;home&gt;/Library/Application Support</code> there instead: model files never land in the user's Documents (proved 2026-09-25 by the probe on Mac Catalyst, macOS 27, and the iOS 26.1 simulator). Move it with <code>builder.UseModelRoot(path)</code> (or <code>ModelRoot.Set(path)</code>, or the <code>TECHIERAG_MODEL_ROOT</code> environment variable) before the first model loads. A complete copy an older version left next to the assembly is still used, so upgrading does not download again.
 </li>
 <li><strong>Phone default (REQ-RAG-054).</strong> <code>UseEmbedded()</code> picks bge-m3 (1024 dimensions, 2.3 GB) on Windows, macOS and Mac Catalyst, and all-MiniLM-L6-v2 (384 dimensions, 91 MB, English) on Android and iOS. <code>UseEmbedded(EmbeddedModel.BgeM3)</code> on a phone throws <code>NotSupportedException</code> naming 2.3 GB. Vectors from the two models are not comparable; a corpus is re-embedded when the model changes (the embedding signature already flags it).
 </li>
@@ -478,7 +496,11 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 </li>
 <li><strong>Local model (REQ-RAG-057 to REQ-RAG-066).</strong> <code>UseLocalLlm()</code> picks Qwen2.5 0.5B Instruct (Apache-2.0) on Android and iOS with a 2,048-token context, and Phi-3 mini 4k Instruct (MIT) elsewhere with 4,096; <code>UseLocalLlm("phi-3-mini-4k-instruct")</code> on a phone throws <code>NotSupportedException</code>. Nothing downloads until the host accepts the model's terms (<code>LocalLlmOptions.TermsAccepted</code> or <code>ConfirmTermsAsync</code>, which receives the licence, its URL and the download size); the files then come once through <code>ModelDownloadService</code> (size first, resumable, <code>TECHIERAG_MODEL_BASE_URL</code> as <code>&lt;mirror&gt;/&lt;model&gt;-&lt;format&gt;/&lt;file&gt;</code>) into <code>&lt;ModelRoot&gt;/&lt;model&gt;-&lt;format&gt;</code>, each checked against its SHA-256; after that the model works offline. Before loading, free memory (<code>MemAvailable</code> on Android, <code>os_proc_available_memory</code> on iOS, <code>GlobalMemoryStatusEx</code> on Windows, the runtime's estimate on Mac Catalyst) is compared with weights + context + 256 MB, and a shortfall throws <code>LocalModelMemoryException</code> instead of letting the system end the app.
 </li>
+<li><strong>Any Hugging Face model (REQ-RAG-108).</strong> <code>UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))</code> runs any public ONNX Runtime GenAI model by name (optional <code>folder</code> and <code>version</code>). The model card's licence, terms URL and size reach <code>ConfirmTermsAsync</code> (or <code>GetTermsAsync()</code>) before any file; only the engine's files download, each checked against Hugging Face's fingerprint (SHA-256, or the git SHA-1 of a small file). An unpinned name is pinned to one commit once, so later starts are offline. Gated or private models are refused (no token); <code>TECHIERAG_MODEL_BASE_URL</code> does not apply. The model's own chat template and <code>genai_config.json</code> limits are used.
+</li>
 <li><strong>Native ONNX Runtime (REQ-FN-055).</strong> <code>TechieRag.Embedded</code> ships <code>buildTransitive/TechieRag.Embedded.targets</code>: on Mac Catalyst it links ONNX Runtime's static xcframework (ONNX Runtime's own package links nothing there); on iOS and Mac Catalyst Debug builds it compiles a <code>RegisterCustomOps</code> stub; on Android it checks ONNX Runtime's <code>.aar</code> (arm64-v8a, x86_64) arrived. A consuming app writes no native wiring. Properties: <code>TechieRagOnnxRuntimeVersion</code> (when the app pins another ONNX Runtime), <code>TechieRagDisableOnnxNativeWiring</code>, <code>TechieRagDisableOnnxCustomOpsStub</code>.
+</li>
+<li><strong>Native ONNX Runtime GenAI (REQ-FN-058).</strong> <code>TechieRag.Local</code> ships <code>buildTransitive/TechieRag.Local.targets</code>: on Mac Catalyst it links the <code>ios-arm64_x86_64-maccatalyst</code> slice of GenAI's xcframework (GenAI's own package links nothing there); on Android it checks GenAI's <code>.aar</code> (arm64-v8a, x86_64) arrived. iOS gets GenAI's xcframework from GenAI's own package, and Windows, macOS and Linux get its native library as a NuGet runtime asset. A consuming app writes no native wiring. Properties: <code>TechieRagOnnxRuntimeGenAIVersion</code> (when the app pins another GenAI), <code>TechieRagDisableLocalNativeWiring</code>.
 </li>
 <li><strong>SQLite search (REQ-RAG-056).</strong> <code>SqliteVecStore</code> search is an exact cosine scan in managed code on every platform, and it is the supported path: it reads only the vector column, scores each stored vector in place with SIMD, keeps the best top-K in a bounded heap, then fetches the winners' rows. sqlite-vec is not used (the dead loading code is removed): it is a native extension phones and the Catalyst sandbox do not load. Measured 2026-09-24 with <code>SqliteSearchBenchmarkTests</code> (<code>TechieRagSearchBenchmark=1</code>), WSL Ubuntu 24.04 on the Windows 11 laptop above, 8 logical CPUs, .NET 10.0.10, top-10, median of 5 after a warm-up; the old path is the pre-2026-09-24 implementation, kept in the tests as the reference:
 </li>
@@ -496,7 +518,7 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 </table>
 <p>Raw output: <code>tests/.artifacts/benchmarks/sqlite-search.md</code> and <code>.json</code>. Re-run: <code>TechieRagSearchBenchmark=1 dotnet test tests/TechieRag.Tests --filter SqliteSearchBenchmarkTests</code>.</p>
 <h3 id="the-probe-app-req-fn-056">The probe app (REQ-FN-056)<a class="anchor-link" href="#the-probe-app-req-fn-056">#</a></h3>
-<p><code>samples/TechieRag.Probe</code> is a .NET MAUI app with Windows, Mac Catalyst, Android and iOS heads. Its one screen shows the platform, the model <code>UseEmbedded()</code> picks there and the model root; the button <strong>Embed, store, search</strong> (AutomationId <code>RunEmbedButton</code>) embeds three sentences, stores them in SQLite, searches "What is the capital of France?" and shows the top result (<code>TopResultLabel</code>), the load, embed, store and search timings (<code>TimingsLabel</code>) and one result line (<code>ResultLineLabel</code>, also written to the console with the prefix <code>TECHIERAG_PROBE_RESULT:</code> and to <code>probe-result.txt</code> in the app data folder). A pass is <code>Done</code> with the top result "Paris is the capital city of France." The first press includes the model download (2.3 GB on desktops, 91 MB on phones); press it a second time for warm timings. The second button, <strong>Generate one sentence</strong> (AutomationId <code>RunGenerateButton</code>, REQ-FN-059), loads the platform's default local model through <code>TechieRag.Local</code> (a terms dialog before the one-time download), asks for one sentence about the sea and shows it (<code>GeneratedSentenceLabel</code>), the load time, time to first token, tokens per second and peak memory (<code>GenerationTimingsLabel</code>) and its own status (<code>GenerateStatusLabel</code>); the result line gets the prefix <code>OK generate</code>. Until the owner chooses the engine it shows the "no local inference runtime" message (Windows, 2026-09-24: <code>tests/.artifacts/probe/windows-generate.txt</code>). The Windows script presses it with <code>-ButtonId RunGenerateButton -StatusId GenerateStatusLabel -ResultName windows-generate -ShotName windows-generate</code>.</p>
+<p><code>samples/TechieRag.Probe</code> is a .NET MAUI app with Windows, Mac Catalyst, Android and iOS heads. Its one screen shows the platform, the model <code>UseEmbedded()</code> picks there and the model root; the button <strong>Embed, store, search</strong> (AutomationId <code>RunEmbedButton</code>) embeds three sentences, stores them in SQLite, searches "What is the capital of France?" and shows the top result (<code>TopResultLabel</code>), the load, embed, store and search timings (<code>TimingsLabel</code>) and one result line (<code>ResultLineLabel</code>, also written to the console with the prefix <code>TECHIERAG_PROBE_RESULT:</code> and to <code>probe-result.txt</code> in the app data folder). A pass is <code>Done</code> with the top result "Paris is the capital city of France." The first press includes the model download (2.3 GB on desktops, 91 MB on phones); press it a second time for warm timings. The second button, <strong>Generate one sentence</strong> (AutomationId <code>RunGenerateButton</code>, REQ-FN-059), loads the platform's default local model through <code>TechieRag.Local</code> (a terms dialog before the one-time download), asks for one sentence about the sea and shows it (<code>GeneratedSentenceLabel</code>), the load time, time to first token, tokens per second and peak memory (<code>GenerationTimingsLabel</code>) and its own status (<code>GenerateStatusLabel</code>); the result line gets the prefix <code>OK generate</code>. Peak memory is the peak physical footprint on iOS and Mac Catalyst and the peak working set elsewhere. Unattended: <code>TECHIERAG_PROBE_AUTORUN=local</code> (Android: the intent extra <code>--ez autorunlocal true</code>) presses it once the page appears; a first run still waits on the terms dialog's <strong>Accept</strong>, which an unattended run presses through the app's own automation (AutomationId / accessibility label), never by skipping it. Ran 2026-09-25 on Mac Catalyst (Phi-3 mini) and the iOS 26.1 simulator (Qwen2.5 0.5B, from a local mirror through <code>TECHIERAG_MODEL_BASE_URL</code>): numbers under "Local model: measured per platform". On Windows on 2026-09-24, before the engine was chosen, it showed the "no local inference runtime" message (<code>tests/.artifacts/probe/windows-generate.txt</code>). The Windows script presses it with <code>-ButtonId RunGenerateButton -StatusId GenerateStatusLabel -ResultName windows-generate -ShotName windows-generate</code>.</p>
 <p>Recorded runs:</p>
 <table>
 <thead><tr><th>Head</th><th>Device</th><th>Date</th><th>Model</th><th>Top result</th><th>Load / embed / store / search (ms)</th><th>Evidence</th></tr></thead>
@@ -565,7 +587,7 @@ About 634 xUnit test methods across processors, providers, stores, agent loop, o
 </li>
 <li>When the status is <code>Done</code> and the top result is the Paris sentence, change that platform's <code>TechieRag</code> and <code>TechieRag.Embedded</code> cells in the matrix above and in the phase-1 BRD §9 to <code>tested (&lt;device&gt;, &lt;date&gt;)</code>. If it failed, leave <code>supported</code> and write the error in the Remarks of REQ-FN-056.
 </li>
-<li>Press <strong>Generate one sentence</strong> (AutomationId <code>RunGenerateButton</code>, REQ-FN-059) the same way, accept the model's terms in the dialog, and record the time to first token, tokens per second and peak memory from <code>GenerationTimingsLabel</code> as a row of "Local model: runtime comparison" above and in the <code>TechieRag.Local</code> cell. Until the owner has chosen the engine it answers with the "no local inference runtime" message.
+<li>Press <strong>Generate one sentence</strong> (AutomationId <code>RunGenerateButton</code>, REQ-FN-059) the same way, accept the model's terms in the dialog, and record the time to first token, tokens per second and peak memory from <code>GenerationTimingsLabel</code> in that platform's row of "Local model: measured per platform" above (device, date, model), and set the <code>TechieRag.Local</code> cell to <code>tested (&lt;device&gt;, &lt;date&gt;)</code>. Phones and the iPhone download Qwen2.5 0.5B, whose files have no default address yet: until the owner's mirror is published, serve <code>tests/.artifacts/model-mirror/</code> over HTTP on the Mac and start the app with <code>TECHIERAG_MODEL_BASE_URL</code> pointing at it.
 </li>
 <li>Or paste the result lines to an agent with "record this probe run"; it makes the same edits.
 </li>

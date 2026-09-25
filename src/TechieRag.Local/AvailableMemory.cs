@@ -11,7 +11,8 @@ namespace TechieRag.Local;
 /// <item><description><b>Linux and Android:</b> <c>MemAvailable</c> from <c>/proc/meminfo</c>.</description></item>
 /// <item><description><b>Windows:</b> <c>GlobalMemoryStatusEx</c> available physical memory.</description></item>
 /// <item><description><b>iOS:</b> <c>os_proc_available_memory()</c>, the amount the app can allocate
-/// before the system ends it — the number that matters on a phone.</description></item>
+/// before the system ends it — the number that matters on a phone. It reports 0 when the process has no
+/// limit (the simulator); the runtime's estimate below is used then.</description></item>
 /// <item><description><b>Mac Catalyst, macOS and anything else:</b> the memory the .NET runtime reports as available
 /// to the process minus what the process already uses; an estimate.</description></item>
 /// </list>
@@ -37,16 +38,32 @@ internal static class AvailableMemory
 
             if (OperatingSystem.IsIOS() && !OperatingSystem.IsMacCatalyst())
             {
-                return (long)OsProcAvailableMemory();
+                return FromIosLimit((ulong)OsProcAvailableMemory(), ReadRuntimeEstimate);
             }
 
-            var info = GC.GetGCMemoryInfo();
-            return Math.Max(0, info.TotalAvailableMemoryBytes - Environment.WorkingSet);
+            return ReadRuntimeEstimate();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DllNotFoundException or EntryPointNotFoundException)
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Interprets <c>os_proc_available_memory()</c>: it returns 0 when the process has no memory limit
+    /// (the iOS simulator, seen 2026-09-25 on iOS 26.1), which means "not reported", not "nothing free";
+    /// the runtime's estimate is used then.
+    /// </summary>
+    /// <param name="reported">What <c>os_proc_available_memory()</c> returned.</param>
+    /// <param name="fallback">The estimate used when nothing was reported.</param>
+    /// <returns>Bytes, or what the fallback returns.</returns>
+    internal static long? FromIosLimit(ulong reported, Func<long?> fallback) =>
+        reported == 0 ? fallback() : (long)reported;
+
+    private static long? ReadRuntimeEstimate()
+    {
+        var info = GC.GetGCMemoryInfo();
+        return Math.Max(0, info.TotalAvailableMemoryBytes - Environment.WorkingSet);
     }
 
     /// <summary>Parses the <c>MemAvailable</c> line of <c>/proc/meminfo</c>.</summary>

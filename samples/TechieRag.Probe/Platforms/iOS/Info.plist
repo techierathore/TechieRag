@@ -26,5 +26,27 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Without a launch screen iOS runs the app letterboxed in a legacy screen size. -->
+	<key>UILaunchScreen</key>
+	<dict/>
+	<!-- UIKit scene lifecycle: macOS 27 / iOS 27 UIKit traps (EXC_BREAKPOINT in
+	     _UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption) in an app without it. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>__MAUI_DEFAULT_SCENE_CONFIGURATION__</string>
+					<key>UISceneDelegateClassName</key>
+					<string>SceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
 </dict>
 </plist>

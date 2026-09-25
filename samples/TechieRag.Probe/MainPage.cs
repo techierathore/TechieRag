@@ -63,16 +63,18 @@ public sealed class MainPage : ContentPage
                     new Label { Text = "TechieRag Probe", FontSize = 24, FontAttributes = FontAttributes.Bold, AutomationId = "TitleLabel" },
                     new Label { Text = $"Platform: {DeviceInfo.Current.Platform} {DeviceInfo.Current.VersionString}", AutomationId = "PlatformLabel" },
                     new Label { Text = $"Model: {model}", AutomationId = "ModelLabel" },
-                    new Label { Text = $"Model root: {ModelRoot.Current}", AutomationId = "ModelRootLabel", FontSize = 11 },
                     actions,
                     statusLabel,
-                    downloadLabel,
                     topResultLabel,
                     timingsLabel,
-                    resultLineLabel,
+                    downloadLabel,
                     generateStatusLabel,
                     generatedSentenceLabel,
-                    generationTimingsLabel
+                    generationTimingsLabel,
+
+                    // The long paths last, so the result and timings stay on a phone's first screen.
+                    new Label { Text = $"Model root: {ModelRoot.Current}", AutomationId = "ModelRootLabel", FontSize = 11 },
+                    resultLineLabel
                 }
             }
         };
@@ -94,10 +96,20 @@ public sealed class MainPage : ContentPage
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-        if (ProbeLaunch.AutoRun && !autoRunDone)
+        if (autoRunDone)
         {
-            autoRunDone = true;
+            return;
+        }
+
+        autoRunDone = true;
+        if (ProbeLaunch.AutoRun)
+        {
             await RunAsync();
+        }
+
+        if (ProbeLaunch.AutoRunLocal)
+        {
+            await GenerateAsync();
         }
     }
 
@@ -120,6 +132,9 @@ public sealed class MainPage : ContentPage
             statusLabel.Text = "Error: " + exception.Message;
             resultLineLabel.Text = "FAIL " + exception.GetType().Name + ": " + exception.Message;
             Report(resultLineLabel.Text);
+
+            // The full stack goes to the console (logcat, the simulator log) for whoever reads the run.
+            Console.WriteLine(exception.ToString());
         }
         finally
         {
@@ -136,7 +151,7 @@ public sealed class MainPage : ContentPage
             var result = await Task.Run(() => localRunner.RunAsync());
             generatedSentenceLabel.Text = "Sentence: " + result.Sentence;
             generationTimingsLabel.Text = "Generation: " + result.Timings;
-            generateStatusLabel.Text = "Done";
+            generateStatusLabel.Text = "Done: " + result.ModelName;
             resultLineLabel.Text = result.ToLine();
             Report(result.ToLine());
         }
@@ -145,6 +160,7 @@ public sealed class MainPage : ContentPage
             generateStatusLabel.Text = "Error: " + exception.Message;
             resultLineLabel.Text = "FAIL generate " + exception.GetType().Name + ": " + exception.Message;
             Report(resultLineLabel.Text);
+            Console.WriteLine(exception.ToString());
         }
         finally
         {

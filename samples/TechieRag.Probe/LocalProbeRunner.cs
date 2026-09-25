@@ -64,7 +64,6 @@ public sealed class LocalProbeRunner
         var outputTokens = usage?.OutputTokens ?? 0;
         var ttft = firstTokenMs ?? totalMs;
         var tokensPerSecond = outputTokens > 1 && totalMs > ttft ? (outputTokens - 1) / ((totalMs - ttft) / 1000d) : 0;
-        using var process = Process.GetCurrentProcess();
-        return new GenerationResult(provider.ModelName, text.ToString().Trim(), loadMs, ttft, tokensPerSecond, outputTokens, process.PeakWorkingSet64);
+        return new GenerationResult(provider.ModelName, text.ToString().Trim(), loadMs, ttft, tokensPerSecond, outputTokens, PeakMemory.ReadBytes());
     }
 }

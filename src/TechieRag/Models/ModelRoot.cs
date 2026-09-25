@@ -34,17 +34,25 @@ public static class ModelRoot
     private static string? hostOverride;
 
     /// <summary>
-    /// Gets the default root: <c>&lt;LocalApplicationData&gt;/TechieRag/models</c>.
+    /// Gets the default root: <c>&lt;LocalApplicationData&gt;/TechieRag/models</c>, and on iOS and
+    /// Mac Catalyst <c>&lt;home&gt;/Library/Application Support/TechieRag/models</c>.
     /// </summary>
     /// <remarks>
-    /// On a host where the application data folder is not defined (a Linux service account with no
-    /// home), the user profile and then the temporary folder are used instead, so the path is never
-    /// empty and never the read-only assembly folder.
+    /// <para>On iOS and Mac Catalyst .NET reports the <c>Documents</c> folder as
+    /// <see cref="Environment.SpecialFolder.LocalApplicationData"/> (seen 2026-09-25 on macOS 27: the
+    /// probe's bge-m3 landed in <c>~/Documents/TechieRag/models</c>). <c>Documents</c> is the user's
+    /// own files, shown in Finder and the Files app; Apple's per-user application data folder is
+    /// <c>Library/Application Support</c> under the app's home, which is also where plain .NET on
+    /// macOS puts <see cref="Environment.SpecialFolder.LocalApplicationData"/>.</para>
+    /// <para>On a host where the application data folder is not defined (a Linux service account with
+    /// no home), the user profile and then the temporary folder are used instead, so the path is
+    /// never empty and never the read-only assembly folder.</para>
     /// </remarks>
     public static string DefaultPath => ComputeDefault(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.DoNotVerify),
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile, Environment.SpecialFolderOption.DoNotVerify),
-        System.IO.Path.GetTempPath());
+        System.IO.Path.GetTempPath(),
+        OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst());
 
     /// <summary>
     /// Gets the root in effect: the host override, else <see cref="EnvironmentVariable"/>, else
@@ -116,10 +124,14 @@ public static class ModelRoot
     /// <param name="localApplicationData">The per-user application data folder, possibly empty.</param>
     /// <param name="userProfile">The user profile folder, possibly empty.</param>
     /// <param name="tempPath">The temporary folder.</param>
+    /// <param name="isAppleUiKit">Whether this is iOS or Mac Catalyst, where the application data
+    /// folder is <c>&lt;home&gt;/Library/Application Support</c> rather than what .NET reports.</param>
     /// <returns><c>&lt;first non-empty&gt;/TechieRag/models</c>.</returns>
-    internal static string ComputeDefault(string? localApplicationData, string? userProfile, string tempPath)
+    internal static string ComputeDefault(string? localApplicationData, string? userProfile, string tempPath, bool isAppleUiKit = false)
     {
-        var baseFolder = !string.IsNullOrWhiteSpace(localApplicationData)
+        var baseFolder = isAppleUiKit && !string.IsNullOrWhiteSpace(userProfile)
+            ? System.IO.Path.Combine(userProfile, "Library", "Application Support")
+            : !string.IsNullOrWhiteSpace(localApplicationData)
             ? localApplicationData
             : !string.IsNullOrWhiteSpace(userProfile)
                 ? System.IO.Path.Combine(userProfile, ".local", "share")

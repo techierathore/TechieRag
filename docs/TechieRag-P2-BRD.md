@@ -140,6 +140,9 @@ Runs a language model inside the app process, no server, no network after one do
 - **BRD-109** — The UsageGuide shall gain a `TechieRag.Local` section, the platform matrix is updated, and every "offline" or "air-gapped" claim across the docs is corrected to "downloads once, then works offline" *(F-LOCAL-LLM)* *Screen:* Local model
   - *Acceptance:* When a reader opens the UsageGuide, then a `TechieRag.Local` section exists and no page claims offline without saying downloads once first.
 
+- **BRD-166** — A developer can run any ONNX Runtime GenAI model published on Hugging Face by naming it: `LocalModel.FromHuggingFace(repository, folder inside it, exact version)` lists the files through Hugging Face's public API, shows the model card's licence for acceptance before any download (BRD-101), downloads to the model root (BRD-89) through `ModelDownloadService`, and checks every file against the fingerprint Hugging Face publishes (SHA-256 for large files, the git checksum for small ones); an unpinned name is resolved to its current version once and recorded, so later changes on the page never reach an installed app. The built-in phone default stays the library's own Qwen2.5 0.5B conversion, published on the owner's Hugging Face account *(added 2026-09-25, owner decisions 1 and 2)* *Screen:* Local model
+  - *Acceptance:* When a developer calls `UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))` and the host accepts the shown licence, then the files download, every fingerprint is checked, and the provider answers a prompt.
+
 ### Typed streaming
 
 Streams a reply as typed events so a tool-using turn can stream.
@@ -291,7 +294,7 @@ Only what this phase adds. The ones that apply to the whole library are in the p
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-09-24.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
+**Snapshot as of 2026-09-25.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -300,8 +303,8 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: Repository separation | 1 | 1 | 0 | Done |
 | Surface: Flow orchestration | 6 | 6 | 0 | Done |
 | Surface: Provider breadth | 10 | 10 | 0 | Done |
-| Surface: Platform groundwork | 9 | 5 | 4 | Partial |
-| Surface: Local model | 14 | 7 | 7 | Partial |
+| Surface: Platform groundwork | 9 | 8 | 1 | Partial |
+| Surface: Local model | 15 | 12 | 3 | Partial |
 | Surface: Typed streaming | 2 | 2 | 0 | Done |
 | Surface: Subscription sign-in | 3 | 3 | 0 | Done |
 | Surface: Ingestion breadth | 7 | 7 | 0 | Done |

@@ -1,3 +1,4 @@
+using TechieRag.Local.HuggingFace;
 using TechieRag.Local.Runtime;
 using TechieRag.Models;
 
@@ -8,16 +9,19 @@ namespace TechieRag.Local;
 /// template, context length and memory needs (REQ-RAG-057 / BRD-96).
 /// </summary>
 /// <remarks>
-/// <para><b>Two models ship.</b> <see cref="Qwen25Instruct05B"/> (0.5 billion parameters, about 0.5 to
-/// 0.9 GB) is the default on Android and iOS. <see cref="Phi3Mini4kInstruct"/> (3.8 billion
-/// parameters, about 2.4 to 2.7 GB) is the default on desktops. <see cref="PlatformDefault"/> picks
+/// <para><b>Two models ship.</b> <see cref="Qwen25Instruct05B"/> (0.5 billion parameters, about 0.3
+/// GB) is the default on Android and iOS. <see cref="Phi3Mini4kInstruct"/> (3.8 billion parameters,
+/// about 2.7 GB) is the default on desktops. <see cref="PlatformDefault"/> picks
 /// between them.</para>
-/// <para><b>One model, a file set per runtime.</b> Each model is published in the format of every
-/// runtime the package can use; the provider fetches the one its platform's runtime loads, so the app
-/// names a model and never a runtime (REQ-RAG-058). Every file is pinned to a repository commit and
-/// carries its SHA-256 (REQ-RAG-061).</para>
+/// <para><b>One model, one format.</b> ONNX Runtime GenAI runs every model on every platform
+/// (DECISIONS.md 2026-09-25), so each model has exactly one file set, in that engine's format; the app
+/// names a model and never a runtime (REQ-RAG-058). Every file carries its size and SHA-256, and its
+/// source is pinned to a repository commit or served from the owner's mirror (REQ-RAG-061).</para>
 /// <para><b>Terms.</b> Each model has a licence (<see cref="LicenceName"/>, <see cref="TermsUrl"/>);
 /// nothing downloads until the host signals the user accepted it (REQ-RAG-062 / BRD-101).</para>
+/// <para><b>Any model on Hugging Face.</b> <see cref="FromHuggingFace(string, string?, string?)"/> names any other ONNX Runtime
+/// GenAI model by its repository; its licence, files and fingerprints come from Hugging Face's public
+/// API (REQ-RAG-108 / BRD-166).</para>
 /// </remarks>
 public sealed class LocalModel
 {
@@ -25,6 +29,11 @@ public sealed class LocalModel
     internal const long RuntimeOverheadBytes = 256L * 1024 * 1024;
 
     private readonly IReadOnlyList<LocalModelVariant> variants;
+    private readonly string licenceName;
+    private readonly Uri? termsUrl;
+    private int contextLength;
+    private long kvBytesPerToken;
+    private HuggingFaceResolution? huggingFaceResolution;
 
     /// <summary>Creates a model description.</summary>
     /// <param name="id">The id apps and <c>local/&lt;id&gt;</c> routes use.</param>
@@ -35,8 +44,9 @@ public sealed class LocalModel
     /// <param name="contextLength">The longest context the model supports, in tokens.</param>
     /// <param name="kvBytesPerToken">Memory the context cache takes per token, in bytes.</param>
     /// <param name="runsOnPhones">Whether it is allowed on Android and iOS.</param>
-    /// <param name="variants">The file set per runtime format.</param>
+    /// <param name="variants">The file set, one per format (one format today).</param>
     /// <param name="folder">For a model loaded from a folder, that folder; null for a downloadable one.</param>
+    /// <param name="huggingFace">For a model named on Hugging Face, its name; null otherwise.</param>
     internal LocalModel(
         string id,
         string displayName,
@@ -47,24 +57,36 @@ public sealed class LocalModel
         long kvBytesPerToken,
         bool runsOnPhones,
         IReadOnlyList<LocalModelVariant> variants,
-        string? folder = null)
+        string? folder = null,
+        HuggingFaceModelSource? huggingFace = null)
     {
         Id = id;
         DisplayName = displayName;
-        LicenceName = licenceName;
-        TermsUrl = termsUrl;
+        this.licenceName = licenceName;
+        this.termsUrl = termsUrl;
         ChatTemplate = chatTemplate;
-        ContextLength = contextLength;
-        KvBytesPerToken = kvBytesPerToken;
+        this.contextLength = contextLength;
+        this.kvBytesPerToken = kvBytesPerToken;
         RunsOnPhones = runsOnPhones;
         this.variants = variants;
         Folder = folder;
+        HuggingFace = huggingFace;
     }
 
     /// <summary>
     /// Qwen2.5-0.5B-Instruct (Apache-2.0): 0.5 billion parameters, 32,768-token context, ChatML.
     /// The default on Android and iOS.
     /// </summary>
+    /// <remarks>
+    /// The ONNX files are TechieRag's own conversion (DECISIONS.md 2026-09-25 decision 3): Qwen's
+    /// official release <c>Qwen/Qwen2.5-0.5B-Instruct</c> at commit
+    /// <c>7ae557604adf67be50417f59c2c2f167def9a775</c>, converted with ONNX Runtime GenAI 0.16.0's model
+    /// builder, <c>python -m onnxruntime_genai.models.builder -p int4 -e cpu --extra_options
+    /// int4_block_size=32</c> (about 322 MB). They are served from the owner's mirror, whose address is
+    /// not recorded yet: until it is, the download needs <c>TECHIERAG_MODEL_BASE_URL</c> pointing at a
+    /// mirror laid out as <c>&lt;mirror&gt;/qwen2.5-0.5b-instruct-onnx/&lt;file&gt;</c>, and fails before
+    /// any request without it.
+    /// </remarks>
     public static LocalModel Qwen25Instruct05B { get; } = new(
         "qwen2.5-0.5b-instruct",
         "Qwen2.5 0.5B Instruct",
@@ -77,32 +99,23 @@ public sealed class LocalModel
         variants:
         [
             new LocalModelVariant(
-                LocalModelFormat.Gguf,
-                "qwen2.5-0.5b-instruct-gguf",
-                "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67",
-                [
-                    new("qwen2.5-0.5b-instruct-q4_k_m.gguf", "qwen2.5-0.5b-instruct-q4_k_m.gguf", 491_400_032, "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db")
-                ]),
-            new LocalModelVariant(
                 LocalModelFormat.OnnxGenAi,
                 "qwen2.5-0.5b-instruct-onnx",
-                "https://huggingface.co/xiaoyao9184/Qwen2.5-0.5B-Instruct-onnx-genai/resolve/455ccdae478e4149475923256cc27bfa6f775b02/cpu_and_mobile/cpu-int4-rtn-block-32",
+                DefaultBaseUrl: null,
                 [
-                    new("added_tokens.json", "added_tokens.json", 605, "58b54bbe36fc752f79a24a271ef66a0a0830054b4dfad94bde757d851968060b"),
-                    new("genai_config.json", "genai_config.json", 1_516, "91451609de365f1b383aae19c6bd935e7b0778c610c83e9bfadcd647f3c3e573"),
-                    new("merges.txt", "merges.txt", 1_671_853, "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"),
-                    new("model.onnx", "model.onnx", 169_847, "ce313fa11d3d5b12a752f27531d745514fab253f5ff8690889717d73d9599382"),
-                    new("model.onnx.data", "model.onnx.data", 861_939_200, "19a2860d7b120cf2d5c5d91c516ecbbbb9d2f7ce2ddbee75bf4c4c6d1ad26e02"),
-                    new("special_tokens_map.json", "special_tokens_map.json", 613, "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"),
-                    new("tokenizer.json", "tokenizer.json", 11_421_896, "9c5ae00e602b8860cbd784ba82a8aa14e8feecec692e7076590d014d7b7fdafa"),
-                    new("tokenizer_config.json", "tokenizer_config.json", 4_686, "0a04a9d7d4a62b28482bdfe726c122756de85714fb64166ace92ae75b8f57614"),
-                    new("vocab.json", "vocab.json", 2_776_833, "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910")
+                    new("chat_template.jinja", "chat_template.jinja", 2_507, "cd8e9439f0570856fd70470bf8889ebd8b5d1107207f67a5efb46e342330527f"),
+                    new("genai_config.json", "genai_config.json", 1_581, "a023918fb6dfdf680b0267bdb4ead00083a954194d8178d8fb1af7a0d9adbe63"),
+                    new("model.onnx", "model.onnx", 191_725, "4bab94c84fbdd6f3ef6351505aa3cad6d8011e99c5886b2e3def4ddd99f74cd3"),
+                    new("model.onnx.data", "model.onnx.data", 320_970_752, "049349730cf56adaf79e2444c11eddc76ac4b114b2953c3959274952a17d5b6c"),
+                    new("tokenizer.json", "tokenizer.json", 11_421_892, "3fd169731d2cbde95e10bf356d66d5997fd885dd8dbb6fb4684da3f23b2585d8"),
+                    new("tokenizer_config.json", "tokenizer_config.json", 691, "bd9df05957db8b747d5b6fae78d8a00cc1f1bebe46f7bf3d159c17e0aaf9a5b2")
                 ])
         ]);
 
     /// <summary>
     /// Phi-3-mini-4k-instruct (MIT): 3.8 billion parameters, 4,096-token context. The desktop default.
     /// </summary>
+    /// <remarks>Microsoft's own ONNX Runtime GenAI build (<c>cpu-int4-rtn-block-32-acc-level-4</c>), pinned to a commit.</remarks>
     public static LocalModel Phi3Mini4kInstruct { get; } = new(
         "phi-3-mini-4k-instruct",
         "Phi-3 mini 4k Instruct",
@@ -114,13 +127,6 @@ public sealed class LocalModel
         runsOnPhones: false,
         variants:
         [
-            new LocalModelVariant(
-                LocalModelFormat.Gguf,
-                "phi-3-mini-4k-instruct-gguf",
-                "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/a64113399c2f6b8ad3e11c394733a2ddadaa7f33",
-                [
-                    new("Phi-3-mini-4k-instruct-q4.gguf", "Phi-3-mini-4k-instruct-q4.gguf", 2_393_231_072, "8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef")
-                ]),
             new LocalModelVariant(
                 LocalModelFormat.OnnxGenAi,
                 "phi-3-mini-4k-instruct-onnx",
@@ -157,17 +163,27 @@ public sealed class LocalModel
     /// <summary>Gets the name shown to a user.</summary>
     public string DisplayName { get; }
 
-    /// <summary>Gets the licence the weights are published under, for example <c>Apache-2.0</c>.</summary>
-    public string LicenceName { get; }
+    /// <summary>
+    /// Gets the licence the weights are published under, for example <c>Apache-2.0</c>; for a Hugging Face
+    /// model, the model card's licence once it has been read (<see cref="GetTermsAsync"/>).
+    /// </summary>
+    public string LicenceName => Resolution?.Snapshot.LicenceName ?? licenceName;
 
-    /// <summary>Gets where the licence text is; null for a model loaded from a folder the host supplied.</summary>
-    public Uri? TermsUrl { get; }
+    /// <summary>
+    /// Gets where the licence text is; null for a model loaded from a folder the host supplied. For a
+    /// Hugging Face model: the repository's LICENSE file at the pinned commit, else the card's licence
+    /// link, else the model's page at that commit; the model's page until it has been read.
+    /// </summary>
+    public Uri? TermsUrl => Resolution?.Snapshot.TermsUrl ?? termsUrl;
 
     /// <summary>Gets the chat format the provider applies.</summary>
     public LocalChatTemplate ChatTemplate { get; }
 
-    /// <summary>Gets the longest context the model supports, in tokens.</summary>
-    public int ContextLength { get; }
+    /// <summary>
+    /// Gets the longest context the model supports, in tokens; for a Hugging Face model, 0 until its
+    /// <c>genai_config.json</c> is on disk.
+    /// </summary>
+    public int ContextLength => Volatile.Read(ref contextLength);
 
     /// <summary>Gets whether the model is allowed on Android and iOS.</summary>
     public bool RunsOnPhones { get; }
@@ -176,10 +192,17 @@ public sealed class LocalModel
     public string? Folder { get; }
 
     /// <summary>Gets the memory the context cache takes per token, in bytes.</summary>
-    internal long KvBytesPerToken { get; }
+    internal long KvBytesPerToken => Volatile.Read(ref kvBytesPerToken);
 
-    /// <summary>Gets the file sets, one per runtime format.</summary>
-    internal IReadOnlyList<LocalModelVariant> Variants => variants;
+    /// <summary>Gets the file sets, one per format (one format today); for a Hugging Face model, the resolved one.</summary>
+    internal IReadOnlyList<LocalModelVariant> Variants =>
+        Resolution is { } resolution ? [resolution.Variant] : variants;
+
+    /// <summary>Gets the Hugging Face name this model was created from, or null.</summary>
+    internal HuggingFaceModelSource? HuggingFace { get; }
+
+    /// <summary>Gets the pinned commit, files and folder of a Hugging Face model, once known.</summary>
+    internal HuggingFaceResolution? Resolution => Volatile.Read(ref huggingFaceResolution);
 
     /// <summary>
     /// Finds a model by its <see cref="Id"/>, ignoring case.
@@ -192,7 +215,10 @@ public sealed class LocalModel
     /// <summary>
     /// Describes a model the host has already placed in a folder; nothing is downloaded.
     /// </summary>
-    /// <param name="folder">The folder: a GGUF file, or an ONNX Runtime GenAI model with <c>genai_config.json</c>.</param>
+    /// <param name="folder">
+    /// The folder of an ONNX Runtime GenAI model: <c>genai_config.json</c>, the <c>.onnx</c> file(s) it
+    /// names and the tokenizer files, as <c>onnxruntime_genai.models.builder</c> writes them.
+    /// </param>
     /// <param name="chatTemplate">The chat format the model was trained on.</param>
     /// <param name="contextLength">The longest context the model supports, in tokens.</param>
     /// <param name="kvBytesPerToken">Memory the context cache takes per token; the default suits a 1 to 4 billion parameter model.</param>
@@ -214,10 +240,84 @@ public sealed class LocalModel
     }
 
     /// <summary>
+    /// Names any ONNX Runtime GenAI model published on Hugging Face (REQ-RAG-108 / BRD-166). Nothing is
+    /// requested until the model is first used or <see cref="GetTermsAsync"/> is called.
+    /// </summary>
+    /// <param name="repository">The repository id, <c>owner/name</c>, for example <c>Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8</c>.</param>
+    /// <param name="folder">The folder inside the repository that holds <c>genai_config.json</c>; null for its root.</param>
+    /// <param name="version">
+    /// A commit id (used exactly), a branch or a tag; null for the current version. A name that is not a
+    /// commit id is resolved to one commit once and recorded in the model root, so a later change on the
+    /// page never reaches an installed app and the model works offline after its first download.
+    /// </param>
+    /// <returns>The model.</returns>
+    /// <exception cref="ArgumentException">A part is malformed (see the remarks).</exception>
+    /// <remarks>
+    /// <para><b>Licence first.</b> The model card's licence, the terms URL and the download size are read
+    /// through Hugging Face's public API and handed to <see cref="LocalLlmOptions.ConfirmTermsAsync"/> (or
+    /// carried by <see cref="LocalModelTermsNotAcceptedException"/>) before any model file is requested.</para>
+    /// <para><b>Only what the engine loads.</b> From the folder (not its sub-folders): <c>genai_config.json</c>,
+    /// the <c>.onnx</c> files and their external data, the tokenizer files, the chat template and
+    /// <c>config.json</c>. Each is checked against the fingerprint Hugging Face publishes — SHA-256 for a
+    /// large file, the git blob SHA-1 for a small one — and deleted when it does not match.</para>
+    /// <para><b>Its own chat template and limits.</b> The prompt is built with the model's own chat
+    /// template (<see cref="LocalChatTemplate.ModelDefined"/>); the context length and the memory check's
+    /// cache size come from its <c>genai_config.json</c>.</para>
+    /// <para><b>Refused:</b> a gated or private model (the library takes no Hugging Face token), a name
+    /// outside Hugging Face's character set (letters, digits, <c>.</c>, <c>_</c>, <c>-</c>; no <c>..</c> or
+    /// <c>--</c>), and a folder without <c>genai_config.json</c>. <c>TECHIERAG_MODEL_BASE_URL</c> does not
+    /// apply: the name is the source. The developer answers for the model they name.</para>
+    /// </remarks>
+    public static LocalModel FromHuggingFace(string repository, string? folder = null, string? version = null) =>
+        FromHuggingFace(repository, folder, version, modelRoot: null);
+
+    /// <summary>
+    /// Names a Hugging Face model whose files go to a given model root instead of <see cref="ModelRoot.Current"/>.
+    /// </summary>
+    /// <param name="repository">The repository id.</param>
+    /// <param name="folder">The folder inside it, or null.</param>
+    /// <param name="version">The version, or null.</param>
+    /// <param name="modelRoot">The model root, or null for <see cref="ModelRoot.Current"/>.</param>
+    /// <returns>The model, already resolved when a pinned copy is on disk.</returns>
+    internal static LocalModel FromHuggingFace(string repository, string? folder, string? version, string? modelRoot)
+    {
+        var source = HuggingFaceModelSource.Create(repository, folder, version, modelRoot);
+        var model = new LocalModel(
+            source.Id,
+            source.Id,
+            "not read yet from the model card",
+            new Uri(HuggingFaceHub.DefaultBaseAddress, source.Repository),
+            LocalChatTemplate.ModelDefined,
+            contextLength: 0,
+            kvBytesPerToken: 0,
+            runsOnPhones: true,
+            variants: [],
+            huggingFace: source);
+        HuggingFaceResolution.TryRestore(model);
+        return model;
+    }
+
+    /// <summary>
     /// Gets the terms a user accepts before this model downloads.
     /// </summary>
-    /// <returns>The model's id, name, licence and terms URL.</returns>
-    public LocalModelTerms GetTerms() => new(Id, DisplayName, LicenceName, TermsUrl);
+    /// <returns>
+    /// The model's id, name, licence and terms URL. For a Hugging Face model not yet resolved, the licence
+    /// is not known yet: use <see cref="GetTermsAsync"/>.
+    /// </returns>
+    public LocalModelTerms GetTerms() =>
+        new(Id, DisplayName, LicenceName, TermsUrl) { DownloadBytes = Resolution?.Snapshot.DownloadBytes ?? 0 };
+
+    /// <summary>
+    /// Gets the terms a user accepts before this model downloads, with the download size. For a Hugging
+    /// Face model this asks Hugging Face's API (once; a pinned copy on disk needs no network) and requests
+    /// no model file (REQ-RAG-108).
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The terms.</returns>
+    /// <exception cref="InvalidOperationException">A Hugging Face model is gated, private, missing, or not in ONNX Runtime GenAI's format.</exception>
+    /// <exception cref="HttpRequestException">Hugging Face could not be reached.</exception>
+    public Task<LocalModelTerms> GetTermsAsync(CancellationToken cancellationToken = default) =>
+        LocalModelStore.Shared.GetTermsAsync(this, LocalModelFormat.OnnxGenAi, cancellationToken);
 
     /// <inheritdoc/>
     public override string ToString() => $"{DisplayName} ({Id}, {LicenceName})";
@@ -235,7 +335,8 @@ public sealed class LocalModel
     /// </summary>
     /// <param name="isPhone">Whether the platform is Android or iOS.</param>
     /// <returns>The context size in tokens.</returns>
-    internal int DefaultContextSize(bool isPhone) => Math.Min(ContextLength, isPhone ? 2_048 : 4_096);
+    internal int DefaultContextSize(bool isPhone) =>
+        ContextLength > 0 ? Math.Min(ContextLength, isPhone ? 2_048 : 4_096) : isPhone ? 2_048 : 4_096;
 
     /// <summary>
     /// Estimates the memory loading the model takes: the weights, the context cache and the runtime's
@@ -268,7 +369,7 @@ public sealed class LocalModel
     /// <param name="format">The runtime's format.</param>
     /// <returns>The variant, or null when the model is not published in that format.</returns>
     internal LocalModelVariant? FindVariant(LocalModelFormat format) =>
-        variants.FirstOrDefault(v => v.Format == format);
+        Variants.FirstOrDefault(v => v.Format == format);
 
     /// <summary>
     /// Gets the folder this model loads from for a variant: the host's folder, else
@@ -277,5 +378,22 @@ public sealed class LocalModel
     /// <param name="variant">The variant; ignored for a folder model.</param>
     /// <returns>An absolute folder path.</returns>
     internal string GetDirectory(LocalModelVariant? variant) =>
-        Folder ?? ModelRoot.GetModelDirectory(variant?.FolderName ?? Id);
+        Folder ?? Resolution?.Directory ?? ModelRoot.GetModelDirectory(variant?.FolderName ?? Id);
+
+    /// <summary>
+    /// Records what a Hugging Face model resolved to; its terms, files and folder come from it from now on.
+    /// </summary>
+    /// <param name="resolution">The pinned snapshot and its folder.</param>
+    internal void ApplyResolution(HuggingFaceResolution resolution) =>
+        Volatile.Write(ref huggingFaceResolution, resolution);
+
+    /// <summary>
+    /// Records the context length and cache size read from the model's own <c>genai_config.json</c>.
+    /// </summary>
+    /// <param name="config">The values read.</param>
+    internal void ApplyGenAiConfig(GenAiConfigInfo config)
+    {
+        Volatile.Write(ref kvBytesPerToken, config.KvBytesPerToken);
+        Volatile.Write(ref contextLength, config.ContextLength);
+    }
 }

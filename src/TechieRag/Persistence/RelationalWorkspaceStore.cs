@@ -1,12 +1,11 @@
 using System.Data.Common;
-using Dapper;
 using TechieRag.Abstractions;
 using TechieRag.Models;
 
 namespace TechieRag.Persistence;
 
 /// <summary>
-/// Shared Dapper-based implementation of <see cref="IWorkspaceStore"/> for relational
+/// Shared plain ADO.NET implementation of <see cref="IWorkspaceStore"/> for relational
 /// databases. Owns and self-creates the TrWorkspace and TrWorkspaceDocument tables.
 /// </summary>
 /// <remarks>
@@ -14,6 +13,9 @@ namespace TechieRag.Persistence;
 /// PostgreSQL workspace stores; subclasses only supply the connection.</para>
 /// <para><b>Schema:</b> Idempotent <c>CREATE TABLE IF NOT EXISTS</c> statements using
 /// PascalCase singular names with no underscores, portable across SQLite and PostgreSQL.</para>
+/// <para><b>No Reflection.Emit (REQ-FN-056).</b> Parameters and rows are mapped by hand through
+/// <see cref="DbCommandExtensions"/>, so the store works in an ahead-of-time compiled iOS or
+/// Mac Catalyst Release build.</para>
 /// </remarks>
 public abstract class RelationalWorkspaceStore : IWorkspaceStore
 {
@@ -51,7 +53,7 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
                     CreatedAt TEXT NOT NULL,
                     UpdatedAt TEXT NOT NULL
                 )
-                """).ConfigureAwait(false);
+                """, cancellationToken).ConfigureAwait(false);
 
             await connection.ExecuteAsync("""
                 CREATE TABLE IF NOT EXISTS TrWorkspaceDocument (
@@ -62,11 +64,11 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
                     AddedAt TEXT NOT NULL,
                     PRIMARY KEY (WorkspaceId, DocumentId)
                 )
-                """).ConfigureAwait(false);
+                """, cancellationToken).ConfigureAwait(false);
 
             await connection.ExecuteAsync(
-                "CREATE INDEX IF NOT EXISTS IxTrWorkspaceDocumentContentHash ON TrWorkspaceDocument(ContentHash)")
-                .ConfigureAwait(false);
+                "CREATE INDEX IF NOT EXISTS IxTrWorkspaceDocumentContentHash ON TrWorkspaceDocument(ContentHash)",
+                cancellationToken).ConfigureAwait(false);
 
             initialized = true;
         }
@@ -86,7 +88,7 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await connection.ExecuteAsync("""
             INSERT INTO TrWorkspace (WorkspaceId, Name, SystemPrompt, LlmModel, SimilarityThreshold, TopK, RerankEnabled, ChatMode, CreatedAt, UpdatedAt)
             VALUES (@WorkspaceId, @Name, @SystemPrompt, @LlmModel, @SimilarityThreshold, @TopK, @RerankEnabled, @ChatMode, @CreatedAt, @UpdatedAt)
-            """, ToParameters(workspace)).ConfigureAwait(false);
+            """, cancellationToken, ToParameters(workspace)).ConfigureAwait(false);
 
         return workspace;
     }
@@ -98,9 +100,11 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var row = await connection.QuerySingleOrDefaultAsync<WorkspaceRow>(
+        var row = await connection.QuerySingleOrDefaultAsync(
             "SELECT WorkspaceId, Name, SystemPrompt, LlmModel, SimilarityThreshold, TopK, RerankEnabled, ChatMode, CreatedAt, UpdatedAt FROM TrWorkspace WHERE WorkspaceId = @WorkspaceId",
-            new { WorkspaceId = workspaceId }).ConfigureAwait(false);
+            WorkspaceRow.Read,
+            cancellationToken,
+            DbParam.Text("WorkspaceId", workspaceId)).ConfigureAwait(false);
 
         return row is null ? null : MapWorkspace(row);
     }
@@ -111,9 +115,10 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<WorkspaceRow>(
-            "SELECT WorkspaceId, Name, SystemPrompt, LlmModel, SimilarityThreshold, TopK, RerankEnabled, ChatMode, CreatedAt, UpdatedAt FROM TrWorkspace ORDER BY UpdatedAt DESC")
-            .ConfigureAwait(false);
+        var rows = await connection.QueryAsync(
+            "SELECT WorkspaceId, Name, SystemPrompt, LlmModel, SimilarityThreshold, TopK, RerankEnabled, ChatMode, CreatedAt, UpdatedAt FROM TrWorkspace ORDER BY UpdatedAt DESC",
+            WorkspaceRow.Read,
+            cancellationToken).ConfigureAwait(false);
 
         return rows.Select(MapWorkspace).ToList();
     }
@@ -133,7 +138,7 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
                 SimilarityThreshold = @SimilarityThreshold, TopK = @TopK,
                 RerankEnabled = @RerankEnabled, ChatMode = @ChatMode, UpdatedAt = @UpdatedAt
             WHERE WorkspaceId = @WorkspaceId
-            """, ToParameters(workspace)).ConfigureAwait(false);
+            """, cancellationToken, ToParameters(workspace)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -145,10 +150,12 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "DELETE FROM TrWorkspaceDocument WHERE WorkspaceId = @WorkspaceId",
-            new { WorkspaceId = workspaceId }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("WorkspaceId", workspaceId)).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "DELETE FROM TrWorkspace WHERE WorkspaceId = @WorkspaceId",
-            new { WorkspaceId = workspaceId }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("WorkspaceId", workspaceId)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -164,14 +171,12 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
             ON CONFLICT (WorkspaceId, DocumentId)
             DO UPDATE SET ContentHash = excluded.ContentHash, IsPinned = excluded.IsPinned
             """,
-            new
-            {
-                document.WorkspaceId,
-                document.DocumentId,
-                document.ContentHash,
-                IsPinned = document.IsPinned ? 1 : 0,
-                AddedAt = document.AddedAt.ToString("o")
-            }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("WorkspaceId", document.WorkspaceId),
+            DbParam.Text("DocumentId", document.DocumentId),
+            DbParam.Text("ContentHash", document.ContentHash),
+            DbParam.Int32("IsPinned", document.IsPinned ? 1 : 0),
+            DbParam.Text("AddedAt", document.AddedAt.ToString("o"))).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -184,7 +189,9 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "DELETE FROM TrWorkspaceDocument WHERE WorkspaceId = @WorkspaceId AND DocumentId = @DocumentId",
-            new { WorkspaceId = workspaceId, DocumentId = documentId }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("WorkspaceId", workspaceId),
+            DbParam.Text("DocumentId", documentId)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -196,7 +203,8 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "DELETE FROM TrWorkspaceDocument WHERE DocumentId = @DocumentId",
-            new { DocumentId = documentId }).ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("DocumentId", documentId)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -208,9 +216,11 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var rows = await connection.QueryAsync<WorkspaceDocumentRow>(
+        var rows = await connection.QueryAsync(
             "SELECT WorkspaceId, DocumentId, ContentHash, IsPinned, AddedAt FROM TrWorkspaceDocument WHERE WorkspaceId = @WorkspaceId ORDER BY AddedAt",
-            new { WorkspaceId = workspaceId }).ConfigureAwait(false);
+            WorkspaceDocumentRow.Read,
+            cancellationToken,
+            DbParam.Text("WorkspaceId", workspaceId)).ConfigureAwait(false);
 
         return rows.Select(MapDocument).ToList();
     }
@@ -222,9 +232,12 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
-        return await connection.QueryFirstOrDefaultAsync<string>(
+        var documentId = await connection.ScalarAsync(
             "SELECT DocumentId FROM TrWorkspaceDocument WHERE ContentHash = @ContentHash ORDER BY AddedAt LIMIT 1",
-            new { ContentHash = contentHash }).ConfigureAwait(false);
+            null,
+            cancellationToken,
+            DbParam.Text("ContentHash", contentHash)).ConfigureAwait(false);
+        return documentId as string;
     }
 
     /// <inheritdoc/>
@@ -241,23 +254,25 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync(
             "UPDATE TrWorkspaceDocument SET IsPinned = @IsPinned WHERE WorkspaceId = @WorkspaceId AND DocumentId = @DocumentId",
-            new { WorkspaceId = workspaceId, DocumentId = documentId, IsPinned = pinned ? 1 : 0 })
-            .ConfigureAwait(false);
+            cancellationToken,
+            DbParam.Text("WorkspaceId", workspaceId),
+            DbParam.Text("DocumentId", documentId),
+            DbParam.Int32("IsPinned", pinned ? 1 : 0)).ConfigureAwait(false);
     }
 
-    private static object ToParameters(Workspace workspace) => new
-    {
-        workspace.WorkspaceId,
-        workspace.Name,
-        workspace.SystemPrompt,
-        workspace.LlmModel,
-        SimilarityThreshold = (double?)workspace.SimilarityThreshold,
-        workspace.TopK,
-        RerankEnabled = workspace.RerankEnabled ? 1 : 0,
-        ChatMode = workspace.ChatMode.ToString(),
-        CreatedAt = workspace.CreatedAt.ToString("o"),
-        UpdatedAt = workspace.UpdatedAt.ToString("o")
-    };
+    private static DbParam[] ToParameters(Workspace workspace) =>
+    [
+        DbParam.Text("WorkspaceId", workspace.WorkspaceId),
+        DbParam.Text("Name", workspace.Name),
+        DbParam.Text("SystemPrompt", workspace.SystemPrompt),
+        DbParam.Text("LlmModel", workspace.LlmModel),
+        DbParam.Double("SimilarityThreshold", workspace.SimilarityThreshold),
+        DbParam.Int32("TopK", workspace.TopK),
+        DbParam.Int32("RerankEnabled", workspace.RerankEnabled ? 1 : 0),
+        DbParam.Text("ChatMode", workspace.ChatMode.ToString()),
+        DbParam.Text("CreatedAt", workspace.CreatedAt.ToString("o")),
+        DbParam.Text("UpdatedAt", workspace.UpdatedAt.ToString("o"))
+    ];
 
     private static Workspace MapWorkspace(WorkspaceRow row) => new()
     {
@@ -297,6 +312,21 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         public string ChatMode { get; set; } = nameof(WorkspaceChatMode.Chat);
         public string CreatedAt { get; set; } = string.Empty;
         public string UpdatedAt { get; set; } = string.Empty;
+
+        /// <summary>Maps the current row of a query selecting the columns in declaration order.</summary>
+        public static WorkspaceRow Read(DbDataReader reader) => new()
+        {
+            WorkspaceId = reader.GetNullableString(0) ?? string.Empty,
+            Name = reader.GetNullableString(1) ?? string.Empty,
+            SystemPrompt = reader.GetNullableString(2),
+            LlmModel = reader.GetNullableString(3),
+            SimilarityThreshold = reader.GetNullableDouble(4),
+            TopK = reader.GetNullableInt64(5),
+            RerankEnabled = reader.GetNullableInt64(6) ?? 0,
+            ChatMode = reader.GetNullableString(7) ?? nameof(WorkspaceChatMode.Chat),
+            CreatedAt = reader.GetNullableString(8) ?? string.Empty,
+            UpdatedAt = reader.GetNullableString(9) ?? string.Empty
+        };
     }
 
     private sealed class WorkspaceDocumentRow
@@ -306,5 +336,15 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
         public string ContentHash { get; set; } = string.Empty;
         public long IsPinned { get; set; }
         public string AddedAt { get; set; } = string.Empty;
+
+        /// <summary>Maps the current row of a query selecting the columns in declaration order.</summary>
+        public static WorkspaceDocumentRow Read(DbDataReader reader) => new()
+        {
+            WorkspaceId = reader.GetNullableString(0) ?? string.Empty,
+            DocumentId = reader.GetNullableString(1) ?? string.Empty,
+            ContentHash = reader.GetNullableString(2) ?? string.Empty,
+            IsPinned = reader.GetNullableInt64(3) ?? 0,
+            AddedAt = reader.GetNullableString(4) ?? string.Empty
+        };
     }
 }

@@ -3,7 +3,7 @@
   <!--
     REQ-FN-056 / BRD-94: the four-platform probe. One screen, one button: embed three texts, store
     them, search, show the top result and the embed, store and search timings. A second button
-    (local-model generation, BRD-106) joins it later in the same actions panel.
+    (local-model generation, BRD-106, REQ-FN-059) sits in the same actions panel.
 
     Heads: Android, iOS and Mac Catalyst everywhere; Windows only on a Windows host (MAUI cannot build
     a Windows head elsewhere). iOS and Mac Catalyst link only on a Mac. Build one head at a time with
@@ -59,5 +59,7 @@
     ProjectReference carries no NuGet build assets, so the probe imports the same file by path.
   -->
   <Import Project="..\..\src\TechieRag.Embedded\buildTransitive\TechieRag.Embedded.targets" />
+  <!-- REQ-FN-058: the same for TechieRag.Local's ONNX Runtime GenAI wiring (the Mac Catalyst library). -->
+  <Import Project="..\..\src\TechieRag.Local\buildTransitive\TechieRag.Local.targets" />
 
 </Project>

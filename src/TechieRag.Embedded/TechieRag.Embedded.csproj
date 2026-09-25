@@ -52,8 +52,8 @@
 
   <ItemGroup>
     <!-- ONNX Runtime for running embedding models locally -->
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.1" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.24.1" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.30.0" />
 
     <!-- Tokenizers for text preprocessing -->
     <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
