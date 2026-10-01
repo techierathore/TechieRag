@@ -303,6 +303,34 @@ public class TechieRagBuilder
         => UseLlm(LlmSource.OpenAICompatible, endpoint, apiKey, model);
 
     /// <summary>
+    /// Configures an OpenAI-compatible REST API that needs extra request headers (REQ-RAG-109).
+    /// </summary>
+    /// <param name="endpoint">The base endpoint, e.g. <c>https://opencode.ai/zen/go/v1</c>.</param>
+    /// <param name="apiKey">The API key.</param>
+    /// <param name="model">The model id.</param>
+    /// <param name="headers">Headers sent on every request, e.g. <c>User-Agent</c>; null for none.</param>
+    /// <param name="sessionHeader">The header that carries <see cref="LlmCompletionOptions.SessionId"/>,
+    /// e.g. <c>x-opencode-session</c>; null for none.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>For OpenCode Go, <c>UseConnectorLlm("opencode-go", key, model)</c> sets the session header itself.</remarks>
+    public TechieRagBuilder UseOpenAICompatibleLlm(
+        string endpoint,
+        string apiKey,
+        string model,
+        IReadOnlyDictionary<string, string>? headers,
+        string? sessionHeader = null)
+    {
+        UseLlm(LlmSource.OpenAICompatible, endpoint, apiKey, model);
+        config.Llm.SessionHeader = sessionHeader;
+        if (headers is not null)
+        {
+            config.Llm.Headers = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return this;
+    }
+
+    /// <summary>
     /// Configures Azure AI Foundry as the LLM provider.
     /// </summary>
     public TechieRagBuilder UseAzureAIFoundryLlm(string endpoint, string apiKey, string model,
@@ -396,7 +424,9 @@ public class TechieRagBuilder
     /// <param name="signInCallback">Called with the sign-in page and one-time code when the user must
     /// sign in. The host opens the page in a browser (or shows it with the code) and returns; the library
     /// waits for the authorisation. Called on the first model call, or on
-    /// <see cref="ChatGptSubscriptionLlmProvider.SignInAsync"/>, and again only if the session is refused.</param>
+    /// <see cref="ChatGptSubscriptionLlmProvider.SignInAsync"/>, and again only if the session is refused.
+    /// It may throw when it cannot show the prompt now (e.g. during a model turn); the call then fails with
+    /// <see cref="SubscriptionSignInException.CodeSignInRequired"/>.</param>
     /// <param name="options">Model, session store and endpoints; null uses the defaults (model
     /// <c>gpt-6-luna</c>, in-memory session).</param>
     /// <returns>The builder instance for method chaining.</returns>
@@ -435,6 +465,51 @@ public class TechieRagBuilder
     {
         config.LlmFallback = new LlmConfig();
         configure(config.LlmFallback);
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the keys of sections already configured, without changing anything else (REQ-FN-066 / BRD-159).
+    /// </summary>
+    /// <param name="llm">The LLM key, or null to leave it.</param>
+    /// <param name="embedding">The embedding provider key, or null to leave it.</param>
+    /// <param name="vectorStore">The vector store key, or null to leave it.</param>
+    /// <param name="rerank">The API reranker key, or null to leave it.</param>
+    /// <param name="llmFallback">The fallback LLM key, or null to leave it.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <exception cref="InvalidOperationException"><paramref name="llmFallback"/> is given and no fallback LLM is configured.</exception>
+    /// <remarks>Keys are injected only through code: an <c>IConfiguration</c> section supplies the rest and
+    /// this call, in <c>AddTechieRag(section, rag => rag.WithApiKeys(...))</c>, supplies the keys.</remarks>
+    public TechieRagBuilder WithApiKeys(
+        string? llm = null,
+        string? embedding = null,
+        string? vectorStore = null,
+        string? rerank = null,
+        string? llmFallback = null)
+    {
+        if (llm is not null) config.Llm.ApiKey = llm;
+        if (embedding is not null) config.Embedding.ApiKey = embedding;
+        if (vectorStore is not null) config.VectorStore.ApiKey = vectorStore;
+        if (rerank is not null) config.Rerank.ApiKey = rerank;
+        if (llmFallback is not null)
+        {
+            (config.LlmFallback ?? throw new InvalidOperationException("No fallback LLM is configured to take a key."))
+                .ApiKey = llmFallback;
+        }
+
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the extra request headers of the configured OpenAI-compatible LLM (REQ-RAG-109, REQ-FN-066).
+    /// </summary>
+    /// <param name="headers">Headers sent on every request; one named here replaces the library's own value.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>Headers can carry secrets, so like keys they come only through code.</remarks>
+    public TechieRagBuilder WithLlmHeaders(IReadOnlyDictionary<string, string> headers)
+    {
+        ArgumentNullException.ThrowIfNull(headers);
+        config.Llm.Headers = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
         return this;
     }
 
@@ -844,9 +919,14 @@ public class TechieRagBuilder
                 ApiVersion = llmConfig.ApiVersion,
                 ProjectId = llmConfig.ProjectId,
                 MaxContextTokens = llmConfig.MaxContextTokens,
-                Connector = llmConfig.Connector
+                Connector = llmConfig.Connector,
+                Headers = llmConfig.Headers,
+                SessionHeader = llmConfig.SessionHeader
             };
         }
+
+        // REQ-RAG-109: a service that reads a per-conversation session id names its header in the catalog.
+        var sessionHeader = llmConfig.SessionHeader ?? connector?.SessionHeader;
 
         return llmConfig.Source switch
         {
@@ -867,6 +947,8 @@ public class TechieRagBuilder
                 llmConfig.Endpoint ?? throw new InvalidOperationException("Endpoint is required for OpenAI-compatible LLM provider."),
                 llmConfig.ApiKey ?? string.Empty,
                 llmConfig.Model,
+                llmConfig.Headers,
+                sessionHeader,
                 config.LoggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>()),
 
             LlmSource.AzureAIFoundry => new AzureAIFoundryLlmProvider(

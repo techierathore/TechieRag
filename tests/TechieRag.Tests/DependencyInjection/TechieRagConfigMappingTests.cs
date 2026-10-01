@@ -31,7 +31,7 @@ public class TechieRagConfigMappingTests
     private static readonly HashSet<Type> LeafTypes =
     [
         typeof(string), typeof(int), typeof(long), typeof(float), typeof(decimal), typeof(bool),
-        typeof(Dictionary<string, ModelPricing>)
+        typeof(Dictionary<string, ModelPricing>), typeof(Dictionary<string, string>)
     ];
 
     /// <summary>
@@ -64,9 +64,9 @@ public class TechieRagConfigMappingTests
     }
 
     /// <summary>
-    /// The same fully populated configuration, written out as appsettings keys and passed to
-    /// <c>AddTechieRag(IConfiguration)</c>, arrives in the registered configuration with every field
-    /// intact.
+    /// The same fully populated configuration, written out as appsettings keys without its keys, and with
+    /// the keys passed in code through <c>AddTechieRag(IConfiguration, Action&lt;TechieRagBuilder&gt;)</c>,
+    /// arrives in the registered configuration with every field intact.
     /// </summary>
     [Fact]
     public void ConfigurationSectionOverloadMapsEveryField()
@@ -76,28 +76,37 @@ public class TechieRagConfigMappingTests
             .AddInMemoryCollection(ToSettings(source))
             .Build();
 
-        var registered = RegisteredConfig(services => services.AddTechieRag(section));
+        var registered = RegisteredConfig(services => services.AddTechieRag(section, rag =>
+        {
+            rag.WithApiKeys(
+                llm: source.Llm.ApiKey,
+                embedding: source.Embedding.ApiKey,
+                vectorStore: source.VectorStore.ApiKey,
+                rerank: source.Rerank.ApiKey,
+                llmFallback: source.LlmFallback!.ApiKey);
+            rag.WithLlmHeaders(source.Llm.Headers);
+            rag.GetConfig().LlmFallback!.Headers = new Dictionary<string, string>(source.LlmFallback.Headers, StringComparer.OrdinalIgnoreCase);
+        }));
 
         AssertEveryFieldEqual(source, registered);
     }
 
     /// <summary>
-    /// The acceptance case: <c>VectorStore.ApiKey</c> and <c>Prompt.SystemPrompt</c> set in appsettings
-    /// reach the built instance, whose Qdrant store carries the key and whose prompt template writes
-    /// the configured system prompt.
+    /// The acceptance case: <c>Prompt.SystemPrompt</c> set in appsettings and the vector-store key passed in
+    /// code both reach the built instance, whose Qdrant store carries the key and whose prompt template
+    /// writes the configured system prompt.
     /// </summary>
-    [Fact(DisplayName = "REQ-FN-066 AppSettingsApiKeyAndSystemPromptReachBuiltInstance")]
-    public void AppSettingsApiKeyAndSystemPromptReachBuiltInstance()
+    [Fact(DisplayName = "REQ-FN-066 AppSettingsPromptAndCodeKeyReachBuiltInstance")]
+    public void AppSettingsPromptAndCodeKeyReachBuiltInstance()
     {
         var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["VectorStore:Type"] = "Qdrant",
             ["VectorStore:ConnectionString"] = "http://localhost:6334",
-            ["VectorStore:ApiKey"] = "qdrant-key-from-appsettings",
             ["Prompt:SystemPrompt"] = "You answer only from the Sevak handbook."
         }).Build();
         var services = new ServiceCollection();
-        services.AddTechieRag(section);
+        services.AddTechieRag(section, rag => rag.WithApiKeys(vectorStore: "qdrant-key-from-code"));
 
         using var provider = services.BuildServiceProvider();
         var client = Assert.IsType<TechieRagClient>(provider.GetRequiredService<ITechieRag>());
@@ -105,8 +114,88 @@ public class TechieRagConfigMappingTests
         var clientConfig = PrivateField<TechieRagConfig>(client, "config");
         var prompt = PrivateField<IPromptTemplate>(client, "promptTemplate").BuildRagPrompt("q", []);
         Assert.IsType<QdrantStore>(PrivateField<IVectorStore>(client, "vectorStore"));
-        Assert.Equal("qdrant-key-from-appsettings", clientConfig.VectorStore.ApiKey);
+        Assert.Equal("qdrant-key-from-code", clientConfig.VectorStore.ApiKey);
         Assert.Contains("You answer only from the Sevak handbook.", prompt[0].Content);
+    }
+
+    /// <summary>
+    /// The acceptance case: a key in appsettings is refused at registration, and the message names each
+    /// setting without ever showing its value.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-066 AppSettingsKeyIsRefused")]
+    public void AppSettingsKeyIsRefused()
+    {
+        var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["VectorStore:Type"] = "Qdrant",
+            ["VectorStore:ConnectionString"] = "http://localhost:6334",
+            ["VectorStore:ApiKey"] = "secret-qdrant-key",
+            ["Llm:Headers:x-opencode-session"] = "secret-header"
+        }).Build();
+
+        var failure = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddTechieRag(section));
+
+        Assert.Contains("VectorStore:ApiKey", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Llm:Headers", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("WithApiKeys", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret", failure.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Acceptance of REQ-FN-001 (BRD-20): a <c>TechieRag</c> section bound through
+    /// <c>AddTechieRag(IConfiguration)</c> gives an instance using the configured providers, and the same
+    /// section with an <c>ApiKey</c> is refused.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-001 SectionConfiguresProvidersAndRefusesKeys")]
+    public void SectionConfiguresProvidersAndRefusesKeys()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["VectorStore:Type"] = "Qdrant",
+            ["VectorStore:ConnectionString"] = "http://localhost:6334"
+        };
+        var services = new ServiceCollection();
+        services.AddTechieRag(new ConfigurationBuilder().AddInMemoryCollection(settings).Build());
+        using var provider = services.BuildServiceProvider();
+        var client = Assert.IsType<TechieRagClient>(provider.GetRequiredService<ITechieRag>());
+
+        settings["Llm:ApiKey"] = "secret-llm-key";
+        var refused = Assert.Throws<InvalidOperationException>(
+            () => new ServiceCollection().AddTechieRag(new ConfigurationBuilder().AddInMemoryCollection(settings).Build()));
+
+        Assert.IsType<QdrantStore>(PrivateField<IVectorStore>(client, "vectorStore"));
+        Assert.Contains("Llm:ApiKey", refused.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// An API reranker configured in appsettings and given its key in code stays on: the usable check runs
+    /// after the host's code, not before it.
+    /// </summary>
+    [Fact]
+    public void RerankerKeyFromCodeKeepsAppSettingsRerankerOn()
+    {
+        var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["VectorStore:Type"] = "Qdrant",
+            ["VectorStore:ConnectionString"] = "http://localhost:6334",
+            ["Rerank:Enabled"] = "true",
+            ["Rerank:Source"] = "Cohere"
+        }).Build();
+
+        var registered = RegisteredConfig(services => services.AddTechieRag(section, rag => rag.WithApiKeys(rerank: "cohere-key")));
+
+        Assert.True(registered.Rerank.Enabled);
+    }
+
+    /// <summary>A config object built in code may carry keys; only the <c>IConfiguration</c> path refuses them.</summary>
+    [Fact]
+    public void ConfigObjectBuiltInCodeMayCarryKeys()
+    {
+        var source = new TechieRagConfig { VectorStore = new VectorStoreConfig { Type = VectorStoreType.Qdrant, ConnectionString = "http://localhost:6334", ApiKey = "k" } };
+
+        var registered = RegisteredConfig(services => services.AddTechieRag(source));
+
+        Assert.Equal("k", registered.VectorStore.ApiKey);
     }
 
     /// <summary>
@@ -251,6 +340,10 @@ public class TechieRagConfigMappingTests
             {
                 ["sentinel-model"] = new ModelPricing { InputPerMillionUsd = 1.5m, OutputPerMillionUsd = 2.5m }
             },
+            _ when type == typeof(Dictionary<string, string>) => new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [$"x-{path.Replace(':', '-')}"] = $"set-{index}"
+            },
             _ => throw new InvalidOperationException($"No sentinel for {path} ({type.Name}); extend the mapping guard.")
         };
     }
@@ -260,7 +353,14 @@ public class TechieRagConfigMappingTests
         var settings = new Dictionary<string, string?>();
         foreach (var leaf in LeafPaths())
         {
+            // Keys never go into a section (REQ-FN-066); the test passes them in code.
+            if (leaf.Property.Name is "ApiKey" or "Headers")
+            {
+                continue;
+            }
+
             var value = ReadPath(config, leaf.Path);
+
             if (value is IDictionary pricing)
             {
                 foreach (DictionaryEntry entry in pricing)

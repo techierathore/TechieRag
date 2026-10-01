@@ -250,6 +250,38 @@ public class ChatGptSubscriptionTests
         Assert.DoesNotContain("secret", text, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Chatur TR-RAG-005: a sign-in callback that cannot show the prompt during a model turn throws; the
+    /// turn fails with the coded <see cref="SubscriptionSignInException.CodeSignInRequired"/> carrying the
+    /// callback's exception, so the host can tell the user to sign in again.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-069 ThrowingCallbackMeansSignInRequired")]
+    public async Task ThrowingCallbackMeansSignInRequired()
+    {
+        var server = new FakeChatGptServer();
+        var noWindow = new InvalidOperationException("No window to show the code in.");
+        using var provider = new ChatGptSubscriptionLlmProvider((_, _) => throw noWindow, Options(server));
+
+        var failure = await Assert.ThrowsAsync<SubscriptionSignInException>(() => provider.ChatAsync(Question));
+
+        Assert.Equal(SubscriptionSignInException.CodeSignInRequired, failure.Code);
+        Assert.Same(noWindow, failure.InnerException);
+    }
+
+    /// <summary>A callback that throws a coded sign-in exception itself keeps its own code.</summary>
+    [Fact]
+    public async Task CallbackSignInExceptionKeepsItsCode()
+    {
+        var server = new FakeChatGptServer();
+        using var provider = new ChatGptSubscriptionLlmProvider(
+            (_, _) => throw new SubscriptionSignInException(SubscriptionSignInException.CodeRejected, "Refused by the host."),
+            Options(server));
+
+        var failure = await Assert.ThrowsAsync<SubscriptionSignInException>(() => provider.SignInAsync());
+
+        Assert.Equal(SubscriptionSignInException.CodeRejected, failure.Code);
+    }
+
     private static ChatGptSubscriptionOptions Options(FakeChatGptServer server) => new()
     {
         Handler = server,

@@ -6,10 +6,10 @@
 | Kind | library |
 | Size | Large |
 | Phase | 2 of 2 |
-| Verified on | 2026-09-25 |
-| Date | 2026-09-25 |
+| Verified on | 2026-10-01 |
+| Date | 2026-10-01 |
 
-This guide maps each public service that phase 2 added or changed to the code that serves it, read at file and line on 2026-09-25: the local model package `TechieRag.Local`, the phase-2 changes in `TechieRag.Embedded` and the platform work, the `TechieRag.Agents` package and typed streaming, and subscription sign-in, provider routing, configuration mapping, connectors, reranking and telemetry packaging in `TechieRag`. Phase-1 services are in `docs/TechieRag-DevGuide.md`. The sample that runs here is `samples/TechieRag.Probe`, a MAUI app with one screen: it booted on this Mac as the Mac Catalyst head and in the iOS 26.1 simulator on 2026-09-25, and the four screenshots under `docs/screenshots/TechieRag/probe-*.png` come from those runs. Entries the probe exercises are marked `renders`; the rest have no sample here and are `static-only (unconfirmed)`, covered by the test project each entry names, and their image is the July 2026 screen of the sample application of that time (TechieDesk, now Sevak, in its own repository since 2026-09-24) that exercised the service. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.
+This guide maps each public service that phase 2 added or changed to the code that serves it, read at file and line on 2026-09-25, with the sign-in, connector, request-header, configuration and streaming entries re-read on 2026-10-01: the local model package `TechieRag.Local`, the phase-2 changes in `TechieRag.Embedded` and the platform work, the `TechieRag.Agents` package and typed streaming, and subscription sign-in, provider routing, configuration mapping, connectors, reranking and telemetry packaging in `TechieRag`. Phase-1 services are in `docs/TechieRag-DevGuide.md`. The sample that runs here is `samples/TechieRag.Probe`, a MAUI app with one screen: it booted on this Mac as the Mac Catalyst head and in the iOS 26.1 simulator on 2026-09-25, and the four screenshots under `docs/screenshots/TechieRag/probe-*.png` come from those runs. Entries the probe exercises are marked `renders`; the rest have no sample here and are `static-only (unconfirmed)`, covered by the test project each entry names, and their image is the July 2026 screen of the sample application of that time (TechieDesk, now Sevak, in its own repository since 2026-09-24) that exercised the service. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.
 
 ## Architecture cheat-sheet
 
@@ -52,7 +52,7 @@ The probe constructs `LocalLlmProvider` directly rather than through the builder
 
 **Runtime:** `static-only (unconfirmed)`. The probe reaches only `LocalModel.PlatformDefault`; the overloads, `LocalLlm.Register` and the `local/<model>` route are proven by `LocalRegistrationTests` and `LocalModelCatalogTests`.
 
-**Call chain:** `LocalLlmBuilderExtensions.UseLocalLlm(builder, configure)` → `UseLocalLlm(builder, LocalModel.PlatformDefault, configure)` → `LocalModel.EnsureSupported` → `LocalLlm.Register` → `LocalLlmProviderRegistry.Register` (core) → `TechieRagBuilder.UseCustomLlmProvider(() => new LocalLlmProvider(options, logger))`. Configuration route: `LlmProviderFactory` (`src/TechieRag/Llm/LlmProviderFactory.cs:81`, the `LlmSource.Local` arm) → `LocalLlmProviderRegistry.Create` → `LocalLlm.Create` → `LocalLlm.RequireModel` → `LocalModel.FromId`.
+**Call chain:** `LocalLlmBuilderExtensions.UseLocalLlm(builder, configure)` → `UseLocalLlm(builder, LocalModel.PlatformDefault, configure)` → `LocalModel.EnsureSupported` → `LocalLlm.Register` → `LocalLlmProviderRegistry.Register` (core) → `TechieRagBuilder.UseCustomLlmProvider(() => new LocalLlmProvider(options, logger))`. Configuration route: `LlmProviderFactory` (`src/TechieRag/Llm/LlmProviderFactory.cs:83`, the `LlmSource.Local` arm) → `LocalLlmProviderRegistry.Create` → `LocalLlm.Create` → `LocalLlm.RequireModel` → `LocalModel.FromId`.
 
 `UseLocalLlm()` picks the platform default: Qwen2.5 0.5B Instruct on phones, Phi-3 mini 4k Instruct on desktops and Mac Catalyst. The string overload takes a catalogue id; the `DirectoryInfo` overload a host-filled folder, with no download or terms. All end in the `LocalModel` overload: refuse Phi-3 on a phone, write `LlmSource.Local` and the model id into the config, hand the builder a provider factory. Nothing touches network or disk until the first call.
 
@@ -421,7 +421,7 @@ REQ-RAG-067: `ILlmProvider.ChatStreamEventsAsync` has a default body (`ILlmProvi
 
 Where the other providers (under `src/TechieRag/Llm/`) emit `ToolCall`:
 
-- **OpenAI-compatible** — `OpenAICompatibleLlmProvider.cs:182-203`, reader line 199.
+- **OpenAI-compatible** — `OpenAICompatibleLlmProvider.cs:228-249`, reader line 245.
 - **Azure AI Foundry** — `AzureAIFoundryLlmProvider.cs:165-186`, reader line 182.
 - **Ollama** — `OllamaLlmProvider.cs:168-222`; `ParseToolCalls` (line 195), emitted at 211-214.
 - **Google Gemini** — `GoogleGeminiLlmProvider.cs:166-225`; `ExtractToolCalls` (line 204), emitted at 214-217.
@@ -468,30 +468,31 @@ REQ-RAG-069. A host app can bill model calls to the user's own ChatGPT plan inst
 
 ![Sevak's LLM settings screen, July 2026: where a host chooses the provider; a subscription sign-in would sit here](screenshots/TechieRag/llm-settings.png)
 
-Static-only: the July 2026 Sevak screen that configured providers; covered by tests in tests/TechieRag.Tests — `Llm/Subscription/ChatGptSubscriptionTests.cs`.
+Static-only: the July 2026 Sevak screen that configured providers; covered by tests in tests/TechieRag.Tests — `Llm/Subscription/ChatGptSubscriptionTests.cs` (`ThrowingCallbackMeansSignInRequired` for the wrapping).
 
 **Runtime:** static-only (unconfirmed)
 
-**Call chain:** `TechieRagBuilder.UseChatGptSubscriptionLlm` → `TechieRagBuilder.CreateLlmProvider` (returns the captured factory) → `ChatGptSubscriptionLlmProvider..ctor` (guarded `HttpClient` + `ChatGptDeviceSignIn`) → `ChatGptSubscriptionLlmProvider.ChatAsync` / `ChatStreamEventsAsync` → `StreamAsync` → `SendWithSessionAsync` → `GetSessionAsync` → `ISubscriptionSessionStore.LoadAsync` → (expired or missing) `RenewAsync` → `ChatGptDeviceSignIn.RefreshAsync` or `ChatGptDeviceSignIn.SignInAsync` → `RequestUserCodeAsync` (POST `{issuer}/api/accounts/deviceauth/usercode`) → host callback → `PollForAuthorisationAsync` (POST `.../deviceauth/token` until not 403/404) → `ExchangeCodeAsync` (POST `{issuer}/oauth/token`) → `ISubscriptionSessionStore.SaveAsync` → `SendAsync` (POST `{BackendEndpoint}/responses` with `Bearer` access token) → `OpenAIResponsesStreamReader.ReadAsync`.
+**Call chain:** `TechieRagBuilder.UseChatGptSubscriptionLlm` → `TechieRagBuilder.CreateLlmProvider` (returns the captured factory) → `ChatGptSubscriptionLlmProvider..ctor` (guarded `HttpClient` + `ChatGptDeviceSignIn`) → `ChatGptSubscriptionLlmProvider.ChatAsync` / `ChatStreamEventsAsync` → `StreamAsync` → `SendWithSessionAsync` → `GetSessionAsync` → `ISubscriptionSessionStore.LoadAsync` → (expired or missing) `RenewAsync` → `ChatGptDeviceSignIn.RefreshAsync` or `ChatGptDeviceSignIn.SignInAsync` → `RequestUserCodeAsync` (POST `{issuer}/api/accounts/deviceauth/usercode`) → host callback (a throw becomes `SubscriptionSignInException` `CodeSignInRequired`) → `PollForAuthorisationAsync` (POST `.../deviceauth/token` until not 403/404) → `ExchangeCodeAsync` (POST `{issuer}/oauth/token`) → `ISubscriptionSessionStore.SaveAsync` → `SendAsync` (POST `{BackendEndpoint}/responses` with `Bearer` access token) → `OpenAIResponsesStreamReader.ReadAsync`.
 
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
-| `src/TechieRag/TechieRagBuilder.cs:418` | `UseChatGptSubscriptionLlm` | `config.Llm.Source` / `Connector` | `LlmSource.Subscription`, `"chatgpt-subscription"`; factory captured at line 424 |
+| `src/TechieRag/TechieRagBuilder.cs:441` | `UseChatGptSubscriptionLlm` | `config.Llm.Source` / `Connector` | `LlmSource.Subscription`, `"chatgpt-subscription"`; factory captured at line 454 |
 | `src/TechieRag/Llm/ChatGptSubscriptionLlmProvider.cs:59` | `..ctor` | `httpClient` handler | `options.Handler` (test seam) or `HttpWebContentFetcher.CreateGuardedHandler()` |
 | `src/TechieRag/Llm/ChatGptSubscriptionLlmProvider.cs:238` | `GetSessionAsync` | `needsRenewal` | true on `forceRenewal` or `session.IsExpired(now, 5 min)` |
-| `src/TechieRag/Llm/ChatGptDeviceSignIn.cs:118` | `PollForAuthorisationAsync` | `options.Clock() < expiresAt` | runs until `SignInTimeout` (15 min); 403/404 = not yet, else `CodeRejected` |
-| `src/TechieRag/Llm/ChatGptDeviceSignIn.cs:178` | `BuildSession` | `expiresAt` | `now + expires_in` seconds, else the JWT `exp` claim via `JwtClaimReader` |
+| `src/TechieRag/Llm/ChatGptDeviceSignIn.cs:63` | `SignInAsync` | `ex` from the callback | not a `SubscriptionSignInException` or a cancellation; rethrown at line 67 as `CodeSignInRequired`, `ex` inner |
+| `src/TechieRag/Llm/ChatGptDeviceSignIn.cs:131` | `PollForAuthorisationAsync` | `options.Clock() < expiresAt` | runs until `SignInTimeout` (15 min); 403/404 = not yet, else `CodeRejected` |
+| `src/TechieRag/Llm/ChatGptDeviceSignIn.cs:191` | `BuildSession` | `expiresAt` | `now + expires_in` seconds, else the JWT `exp` claim via `JwtClaimReader` |
 | `src/TechieRag/Llm/ChatGptSubscriptionLlmProvider.cs:203` | `SendWithSessionAsync` | `response.StatusCode` after renewal | not 401; a second 401 clears the store, throws `CodeSessionRejected` |
 
-Key types: `ChatGptSubscriptionOptions` (`src/TechieRag/Llm/ChatGptSubscriptionOptions.cs:13`: model 21, client id 18, issuer 30, backend 33, `SignInTimeout` 36; `Handler`, `Delay`, `Clock` are test seams); `ISubscriptionSessionStore` (`src/TechieRag/Abstractions/ISubscriptionSessionStore.cs:20`); `SubscriptionSignInException` (`src/TechieRag/Llm/SubscriptionSignInException.cs:11`: four stable `Code*` strings, no token in messages); `SubscriptionSignInPrompt` (`src/TechieRag/Models/SubscriptionSignInPrompt.cs:11`).
+Key types: `ChatGptSubscriptionOptions` (`src/TechieRag/Llm/ChatGptSubscriptionOptions.cs:13`: model 21, client id 18, issuer 30, backend 33, `SignInTimeout` 36; `Handler`, `Delay`, `Clock` are test seams); `ISubscriptionSessionStore` (`src/TechieRag/Abstractions/ISubscriptionSessionStore.cs:20`); `SubscriptionSignInException` (`src/TechieRag/Llm/SubscriptionSignInException.cs:11`: five stable `Code*` strings, no token in messages; `CodeSignInRequired` at line 27 means the callback could not show the prompt now, e.g. mid-turn, and the host should ask the user to sign in again); `SubscriptionSignInPrompt` (`src/TechieRag/Models/SubscriptionSignInPrompt.cs:11`).
 
-**Calculations on this service:** `SubscriptionSession.IsExpired` (`src/TechieRag/Models/SubscriptionSession.cs:38`) returns `ExpiresAt - margin <= now`; `ChatGptDeviceSignIn.ReadInterval` (`ChatGptDeviceSignIn.cs:220`) reads the vendor's poll interval (number or numeric string), default 5 seconds; `EstimateTokenCount` (`ChatGptSubscriptionLlmProvider.cs:157`) is `ceil(length / 4)`.
+**Calculations on this service:** `SubscriptionSession.IsExpired` (`src/TechieRag/Models/SubscriptionSession.cs:38`) returns `ExpiresAt - margin <= now`; `ChatGptDeviceSignIn.ReadInterval` (`ChatGptDeviceSignIn.cs:233`) reads the vendor's poll interval (number or numeric string), default 5 seconds; `EstimateTokenCount` (`ChatGptSubscriptionLlmProvider.cs:157`) is `ceil(length / 4)`.
 
 ---
 
 ### Connector catalog, model routing and the subscription factory arm (`TechieRag`)
 
-REQ-RAG-070, REQ-FN-062, REQ-RAG-099, REQ-RAG-103. `LlmConnectorCatalog` is a static table of connectors; `ModelRouter` turns a model string into a `(connector, modelId)` route; `LlmProviderFactory` turns a route into an `ILlmProvider`. `CreateSubscription` is a separate arm: a subscription has no API key and needs the host's sign-in callback.
+REQ-RAG-070, REQ-FN-062, REQ-RAG-099, REQ-RAG-103, REQ-RAG-109. `LlmConnectorCatalog` is a static table of connectors; `ModelRouter` turns a model string into a `(connector, modelId)` route; `LlmProviderFactory` turns a route into an `ILlmProvider`. `CreateSubscription` is a separate arm: a subscription has no API key and needs the host's sign-in callback. The `opencode-go` row (no prefixes, so `opencode-go/<model>` or `UseConnectorLlm`) carries `SessionHeader = "x-opencode-session"`; both factories pass it to the provider (entry below). Two public constants name rows for hosts: `ChatGptSubscriptionName` and `OpenCodeGoName`.
 
 ![Sevak's LLM settings screen, July 2026: the provider and model choice that the router resolves](screenshots/TechieRag/llm-settings.png)
 
@@ -503,16 +504,17 @@ Static-only: the July 2026 Sevak screen that chose a model; covered by tests in 
 
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
-| `src/TechieRag/Llm/LlmConnectorCatalog.cs:156` | static initialiser | `Connectors` tail | `SubscriptionConnectorRows.All` after the 16 API-key/local rows |
+| `src/TechieRag/Llm/LlmConnectorCatalog.cs:20` | constants | `ChatGptSubscriptionName`, `OpenCodeGoName` (23) | `"chatgpt-subscription"`, `"opencode-go"` |
+| `src/TechieRag/Llm/LlmConnectorCatalog.cs:141` | static initialiser | `opencode-go` row | endpoint `https://opencode.ai/zen/go/v1` (144), default `kimi-k2.7-code`, `SessionHeader` `x-opencode-session` (146) |
+| `src/TechieRag/Llm/LlmConnectorCatalog.cs:174` | static initialiser | `Connectors` tail | `SubscriptionConnectorRows.All` after the 17 API-key/local rows |
 | `src/TechieRag/Llm/SubscriptionConnectorRows.cs:29` | `All` | `Subscription.Permitted` for `chatgpt-subscription` | `true`, `BuilderMethod = "UseChatGptSubscriptionLlm"` (37); others `false`, `CheckedOn` 2026-09-24 (19) |
 | `src/TechieRag/Llm/ModelRouter.cs:56` | `Resolve` | `bestPrefixLength` | grows only on a longer match; no match → null, `Require` throws (line 74) |
-| `src/TechieRag/Llm/LlmProviderFactory.cs:78` | `Create` | `LlmSource.Subscription` arm | throws `SubscriptionNeedsSignIn` naming the builder method |
-| `src/TechieRag/Llm/LlmProviderFactory.cs:133` | `CreateSubscription` | `connector.Name` switch | only `chatgpt-subscription` with `Permitted`; else `CodeNotPermitted` with the terms text (148) |
-| `src/TechieRag/TechieRagBuilder.cs:892` | `CreateLlmProviderFromConfig` | default switch arm | `"Unsupported LLM source: Subscription"` (defect below) |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:76` | `Create` | `connector.SessionHeader` | passed to `OpenAICompatibleLlmProvider`; `headers: null` (75) |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:80` | `Create` | `LlmSource.Subscription` arm | throws `SubscriptionNeedsSignIn` (152) naming the builder method |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:133` | `CreateSubscription` | `connector.Name` switch | only `chatgpt-subscription` with `Permitted`; else `CodeNotPermitted` with the terms text (158) |
+| `src/TechieRag/TechieRagBuilder.cs:976` | `CreateLlmProviderFromConfig` | `LlmSource.Subscription` arm | the same `SubscriptionNeedsSignIn` message as the factory (the REQ-FN-066 fix in Known issues) |
 
 No `ModelPrefixes` on subscription rows (`SubscriptionConnectorRows.cs:12`): bare `gpt-` routes to the API-key `openai` row; use `chatgpt-subscription/<model>`.
-
-**Defect noticed:** `CreateLlmProviderFromConfig` (`TechieRagBuilder.cs:851`) has no `LlmSource.Subscription` arm, so `Llm.Connector = "chatgpt-subscription"` via `AddTechieRag(IConfiguration)` gets the generic message instead of the `SubscriptionNeedsSignIn` text at `LlmProviderFactory.cs:142`. Throwing is right; the message is not.
 
 **REQ-RAG-103 (streaming with sources):** `TechieRagClient.AskStreamWithSourcesAsync` (`src/TechieRag/TechieRagClient.cs:690`): `SearchAsync` (701), `FromSources` (702), `FromToken` per token (710), `FromCompleted` (713).
 
@@ -520,30 +522,60 @@ No `ModelPrefixes` on subscription rows (`SubscriptionConnectorRows.cs:12`): bar
 
 ---
 
-### Configuration mapping: `AddTechieRag(IConfiguration)` and `TechieRagConfig` (`TechieRag`)
+### OpenAI-compatible request headers and the session header (`TechieRag`)
 
-REQ-FN-066. Both configuration overloads now go through one internal mapper, `TechieRagConfigMapper.Apply`, so a field set in `appsettings.json` and one set on a `TechieRagConfig` object reach the built instance the same way. Before, each overload dropped `VectorStore.ApiKey`, embedding `Dimensions`/`ApiFormat`/`ApiPath`/`RequestDelayMs` and the `Prompt` section. A reflection test fails if any public settable property does not survive.
+REQ-RAG-109 / BRD-168. Some OpenAI-compatible services need more than a key. OpenCode Go refuses a request without a per-conversation id in `x-opencode-session` and asks each client to name itself. `OpenAICompatibleLlmProvider` now sends `User-Agent: TechieRag/<version>` on every request, any extra headers the host gives (one named the same replaces the library's value), and, when a session header is configured, `LlmCompletionOptions.SessionId` in it. With no `SessionId` the provider sends one random id per instance. Headers can hold secrets, so they come only through code (`WithLlmHeaders` or the `UseOpenAICompatibleLlm` overload) and are never logged.
 
-![Sevak's settings screen, July 2026: the values a host writes to the configuration section this mapper reads](screenshots/TechieRag/settings.png)
+![Sevak's LLM playground, July 2026: one chat with an OpenAI-compatible model, the kind of call that carries these headers](screenshots/TechieRag/llm-playground.png)
 
-Static-only: the July 2026 Sevak screen that edited configuration; covered by tests in tests/TechieRag.Tests — `DependencyInjection/TechieRagConfigMappingTests.cs`.
+Static-only: the July 2026 Sevak screen that called an OpenAI-compatible model; covered by tests in tests/TechieRag.Tests — `Llm/OpenAiRequestHeaderTests.cs` (six tests, a stub handler records the headers) and `Llm/LiveOpenCodeGoTests.cs` (skipped unless `TechieRagOpenCodeGoKey` is set).
 
 **Runtime:** static-only (unconfirmed)
 
-**Call chain:** `ServiceCollectionExtensions.AddTechieRag(IServiceCollection, IConfiguration)` → `IConfiguration.Get<TechieRagConfig>()` → `ServiceCollectionExtensions.AddTechieRag(IServiceCollection, Action<TechieRagBuilder>)` → `TechieRagConfigMapper.Apply(builder, config)` → `MapEmbedding` / `UseVectorStore` / `WithChunkSize` / `WithChunking` / `WithTelemetry` / `MapLlm` / `MapUsageTracking` / `MapPrompt` / `WithResilience` / `MapRerank` / `MapPersistence` → `services.AddSingleton(builder.GetConfig())` → `services.AddSingleton<ITechieRag>(sp => builder.WithLogging(loggerFactory).Build())` (lazy, on first resolve). `AddTechieRag(IServiceCollection, TechieRagConfig)` skips the bind and enters at the same `Apply`.
+**Call chain:** `TechieRagBuilder.UseConnectorLlm("opencode-go", key, model)` → `LlmConnectorCatalog.Require` → `ApplyRoute` (new `config.Llm` with `Connector`) → `Build()` → `CreateLlmProvider` → `CreateLlmProviderFromConfig` → `LlmConnectorCatalog.Find` → `sessionHeader = llmConfig.SessionHeader ?? connector?.SessionHeader` → `new OpenAICompatibleLlmProvider(endpoint, key, model, llmConfig.Headers, sessionHeader, logger)` → `ApplyHeaders`. Per call: `ChatAsync` / `ChatStreamEventsAsync` → `BuildRequest` → `CreateRequest(content, options)` → `HttpClient.SendAsync`. Outside the builder `LlmProviderFactory.Create` passes `connector.SessionHeader` with `headers: null`.
+
+`ApplyRoute` replaces `config.Llm`, so call `WithLlmHeaders` after `UseConnectorLlm`, not before.
 
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
-| `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:141` | `AddTechieRag(IConfiguration)` | `config` | a bound `TechieRagConfig`; null (missing section) throws `InvalidOperationException` |
-| `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:147` | `AddTechieRag(IConfiguration)` | delegate passed on | `builder => TechieRagConfigMapper.Apply(builder, config)`; the `TechieRagConfig` overload (line 179) passes the same lambda |
-| `src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:35` | `Apply` | third argument of `UseVectorStore` | `source.VectorStore.ApiKey` — the field the old overloads dropped |
-| `src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:52` | `MapEmbedding` | `target.ApiFormat`, `ApiPath`, `Dimensions`, `RequestDelayMs` | copied onto `builder.GetConfig().Embedding` after `UseEmbedding` (line 49) |
-| `src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:95` | `MapPrompt` | `WithPromptTemplate(SystemPrompt, ContextChunkTemplate)` | both strings applied; `MaxContextChunks`, `MaxContextTokens` copied at lines 98–99 |
-| `src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:123` | `MapRerank` | `target.Enabled` | `source.Enabled && IsRerankUsableFromConfiguration(source)`; keyless Cohere/Jina or `LocalOnnx` leaves the stage off instead of throwing at resolve |
+| `src/TechieRag/TechieRagBuilder.cs:929` | `CreateLlmProviderFromConfig` | `sessionHeader` | `x-opencode-session` for `opencode-go`; a set `LlmConfig.SessionHeader` wins |
+| `src/TechieRag/TechieRagBuilder.cs:316` | `UseOpenAICompatibleLlm` (headers overload) | `config.Llm.Headers`, `SessionHeader` | case-insensitive copy (327); session header as given (324) |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:113` | public constructor | `DefaultUserAgent` (line 24) | `TechieRag/<major.minor.patch>`, added before `ApplyHeaders` (114) |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:303` | `ApplyHeaders` | `header.Key` | removed then re-added, so a host `User-Agent` wins; blank keys skipped (301) |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:288` | `CreateRequest` | `sessionId` | `options.SessionId`, else `defaultSessionId` (30, one GUID per instance); no header when `sessionHeader` is null (286) |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:186` | `ChatAsync` | `requestMessage` | POST `chat/completions` with the session header; streaming builds it at line 235 |
 
-The instance is lazy (`ServiceCollectionExtensions.cs:72–82`): `ILoggerFactory` comes from the container inside the singleton factory and goes to `builder.WithLogging` before `Build()`. `MapPersistence` (`TechieRagConfigMapper.cs:141`) calls `WithPersistence` only when provider and connection string are both present; it always copies `DefaultUserId`.
+`SessionHeaderName` (`OpenAICompatibleLlmProvider.cs:151`) is the internal test seam the connector tests read.
 
-**Calculations on this service:** none — every method is a field copy; the only decisions are `IsRerankUsableFromConfiguration` (`TechieRagConfigMapper.cs:132`: Cohere/Jina need a non-empty `ApiKey`, `LocalOnnx` is always false, anything else true) and the persistence guard above.
+**Calculations on this service:** none; `defaultSessionId` is `Guid.NewGuid().ToString("N")`, fixed for the provider's lifetime.
+
+---
+
+### Configuration mapping: `AddTechieRag(IConfiguration)` and `TechieRagConfig` (`TechieRag`)
+
+REQ-FN-066 / REQ-FN-001. Every configuration overload goes through one internal mapper, `TechieRagConfigMapper.Apply`, so a field set in `appsettings.json` and one set on a `TechieRagConfig` object reach the built instance the same way; a reflection test fails if a public settable property does not survive. Keys come only through code (owner decision 2026-10-01): `ConfigurationKeyGuard` refuses a bound section holding any non-empty `ApiKey` or `Headers`, naming each setting, never its value. The host passes keys in the new overload `AddTechieRag(IConfiguration, Action<TechieRagBuilder>)` with `WithApiKeys(llm, embedding, vectorStore, rerank, llmFallback)` and `WithLlmHeaders`. A `TechieRagConfig` built in code may still carry keys.
+
+![Sevak's settings screen, July 2026: the values a host writes to the configuration section this mapper reads](screenshots/TechieRag/settings.png)
+
+Static-only: the July 2026 Sevak screen that edited configuration; covered by tests in tests/TechieRag.Tests — `DependencyInjection/TechieRagConfigMappingTests.cs` (`AppSettingsKeyIsRefused`, `RerankerKeyFromCodeKeepsAppSettingsRerankerOn`, `ConfigObjectBuiltInCodeMayCarryKeys`).
+
+**Runtime:** static-only (unconfirmed)
+
+**Call chain:** `ServiceCollectionExtensions.AddTechieRag(IServiceCollection, IConfiguration[, configure])` → `AddFromConfiguration` → `IConfiguration.Get<TechieRagConfig>()` → `ConfigurationKeyGuard.ThrowIfKeysPresent` → `AddTechieRag(IServiceCollection, Action<TechieRagBuilder>)` → `TechieRagConfigMapper.Apply(builder, config, configure)` → `MapAll` (`MapEmbedding` / `UseVectorStore` / `WithChunkSize` / `WithChunking` / `WithTelemetry` / `MapLlm` / `MapUsageTracking` / `MapPrompt` / `WithResilience` / `MapRerank` / `MapPersistence`) → `configure` (e.g. `WithApiKeys`) → rerank usable-check → `services.AddSingleton(builder.GetConfig())` → `services.AddSingleton<ITechieRag>(sp => builder.WithLogging(loggerFactory).Build())` (lazy). `AddTechieRag(IServiceCollection, TechieRagConfig)` skips the bind and the guard and enters at `Apply`.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:177` | `AddFromConfiguration` | `config` | a bound `TechieRagConfig`; null (missing section) throws `InvalidOperationException` |
+| `src/TechieRag/DependencyInjection/ConfigurationKeyGuard.cs:45` | `Collect` | `path`, `found` | empty for a clean section; e.g. `Llm:ApiKey` or `Llm:Headers` (49) throws at line 29 |
+| `src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:186` | `AddFromConfiguration` | delegate passed on | `builder => TechieRagConfigMapper.Apply(builder, config, configure)`; the `TechieRagConfig` overload (218) passes no `configure` |
+| `src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:37` | `Apply` | `configure` | the host's code, after `MapAll` (36); its `WithApiKeys` values land on `builder.GetConfig()` |
+| `src/TechieRag/DependencyInjection/TechieRagConfigMapper.cs:40` | `Apply` | `rerank.Enabled` | `Enabled && IsRerankUsableFromConfiguration`, judged after `configure`, so a code key keeps an appsettings reranker on |
+| `src/TechieRag/TechieRagBuilder.cs:483` | `WithApiKeys` | `config.Llm.ApiKey` etc. | set only when the argument is non-null; `llmFallback` with no fallback throws (496) |
+| `src/TechieRag/TechieRagBuilder.cs:509` | `WithLlmHeaders` | `config.Llm.Headers` | a case-insensitive copy (512) |
+
+`MapAll` (`TechieRagConfigMapper.cs:43`) passes `VectorStore.ApiKey` to `UseVectorStore` (47), copies embedding `ApiFormat`/`ApiPath`/`Dimensions`/`RequestDelayMs` (64–67), prompt limits (112–113) and `Headers`/`SessionHeader` in `CopyLlm` (93–94). `MapRerank` (128) now copies `Enabled` as is. The instance is lazy (`ServiceCollectionExtensions.cs:72–82`). `MapPersistence` (153) calls `WithPersistence` only with provider and connection string.
+
+**Calculations on this service:** none — field copies; the decisions are `IsRerankUsableFromConfiguration` (`TechieRagConfigMapper.cs:146`: Cohere/Jina need an `ApiKey`, `LocalOnnx` false, else true), the key guard and the persistence guard.
 
 ---
 
@@ -645,8 +677,8 @@ Static-only: the July 2026 Sevak screen that showed search results; covered by t
 
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
-| `src/TechieRag/TechieRagBuilder.cs:557` | `WithReranker(Func<IReranker>, …)` | `config.Rerank.Enabled` / `Source` | `true` / `RerankSource.Custom`; `WithRerankEnabledByDefault(false)` afterwards (line 578) flips only `Enabled` |
-| `src/TechieRag/TechieRagBuilder.cs:740` | `CreateReranker` | `LocalOnnx` without a factory | throws only when `Enabled` is true, else null; the factory branch at line 732 wins first |
+| `src/TechieRag/TechieRagBuilder.cs:628` | `WithReranker(Func<IReranker>, …)` | `config.Rerank.Enabled` / `Source` | `true` / `RerankSource.Custom`; `WithRerankEnabledByDefault(false)` afterwards (line 651) flips only `Enabled` |
+| `src/TechieRag/TechieRagBuilder.cs:813` | `CreateReranker` | `LocalOnnx` without a factory | throws only when `Enabled` is true, else null; the factory branch at line 807 wins first |
 | `src/TechieRag/TechieRagClient.cs:449` | `ResolveRerank` | `requested` | `options.Rerank ?? config.Rerank.Enabled`; no reranker configured logs a warning and returns false (line 452) |
 | `src/TechieRag/TechieRagClient.cs:420` | `SearchAsync` | `fetchCount` | `Math.Max(topK, config.Rerank.CandidateCount)` (default 20) when reranking, else `topK` |
 | `src/TechieRag/TechieRagClient.cs:468` | `ApplyRerankAsync` | `topN` | `Math.Min(config.Rerank.TopN, topK)` when `TopN > 0`, else `topK` |
@@ -689,7 +721,7 @@ Static-only: the July 2026 Sevak screen that showed usage; covered by tests in t
 Phase 1's flows are unchanged and stay in `docs/TechieRag-DevGuide.md` (data connectors, MCP client, flow orchestration, web ingestion, workspaces and memory, speech, telemetry, resilience). Phase 2 changed three of them; the rest of this section says where.
 
 ### Configuration
-**Call chain:** `ServiceCollectionExtensions.AddTechieRag(IConfiguration)` → `TechieRagConfigMapper` → `TechieRagBuilder.Build()`; every field the builder accepts is mapped (entry "Configuration mapping" above). Environment variables the library reads: `TECHIERAG_MODEL_ROOT`, `TECHIERAG_MODEL_BASE_URL`, `TECHIERAG_RERANKER_BASE_URL`, `TECHIERAG_PROBE_AUTORUN` (probe only).
+**Call chain:** `ServiceCollectionExtensions.AddTechieRag(IConfiguration)` → `TechieRagConfigMapper` → `TechieRagBuilder.Build()`; every field the builder accepts is mapped, and keys or headers in the section are refused; they come in code through `WithApiKeys` / `WithLlmHeaders` (entry "Configuration mapping" above). Environment variables the library reads: `TECHIERAG_MODEL_ROOT`, `TECHIERAG_MODEL_BASE_URL`, `TECHIERAG_RERANKER_BASE_URL`, `TECHIERAG_PROBE_AUTORUN` (probe only).
 
 ### Model files on disk
 **Call chain:** `ModelRoot.Current` → `ModelDownloadService.DownloadAsync` → `<ModelRoot>/<model>` (embedding, reranker) or `<ModelRoot>/<model>-<format>` (local model, with a `.techierag-verified` marker); entries "Model root and the phone default", "Download size, decline and resume" and "Terms, download and verification" above.

@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Usage Guide</h1>
-    <div class="sub">Last rendered: 2026-09-25</div>
+    <div class="sub">Last rendered: 2026-10-01</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#test-users">Test users</a></li>
@@ -120,6 +120,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-techierag-local-terms-and-download">Local model (TechieRag.Local): terms and download</a></li>
         <li class="h3"><a href="#local-model-techierag-local-generation-and-limits">Local model (TechieRag.Local): generation and limits</a></li>
         <li class="h3"><a href="#llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output</a></li>
+        <li class="h3"><a href="#openai-compatible-headers-and-opencode-go">OpenAI-compatible headers and OpenCode Go</a></li>
         <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
         <li class="h3"><a href="#typed-streaming-and-the-streaming-agent-loop">Typed streaming and the streaming agent loop</a></li>
         <li class="h3"><a href="#subscription-catalog">Subscription catalog</a></li>
@@ -143,7 +144,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Usage Guide</h1>
-    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-UsageGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-01 &middot; source <code>TechieRag-UsageGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -159,6 +160,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-techierag-local-terms-and-download">Local model (TechieRag.Local): terms and download</a></li>
         <li class="h3"><a href="#local-model-techierag-local-generation-and-limits">Local model (TechieRag.Local): generation and limits</a></li>
         <li class="h3"><a href="#llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output</a></li>
+        <li class="h3"><a href="#openai-compatible-headers-and-opencode-go">OpenAI-compatible headers and OpenCode Go</a></li>
         <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
         <li class="h3"><a href="#typed-streaming-and-the-streaming-agent-loop">Typed streaming and the streaming agent loop</a></li>
         <li class="h3"><a href="#subscription-catalog">Subscription catalog</a></li>
@@ -186,7 +188,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>App</td><td>TechieRag</td></tr>
 <tr><td>Kind</td><td>library</td></tr>
 <tr><td>Size</td><td>Large</td></tr>
-<tr><td>Date</td><td>2026-09-24</td></tr>
+<tr><td>Date</td><td>2026-10-01</td></tr>
 </tbody>
 </table>
 <h2 id="test-users">Test users<a class="anchor-link" href="#test-users">#</a></h2>
@@ -199,6 +201,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>3</td><td><code>TechieRagTestPostgres</code></td><td>environment variable holding a PostgreSQL connection string; enables <code>LivePgVectorStoreTests</code></td><td>Maintainer</td><td>set per machine</td></tr>
 <tr><td>4</td><td>staged weights under <code>~/.cache/techierag-models/bge-reranker-v2-m3</code> and <code>bge-m3</code></td><td>files on disk; enable the live reranker and embedder tests</td><td>Maintainer</td><td>ask owner</td></tr>
 <tr><td>5</td><td><code>TechieRagLiveLocalModel</code> (optional model id) and a local model downloaded under the model root</td><td>environment variable plus files on disk; enable the live <code>TechieRag.Local</code> tests once a runtime is chosen for the platform</td><td>Maintainer</td><td>set per machine</td></tr>
+<tr><td>6</td><td><code>TechieRagOpenCodeGoKey</code></td><td>environment variable holding an OpenCode Go key; enables <code>LiveOpenCodeGoTests</code> (test-only: apps pass keys in code)</td><td>Maintainer</td><td>set per machine</td></tr>
 </tbody>
 </table>
 <h2 id="execution-guide">Execution guide<a class="anchor-link" href="#execution-guide">#</a></h2>
@@ -247,9 +250,9 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <ul>
 <li><strong>Sign in as:</strong> user 1
 </li>
-<li><strong>Steps:</strong> 1) put a <code>TechieRag</code> section in an <code>appsettings.json</code> with embedding, vector store and LLM values 2) call <code>services.AddTechieRag(configuration.GetSection("TechieRag"))</code> and resolve <code>ITechieRag</code> 3) change only the vector store type in the file and resolve again
+<li><strong>Steps:</strong> 1) a keyless <code>TechieRag</code> section in <code>appsettings.json</code> 2) <code>services.AddTechieRag(section, rag =&gt; rag.WithApiKeys(vectorStore: key))</code>, resolve <code>ITechieRag</code> 3) change the store type, resolve again 4) add a <code>VectorStore:ApiKey</code>, register again
 </li>
-<li><strong>Expected:</strong> the instance uses the configured providers, including <code>VectorStore.ApiKey</code> and the <code>Prompt</code> section; the second resolution uses the new store with no code change.
+<li><strong>Expected:</strong> configured providers and the code key are used; step 3 uses the new store; step 4 is refused, naming the setting, not its value.
 </li>
 <li><strong>Covers:</strong> REQ-FN-001, REQ-FN-066
 </li>
@@ -298,6 +301,17 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Covers:</strong> REQ-RAG-006, REQ-RAG-007, REQ-RAG-008, REQ-RAG-099, REQ-RAG-103
 </li>
 </ul>
+<h3 id="openai-compatible-headers-and-opencode-go">OpenAI-compatible headers and OpenCode Go<a class="anchor-link" href="#openai-compatible-headers-and-opencode-go">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 6
+</li>
+<li><strong>Steps:</strong> 1) <code>.UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, "kimi-k2.7-code")</code> 2) <code>ChatAsync</code> twice with one <code>LlmCompletionOptions.SessionId</code> 3) <code>UseOpenAICompatibleLlm(endpoint, key, model, new Dictionary&lt;string, string&gt; { ["x-tag"] = "1" }, "x-session")</code>
+</li>
+<li><strong>Expected:</strong> 1)–2) answers, not 400 <code>MissingSessionID</code>; both requests carry the same <code>x-opencode-session</code>; 3) every request carries <code>x-tag</code> and <code>x-session</code>.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-109
+</li>
+</ul>
 <h3 id="agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows<a class="anchor-link" href="#agent-loop-mcp-tools-and-flows">#</a></h3>
 <ul>
 <li><strong>Sign in as:</strong> user 1, with a provider that supports tool calling
@@ -326,18 +340,18 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 </li>
 <li><strong>Steps:</strong> 1) list <code>LlmConnectorCatalog.All.Where(c =&gt; c.Source == LlmSource.Subscription)</code> and read each row's <code>Subscription.Terms</code>, <code>AppliesTo</code> and <code>CheckedOn</code> 2) call <code>LlmProviderFactory.CreateSubscription(ModelRouter.Require("claude-subscription/claude-sonnet-4-5"), callback)</code>
 </li>
-<li><strong>Expected:</strong> 1) six rows (ChatGPT, Claude, Gemini, Grok, Groq, Meta), each with its terms and the date 2026-09-24; only <code>chatgpt-subscription</code> is permitted and names <code>UseChatGptSubscriptionLlm</code>; Anthropic's reads "Not permitted"; 2) <code>SubscriptionSignInException</code> with code <code>SubscriptionNotPermitted</code> carrying Anthropic's terms. The research behind each row is in <code>DECISIONS.md</code>.
+<li><strong>Expected:</strong> 1) six rows (ChatGPT, Claude, Gemini, Grok, Groq, Meta), each with its terms and the date 2026-09-24; only <code>chatgpt-subscription</code> (<code>LlmConnectorCatalog.ChatGptSubscriptionName</code>) is permitted and names <code>UseChatGptSubscriptionLlm</code>; Anthropic's reads "Not permitted"; 2) <code>SubscriptionSignInException</code> with code <code>SubscriptionNotPermitted</code> carrying Anthropic's terms. The research behind each row is in <code>DECISIONS.md</code>.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-070, REQ-FN-062
 </li>
 </ul>
 <h3 id="subscription-sign-in-chatgpt">Subscription sign-in (ChatGPT)<a class="anchor-link" href="#subscription-sign-in-chatgpt">#</a></h3>
 <ul>
-<li><strong>Sign in as:</strong> user 1, with a ChatGPT account whose device-code sign-in is on (ChatGPT → Settings → Security; Business or Enterprise need their admin's consent)
+<li><strong>Sign in as:</strong> user 1, with a ChatGPT account whose device-code sign-in is on (Settings → Security)
 </li>
-<li><strong>Steps:</strong> 1) build with <code>.UseChatGptSubscriptionLlm((prompt, ct) =&gt; { OpenBrowser(prompt.VerificationUri); ShowCode(prompt.UserCode); return Task.CompletedTask; })</code>; the host opens the browser, never the library 2) call <code>AskAsync("What does TechieRag do?")</code>, enter the code and approve 3) restart with <code>new ChatGptSubscriptionOptions { SessionStore = mySecureStore }</code> and ask again
+<li><strong>Steps:</strong> 1) build with <code>.UseChatGptSubscriptionLlm((prompt, ct) =&gt; { OpenBrowser(prompt.VerificationUri); ShowCode(prompt.UserCode); return Task.CompletedTask; })</code>; the host opens the browser, never the library 2) call <code>AskAsync("What does TechieRag do?")</code>, enter the code and approve 3) restart with <code>new ChatGptSubscriptionOptions { SessionStore = mySecureStore }</code> and ask again 4) clear the store, use a callback that throws, ask again
 </li>
-<li><strong>Expected:</strong> 1)–2) the callback receives <code>https://auth.openai.com/codex/device</code> and a one-time code; once approved the answer arrives, billed to the ChatGPT plan; 3) with the session saved, nothing is asked. Choose a model with <code>ChatGptSubscriptionOptions.Model</code> or route <code>chatgpt-subscription/&lt;model&gt;</code>.
+<li><strong>Expected:</strong> 1)–2) the callback receives <code>https://auth.openai.com/codex/device</code> and a one-time code; once approved the answer arrives; 3) nothing is asked; 4) <code>SubscriptionSignInException</code> with code <code>SubscriptionSignInRequired</code>. Choose a model with <code>ChatGptSubscriptionOptions.Model</code> or route <code>chatgpt-subscription/&lt;model&gt;</code>.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-069
 </li>
@@ -405,10 +419,11 @@ bash .tfcore/utils/tf-build.sh test tests/TechieRag.Agents.Tests/TechieRag.Agent
 TechieRagLiveLmStudioModel=qwen3-8b dotnet test tests/TechieRag.Agents.Tests --filter "Category=LiveLmStudio"   # optional TechieRagLiveLmStudioEndpoint
 bash .tfcore/utils/tf-build.sh test tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj
 TechieRagLiveLocalModel=qwen2.5-0.5b-instruct dotnet test tests/TechieRag.Local.Tests --filter LiveLocalLlmTests
-TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter LiveHuggingFaceTests   # downloads about 900 MB</code></pre>
-<p><code>TechieRag.Local.Tests</code> runs the runtime-neutral conformance suite (<code>LocalLlmConformanceTests</code>) against a scripted runtime, plus the provider, template, stop-sequence, memory, registration and catalog tests, and the download tests against a loopback HTTP server. Its three live tests (<code>LiveLocalLlmTests</code>, collection <code>LiveLocalLlm</code>, one at a time) skip with a printed reason until the platform has a runtime and the model is downloaded; they never download.
-<code>TechieRag.Agents.Tests</code> (28 methods on 2026-09-24) runs the Agent Framework builder and the four seam adapters against a scripted <code>IChatClient</code> and a real <code>TechieRagClient</code>; its two LM Studio tests skip with a reason unless <code>TechieRagLiveLmStudioModel</code> names a loaded tool-capable model.
-1,097 xUnit tests across the three test projects (930 core, 141 local model, 26 agents); 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-25 through the build ladder.</p>
+TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter LiveHuggingFaceTests   # downloads about 900 MB
+TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=LiveOpenCodeGo"</code></pre>
+<p><code>TechieRag.Local.Tests</code> runs the conformance suite against a scripted runtime and the download tests against a loopback server; its live tests skip with a reason until a model is downloaded, and never download.
+<code>TechieRag.Agents.Tests</code> runs the builder and seam adapters against a scripted <code>IChatClient</code>; its LM Studio tests skip unless <code>TechieRagLiveLmStudioModel</code> is set.
+1,125 xUnit tests across the three test projects (952 core, 143 local model, 30 agents); 41 live tests skip with a reason when their environment is absent. Core and agents PASS on 2026-10-01; local-model tests need about 4.6 GB of free memory for phi-3-mini and fail with <code>LocalModelMemoryException</code> below that.</p>
 <h2 id="known-limitations">Known limitations<a class="anchor-link" href="#known-limitations">#</a></h2>
 <ul>
 <li>SQLite search is an exact managed scan by design (no sqlite-vec, no approximate index): 0.24 s at 50,000 chunks of 1024 dimensions on a desktop (Platform notes). Past a few hundred thousand chunks, use pgvector or Qdrant.
@@ -429,6 +444,10 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 </li>
 <li><code>TechieRag.Agents</code>: citation refs live in memory against the <code>AgentSession</code> object, so a serialized and restored session restarts at S1; a traced agent (<code>WithTrace</code>) runs one turn at a time; MAF approval requests (<code>PendingApprovals</code>) are surfaced, not resumed for you.
 </li>
+<li>Keys are refused in an appsettings section (any <code>ApiKey</code> or <code>Headers</code>); pass them in code with <code>AddTechieRag(section, rag =&gt; rag.WithApiKeys(...))</code> (REQ-FN-066). An app that kept keys there fails at startup after upgrading.
+</li>
+<li>The <code>opencode-go</code> connector reaches OpenCode Go's <code>chat/completions</code> models only; its <code>/responses</code> and <code>/messages</code> models are not reached (REQ-RAG-109).
+</li>
 <li>Ollama's request mapping sends no <code>tool_calls</code> on assistant messages and Gemini's sends tool results as a <code>tool</code> role, not <code>functionResponse</code>; multi-turn tool use there relies on the server tolerating that (unchanged by REQ-RAG-067).
 </li>
 </ul>
@@ -447,7 +466,7 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 <ol>
 <li>Shipped 2026-09-24 (REQ-RAG-016); plain .NET, no native code; the probe does not exercise it.
 </li>
-<li>ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native <code>dotnet test</code>) and the probe generated (2026-09-25). Android: the probe generated on the owner's Galaxy S23, downloading from the default Hugging Face address (all six fingerprints matched); the xUnit suite does not run on Android. iOS ran on a <strong>simulator</strong> only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
+<li>ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25; Mac Catalyst wiring REQ-FN-058). Windows and the Galaxy S23 generated through the probe; iOS ran on a <strong>simulator</strong> only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
 </li>
 </ol>
 <h3 id="local-model-measured-per-platform-req-fn-060-brd-108">Local model: measured per platform (REQ-FN-060, BRD-108)<a class="anchor-link" href="#local-model-measured-per-platform-req-fn-060-brd-108">#</a></h3>
@@ -467,7 +486,7 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 <tr><td>iOS</td><td>owner's iPhone</td><td>not yet run</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
 </tbody>
 </table>
-<p>Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Catalyst and iOS, the probe's peak physical footprint (matches <code>footprint &lt;pid&gt;</code>, what the iOS limit counts). Probe peak memory figures recorded up to 2026-09-25 are binary megabytes (labelled MB until that day's fix), about 5 percent under the decimal figure shown now. First token includes reading the prompt. Ranges: a run after the download and a fresh launch; the laptop and its emulator share a host, so speeds vary with load. Evidence: <code>tests/.artifacts/probe/</code> (per head) and <code>tests/.artifacts/local-llm-bench/</code>.</p>
+<p>Peak memory: Windows, peak working set; macOS, peak resident set; Mac Catalyst and iOS, peak physical footprint. First token includes reading the prompt. Evidence: <code>tests/.artifacts/probe/</code> and <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <h3 id="local-model-engine-comparison-on-the-windows-laptop-2026-09-24">Local model: engine comparison on the Windows laptop (2026-09-24)<a class="anchor-link" href="#local-model-engine-comparison-on-the-windows-laptop-2026-09-24">#</a></h3>
 <p>Both engines on the Windows 11 laptop (Core i5-11300H, 16 GB; WSL gets 7.6 GB) before the owner chose one (<code>DECISIONS.md</code> 2026-09-25). Same prompt, greedy, 128 tokens, three runs per row. Raw JSON: <code>tests/.artifacts/local-llm-bench/</code>.</p>
 <table>
@@ -610,7 +629,7 @@ var rag = new TechieRagBuilder()
     .WithLogging(loggerFactory)
     .Build();
 
-services.AddTechieRag(configuration.GetSection("TechieRag"));   // or the appsettings path</code></pre>
+services.AddTechieRag(configuration.GetSection("TechieRag"), rag =&gt; rag.WithApiKeys(llm: llmKey));   // appsettings path; keys only in code</code></pre>
 <p>One call per public service:</p>
 <table>
 <thead><tr><th>Service</th><th>Call</th></tr></thead>

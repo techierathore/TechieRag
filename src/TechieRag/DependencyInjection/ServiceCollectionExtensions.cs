@@ -128,11 +128,47 @@ public static class ServiceCollectionExtensions
     /// Thrown when services or configuration is null.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the configuration section is missing or cannot be bound.
+    /// Thrown when the configuration section is missing or cannot be bound, or when it holds a key
+    /// (any <c>ApiKey</c> or <c>Headers</c> value): keys are passed only in code.
     /// </exception>
     public static IServiceCollection AddTechieRag(
         this IServiceCollection services,
         IConfiguration configuration)
+        => AddFromConfiguration(services, configuration, configure: null);
+
+    /// <summary>
+    /// Adds TechieRag services from an <see cref="IConfiguration"/> section, then applies the host's code,
+    /// which is where keys and dependencies are supplied (REQ-FN-066 / BRD-159).
+    /// </summary>
+    /// <param name="services">The service collection to add to.</param>
+    /// <param name="configuration">The <c>TechieRag</c> section; it must hold no keys.</param>
+    /// <param name="configure">Runs after the section is mapped: pass keys with
+    /// <see cref="TechieRagBuilder.WithApiKeys"/> and <see cref="TechieRagBuilder.WithLlmHeaders"/>, or any
+    /// other builder call such as a custom provider.</param>
+    /// <returns>The service collection for method chaining.</returns>
+    /// <remarks>
+    /// <code>
+    /// builder.Services.AddTechieRag(
+    ///     builder.Configuration.GetSection("TechieRag"),
+    ///     rag => rag.WithApiKeys(llm: secrets.OpenAiKey, vectorStore: secrets.QdrantKey));
+    /// </code>
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when services, configuration or configure is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the section is missing or cannot be bound,
+    /// or when it holds a key; the message names each key's setting, never its value.</exception>
+    public static IServiceCollection AddTechieRag(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        Action<TechieRagBuilder> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        return AddFromConfiguration(services, configuration, configure);
+    }
+
+    private static IServiceCollection AddFromConfiguration(
+        IServiceCollection services,
+        IConfiguration configuration,
+        Action<TechieRagBuilder>? configure)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -143,8 +179,11 @@ public static class ServiceCollectionExtensions
                 "TechieRag configuration section not found or could not be bound. " +
                 "Ensure the configuration section exists and contains valid TechieRag settings.");
 
-        // REQ-FN-066: one mapper for both overloads, so every bound field reaches the builder.
-        return services.AddTechieRag(builder => TechieRagConfigMapper.Apply(builder, config));
+        // Keys and dependencies are injected only through code (owner decision 2026-10-01).
+        ConfigurationKeyGuard.ThrowIfKeysPresent(config);
+
+        // REQ-FN-066: one mapper for every overload, so every bound field reaches the builder.
+        return services.AddTechieRag(builder => TechieRagConfigMapper.Apply(builder, config, configure));
     }
 
     /// <summary>

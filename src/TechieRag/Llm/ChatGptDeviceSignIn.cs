@@ -41,7 +41,8 @@ internal sealed class ChatGptDeviceSignIn
     /// <param name="signInCallback">The host's callback that shows the user the page and code.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The new session.</returns>
-    /// <exception cref="SubscriptionSignInException">The vendor refused, or the user did not authorise in time.</exception>
+    /// <exception cref="SubscriptionSignInException">The vendor refused, the user did not authorise in time,
+    /// or the callback threw (<see cref="SubscriptionSignInException.CodeSignInRequired"/>).</exception>
     public async Task<SubscriptionSession> SignInAsync(
         Func<SubscriptionSignInPrompt, CancellationToken, Task> signInCallback,
         CancellationToken cancellationToken)
@@ -49,13 +50,25 @@ internal sealed class ChatGptDeviceSignIn
         var device = await RequestUserCodeAsync(cancellationToken).ConfigureAwait(false);
         var expiresAt = options.Clock() + options.SignInTimeout;
 
-        await signInCallback(new SubscriptionSignInPrompt
+        try
         {
-            ConnectorName = SubscriptionConnectorRows.ChatGptName,
-            VerificationUri = IssuerUri("codex/device"),
-            UserCode = device.UserCode,
-            ExpiresAt = expiresAt
-        }, cancellationToken).ConfigureAwait(false);
+            await signInCallback(new SubscriptionSignInPrompt
+            {
+                ConnectorName = SubscriptionConnectorRows.ChatGptName,
+                VerificationUri = IssuerUri("codex/device"),
+                UserCode = device.UserCode,
+                ExpiresAt = expiresAt
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not SubscriptionSignInException and not OperationCanceledException)
+        {
+            // TR-RAG-005: a callback that cannot show the prompt now (no window during a model turn) throws;
+            // the host gets one coded exception to turn into "sign in again".
+            throw new SubscriptionSignInException(
+                SubscriptionSignInException.CodeSignInRequired,
+                "The ChatGPT subscription needs a new sign-in and the host's sign-in callback did not show it.",
+                ex);
+        }
 
         var grant = await PollForAuthorisationAsync(device, expiresAt, cancellationToken).ConfigureAwait(false);
         return await ExchangeCodeAsync(grant, cancellationToken).ConfigureAwait(false);

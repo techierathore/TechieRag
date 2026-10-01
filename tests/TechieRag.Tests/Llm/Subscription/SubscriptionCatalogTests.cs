@@ -52,6 +52,20 @@ public class SubscriptionCatalogTests
         Assert.StartsWith("Not permitted", terms.Terms, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Chatur TR-RAG-004: the ChatGPT subscription connector's key is a public constant, so a host finds
+    /// the row and its terms without writing <c>"chatgpt-subscription"</c> itself.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-070 ChatGptConnectorNameIsPublic")]
+    public void ChatGptConnectorNameIsPublic()
+    {
+        var row = LlmConnectorCatalog.Find(LlmConnectorCatalog.ChatGptSubscriptionName);
+
+        Assert.Equal("chatgpt-subscription", LlmConnectorCatalog.ChatGptSubscriptionName);
+        Assert.NotNull(row);
+        Assert.True(row.Subscription!.Permitted);
+    }
+
     /// <summary>Only OpenAI's row is permitted, and it names the builder method that exists.</summary>
     [Fact]
     public void OnlyChatGptIsPermitted()

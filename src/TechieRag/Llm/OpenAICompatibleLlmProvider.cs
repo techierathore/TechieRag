@@ -21,8 +21,13 @@ namespace TechieRag.Llm;
 /// </remarks>
 public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
+    private static readonly string DefaultUserAgent =
+        $"TechieRag/{typeof(OpenAICompatibleLlmProvider).Assembly.GetName().Version?.ToString(3)}";
+
     private readonly HttpClient httpClient;
     private readonly string completionsPath;
+    private readonly string? sessionHeader;
+    private readonly string defaultSessionId = Guid.NewGuid().ToString("N");
     private readonly ILogger<OpenAICompatibleLlmProvider> logger;
 
     /// <inheritdoc/>
@@ -53,11 +58,34 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="model">Model name (e.g., "gpt-4o").</param>
     /// <param name="logger">Logger instance.</param>
     public OpenAICompatibleLlmProvider(string endpoint, string apiKey, string model, ILogger<OpenAICompatibleLlmProvider>? logger = null)
+        : this(endpoint, apiKey, model, headers: null, sessionHeader: null, logger)
+    {
+    }
+
+    /// <summary>
+    /// Creates an OpenAI-compatible provider that sends extra headers and a per-conversation session id
+    /// (REQ-RAG-109).
+    /// </summary>
+    /// <param name="endpoint">API endpoint (e.g., "https://opencode.ai/zen/go/v1").</param>
+    /// <param name="apiKey">API key for authentication.</param>
+    /// <param name="model">Model name.</param>
+    /// <param name="headers">Headers sent on every request; one named here replaces the library's own value.</param>
+    /// <param name="sessionHeader">The header that carries <see cref="LlmCompletionOptions.SessionId"/>,
+    /// e.g. <c>x-opencode-session</c>; null sends none.</param>
+    /// <param name="logger">Logger instance; never receives a header value.</param>
+    public OpenAICompatibleLlmProvider(
+        string endpoint,
+        string apiKey,
+        string model,
+        IReadOnlyDictionary<string, string>? headers,
+        string? sessionHeader,
+        ILogger<OpenAICompatibleLlmProvider>? logger = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(endpoint);
         ArgumentException.ThrowIfNullOrEmpty(model);
 
         ModelName = model;
+        this.sessionHeader = string.IsNullOrWhiteSpace(sessionHeader) ? null : sessionHeader;
         this.logger = logger ?? NullLogger<OpenAICompatibleLlmProvider>.Instance;
 
         // The request URI is composed as "{endpoint}/chat/completions", by keeping the whole endpoint
@@ -80,6 +108,10 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         {
             httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
         }
+
+        // Services such as OpenCode Go ask each client to name itself rather than send an HTTP library's name.
+        httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", DefaultUserAgent);
+        ApplyHeaders(httpClient, headers);
     }
 
     /// <summary>
@@ -89,13 +121,22 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
     /// <param name="model">Model name.</param>
     /// <param name="logger">Logger instance.</param>
-    internal OpenAICompatibleLlmProvider(HttpClient httpClient, string model, ILogger<OpenAICompatibleLlmProvider>? logger = null)
+    /// <param name="headers">Headers sent on every request.</param>
+    /// <param name="sessionHeader">The header that carries the session id, or null for none.</param>
+    internal OpenAICompatibleLlmProvider(
+        HttpClient httpClient,
+        string model,
+        ILogger<OpenAICompatibleLlmProvider>? logger = null,
+        IReadOnlyDictionary<string, string>? headers = null,
+        string? sessionHeader = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
         ModelName = model;
         completionsPath = "/v1/chat/completions";
+        this.sessionHeader = string.IsNullOrWhiteSpace(sessionHeader) ? null : sessionHeader;
         this.logger = logger ?? NullLogger<OpenAICompatibleLlmProvider>.Instance;
+        ApplyHeaders(httpClient, headers);
     }
 
     /// <summary>
@@ -104,6 +145,10 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// </summary>
     /// <remarks>Test seam for REQ-RAG-034: lets endpoint composition be asserted without a network call.</remarks>
     internal Uri EffectiveCompletionsUri => new(httpClient.BaseAddress!, completionsPath);
+
+    /// <summary>The header the session id travels in, or null for none.</summary>
+    /// <remarks>Test seam for REQ-RAG-109: lets connector wiring be asserted without a network call.</remarks>
+    internal string? SessionHeaderName => sessionHeader;
 
     /// <inheritdoc/>
     public async Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
@@ -138,7 +183,8 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync(completionsPath, content, cancellationToken).ConfigureAwait(false);
+        using var requestMessage = CreateRequest(content, options);
+        var response = await httpClient.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
         LlmHttpGuard.EnsureSuccess(response);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -186,7 +232,7 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var requestMessage = new HttpRequestMessage(HttpMethod.Post, completionsPath) { Content = content };
+        using var requestMessage = CreateRequest(content, options);
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         LlmHttpGuard.EnsureSuccess(response);
 
@@ -232,6 +278,31 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     {
         if (string.IsNullOrEmpty(text)) return 0;
         return (int)Math.Ceiling(text.Length / 4.0);
+    }
+
+    private HttpRequestMessage CreateRequest(HttpContent content, LlmCompletionOptions? options)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, completionsPath) { Content = content };
+        if (sessionHeader is not null)
+        {
+            var sessionId = string.IsNullOrWhiteSpace(options?.SessionId) ? defaultSessionId : options.SessionId;
+            request.Headers.TryAddWithoutValidation(sessionHeader, sessionId);
+        }
+
+        return request;
+    }
+
+    private static void ApplyHeaders(HttpClient client, IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null) return;
+
+        foreach (var header in headers)
+        {
+            if (string.IsNullOrWhiteSpace(header.Key)) continue;
+
+            client.DefaultRequestHeaders.Remove(header.Key);
+            client.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+        }
     }
 
     private object BuildRequest(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options, bool stream)

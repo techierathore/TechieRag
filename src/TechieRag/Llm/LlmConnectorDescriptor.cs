@@ -41,6 +41,12 @@ public sealed record LlmConnectorDescriptor
     public bool RequiresApiKey { get; init; } = true;
 
     /// <summary>
+    /// Gets the header this service reads a per-conversation session id from, or null when it reads none
+    /// (REQ-RAG-109). The id is <c>LlmCompletionOptions.SessionId</c>.
+    /// </summary>
+    public string? SessionHeader { get; init; }
+
+    /// <summary>
     /// Gets the vendor's stated terms for subscription sign-in and the date they were checked, or null
     /// for a connector that is not a <see cref="LlmSource.Subscription"/> connector (REQ-RAG-070 / BRD-113).
     /// </summary>

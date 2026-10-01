@@ -4,18 +4,62 @@
 |---|---|
 | App | Chatur |
 | Upstream | TechieRag |
-| Updated | 2026-09-22 |
+| Updated | 2026-10-01 (TR-RAG-003, 004, 005 fixed upstream, next release after 1.0.8) |
 
 ## Summary
 
-2 entries: 1 blocking now, 1 filed and not blocking, 0 fixed upstream.
+5 entries: 0 open, 3 fixed upstream and not yet re-checked here (TR-RAG-003, 004, 005, in the next TechieRag release after 1.0.8), 2 closed (TR-RAG-001, 002, fixed in 1.0.8). Nothing is blocked.
 
-REQ-FN-016 ("Sign in to a ChatGPT subscription") is blocked. Nothing else is blocked.
+TR-RAG-003 no longer blocks OpenCode Go: use the `opencode-go` connector and pass one `SessionId` per conversation. The fix was tested against OpenCode Go with the owner's key, and the reply came back.
 
 ## Entries
 
+### TR-RAG-003 — An OpenAI-compatible model cannot be sent extra request headers
+
+- **Status:** fixed upstream 2026-10-01 (REQ-RAG-109, Verified), ships in the next TechieRag release after 1.0.8 — re-check from Chatur, then close
+- **Severity:** blocker
+- **Blocks:** yes — the owner chose OpenCode Go (decision 1, option A); every conversation row that
+  needs a real reply waits on it (REQ-FN-021, 022, 025–027, 033–036, REQ-UI-021, 022, 032, 033).
+  Key-only providers are not affected.
+- **Repro:** 1.0.7 and 1.0.8. `UseOpenAICompatibleLlm("https://opencode.ai/zen/go/v1", key, "kimi-k2.7-code")`
+  then `ChatAsync` → HTTP 400 `MissingSessionID` ("Request is missing x-opencode-session"). The same
+  request by hand with that header answers 200 (2026-09-30, owner's key).
+- **Expected:** Extra request headers on an OpenAI-compatible model, including one that stays the
+  same for a conversation (https://opencode.ai/docs/go/).
+- **Actual:** No header option on `UseOpenAICompatibleLlm` or `LlmConfig`; the `HttpClient`
+  constructor of `OpenAICompatibleLlmProvider` is internal; no `opencode` catalog entry.
+- **Encountered in:** REQ-FN-025
+- **Workaround:** None; the rows stay blocked.
+- **Suggested fix:** `LlmConfig.Headers` (like `McpServerConfig.Headers`) plus a per-call session id
+  in `LlmCompletionOptions`; or a public `HttpClient` constructor; or an `opencode-go` catalog entry.
+
+### TR-RAG-004 — The ChatGPT subscription connector's name is not public
+
+- **Status:** fixed upstream 2026-10-01 (REQ-RAG-070, Verified), ships in the next TechieRag release after 1.0.8 — re-check from Chatur, then close
+- **Severity:** minor
+- **Blocks:** no — Chatur hardcodes the name and reads the terms through the public `LlmConnectorCatalog.Find`. The work carried on.
+- **Repro:** TechieRag 1.0.8. `SubscriptionConnectorRows` and its `ChatGptName` are internal.
+- **Expected:** A public constant for the connector key, e.g. `LlmConnectorCatalog.ChatGptSubscriptionName`.
+- **Actual:** A host must write `"chatgpt-subscription"` itself and hope it never changes.
+- **Encountered in:** REQ-FN-016
+- **Workaround:** `ProviderActions.ChatGptCatalogName = "chatgpt-subscription"`, named after this entry.
+- **Suggested fix:** Make `SubscriptionConnectorRows` (or just its names) public.
+
+### TR-RAG-005 — No clear way to say "the subscription session is gone, sign in again" during a model turn
+
+- **Status:** fixed upstream 2026-10-01 (REQ-RAG-069, Verified), ships in the next TechieRag release after 1.0.8 — re-check from Chatur, then close
+- **Severity:** minor
+- **Blocks:** no — Chatur's sign-in callback throws `InvalidOperationException` during a turn, and the turn tells the owner to sign in again under Settings ▸ Providers.
+- **Repro:** TechieRag 1.0.8. `UseChatGptSubscriptionLlm` needs a sign-in callback; during a model turn a host has no window to show a code in.
+- **Expected:** A documented exception (or a documented rule that the callback may throw) meaning "not signed in any more", that the host can catch and turn into a "sign in again" message.
+- **Actual:** Nothing documents what TechieRag does when the callback throws.
+- **Encountered in:** REQ-FN-016
+- **Workaround:** As above; not confirmed against TechieRag's own handling.
+- **Suggested fix:** A `SubscriptionSignInException` code such as `CodeSignInRequired`, raised when a stored session is refused and no interactive callback is available.
+
 ### TR-RAG-001 — No browser-based subscription sign-in for any connector
 
+- **Status:** closed 2026-09-30 — fixed upstream in TechieRag 1.0.8 (`UseChatGptSubscriptionLlm`, device-code sign-in, `ISubscriptionSessionStore`)
 - **Severity:** blocker
 - **Blocks:** yes — REQ-FN-016, "Sign in to a ChatGPT subscription" (Settings ▸ Model providers)
 - **Repro:** `.techierag/TechieRag-AI-Reference.md` — every `TechieRagBuilder` LLM method
@@ -43,6 +87,7 @@ unreachable through TechieRag. Everything else about Chatur's provider/routing/m
 
 ### TR-RAG-002 — `ChatStreamAsync` cannot surface a tool call, so a tool-using turn can't stream
 
+- **Status:** closed 2026-09-30 — fixed upstream in TechieRag 1.0.8 (`ChatStreamEventsAsync` yields `TextDelta`, `ToolCall` and `Completed`)
 - **Severity:** minor
 - **Blocks:** no — the agent loop calls `ChatAsync` (non-streaming) whenever tools are offered, so
   every tool call still passes Chatur's guards; the real, finished answer is then paced out to the
@@ -68,10 +113,22 @@ unreachable through TechieRag. Everything else about Chatur's provider/routing/m
 
 <!-- The upstream team's answers, newest block first. Left in full: this is the record. -->
 
-### 2026-09-24 — both entries accepted
+### 2026-10-01 — TR-RAG-003, 004 and 005 fixed
 
-**TR-RAG-001 (subscription sign-in) — accepted, tracked as TechieRag BRD-112, BRD-113, BRD-114 (checklist `REQ-RAG-069`, `REQ-RAG-070`, `REQ-FN-062`).** The library gets one builder method per vendor whose terms permit it, starting with OpenAI as `UseChatGptSubscriptionLlm(signInCallback)`, exactly the shape you suggested: the library hands your callback the sign-in URL and user code, Chatur opens the browser, the library waits and yields an `ILlmProvider` billed to the user's subscription. A session-store seam lets Chatur persist the session so the user signs in once. Vendor terms are recorded as dated text in `LlmConnectorCatalog` so your Settings screen can show them before sign-in. Two facts you should know now: OpenAI permits this in external tools for personal use; Anthropic prohibits it for Free, Pro and Max plans since April 2026, so there will be no Anthropic subscription method. Google, Groq, xAI and Meta are being researched before build (BRD-114). Your `AddSubscriptionAsync` can stay `NotSupportedException` until the package ships; the mockup's `signin-browser` control needs no change.
+**TR-RAG-003 (OpenCode Go headers), REQ-RAG-109.** These are new in TechieRag:
+- A catalog connector `opencode-go` (`LlmConnectorCatalog.OpenCodeGoName`), endpoint `https://opencode.ai/zen/go/v1`. It sends `x-opencode-session` on every request.
+- `LlmCompletionOptions.SessionId`: pass the same id on every turn of one conversation, for example Chatur's conversation id. If you pass none, each provider instance uses one id of its own.
+- `LlmConfig.Headers` (bindable from `TechieRag:Llm:Headers`) and `LlmConfig.SessionHeader`, for any other OpenAI-compatible service. There is also a builder overload: `UseOpenAICompatibleLlm(endpoint, key, model, headers, sessionHeader)`.
+- OpenAI-compatible requests now send `User-Agent: TechieRag/<version>`. OpenCode Go asks each client to name itself, so set `Headers["User-Agent"] = "chatur/<version>"` if you want Chatur's own name to show.
 
-**TR-RAG-002 (streaming with tool calls) — accepted, tracked as TechieRag BRD-110 and BRD-111 (checklist `REQ-RAG-067`, `REQ-RAG-068`).** `ILlmProvider` gains an additive streaming method yielding typed events: a text delta, a decided tool call (name, arguments, id), and a final record with usage and finish reason, the way you described OpenAI's own `tool_calls` deltas. `ChatStreamAsync` stays unchanged, so nothing in Chatur breaks. All six providers implement it, `AgentLoopRunner` gets a streaming run over it, and `TechieRag.Local` (the new in-process provider) is written against it from day one. When it lands, `AgentActions.SendAsync` can drop `PaceReplyAsync` and stream the real tokens while every tool call still passes your guards.
+```csharp
+builder.UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, "kimi-k2.7-code");
+// or: LlmProviderFactory.CreateForModel("opencode-go/kimi-k2.7-code", key)
+await provider.ChatAsync(messages, new LlmCompletionOptions { SessionId = conversationId, Tools = tools });
+```
 
-Decision record: `docs/TechieRag-Update-Brief.md` (TechieRag repository), decisions 8 and 9.
+Only OpenCode Go's `chat/completions` models (Kimi, GLM, DeepSeek, …) work through this connector. The models it serves on `/responses` or `/messages` (GPT, Grok, and the Anthropic-format models) need those wire formats, so they are not covered. **Verify from here:** `UseConnectorLlm("opencode-go", key, "kimi-k2.7-code")`, then call `ChatAsync`. You should get an answer, not HTTP 400 `MissingSessionID`. TechieRag's test `REQ-RAG-109 LiveOpenCodeGoAnswersWithSessionHeader` ran that call, and a streamed call, against OpenCode Go on 2026-10-01, and both passed.
+
+**TR-RAG-004, REQ-RAG-070.** `LlmConnectorCatalog.ChatGptSubscriptionName` (`"chatgpt-subscription"`) is now public. **Verify from here:** set `ProviderActions.ChatGptCatalogName` from it.
+
+**TR-RAG-005, REQ-RAG-069.** The sign-in callback may now throw. The model call then fails with `SubscriptionSignInException` and `Code == SubscriptionSignInException.CodeSignInRequired`, with the callback's exception as `InnerException`. If the callback throws a `SubscriptionSignInException` itself, that exception keeps its own code. **Verify from here:** catch that code during a turn and show "sign in again" (Settings ▸ Providers).

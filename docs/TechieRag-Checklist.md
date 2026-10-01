@@ -14,7 +14,7 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` Â
 
 | ID | Requirement | Status | % | Remarks | Details |
 |----|-------------|--------|---|---------|---------|
-| REQ-FN-001 | Configuration & builder (fluent / appsettings / DI / config object) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-001) |
+| REQ-FN-001 | Configuration & builder (fluent / appsettings / DI / config object) | Verified | 100% | 2026-10-01 verify: PASS â€” test `REQ-FN-001 SectionConfiguresProvidersAndRefusesKeys` | [view](#d-req-fn-001) |
 | REQ-FN-002 | AI-agent autodistribution (MSBuild skill deploy) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-002) |
 | REQ-FN-003 | NuGet packaging & publishing (GitHub Actions) | Done (pre-existing) | 100% | Verified 2026-09-03 (owner dispatch of publish-nuget.yml still the owner's; version rules 9/9 incl. live nuget.org). Migrated 2026-09-24, status preserved. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-003) |
 | REQ-NFR-001 | Performance targets (token est, streaming, batch) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-001) |

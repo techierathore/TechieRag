@@ -19,6 +19,13 @@ public sealed class SubscriptionSignInException : InvalidOperationException
     /// <summary>The vendor refused the saved session and it could not be refreshed.</summary>
     public const string CodeSessionRejected = "SubscriptionSessionRejected";
 
+    /// <summary>
+    /// The user must sign in again, and the host's sign-in callback could not show the prompt now: it threw
+    /// (REQ-RAG-069). Typical during a model turn with no window to show a code in; the host catches this
+    /// and tells the user to sign in again. The callback's exception is the inner exception.
+    /// </summary>
+    public const string CodeSignInRequired = "SubscriptionSignInRequired";
+
     /// <summary>The vendor's terms do not permit this subscription to be used from a third-party app.</summary>
     public const string CodeNotPermitted = "SubscriptionNotPermitted";
 

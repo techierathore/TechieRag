@@ -72,6 +72,8 @@ public static class LlmProviderFactory
                 connector.Endpoint ?? throw new InvalidOperationException($"Connector '{connector.Name}' has no endpoint."),
                 apiKey ?? string.Empty,
                 route.ModelId,
+                headers: null,
+                connector.SessionHeader,
                 loggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>()),
 
             // REQ-RAG-070: a subscription has no API key; it needs the host's sign-in callback.

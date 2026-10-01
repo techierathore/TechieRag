@@ -25,11 +25,23 @@ internal static class TechieRagConfigMapper
     /// </summary>
     /// <param name="builder">The builder being configured.</param>
     /// <param name="source">The configuration to copy from.</param>
-    /// <exception cref="ArgumentNullException">Thrown when either argument is null.</exception>
-    internal static void Apply(TechieRagBuilder builder, TechieRagConfig source)
+    /// <param name="configure">The host's code, run after the mapping and before the rerank stage is
+    /// judged usable, so a key it passes (REQ-FN-066) can make an API reranker usable; null for none.</param>
+    /// <exception cref="ArgumentNullException">Thrown when builder or source is null.</exception>
+    internal static void Apply(TechieRagBuilder builder, TechieRagConfig source, Action<TechieRagBuilder>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(source);
+
+        MapAll(builder, source);
+        configure?.Invoke(builder);
+
+        var rerank = builder.GetConfig().Rerank;
+        rerank.Enabled = rerank.Enabled && IsRerankUsableFromConfiguration(rerank);
+    }
+
+    private static void MapAll(TechieRagBuilder builder, TechieRagConfig source)
+    {
 
         MapEmbedding(builder, source.Embedding);
         builder.UseVectorStore(source.VectorStore.Type, source.VectorStore.ConnectionString, source.VectorStore.ApiKey);
@@ -78,6 +90,8 @@ internal static class TechieRagConfigMapper
         target.ProjectId = source.ProjectId;
         target.MaxContextTokens = source.MaxContextTokens;
         target.Connector = source.Connector;
+        target.Headers = new Dictionary<string, string>(source.Headers, StringComparer.OrdinalIgnoreCase);
+        target.SessionHeader = source.SessionHeader;
     }
 
     private static void MapUsageTracking(UsageTrackingConfig target, UsageTrackingConfig source)
@@ -120,7 +134,7 @@ internal static class TechieRagConfigMapper
         target.TopN = source.TopN;
         target.CandidateCount = source.CandidateCount;
         target.ModelPath = source.ModelPath;
-        target.Enabled = source.Enabled && IsRerankUsableFromConfiguration(source);
+        target.Enabled = source.Enabled;
     }
 
     /// <summary>

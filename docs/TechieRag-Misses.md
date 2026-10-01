@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 14 logged: 1 open, 13 fixed, 0 will not fix |
+| Count | 18 logged: 1 open, 17 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
-| Updated | 2026-09-25 |
+| Updated | 2026-10-01 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
@@ -15,10 +15,14 @@
 |---|---|---|---|
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 
-## Fixed (13)
+## Fixed (17)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20261001-04 | 2026-10-01 by owner | 2026-10-01 by log-miss | the check was too weak | The framework's feedback checks match TR-RAG ids across apps: Chatur's TR-RAG-003/004/005 were reported as already fixed because Sevak's feedback file uses the same ids for different problems, which made the owner think Chatur hit bugs that were fixed earlier |
+| MISS-TechieRag-20261001-03 (REQ-RAG-069) | 2026-10-01 by owner | 2026-10-01 by fix-issues | the check was too weak | Chatur TR-RAG-005: nothing says what happens when the sign-in callback throws during a model turn; there is no coded 'sign in again' exception for the host to catch |
+| MISS-TechieRag-20261001-02 (REQ-RAG-070) | 2026-10-01 by owner | 2026-10-01 by fix-issues | the check was too weak | Chatur TR-RAG-004: the ChatGPT subscription connector's name is not public; a host must hardcode "chatgpt-subscription" |
+| MISS-TechieRag-20261001-01 (REQ-RAG-109) | 2026-10-01 by owner | 2026-10-01 by fix-issues | the app's spec | OpenAI-compatible model: extra request headers and a per-conversation session header |
 | MISS-TechieRag-20260925-02 (REQ-FN-070) | 2026-09-25 by owner | 2026-09-25 by amend-docs | the app's spec | The /techierag persona and the AI reference the package installs into a consumer's repository still describe v2 only; nothing about the local model, the agents package, typed streaming, subscription sign-in, Hugging Face models or the platform work. |
 | MISS-TechieRag-20260925-01 (REQ-RAG-044) | 2026-09-25 by self-smoke | 2026-09-25 by build-phase | the check was too weak | PgVectorStore failed its first save on a new PostgreSQL database because it did not reload the server's types after creating the vector extension, and the mocked tests could not see it. |
 | MISS-TechieRag-20260924-09 (REQ-FN-056) | 2026-09-24 by self-smoke | 2026-09-25 by build-phase | the app's spec | The SQLite stores use Dapper, which generates code at run time, so a Release build of a Mac or iPhone app fails the first time it saves; no requirement said the stores must work in a Release build on Apple platforms. |

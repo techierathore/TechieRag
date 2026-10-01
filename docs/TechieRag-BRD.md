@@ -141,8 +141,8 @@ Lets a developer configure everything by builder, appsettings section, DI or a c
 
 - **BRD-19** — A developer can configure TechieRag via the fluent `TechieRagBuilder` *(F-CFG)* *Screen:* Configuration
   - *Acceptance:* When a developer configures the library through `TechieRagBuilder` on the configuration API and calls `Build()`, then an `ITechieRag` with those providers returns.
-- **BRD-20** — A developer can configure TechieRag from `appsettings.json` (`TechieRag` section binding) *(F-CFG)* *Screen:* Configuration
-  - *Acceptance:* When a developer binds a `TechieRag` appsettings section through `AddTechieRag(IConfiguration)`, then the resulting instance uses the configured providers.
+- **BRD-20** — A developer can configure TechieRag from `appsettings.json` (`TechieRag` section binding) for everything except keys; keys and dependencies are injected only through code, and a key found in the section is refused with a message naming the code method *(F-CFG; modified 2026-10-01: keys only through code, owner decision)* *Screen:* Configuration
+  - *Acceptance:* When a developer binds a `TechieRag` section through `AddTechieRag(IConfiguration)`, then the configured providers are used, and a section holding an `ApiKey` is refused.
 - **BRD-21** — A developer can register TechieRag in DI via `AddTechieRag(...)` (builder and `IConfiguration` overloads) *(F-CFG)* *Screen:* Configuration
   - *Acceptance:* When a developer calls `AddTechieRag(...)` on a service collection, then `ITechieRag` and `TechieRagConfig` resolve as singletons.
 - **BRD-22** — A developer can configure TechieRag from a hand-built `TechieRagConfig` object *(F-CFG)* *Screen:* Configuration
@@ -337,7 +337,7 @@ No `perf-budget:` line is written: the owner has stated no numeric budget. The l
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-09-25.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
+**Snapshot as of 2026-10-01.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|

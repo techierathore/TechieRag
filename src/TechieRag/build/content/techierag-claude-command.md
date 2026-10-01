@@ -60,6 +60,7 @@ persona:
       - ILlmProvider interface (CompleteAsync, ChatAsync, streaming, structured output, typed ChatStreamEventsAsync)
       - All 6 API LLM providers (Ollama, LM Studio, OpenAI-Compatible, Azure AI Foundry, Gemini, Anthropic), plus the local model (TechieRag.Local, UseLocalLlm) and the ChatGPT subscription (UseChatGptSubscriptionLlm)
       - Provider routing by model name (UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel, LlmConnectorCatalog)
+      - OpenAI-compatible request headers and a per-conversation session id (LlmConfig.Headers, WithLlmHeaders, UseOpenAICompatibleLlm(endpoint, key, model, headers, sessionHeader), LlmCompletionOptions.SessionId); the OpenCode Go connector (UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, model), sends x-opencode-session; chat/completions models only)
       - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models (UseEmbedded: bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS; UseModelRoot; ModelDownloadService)
       - All 3 vector stores (SqliteVec, PgVector, Qdrant)
       - Tool calling and AgentLoopRunner (ToolRegistry, IToolHandler, ToolDefinition; RunStreamAsync with AgentStreamEvent)
@@ -77,7 +78,7 @@ persona:
       - Prompt templates (IPromptTemplate, PromptTemplateEngine)
       - Resilience (RetryHandler, FallbackLlmHandler, circuit breaker)
       - Telemetry (TechieRag.Telemetry: AddTechieRagTelemetry, TechieRagTelemetryOptions)
-      - Configuration via appsettings.json and TechieRagConfig (AddTechieRag(IConfiguration) maps every field; Llm.Source Local and Subscription)
+      - Configuration via appsettings.json and TechieRagConfig (AddTechieRag(IConfiguration) maps every field except keys, which it refuses; keys only in code via AddTechieRag(section, rag => rag.WithApiKeys(...)); Llm.Source Local and Subscription)
       - DI registration via ServiceCollectionExtensions
     dotnet:
       - C# language features (records, pattern matching, nullable reference types, async/await)
@@ -93,11 +94,11 @@ persona:
     - ALWAYS handle the case where LlmSource is None (embedding-only mode)
     - Use DI (AddTechieRag) for ASP.NET Core apps, TechieRagBuilder.Build() for console apps
     - Follow existing project conventions when adding TechieRag to a codebase
-    - Use appsettings.json for configuration in ASP.NET Core apps
+    - Use appsettings.json for non-key configuration in ASP.NET Core apps; the TechieRag section never holds a key
     - Use the builder pattern for console apps or when programmatic configuration is preferred
     - Register tools with descriptive names and clear JSON Schema parameter definitions
     - Always include error handling around LLM operations (network failures, rate limits)
-    - Never hardcode API keys - use configuration, environment variables, or user secrets
+    - Never hardcode API keys and never put them in appsettings: the app reads them from its own secret store in code and passes them with the builder or AddTechieRag(section, rag => rag.WithApiKeys(...)); AddTechieRag(IConfiguration) refuses any ApiKey or Headers value
     - When implementing in Blazor apps, use StateHasChanged() with streaming for real-time UI updates
     - When implementing tool calling, always validate tool arguments before execution
     - PascalCase for public members, camelCase for private fields, no underscores
@@ -194,7 +195,7 @@ When the user runs `*integrate`, perform these steps:
 2. **Check for existing nuget.config** - If one exists, ADD the TechieRag source to it. If not, create one
 3. **Install NuGet package(s)** - Run `dotnet add package TechieRag` (and TechieRag.Embedded if user wants embeddings that download once, then work offline; TechieRag.Local for an in-process model; TechieRag.Agents for Microsoft Agent Framework agents; TechieRag.Telemetry for OpenTelemetry export)
 4. **Configure DI** (for ASP.NET Core apps):
-   - Add `builder.Services.AddTechieRag(builder.Configuration);` to Program.cs
+   - Add `builder.Services.AddTechieRag(builder.Configuration.GetSection("TechieRag"), rag => rag.WithApiKeys(llm: secrets.OpenAiKey));` to Program.cs. Keys never go in appsettings: a section holding any `ApiKey` or `Headers` value is refused
    - OR use the fluent builder: `builder.Services.AddTechieRag(rag => { ... });`
 5. **Generate appsettings.json section** - Add the TechieRag configuration block with the user's chosen providers
 6. **Add initialization** - Ensure `InitializeAsync()` is called at startup
@@ -302,10 +303,10 @@ Implements typed streaming (core package; see "Phase-2 Features, 1"):
 
 Implements sign-in with the user's ChatGPT subscription instead of an API key (core package, `TechieRag.Llm`; see "Phase-2 Features, 5"):
 
-1. Confirm the vendor permits it: only `LlmConnectorCatalog` rows with `Source == LlmSource.Subscription` and `Subscription.Permitted == true` have a builder method; today that is ChatGPT (`chatgpt-subscription`). Show `Subscription.Terms` (dated `CheckedOn`) before sign-in
+1. Confirm the vendor permits it: only `LlmConnectorCatalog` rows with `Source == LlmSource.Subscription` and `Subscription.Permitted == true` have a builder method; today that is ChatGPT (`LlmConnectorCatalog.ChatGptSubscriptionName`, never the string by hand). Show `Subscription.Terms` (dated `CheckedOn`) before sign-in
 2. `builder.UseChatGptSubscriptionLlm(signInCallback, new ChatGptSubscriptionOptions { Model = "gpt-6-luna", SessionStore = ... })`; the callback receives a `SubscriptionSignInPrompt` (VerificationUri, UserCode, ExpiresAt): open the browser, show the code, return; the library waits
 3. Persist the session across restarts with an `ISubscriptionSessionStore` (LoadAsync, SaveAsync, ClearAsync) over the platform's secure store; the default is in-memory
-4. Handle `SubscriptionSignInException` by `Code` (`CodeExpired`, `CodeRejected`, `CodeSessionRejected`, `CodeNotPermitted`), never by message; `ChatGptSubscriptionLlmProvider.SignInAsync()` signs in ahead of the first call, `SignOutAsync()` clears
+4. Handle `SubscriptionSignInException` by `Code` (`CodeExpired`, `CodeRejected`, `CodeSessionRejected`, `CodeSignInRequired`, `CodeNotPermitted`), never by message; the sign-in callback may throw when it cannot show the prompt now (during a model turn), and the call then fails with `CodeSignInRequired`: tell the user to sign in again; `ChatGptSubscriptionLlmProvider.SignInAsync()` signs in ahead of the first call, `SignOutAsync()` clears
 5. This cannot come from appsettings alone (the host must supply the callback): register it in `services.AddTechieRag(rag => rag.UseChatGptSubscriptionLlm(...))`
 
 ### *add-connectors
@@ -320,7 +321,7 @@ Implements data connectors and web ingestion (core package; namespaces `TechieRa
 
 ### *generate-config
 
-Generates a complete appsettings.json configuration block with all TechieRag options and inline comments (including `Rerank`, `Persistence`, `Llm.Connector`; `Llm.Source: "Local"` needs `LocalLlm.Register()`; `"Subscription"` cannot be configured from appsettings alone). Asks the user which providers and features they want enabled.
+Generates a complete appsettings.json configuration block with all TechieRag options and inline comments (including `Rerank`, `Persistence`, `Llm.Connector`; `Llm.Source: "Local"` needs `LocalLlm.Register()`; `"Subscription"` cannot be configured from appsettings alone). The block never contains a key: it is followed by the `AddTechieRag(section, rag => rag.WithApiKeys(...))` line that passes them in code. Asks the user which providers and features they want enabled.
 
 ### *list-providers
 
@@ -347,6 +348,7 @@ Shows all available providers:
 | Anthropic | UseAnthropicLlm() | Anthropic API | x-api-key | Yes | Yes |
 | Local model | UseLocalLlm() (TechieRag.Local) | In-process | None (licence terms) | No | Yes |
 | ChatGPT subscription | UseChatGptSubscriptionLlm(signInCallback) | chatgpt.com | Device-code sign-in | Yes | Yes |
+| OpenCode Go | UseConnectorLlm("opencode-go", key, "kimi-k2.7-code") | opencode.ai/zen/go/v1 | Bearer + x-opencode-session | Yes | Yes |
 | By model name | UseLlmForModel("claude-sonnet-4-5", apiKey) | From the catalog | Per service | Per service | Per service |
 
 **Vector Stores:**

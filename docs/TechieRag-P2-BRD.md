@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-167 (BRD-166 and BRD-167 added on 2026-09-25). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
+Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-168 (BRD-166 and BRD-167 added on 2026-09-25, BRD-168 on 2026-10-01). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
 
 ## 2. Screens and flow
 
@@ -67,8 +67,8 @@ Closes the packaging, configuration and store gaps the 2026-09-24 code scan foun
   - *Acceptance:* When `LivePgVectorStoreTests` run against a real PostgreSQL, then upsert, search and delete pass.
 - **BRD-158** — `TechieRagBuilder.Build()` shall pass the embedding provider's `Dimensions` into every vector store instead of the 1024 default, so Cohere, OpenAI and Gemini embedders work with pgvector and Qdrant *(from the 2026-09-24 code scan, Architecture open question 2)* *Screen:* Packaging and quality follow-ups
   - *Acceptance:* When a developer builds with a 1536-dimension embedder and pgvector, then the `Embedding` column is `vector(1536)`.
-- **BRD-159** — `AddTechieRag(IConfiguration)` and `AddTechieRag(TechieRagConfig)` shall map every configuration field the builder accepts, including `VectorStore.ApiKey`, embedding `Dimensions`, `ApiFormat`, `ApiPath`, `RequestDelayMs` and the `Prompt` section *(from the 2026-09-24 code scan, Architecture open question 5)* *Screen:* Packaging and quality follow-ups
-  - *Acceptance:* When a developer sets `VectorStore.ApiKey` and `Prompt.SystemPrompt` in appsettings, then the built instance uses both.
+- **BRD-159** — `AddTechieRag(IConfiguration)` and `AddTechieRag(TechieRagConfig)` shall map every configuration field the builder accepts, including embedding `Dimensions`, `ApiFormat`, `ApiPath`, `RequestDelayMs` and the `Prompt` section. Keys (every `ApiKey` field and `Llm.Headers`) reach the library only through code: the builder, a config object, or `AddTechieRag(IConfiguration, Action<TechieRagBuilder>)`; the `IConfiguration` path refuses a key found in the section *(from the 2026-09-24 code scan, Architecture open question 5; modified 2026-10-01: keys only through code, owner decision)* *Screen:* Packaging and quality follow-ups
+  - *Acceptance:* When a developer sets `Prompt.SystemPrompt` in appsettings and the vector-store key in code, then the built instance uses both; an appsettings key is refused.
 - **BRD-160** — Exactly one path shall publish to nuget.org: the manual dispatch of `publish-nuget.yml`; the automatic `publish-nuget-org` job in `publish-github-packages.yml` is removed *(from the 2026-09-24 code scan, Architecture open question 3; DECISIONS.md 2026-09-03)* *Screen:* Packaging and quality follow-ups
   - *Acceptance:* When a maintainer pushes a `v*` tag on GitHub, then GitHub Packages receives the packages and nuget.org receives nothing until the manual dispatch.
 - **BRD-161** — Image generation, realtime audio, batch, fine-tuning, moderation and OCR endpoints are deferred and re-scoped on demand *(TechieRag checklist REQ-RAG-046, migrated 2026-09-03 from TechieDesk BRD-127; Not Started)* *Screen:* Packaging and quality follow-ups
@@ -284,6 +284,8 @@ Widens the provider set: model-name routing, more embedders, images, prompt cach
   - *Acceptance:* When a consumer on `net8.0` references `TechieRag` and `TechieRag.Telemetry`, then restore and build succeed.
 - **BRD-155** — `TechieRag.Telemetry` shall be a separate opt-in package: OTLP or console exporters, tracing and metrics off by default, a loopback endpoint by default and a non-loopback endpoint refused unless `AllowRemoteEndpoint`; the core package links no exporter *(harvested 2026-09-24 from the TechieDesk BRD BRD-117/99, library part; TechieDesk checklist REQ-RAG-036, REQ-NFR-008 Verified)* *Screen:* Provider breadth
   - *Acceptance:* When a developer adds `TechieRag.Telemetry` with defaults on a host app, then nothing is exported; with `EnableTracing` and a loopback endpoint, spans reach it.
+- **BRD-168** — A developer can send extra request headers to an OpenAI-compatible model (`LlmConfig.Headers`, a `UseOpenAICompatibleLlm` overload) and a per-conversation session id (`LlmCompletionOptions.SessionId`) in the service's session header; the `opencode-go` catalog connector sends OpenCode Go's `x-opencode-session` *(F-LLM; added 2026-10-01; closes Chatur TR-RAG-003)* *Screen:* Provider breadth
+  - *Acceptance:* When a developer uses the `opencode-go` connector with a conversation's `SessionId`, then each request carries `x-opencode-session` and OpenCode Go answers instead of 400 `MissingSessionID`.
 
 ## 4. Non-functional requirements
 
@@ -297,7 +299,7 @@ Only what this phase adds. The ones that apply to the whole library are in the p
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-09-25.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
+**Snapshot as of 2026-10-01.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -316,6 +318,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: Workspaces and memory | 8 | 8 | 0 | Done |
 | Surface: Reranking | 2 | 2 | 0 | Done |
 | Installed agent files | 1 | 1 | 0 | Done |
+| F-LLM | 1 | 1 | 0 | Done |
 
 ## 6. Where the rest lives
 

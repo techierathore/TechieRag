@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 2: Agents, platforms, local model, and the harvested v3 library</h1>
-    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-P2-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-01 &middot; source <code>TechieRag-P2-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -145,7 +145,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-167 (BRD-166 and BRD-167 added on 2026-09-25). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-168 (BRD-166 and BRD-167 added on 2026-09-25, BRD-168 on 2026-10-01). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
 <h2 id="screens-and-flow">2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -228,9 +228,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
-<li><strong>BRD-159</strong> — <code>AddTechieRag(IConfiguration)</code> and <code>AddTechieRag(TechieRagConfig)</code> shall map every configuration field the builder accepts, including <code>VectorStore.ApiKey</code>, embedding <code>Dimensions</code>, <code>ApiFormat</code>, <code>ApiPath</code>, <code>RequestDelayMs</code> and the <code>Prompt</code> section <em>(from the 2026-09-24 code scan, Architecture open question 5)</em> <em>Screen:</em> Packaging and quality follow-ups
+<li><strong>BRD-159</strong> — <code>AddTechieRag(IConfiguration)</code> and <code>AddTechieRag(TechieRagConfig)</code> shall map every configuration field the builder accepts, including embedding <code>Dimensions</code>, <code>ApiFormat</code>, <code>ApiPath</code>, <code>RequestDelayMs</code> and the <code>Prompt</code> section. Keys (every <code>ApiKey</code> field and <code>Llm.Headers</code>) reach the library only through code: the builder, a config object, or <code>AddTechieRag(IConfiguration, Action&lt;TechieRagBuilder&gt;)</code>; the <code>IConfiguration</code> path refuses a key found in the section <em>(from the 2026-09-24 code scan, Architecture open question 5; modified 2026-10-01: keys only through code, owner decision)</em> <em>Screen:</em> Packaging and quality follow-ups
 <ul>
-<li><em>Acceptance:</em> When a developer sets <code>VectorStore.ApiKey</code> and <code>Prompt.SystemPrompt</code> in appsettings, then the built instance uses both.
+<li><em>Acceptance:</em> When a developer sets <code>Prompt.SystemPrompt</code> in appsettings and the vector-store key in code, then the built instance uses both; an appsettings key is refused.
 </li>
 </ul>
 </li>
@@ -744,6 +744,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-168</strong> — A developer can send extra request headers to an OpenAI-compatible model (<code>LlmConfig.Headers</code>, a <code>UseOpenAICompatibleLlm</code> overload) and a per-conversation session id (<code>LlmCompletionOptions.SessionId</code>) in the service's session header; the <code>opencode-go</code> catalog connector sends OpenCode Go's <code>x-opencode-session</code> <em>(F-LLM; added 2026-10-01; closes Chatur TR-RAG-003)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer uses the <code>opencode-go</code> connector with a conversation's <code>SessionId</code>, then each request carries <code>x-opencode-session</code> and OpenCode Go answers instead of 400 <code>MissingSessionID</code>.
+</li>
+</ul>
+</li>
 </ul>
 <h2 id="non-functional-requirements">4. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
 <p>Only what this phase adds. The ones that apply to the whole library are in the phase-1 BRD.</p>
@@ -755,7 +761,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </table>
 <h2 id="development-status">5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-09-25.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-10-01.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -774,19 +780,20 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Surface: Workspaces and memory</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Reranking</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Installed agent files</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>F-LLM</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
 <h2 id="where-the-rest-lives">6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>
 <table>
 <thead><tr><th>What</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td>Scope, users and roles, the context diagram</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
-<tr><td>Non-functional requirements for the whole library</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
-<tr><td>The platform support matrix (BRD-88), package × platform</td><td><a href="TechieRag-BRD.md#platform-support-matrix-brd-88-req-fn-054">phase 1 BRD §9</a>, mirrored in the UsageGuide's Platform notes</td></tr>
-<tr><td>Constraints, assumptions and risks</td><td><a href="TechieRag-BRD.md">phase 1 BRD</a></td></tr>
-<tr><td>Every phase, its surfaces and its BRD range</td><td><a href="TechieRag-Phases.md">TechieRag-Phases.md</a></td></tr>
+<tr><td>Scope, users and roles, the context diagram</td><td><a href="TechieRag-BRD.html">phase 1 BRD</a></td></tr>
+<tr><td>Non-functional requirements for the whole library</td><td><a href="TechieRag-BRD.html">phase 1 BRD</a></td></tr>
+<tr><td>The platform support matrix (BRD-88), package × platform</td><td><a href="TechieRag-BRD.html#platform-support-matrix-brd-88-req-fn-054">phase 1 BRD §9</a>, mirrored in the UsageGuide's Platform notes</td></tr>
+<tr><td>Constraints, assumptions and risks</td><td><a href="TechieRag-BRD.html">phase 1 BRD</a></td></tr>
+<tr><td>Every phase, its surfaces and its BRD range</td><td><a href="TechieRag-Phases.html">TechieRag-Phases.md</a></td></tr>
 <tr><td>This phase's work list</td><td><a href="TechieRag-P2-Checklist.md">TechieRag-P2-Checklist.md</a></td></tr>
-<tr><td>The decisions behind the 2026-09-24 items</td><td><a href="TechieRag-Update-Brief.md">TechieRag-Update-Brief.md</a>, <code>DECISIONS.md</code>, Architecture §6</td></tr>
+<tr><td>The decisions behind the 2026-09-24 items</td><td><a href="TechieRag-Update-Brief.html">TechieRag-Update-Brief.md</a>, <code>DECISIONS.md</code>, Architecture §6</td></tr>
 </tbody>
 </table>
   </main>
