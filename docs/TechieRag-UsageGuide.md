@@ -5,7 +5,7 @@
 | App | TechieRag |
 | Kind | library |
 | Size | Large |
-| Date | 2026-09-24 |
+| Date | 2026-10-01 |
 
 ## Test users
 
@@ -18,6 +18,7 @@ The library has no users of its own; tests use credentials from the environment.
 | 3 | `TechieRagTestPostgres` | environment variable holding a PostgreSQL connection string; enables `LivePgVectorStoreTests` | Maintainer | set per machine |
 | 4 | staged weights under `~/.cache/techierag-models/bge-reranker-v2-m3` and `bge-m3` | files on disk; enable the live reranker and embedder tests | Maintainer | ask owner |
 | 5 | `TechieRagLiveLocalModel` (optional model id) and a local model downloaded under the model root | environment variable plus files on disk; enable the live `TechieRag.Local` tests once a runtime is chosen for the platform | Maintainer | set per machine |
+| 6 | `TechieRagOpenCodeGoKey` | environment variable holding an OpenCode Go key; enables `LiveOpenCodeGoTests` (test-only: apps pass keys in code) | Maintainer | set per machine |
 
 ## Execution guide
 
@@ -55,8 +56,8 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 
 ### Configuration and DI
 - **Sign in as:** user 1
-- **Steps:** 1) put a `TechieRag` section in an `appsettings.json` with embedding, vector store and LLM values 2) call `services.AddTechieRag(configuration.GetSection("TechieRag"))` and resolve `ITechieRag` 3) change only the vector store type in the file and resolve again
-- **Expected:** the instance uses the configured providers, including `VectorStore.ApiKey` and the `Prompt` section; the second resolution uses the new store with no code change.
+- **Steps:** 1) a keyless `TechieRag` section in `appsettings.json` 2) `services.AddTechieRag(section, rag => rag.WithApiKeys(vectorStore: key))`, resolve `ITechieRag` 3) change the store type, resolve again 4) add a `VectorStore:ApiKey`, register again
+- **Expected:** configured providers and the code key are used; step 3 uses the new store; step 4 is refused, naming the setting, not its value.
 - **Covers:** REQ-FN-001, REQ-FN-066
 
 ### Embedded package
@@ -83,6 +84,12 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** an answer with sources and usage; text arrives in pieces, sources arrive as events; the DTO is populated; the router picks Anthropic from the model name alone.
 - **Covers:** REQ-RAG-006, REQ-RAG-007, REQ-RAG-008, REQ-RAG-099, REQ-RAG-103
 
+### OpenAI-compatible headers and OpenCode Go
+- **Sign in as:** user 6
+- **Steps:** 1) `.UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, "kimi-k2.7-code")` 2) `ChatAsync` twice with one `LlmCompletionOptions.SessionId` 3) `UseOpenAICompatibleLlm(endpoint, key, model, new Dictionary<string, string> { ["x-tag"] = "1" }, "x-session")`
+- **Expected:** 1)–2) answers, not 400 `MissingSessionID`; both requests carry the same `x-opencode-session`; 3) every request carries `x-tag` and `x-session`.
+- **Covers:** REQ-RAG-109
+
 ### Agent loop, MCP tools and flows
 - **Sign in as:** user 1, with a provider that supports tool calling
 - **Steps:** 1) register a `get_weather` delegate on `ToolRegistry` and run `AgentLoopRunner` on "What is the weather in Pune?" 2) register an MCP server over stdio and repeat with one of its tools 3) run a five-node flow from the orchestration tests with a `MaxSteps` of 3
@@ -98,13 +105,13 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 ### Subscription catalog
 - **Sign in as:** user 1
 - **Steps:** 1) list `LlmConnectorCatalog.All.Where(c => c.Source == LlmSource.Subscription)` and read each row's `Subscription.Terms`, `AppliesTo` and `CheckedOn` 2) call `LlmProviderFactory.CreateSubscription(ModelRouter.Require("claude-subscription/claude-sonnet-4-5"), callback)`
-- **Expected:** 1) six rows (ChatGPT, Claude, Gemini, Grok, Groq, Meta), each with its terms and the date 2026-09-24; only `chatgpt-subscription` is permitted and names `UseChatGptSubscriptionLlm`; Anthropic's reads "Not permitted"; 2) `SubscriptionSignInException` with code `SubscriptionNotPermitted` carrying Anthropic's terms. The research behind each row is in `DECISIONS.md`.
+- **Expected:** 1) six rows (ChatGPT, Claude, Gemini, Grok, Groq, Meta), each with its terms and the date 2026-09-24; only `chatgpt-subscription` (`LlmConnectorCatalog.ChatGptSubscriptionName`) is permitted and names `UseChatGptSubscriptionLlm`; Anthropic's reads "Not permitted"; 2) `SubscriptionSignInException` with code `SubscriptionNotPermitted` carrying Anthropic's terms. The research behind each row is in `DECISIONS.md`.
 - **Covers:** REQ-RAG-070, REQ-FN-062
 
 ### Subscription sign-in (ChatGPT)
-- **Sign in as:** user 1, with a ChatGPT account whose device-code sign-in is on (ChatGPT → Settings → Security; Business or Enterprise need their admin's consent)
-- **Steps:** 1) build with `.UseChatGptSubscriptionLlm((prompt, ct) => { OpenBrowser(prompt.VerificationUri); ShowCode(prompt.UserCode); return Task.CompletedTask; })`; the host opens the browser, never the library 2) call `AskAsync("What does TechieRag do?")`, enter the code and approve 3) restart with `new ChatGptSubscriptionOptions { SessionStore = mySecureStore }` and ask again
-- **Expected:** 1)–2) the callback receives `https://auth.openai.com/codex/device` and a one-time code; once approved the answer arrives, billed to the ChatGPT plan; 3) with the session saved, nothing is asked. Choose a model with `ChatGptSubscriptionOptions.Model` or route `chatgpt-subscription/<model>`.
+- **Sign in as:** user 1, with a ChatGPT account whose device-code sign-in is on (Settings → Security)
+- **Steps:** 1) build with `.UseChatGptSubscriptionLlm((prompt, ct) => { OpenBrowser(prompt.VerificationUri); ShowCode(prompt.UserCode); return Task.CompletedTask; })`; the host opens the browser, never the library 2) call `AskAsync("What does TechieRag do?")`, enter the code and approve 3) restart with `new ChatGptSubscriptionOptions { SessionStore = mySecureStore }` and ask again 4) clear the store, use a callback that throws, ask again
+- **Expected:** 1)–2) the callback receives `https://auth.openai.com/codex/device` and a one-time code; once approved the answer arrives; 3) nothing is asked; 4) `SubscriptionSignInException` with code `SubscriptionSignInRequired`. Choose a model with `ChatGptSubscriptionOptions.Model` or route `chatgpt-subscription/<model>`.
 - **Covers:** REQ-RAG-069
 
 ### Agents package (Microsoft Agent Framework)
@@ -148,10 +155,11 @@ TechieRagLiveLmStudioModel=qwen3-8b dotnet test tests/TechieRag.Agents.Tests --f
 bash .tfcore/utils/tf-build.sh test tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj
 TechieRagLiveLocalModel=qwen2.5-0.5b-instruct dotnet test tests/TechieRag.Local.Tests --filter LiveLocalLlmTests
 TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter LiveHuggingFaceTests   # downloads about 900 MB
+TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=LiveOpenCodeGo"
 ```
-`TechieRag.Local.Tests` runs the runtime-neutral conformance suite (`LocalLlmConformanceTests`) against a scripted runtime, plus the provider, template, stop-sequence, memory, registration and catalog tests, and the download tests against a loopback HTTP server. Its three live tests (`LiveLocalLlmTests`, collection `LiveLocalLlm`, one at a time) skip with a printed reason until the platform has a runtime and the model is downloaded; they never download.
-`TechieRag.Agents.Tests` (28 methods on 2026-09-24) runs the Agent Framework builder and the four seam adapters against a scripted `IChatClient` and a real `TechieRagClient`; its two LM Studio tests skip with a reason unless `TechieRagLiveLmStudioModel` names a loaded tool-capable model.
-1,097 xUnit tests across the three test projects (930 core, 141 local model, 26 agents); 41 live tests skip with a reason when their environment is absent. PASS on 2026-09-25 through the build ladder.
+`TechieRag.Local.Tests` runs the conformance suite against a scripted runtime and the download tests against a loopback server; its live tests skip with a reason until a model is downloaded, and never download.
+`TechieRag.Agents.Tests` runs the builder and seam adapters against a scripted `IChatClient`; its LM Studio tests skip unless `TechieRagLiveLmStudioModel` is set.
+1,125 xUnit tests across the three test projects (952 core, 143 local model, 30 agents); 41 live tests skip with a reason when their environment is absent. Core and agents PASS on 2026-10-01; local-model tests need about 4.6 GB of free memory for phi-3-mini and fail with `LocalModelMemoryException` below that.
 
 ## Known limitations
 
@@ -164,6 +172,8 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 - The probe ran on 2026-09-25 on the owner's Mac (Mac Catalyst head and the iPhone 17 Pro simulator) and Galaxy S23 (Android head); a physical iPhone has not run it yet (runbook step 1 is the owner's).
 - `TechieRag.Local` has no engine on an Intel Mac (GenAI ships none): `PlatformNotSupportedException`. Subscription sign-in: REQ-RAG-069 and REQ-RAG-070.
 - `TechieRag.Agents`: citation refs live in memory against the `AgentSession` object, so a serialized and restored session restarts at S1; a traced agent (`WithTrace`) runs one turn at a time; MAF approval requests (`PendingApprovals`) are surfaced, not resumed for you.
+- Keys are refused in an appsettings section (any `ApiKey` or `Headers`); pass them in code with `AddTechieRag(section, rag => rag.WithApiKeys(...))` (REQ-FN-066). An app that kept keys there fails at startup after upgrading.
+- The `opencode-go` connector reaches OpenCode Go's `chat/completions` models only; its `/responses` and `/messages` models are not reached (REQ-RAG-109).
 - Ollama's request mapping sends no `tool_calls` on assistant messages and Gemini's sends tool results as a `tool` role, not `functionResponse`; multi-turn tool use there relies on the server tolerating that (unchanged by REQ-RAG-067).
 
 ## Platform notes
@@ -180,7 +190,7 @@ Each cell reads **supported** (built for it, no recorded run there yet), **teste
 | `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³ | supported ³ |
 
 2. Shipped 2026-09-24 (REQ-RAG-016); plain .NET, no native code; the probe does not exercise it.
-3. ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25); `TechieRag.Local.targets` adds the Mac Catalyst library GenAI's package leaves out (REQ-FN-058). Windows: real-engine conformance passed with both models (native `dotnet test`) and the probe generated (2026-09-25). Android: the probe generated on the owner's Galaxy S23, downloading from the default Hugging Face address (all six fingerprints matched); the xUnit suite does not run on Android. iOS ran on a **simulator** only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
+3. ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25; Mac Catalyst wiring REQ-FN-058). Windows and the Galaxy S23 generated through the probe; iOS ran on a **simulator** only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
 
 ### Local model: measured per platform (REQ-FN-060, BRD-108)
 
@@ -199,7 +209,7 @@ One recorded run per row (device, date); change a row only from another (runbook
 | Android | owner's Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2, 8 GB, Android 16) | 2026-09-25 | Qwen2.5 0.5B (phone default) | probe, second button, Debug; after the 333 MB download and two fresh launches | 0.06–0.10 | 112–114 | 703–763 MB |
 | iOS | owner's iPhone | not yet run | — | — | — | — | — |
 
-Peak memory: Windows, peak working set; macOS process, peak resident set; Mac Catalyst and iOS, the probe's peak physical footprint (matches `footprint <pid>`, what the iOS limit counts). Probe peak memory figures recorded up to 2026-09-25 are binary megabytes (labelled MB until that day's fix), about 5 percent under the decimal figure shown now. First token includes reading the prompt. Ranges: a run after the download and a fresh launch; the laptop and its emulator share a host, so speeds vary with load. Evidence: `tests/.artifacts/probe/` (per head) and `tests/.artifacts/local-llm-bench/`.
+Peak memory: Windows, peak working set; macOS, peak resident set; Mac Catalyst and iOS, peak physical footprint. First token includes reading the prompt. Evidence: `tests/.artifacts/probe/` and `tests/.artifacts/local-llm-bench/`.
 
 ### Local model: engine comparison on the Windows laptop (2026-09-24)
 
@@ -324,7 +334,7 @@ var rag = new TechieRagBuilder()
     .WithLogging(loggerFactory)
     .Build();
 
-services.AddTechieRag(configuration.GetSection("TechieRag"));   // or the appsettings path
+services.AddTechieRag(configuration.GetSection("TechieRag"), rag => rag.WithApiKeys(llm: llmKey));   // appsettings path; keys only in code
 ```
 
 One call per public service:

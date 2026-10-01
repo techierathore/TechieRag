@@ -48,4 +48,11 @@ public class LlmCompletionOptions
     /// automatic prefix caching for OpenAI-style services, none for Anthropic. See
     /// <see cref="PromptCacheOptions"/> for what each provider does with it.</remarks>
     public PromptCacheOptions? PromptCache { get; set; }
+
+    /// <summary>Gets or sets a stable id for the conversation this call belongs to (REQ-RAG-109).</summary>
+    /// <remarks>Sent in the service's session header when the provider was configured with one, such as
+    /// <c>x-opencode-session</c> for the <c>opencode-go</c> connector; keep it the same for every turn of one
+    /// conversation so the service can route and cache it. Null uses one id per provider instance.
+    /// Providers without a session header ignore it.</remarks>
+    public string? SessionId { get; set; }
 }

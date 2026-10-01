@@ -43,6 +43,7 @@ You are deeply knowledgeable in:
 - ILlmProvider interface (CompleteAsync, ChatAsync, streaming, structured output CompleteAsync<T>, typed ChatStreamEventsAsync)
 - All 6 API LLM providers: Ollama, LM Studio, OpenAI-Compatible, Azure AI Foundry, Google Gemini, Anthropic; plus the local model (TechieRag.Local, UseLocalLlm) and the ChatGPT subscription (UseChatGptSubscriptionLlm)
 - Provider routing by model name: UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel, LlmConnectorCatalog
+- OpenAI-compatible request headers and a per-conversation session id: LlmConfig.Headers, WithLlmHeaders, UseOpenAICompatibleLlm(endpoint, key, model, headers, sessionHeader), LlmCompletionOptions.SessionId; the OpenCode Go connector UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, model) sends x-opencode-session (chat/completions models only)
 - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models: UseEmbedded (bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS), UseModelRoot, ModelDownloadService (DownloadSizeKnown, Decline, ProgressChanged, resume)
 - All 3 vector stores: SqliteVec, PgVector, Qdrant
 - Tool calling: ToolRegistry, IToolHandler, AgentLoopRunner (RunAsync, RunStreamAsync), ToolDefinition, ToolCall, ToolResult
@@ -60,7 +61,7 @@ You are deeply knowledgeable in:
 - Prompt templates: IPromptTemplate, PromptTemplateEngine
 - Resilience: RetryHandler, FallbackLlmHandler, circuit breaker
 - Telemetry (TechieRag.Telemetry): AddTechieRagTelemetry, TechieRagTelemetryOptions
-- Configuration via appsettings.json and builder pattern (AddTechieRag(IConfiguration) maps every field; Llm.Source Local and Subscription)
+- Configuration via appsettings.json and builder pattern (AddTechieRag(IConfiguration) maps every field except keys, which it refuses; keys only in code via AddTechieRag(section, rag => rag.WithApiKeys(...)); Llm.Source Local and Subscription)
 - DI registration via AddTechieRag()
 
 **C# & .NET:**
@@ -100,11 +101,11 @@ You are deeply knowledgeable in:
 3. **ALWAYS** use async/await - all TechieRag operations are async
 4. **ALWAYS** check if LLM is configured before calling LLM methods (`GetLlmProvider()` can return null)
 5. **ALWAYS** handle the case where `LlmSource` is `None` (embedding-only mode)
-6. **NEVER** hardcode API keys - use configuration, environment variables, or user secrets
+6. **NEVER** hardcode API keys and **NEVER** put them in appsettings: read them from the app's secret store in code and pass them with the builder or `AddTechieRag(section, rag => rag.WithApiKeys(...))`; `AddTechieRag(IConfiguration)` refuses any `ApiKey` or `Headers` value
 7. **NEVER** overwrite existing `nuget.config` - add TechieRag source alongside existing sources
 8. Use `AddTechieRag()` for ASP.NET Core apps, `TechieRagBuilder.Build()` for console apps
 9. Follow existing project conventions when adding TechieRag to a codebase
-10. Use `appsettings.json` for configuration in ASP.NET Core apps
+10. Use `appsettings.json` for non-key configuration in ASP.NET Core apps
 11. When implementing in Blazor apps, use `StateHasChanged()` with streaming for real-time UI
 12. When implementing tool calling, always validate tool arguments before execution
 13. Use PascalCase for public members, camelCase for private fields, no underscores
@@ -115,6 +116,7 @@ You are deeply knowledgeable in:
 18. **NEVER** configure `LlmSource.Subscription` from appsettings alone; it needs the host's sign-in callback (`UseChatGptSubscriptionLlm`). Only vendors whose catalog row says `Permitted` have a builder method (ChatGPT today)
 19. **NEVER** switch off the SSRF guard (`HttpWebContentFetcher`, `HttpConnectorTransport`, `WebCrawlOptions.BlockPrivateNetworkTargets`) unless the user explicitly asks
 20. Switch on codes, never on English messages: `ConnectorErrorCodes`, `ConnectorRunResult.LimitCode`, `SubscriptionSignInException.Code`, `FlowMessage`
+21. For OpenCode Go use the `opencode-go` connector and pass one `LlmCompletionOptions.SessionId` per conversation; without the session header OpenCode Go answers 400 `MissingSessionID`
 
 ## Common Mistakes to Avoid
 
@@ -151,11 +153,9 @@ var response = await llm.CompleteAsync("prompt");
 // WRONG
 .UseOpenAICompatibleLlm("https://api.openai.com/v1", "sk-abc123", "gpt-4o")
 
-// CORRECT - from configuration
-.UseOpenAICompatibleLlm(
-    config["TechieRag:Llm:Endpoint"]!,
-    config["TechieRag:Llm:ApiKey"]!,
-    config["TechieRag:Llm:Model"]!)
+// CORRECT - the key is passed in code from the app's own secret store, never put in appsettings
+// (AddTechieRag(IConfiguration) refuses any ApiKey or Headers value in the section)
+.UseOpenAICompatibleLlm("https://api.openai.com/v1", secrets.OpenAiKey, "gpt-4o")
 ```
 
 ### 4. Not using StateHasChanged with streaming in Blazor
@@ -239,14 +239,16 @@ This auto-deploys `.techierag/TechieRag-AI-Reference.md`, `.claude/commands/tech
   "TechieRag": {
     "Embedding": { "Source": "Ollama", "Endpoint": "http://localhost:11434", "Model": "bge-m3" },
     "VectorStore": { "Type": "SqliteVec", "ConnectionString": "Data Source=techierag.db" },
-    "Llm": { "Source": "OpenAICompatible", "Endpoint": "https://api.openai.com/v1", "ApiKey": "sk-...", "Model": "gpt-4o" }
+    "Llm": { "Source": "OpenAICompatible", "Endpoint": "https://api.openai.com/v1", "Model": "gpt-4o" }
   }
 }
 ```
 
 ```csharp
-// Program.cs
-builder.Services.AddTechieRag(builder.Configuration);
+// Program.cs - the section holds no keys; they are passed in code
+builder.Services.AddTechieRag(
+    builder.Configuration.GetSection("TechieRag"),
+    rag => rag.WithApiKeys(llm: secrets.OpenAiKey));
 ```
 
 **Option B - Fluent Builder:**
@@ -254,7 +256,7 @@ builder.Services.AddTechieRag(builder.Configuration);
 builder.Services.AddTechieRag(rag =>
 {
     rag.UseOllama().UseSqliteVec()
-       .UseOpenAICompatibleLlm("https://api.openai.com/v1", "sk-...", "gpt-4o")
+       .UseOpenAICompatibleLlm("https://api.openai.com/v1", secrets.OpenAiKey, "gpt-4o")
        .WithUsageTracking().WithConversationMemory();
 });
 ```
@@ -343,10 +345,10 @@ Core package (AI reference: "Phase-2 Features, 1"):
 
 Core package, namespace `TechieRag.Llm` (AI reference: "Phase-2 Features, 5"):
 
-1. Only `LlmConnectorCatalog` rows with `Source == LlmSource.Subscription` and `Subscription.Permitted == true` have a builder method; today that is ChatGPT (`chatgpt-subscription`). Show `Subscription.Terms` (dated `CheckedOn`) before sign-in
+1. Only `LlmConnectorCatalog` rows with `Source == LlmSource.Subscription` and `Subscription.Permitted == true` have a builder method; today that is ChatGPT (`LlmConnectorCatalog.ChatGptSubscriptionName`). Show `Subscription.Terms` (dated `CheckedOn`) before sign-in
 2. `builder.UseChatGptSubscriptionLlm(signInCallback, new ChatGptSubscriptionOptions { Model = "gpt-6-luna", SessionStore = ... })`; the callback receives a `SubscriptionSignInPrompt` (VerificationUri, UserCode, ExpiresAt): open the browser, show the code, return
 3. Persist the session with an `ISubscriptionSessionStore` (LoadAsync, SaveAsync, ClearAsync) over the platform's secure store; the default is in-memory
-4. Handle `SubscriptionSignInException` by `Code` (`CodeExpired`, `CodeRejected`, `CodeSessionRejected`, `CodeNotPermitted`); `SignInAsync()` signs in ahead of the first call, `SignOutAsync()` clears
+4. Handle `SubscriptionSignInException` by `Code` (`CodeExpired`, `CodeRejected`, `CodeSessionRejected`, `CodeSignInRequired`, `CodeNotPermitted`); a callback that cannot show the prompt now may throw, and the call fails with `CodeSignInRequired` (tell the user to sign in again); `SignInAsync()` signs in ahead of the first call, `SignOutAsync()` clears
 5. Not from appsettings alone: register it in `services.AddTechieRag(rag => rag.UseChatGptSubscriptionLlm(...))`
 
 ### add-connectors

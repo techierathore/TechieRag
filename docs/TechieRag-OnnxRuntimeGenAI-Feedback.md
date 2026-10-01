@@ -4,7 +4,7 @@
 |---|---|
 | App | TechieRag |
 | Upstream | ONNX Runtime GenAI (microsoft/onnxruntime-genai) |
-| Updated | 2026-09-25 |
+| Updated | 2026-10-01 (consolidated at handoff; no change) |
 
 ## Summary
 

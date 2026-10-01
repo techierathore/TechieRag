@@ -1,6 +1,6 @@
 # TechieRag v3 - AI Agent Reference Guide
 
-Updated 2026-09-25 for the phase-2 packages (`TechieRag.Telemetry`, `TechieRag.Local`, `TechieRag.Agents`) and the phase-2 features of the core. Every signature below is copied from the source; the section "Phase-2 Features (v3)" gives one call example per feature.
+Updated 2026-09-25 for the phase-2 packages (`TechieRag.Telemetry`, `TechieRag.Local`, `TechieRag.Agents`) and the phase-2 features of the core; 2026-10-01 for OpenAI-compatible request headers and the OpenCode Go connector, the `CodeSignInRequired` sign-in code, and keys only through code (an appsettings section holding a key is refused). Every signature below is copied from the source; the section "Phase-2 Features (v3)" gives one call example per feature.
 
 ## Overview
 
@@ -308,6 +308,7 @@ var response = await rag.AskAsync("What is quantum computing?");
 | `UseOllamaLlm(endpoint, model)` | Ollama (default: localhost:11434, llama3.2) |
 | `UseLmStudioLlm(endpoint, model)` | LM Studio (default: localhost:1234) |
 | `UseOpenAICompatibleLlm(endpoint, apiKey, model)` | OpenAI-compatible REST API |
+| `UseOpenAICompatibleLlm(endpoint, apiKey, model, headers, sessionHeader?)` | v3: same, with extra request headers and a per-conversation session header (Phase-2 Features, 6) |
 | `UseAzureAIFoundryLlm(endpoint, apiKey, model, apiVersion)` | Azure AI Foundry |
 | `UseGeminiLlm(apiKey, model)` | Google Gemini (default: gemini-2.0-flash) |
 | `UseAnthropicLlm(apiKey, model)` | Anthropic Claude (default: claude-sonnet-4-5-20250929) |
@@ -322,6 +323,8 @@ var response = await rag.AskAsync("What is quantum computing?");
 | Method | Description |
 |--------|-------------|
 | `WithFallbackLlm(configure)` | Configure fallback LLM provider |
+| `WithApiKeys(llm?, embedding?, vectorStore?, rerank?, llmFallback?)` | v3: set the keys of configured sections in code; the way keys reach an `AddTechieRag(section, rag => ...)` setup, since a section may hold none |
+| `WithLlmHeaders(headers)` | v3: extra request headers for the OpenAI-compatible LLM, in code |
 | `WithUsageTracking(configure?)` | Enable token usage tracking and budgets |
 | `WithConversationMemory()` | Enable conversation history management |
 | `WithPromptTemplate(systemPrompt?, contextTemplate?)` | Customize RAG prompt templates |
@@ -718,7 +721,12 @@ public string Code { get; }
 public const string CodeExpired = "SubscriptionSignInExpired";
 public const string CodeRejected = "SubscriptionSignInRejected";
 public const string CodeSessionRejected = "SubscriptionSessionRejected";
+public const string CodeSignInRequired = "SubscriptionSignInRequired";   // the sign-in callback threw (e.g. no window during a model turn); InnerException is the callback's
 public const string CodeNotPermitted = "SubscriptionNotPermitted";
+
+// The sign-in callback MAY throw when it cannot show the prompt now; the model call then fails with
+// CodeSignInRequired (a SubscriptionSignInException the callback throws keeps its own code).
+public const string LlmConnectorCatalog.ChatGptSubscriptionName = "chatgpt-subscription";   // the connector key; never hardcode the string
 
 // TechieRag.Llm.LlmConnectorCatalog rows with Source == LlmSource.Subscription carry the vendor's terms
 public sealed record SubscriptionTerms { bool Permitted; string Terms; string AppliesTo; DateOnly CheckedOn; IReadOnlyList<string> Sources; string? BuilderMethod; }
@@ -747,6 +755,10 @@ try
 catch (SubscriptionSignInException ex) when (ex.Code == SubscriptionSignInException.CodeExpired)
 {
     // the code expired before the user finished; ask again
+}
+catch (SubscriptionSignInException ex) when (ex.Code == SubscriptionSignInException.CodeSignInRequired)
+{
+    // the session is gone and the callback could not show a code now: tell the user to sign in again
 }
 
 // Which vendors permit it: dated facts from the catalog, shown before sign-in
@@ -777,21 +789,44 @@ public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILog
 public static IReadOnlyList<LlmConnectorDescriptor> All { get; }
 public static LlmConnectorDescriptor? Find(string? name);
 public static LlmConnectorDescriptor Require(string name);
-public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList<string> ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; SubscriptionTerms? Subscription; }
+public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList<string> ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; string? SessionHeader; SubscriptionTerms? Subscription; }
+public const string OpenCodeGoName = "opencode-go";   // OpenCode Go: https://opencode.ai/zen/go/v1, session header x-opencode-session
 
 // TechieRag.LlmConfig - configuration can name the connector instead of pasting its URL
 public string? Connector { get; set; }   // e.g. "groq"; an explicit Endpoint still wins
+public Dictionary<string, string> Headers { get; set; }   // extra headers on every OpenAI-compatible request; set in code (WithLlmHeaders), refused in a configuration section; one named here replaces the library's own
+public string? SessionHeader { get; set; }   // header carrying LlmCompletionOptions.SessionId; null = the connector's own (opencode-go: x-opencode-session)
+
+// TechieRag.Models.LlmCompletionOptions
+public string? SessionId { get; set; }   // stable per conversation; sent in the session header; null = one id per provider instance
+
+// TechieRag.TechieRagBuilder - any OpenAI-compatible service that needs more than a key
+public TechieRagBuilder UseOpenAICompatibleLlm(string endpoint, string apiKey, string model,
+    IReadOnlyDictionary<string, string>? headers, string? sessionHeader = null);
+```
+
+OpenCode Go refuses a request without `x-opencode-session` (HTTP 400 `MissingSessionID`). The `opencode-go` connector sends it; pass the same `SessionId` on every turn of one conversation. Only Go's `chat/completions` models work through it (Kimi, GLM, DeepSeek, …); its `/responses` and `/messages` models need those wire formats. OpenAI-compatible requests carry `User-Agent: TechieRag/<version>` unless `Headers` names another, as OpenCode Go asks each client to name itself.
+
+```csharp
+var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, openCodeGoKey, "kimi-k2.7-code")
+    .Build();
+
+var provider = LlmProviderFactory.CreateForModel("opencode-go/kimi-k3", openCodeGoKey);
+var reply = await provider.ChatAsync(messages, new LlmCompletionOptions { SessionId = conversation.Id });
 ```
 
 ```csharp
 var rag = new TechieRagBuilder()
     .UseOllama()
     .UseSqliteVec()
-    .UseLlmForModel("claude-sonnet-4-5", apiKey: config["Anthropic:ApiKey"])   // routes to Anthropic
+    .UseLlmForModel("claude-sonnet-4-5", apiKey: anthropicKey)   // routes to Anthropic
     .Build();
 
 var route = ModelRouter.Require("groq/llama-3.3-70b-versatile");   // Connector.Name "groq", Source OpenAICompatible
-var gemini = LlmProviderFactory.CreateForModel("gemini-2.0-flash", config["Google:ApiKey"]);
+var gemini = LlmProviderFactory.CreateForModel("gemini-2.0-flash", googleKey);
 ```
 
 ### 7. Connectors and web ingestion
@@ -911,7 +946,7 @@ var rag = new TechieRagBuilder()
     .UseEmbedded()
     .UseSqliteVec()
     .UseEmbeddedReranker()                                       // RerankSource.LocalOnnx: bge-reranker-v2-m3, downloads once
-    // .WithReranker(RerankSource.Cohere, apiKey: config["Cohere:ApiKey"])   // or an API reranker
+    // .WithReranker(RerankSource.Cohere, apiKey: cohereKey)   // or an API reranker
     .Build();
 
 var hits = await rag.SearchAsync("termination clause", new SearchOptions { TopK = 5, Rerank = true });
@@ -1053,9 +1088,24 @@ builder.Services.AddTechieRagTelemetry(o =>
 });
 ```
 
-### 12. Configuration: `AddTechieRag(IConfiguration)` maps every field
+### 12. Configuration: `AddTechieRag(IConfiguration)` maps every field except keys
 
-`AddTechieRag(IConfiguration)` and `AddTechieRag(TechieRagConfig)` go through one mapper, so every bound field reaches the builder: `VectorStore.ApiKey` (Qdrant with a key), the embedding `Dimensions`, `ApiFormat`, `ApiPath` and `RequestDelayMs`, the whole `Prompt` section, `Rerank`, `Persistence`, `Resilience`, `UsageTracking`, `LlmFallback`, `EnableTelemetry` and `Llm.Connector`. Pass the `TechieRag` section, not the root configuration.
+`AddTechieRag(IConfiguration)` and `AddTechieRag(TechieRagConfig)` go through one mapper, so every bound field reaches the builder: the embedding `Dimensions`, `ApiFormat`, `ApiPath` and `RequestDelayMs`, the whole `Prompt` section, `Rerank`, `Persistence`, `Resilience`, `UsageTracking`, `LlmFallback`, `EnableTelemetry` and `Llm.Connector`. Pass the `TechieRag` section, not the root configuration.
+
+**Keys and dependencies are injected only through code.** A section holding any `ApiKey` (embedding, vector store, LLM, fallback LLM, reranker) or `Headers` value is refused with an `InvalidOperationException` naming the setting, never its value. Pass keys with the second overload, which maps the section and then runs your code:
+
+```csharp
+// TechieRag.DependencyInjection.ServiceCollectionExtensions
+public static IServiceCollection AddTechieRag(this IServiceCollection services, IConfiguration configuration, Action<TechieRagBuilder> configure);
+
+// TechieRag.TechieRagBuilder
+public TechieRagBuilder WithApiKeys(string? llm = null, string? embedding = null, string? vectorStore = null, string? rerank = null, string? llmFallback = null);
+public TechieRagBuilder WithLlmHeaders(IReadOnlyDictionary<string, string> headers);
+
+builder.Services.AddTechieRag(
+    builder.Configuration.GetSection("TechieRag"),
+    rag => rag.WithApiKeys(llm: secrets.OpenAiKey, vectorStore: secrets.QdrantKey));
+```
 
 `Llm.Source` accepts two new values:
 - `Local` - the in-process model from `TechieRag.Local`. Call `LocalLlm.Register()` once at startup, before the first `Build()`; then `"Llm": { "Source": "Local", "Model": "qwen2.5-0.5b-instruct" }` needs no endpoint and no key. `"Model": "local/qwen2.5-0.5b-instruct"` reaches it through `UseLlmForModel` as well.
@@ -1362,7 +1412,6 @@ public class ToolResult
     "Llm": {
       "Source": "OpenAICompatible",
       "Endpoint": "https://api.openai.com/v1",
-      "ApiKey": "sk-...",
       "Model": "gpt-4o",
       "Temperature": 0.7,
       "MaxTokens": 2048,
@@ -1398,7 +1447,6 @@ public class ToolResult
     "Rerank": {
       "Enabled": true,
       "Source": "Cohere",
-      "ApiKey": "...",
       "Model": null,
       "TopN": 0,
       "CandidateCount": 20
@@ -1413,7 +1461,18 @@ public class ToolResult
 }
 ```
 
-v3 notes: `VectorStore.ApiKey` (Qdrant), `Embedding.Dimensions`, the `Prompt` section, `Rerank` and `Persistence` are all bound and applied. `Llm.Connector` names a catalog connector (`"groq"`) instead of pasting its URL. `Llm.Source: "Local"` needs `LocalLlm.Register()` at startup; `Llm.Source: "Subscription"` cannot be configured from appsettings alone (see Phase-2 Features, 12).
+**Keys never go in this section.** `AddTechieRag(IConfiguration)` refuses any `ApiKey` or `Headers` value with an error naming the setting (never its value). Pass keys in code:
+
+```csharp
+builder.Services.AddTechieRag(
+    builder.Configuration.GetSection("TechieRag"),
+    rag => rag.WithApiKeys(llm: secrets.OpenAiKey, rerank: secrets.CohereKey)   // also embedding:, vectorStore:, llmFallback:
+              .WithLlmHeaders(new Dictionary<string, string> { ["User-Agent"] = "myapp/1.0" }));
+```
+
+`AddTechieRag(TechieRagConfig)` with a config object built in code may carry keys. The library reads no key from an environment variable.
+
+v3 notes: `Embedding.Dimensions`, the `Prompt` section, `Rerank` and `Persistence` are all bound and applied. `Llm.Connector` names a catalog connector (`"groq"`) instead of pasting its URL. `Llm.Source: "Local"` needs `LocalLlm.Register()` at startup; `Llm.Source: "Subscription"` cannot be configured from appsettings alone (see Phase-2 Features, 12).
 
 ### Minimal Configuration (Embedding Only)
 

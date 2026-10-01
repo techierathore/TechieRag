@@ -16,6 +16,12 @@ namespace TechieRag.Llm;
 /// </remarks>
 public static class LlmConnectorCatalog
 {
+    /// <summary>The ChatGPT subscription connector's key, for <see cref="Find"/> and <c>connector/model</c> names.</summary>
+    public const string ChatGptSubscriptionName = SubscriptionConnectorRows.ChatGptName;
+
+    /// <summary>The OpenCode Go connector's key (REQ-RAG-109).</summary>
+    public const string OpenCodeGoName = "opencode-go";
+
     private static readonly LlmConnectorDescriptor[] Connectors =
     [
         new()
@@ -126,6 +132,18 @@ public static class LlmConnectorCatalog
             DisplayName = "Cerebras",
             Source = LlmSource.OpenAICompatible,
             Endpoint = "https://api.cerebras.ai/v1"
+        },
+        // REQ-RAG-109: OpenCode Go refuses a request without a session id in x-opencode-session
+        // (https://opencode.ai/docs/go/#where-can-i-use-it). Only its chat/completions models work
+        // here; the models it serves on /responses or /messages need those wire formats.
+        new()
+        {
+            Name = OpenCodeGoName,
+            DisplayName = "OpenCode Go",
+            Source = LlmSource.OpenAICompatible,
+            Endpoint = "https://opencode.ai/zen/go/v1",
+            DefaultModel = "kimi-k2.7-code",
+            SessionHeader = "x-opencode-session"
         },
         new()
         {

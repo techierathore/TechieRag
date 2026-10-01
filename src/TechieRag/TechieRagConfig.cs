@@ -537,6 +537,24 @@ public class LlmConfig
     /// member, so no consumer's existing switch over <see cref="LlmSource"/> changes meaning.</para>
     /// </remarks>
     public string? Connector { get; set; }
+
+    /// <summary>
+    /// Gets or sets extra headers sent on every request to an OpenAI-compatible service (REQ-RAG-109).
+    /// </summary>
+    /// <remarks>
+    /// <para>For a service that needs more than a key, e.g. a client name in <c>User-Agent</c>. A header
+    /// named here replaces the library's own value for it. Set in code (<c>WithLlmHeaders</c>): like keys,
+    /// headers in a configuration section are refused (REQ-FN-066).</para>
+    /// <para><b>Credentials:</b> values may hold secrets; they are never logged.</para>
+    /// </remarks>
+    public Dictionary<string, string> Headers { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets or sets the name of the header that carries <c>LlmCompletionOptions.SessionId</c> on every
+    /// request to an OpenAI-compatible service, e.g. <c>x-opencode-session</c> (REQ-RAG-109).
+    /// </summary>
+    /// <remarks>Null uses the connector's own session header, if it has one, and otherwise sends none.</remarks>
+    public string? SessionHeader { get; set; }
 }
 
 /// <summary>Configuration for token usage tracking and budgets.</summary>

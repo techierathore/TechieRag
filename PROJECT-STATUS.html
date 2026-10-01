@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-09-25</div>
+    <div class="sub">Last rendered: 2026-10-01</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,7 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-10-01 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
       <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) set current_phase to Released after UAT — no agent command</div>
@@ -129,10 +129,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-09-25</td></tr>
-<tr><th>current_phase</th><td>Phase 2 of 2 · UAT — handoff done, 84 of 84 verified, 1 not applicable</td></tr>
+<tr><th>last_updated</th><td>2026-10-01</td></tr>
+<tr><th>current_phase</th><td>Phase 2 of 2 · UAT — handoff done, 85 of 85 verified, 1 not applicable</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-09-25</td></tr>
+<tr><th>last_verified_date</th><td>2026-10-01</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,7 +149,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 84 rows Verified. The four document misses from 2026-09-24 are closed: the Architecture no longer says stores are fixed at 1024 dimensions, two BRD items are reworded, one acceptance line is corrected, and both platform matrices agree. The library waits on your test pass. Product Guide generated 2026-09-25: docs/TechieRag-ProductGuide.md (+ .html); 14 tasks, 12 screenshots.</p>
+<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 85 rows Verified; awaiting UAT per the UsageGuide. Handoff refreshed on 2026-10-01 for the OpenCode Go headers (BRD-168), the sign-in-required code and keys only through code: UsageGuide, phase-2 DevGuide, the AI reference and both installed <code>/techierag</code> agent files.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Manual UAT: open <code>docs/TechieRag-UsageGuide.md</code> and work through "How to test, screen by screen"; when it passes, change the phase line at the top of this file from UAT to Released by hand. No agent command is next.</p>
 <p>Claude Code:</p>
@@ -174,7 +174,19 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>🔶 <strong>iPhone run (REQ-FN-060):</strong> the iPhone 17 Pro is connected and its device build passes, but Developer Mode is off on the phone and no Apple ID is signed in to Xcode. Steps: <code>docs/TechieRag-iPhone-Setup.md</code>. Then paste <code>record the iPhone probe run for REQ-FN-060</code>.
+<li>🔶 <strong>Chatur:</strong> publish the next package after 1.0.8; Chatur then re-checks TR-RAG-003, 004, 005.
+</li>
+<li>🔶 <strong>Breaking change:</strong> an app with a key in its appsettings section fails at startup after the next package; check Sevak.
+</li>
+<li>🔶 <strong>OpenCode Go key:</strong> pasted in chat 2026-10-01; rotate it if the transcript is shared. Live test reads <code>TechieRagOpenCodeGoKey</code>.
+</li>
+<li>🔶 <strong>Local model tests:</strong> 13 TechieRag.Local tests fail here: phi-3-mini needs 4.6 GB free, WSL had 3.5 GB. Not caused by this change.
+</li>
+<li>🔶 <strong>Verify boot:</strong> the Windows probe has no web view, so the DevTools port never opens; screenless rows were graded by tests.
+</li>
+<li>🔶 <strong>iPhone run (REQ-FN-060):</strong> Developer Mode is off and no Apple ID is in Xcode. Steps: <code>docs/TechieRag-iPhone-Setup.md</code>.
+</li>
+<li>🔶 <strong>Framework:</strong> feedback checks match TR-RAG ids across apps (MISS-TechieRag-20261001-04, wrongly logged as fixed; still open).
 </li>
 <li>🔶 <strong>Owner git:</strong> commit today's work.
 </li>
@@ -184,11 +196,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-09-25</td><td>handoff-phase</td><td>83/83 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>log-miss</td><td>83/84 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>build-phase</td><td>84/84 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>amend-docs</td><td>84/84 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-09-25</td><td>amend-docs</td><td>84/84 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-01</td><td>triage-and-fix</td><td>85/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-01</td><td>amend-docs</td><td>85/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-01</td><td>amend-docs</td><td>84/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-01</td><td>build-phase</td><td>85/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-01</td><td>handoff-phase</td><td>85/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -200,26 +212,28 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
 <ul>
-<li>Last check 2026-09-25: 0 findings, see the checklist Remarks.
+<li>Last check 2026-10-01: 0 findings, see the checklist Remarks.
 </li>
 </ul>
 <h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
-<li>The physical iPhone row of the UsageGuide's measured-per-platform table, after the owner's two steps.
+<li>The physical iPhone row of the UsageGuide's per-platform table.
 </li>
 <li>OS built-in models (Apple, Android Gemini Nano) as a later <code>ILocalLlmRuntime</code>.
 </li>
-<li>LLamaSharp with Metal on the Mac, behind the same provider (decision 2 option B).
+<li>LLamaSharp with Metal on the Mac (decision 2 option B).
 </li>
 <li>Hugging Face tokens for gated models in <code>LocalModel.FromHuggingFace</code>.
 </li>
-<li><code>REQ-RAG-046</code> deferred endpoints; <code>TechieRag.Agents</code> phase D items (proposal §7).
+<li><code>REQ-RAG-046</code> deferred endpoints; <code>TechieRag.Agents</code> phase D items.
 </li>
 <li>Ollama and Gemini multi-turn tool use.
 </li>
-<li>Rename TechieDesk to Sevak in about 15 XML doc comments under <code>src/TechieRag</code>.
+<li>OpenCode Go models on <code>/responses</code> and <code>/messages</code>.
 </li>
-<li>Update the Android emulator in Visual Studio's SDK (31.2.10 is older than its system image).
+<li>Rename TechieDesk to Sevak in about 15 XML doc comments.
+</li>
+<li>Update the Android emulator in Visual Studio's SDK.
 </li>
 </ul>
   </main>
