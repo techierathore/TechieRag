@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-168 (BRD-166 and BRD-167 added on 2026-09-25, BRD-168 on 2026-10-01). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
+Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-170 (BRD-166 and 167 added 2026-09-25, 168 on 2026-10-01, 169 and 170 on 2026-10-03). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
 
 ## 2. Screens and flow
 
@@ -28,7 +28,7 @@ Each row is a public surface this phase adds or extends; the Route column names 
 | Typed streaming | `ILlmProvider` typed streaming method, `AgentLoopRunner` streaming run | Developer | — (library, no mockup) | LlmTextDelta, LlmToolCallEvent, LlmStreamCompleted |
 | Subscription sign-in | `UseChatGptSubscriptionLlm(callback)`, `LlmConnectorCatalog` | App developer | — (library, no mockup) | URL, user code, session store, VendorTerms |
 | Ingestion breadth | `IChunker`, `Processors/`, `Web/` | Developer | — (library, no mockup) | chunking strategy, XLSX/PPTX/CSV/audio, URL, crawl |
-| Data connectors | `IDataConnector`, `ConnectorRunner`, `Connectors/` | Developer | — (library, no mockup) | repository, Confluence, email, sync state, transport guards |
+| Data connectors | `IDataConnector`, `ConnectorRunner`, `Connectors/` | Developer | — (library, no mockup) | repository, Confluence, email, sync state, transport guards, mail move / label / Trash with dry run |
 | MCP tools | `McpClient`, `McpToolHandler`, `IMcpServerRegistry` | Agent builder | — (library, no mockup) | stdio, HTTP, trust policy |
 | Flow orchestration | `FlowRunner`, `FlowRuntime`, `IFlowGuardrail`, `AgentToolHandler` | Agent builder | — (library, no mockup) | nodes, conditions, MaxSteps, guardrails, FlowMessage |
 | Workspaces and memory | `WorkspaceManager`, `IWorkspaceStore`, `IConversationStore`, `DbConversationMemory` | Developer | — (library, no mockup) | threads, pinning, threshold, chat mode, dedupe |
@@ -203,6 +203,10 @@ Pulls documents from repositories, Confluence and mailboxes through one connecto
   - *Acceptance:* When a connector run exceeds `MaxTotalBytes` or an IMAP server sends an oversized literal, then the run stops with a coded error.
 - **BRD-127** — `ConnectorRunner` shall hand each fetched document to ingestion as it arrives instead of collecting every document before ingesting, so a run stopped part-way keeps what it fetched; `IConnectorTransport` shall support methods beyond GET where a connector needs them (TR-RAG-020…022) *(harvested 2026-09-24 from the TechieDesk BRD BRD-113, library part; TechieDesk checklist open feedback)* *Screen:* Data connectors
   - *Acceptance:* When a connector run is cancelled after some documents were fetched, then those documents are already ingested.
+- **BRD-169** — A developer can act on mail over the same IMAP login the mail connector reads with (password, Gmail app password or XOAUTH2 token): move a message to a folder, add or remove a Gmail label, and move a message to Trash, getting back one result per message (done, skipped or failed, with the reason). The actions live in their own type, so the reading connector (BRD-125) stays read-only. Trash means moving to the server's Trash folder (the `\Trash` special-use folder, or Gmail's `[Gmail]/Trash`); the library never deletes a message permanently. Move uses `MOVE` where the server offers it, otherwise copy, flag and `UID EXPUNGE` of that one message only; a server offering neither is refused with a coded result, never a plain `EXPUNGE`. Labels use Gmail's label extension; on any other server a label request returns a coded "labels not supported" result *(added 2026-10-03; paired with `Sevak#REQ-RAG-056` (Sevak BRD-161, ADR-024); closes Sevak feedback TR-RAG-046)* *Screen:* Data connectors
+  - *Acceptance:* When a developer moves, labels and trashes three messages on a Gmail mailbox, then each message is where it was sent and each has its own result.
+- **BRD-170** — The mail actions of BRD-169 shall offer a dry run that returns the planned action per message and sends no command that changes the mailbox *(added 2026-10-03; paired with `Sevak#REQ-RAG-056`; TR-RAG-046)* *Screen:* Data connectors
+  - *Acceptance:* When a developer dry-runs the same three actions, then the plan comes back per message and the mailbox is unchanged.
 
 ### MCP tools
 
@@ -299,7 +303,7 @@ Only what this phase adds. The ones that apply to the whole library are in the p
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-01.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
+**Snapshot as of 2026-10-03.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -319,6 +323,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: Reranking | 2 | 2 | 0 | Done |
 | Installed agent files | 1 | 1 | 0 | Done |
 | F-LLM | 1 | 1 | 0 | Done |
+| RAG / AI requirements | 2 | 2 | 0 | Done |
 
 ## 6. Where the rest lives
 

@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Architecture</h1>
-    <div class="sub">Last rendered: 2026-10-01</div>
+    <div class="sub">Last rendered: 2026-10-03</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#stack-decisions">1. Stack decisions</a></li>
@@ -123,7 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Architecture</h1>
-    <div class="subtitle">Rendered 2026-10-01 &middot; source <code>TechieRag-Architecture.md</code></div>
+    <div class="subtitle">Rendered 2026-10-03 &middot; source <code>TechieRag-Architecture.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -482,6 +482,10 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 <tr><td>2026-09-25</td><td>The built-in phone default is the library's own Qwen2.5 0.5B conversion, published on the owner's Hugging Face account and pinned by version</td><td>317 MB, 0.5 GB memory and twice the speed of the nearest published alternative (Arm's Gemma 3 1B, 866 MB, 1.7 GB), Apache-2.0; the curated-default model Ollama and LM Studio use (owner decision 2, 2026-09-25)</td><td>done 2026-09-25 (<code>techierathore/Qwen2.5-0.5B-Instruct-onnx-genai</code>, pinned to one commit; downloaded by the Android phone and emulator, the Windows tests and the iOS simulator)</td></tr>
 <tr><td>2026-09-25</td><td>The AI reference and the two persona command files the package installs (ADR-006) are refreshed in the same phase as the features they describe, and a structural test in <code>tests/TechieRag.Tests/Documentation</code> fails the build when a shipped builder method is missing from them</td><td>The owner found the installed <code>/techierag</code> agent still described v2 after phase 2 was verified; a consumer's agent would integrate against a stale surface (BRD-167)</td><td>done 2026-09-25 (REQ-FN-070)</td></tr>
 <tr><td>2026-10-01</td><td>Keys and dependencies are injected only through code: <code>AddTechieRag(IConfiguration)</code> binds every non-key field and refuses any <code>ApiKey</code> or <code>Llm.Headers</code> value in the section; keys come from the builder, a <code>TechieRagConfig</code> built in code, or the new <code>AddTechieRag(IConfiguration, Action&lt;TechieRagBuilder&gt;)</code> overload. Connection strings stay bindable</td><td>Owner decision 2026-10-01; a key in an appsettings file is easy to commit and copy, and a silently ignored key is hard to debug, so it is refused with a message naming the code method (BRD-20, BRD-159)</td><td>done 2026-10-01 (REQ-FN-066, REQ-FN-001; <code>ConfigurationKeyGuard</code>, <code>WithApiKeys</code>, <code>WithLlmHeaders</code>)</td></tr>
+<tr><td>2026-10-03</td><td>Mail actions (move, Gmail label, Trash, dry run) are a separate type in <code>Connectors/Email/</code> (working name <code>ImapMailActions</code>) that shares the connection and login code; <code>ImapMailTransport</code> stays read-only by construction</td><td>Sevak TR-RAG-046 / ADR-024 needs to manage mail on the login it already reads with; keeping writes out of the reading transport means ingesting a mailbox still can never change it, and acting on mail is an explicit separate choice (BRD-169, BRD-170)</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
+<tr><td>2026-10-03</td><td>Trash = move to the server's Trash folder (<code>\Trash</code> special-use, or <code>[Gmail]/Trash</code>); the library never deletes a message permanently</td><td>A mistaken action must be recoverable from the user's own mail client</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
+<tr><td>2026-10-03</td><td>Move uses <code>MOVE</code> (RFC 6851) when advertised; otherwise <code>UID COPY</code> + <code>\Deleted</code> + <code>UID EXPUNGE</code> (UIDPLUS) of that message only; a server with neither is refused with a coded result</td><td>A plain <code>EXPUNGE</code> would also purge every other message the user had flagged deleted</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
+<tr><td>2026-10-03</td><td>Labels use Gmail's <code>X-GM-LABELS</code> extension; on any other server a label request returns a coded "labels not supported" result, never an IMAP keyword</td><td>Outlook categories are not exposed over IMAP, and a keyword the user's client never shows would look like it worked when it did not</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
 </tbody>
 </table>
 <h2 id="module-responsibilities">7. Module responsibilities<a class="anchor-link" href="#module-responsibilities">#</a></h2>
@@ -498,7 +502,7 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 <tr><td><code>Services</code></td><td><code>AgentLoopRunner</code>, <code>ToolRegistry</code>, <code>CompositeToolHandler</code>, <code>RetryHandler</code>, <code>FallbackLlmHandler</code>, <code>TokenUsageTracker</code>, <code>PromptTemplateEngine</code>, <code>InMemoryConversationMemory</code>, <code>DbConversationMemory</code>, <code>WorkspaceManager</code></td><td>Abstractions, Models</td></tr>
 <tr><td><code>Orchestration</code></td><td>Flow graphs (Agent, Tool, Condition, Handoff, Terminal nodes), <code>FlowRunner</code>, <code>FlowRuntime</code>, <code>FlowValidator</code>, <code>FlowSerializer</code>, guardrail chain, <code>GuardedToolHandler</code>, <code>AgentToolHandler</code>, <code>FlowMessage</code> codes</td><td>Services, Abstractions</td></tr>
 <tr><td><code>Mcp</code></td><td><code>McpClient</code>, stdio and HTTP transports, <code>McpToolHandler</code>, <code>McpTrustPolicy</code>, server registry</td><td>Abstractions, <code>HttpClient</code>, <code>System.Diagnostics.Process</code></td></tr>
-<tr><td><code>Connectors</code> (<code>Confluence/</code>, <code>Email/</code>, <code>Http/</code>, <code>Repository/</code>)</td><td><code>IDataConnector</code>, <code>ConnectorRunner</code>, sync state, rate-limited HTTP transport, IMAP and mbox mail, MIME parsing</td><td><code>HttpClient</code>, root ingestion</td></tr>
+<tr><td><code>Connectors</code> (<code>Confluence/</code>, <code>Email/</code>, <code>Http/</code>, <code>Repository/</code>)</td><td><code>IDataConnector</code>, <code>ConnectorRunner</code>, sync state, rate-limited HTTP transport, IMAP and mbox mail (read-only), MIME parsing; mail actions (move, Gmail label, Trash, dry run) in <code>ImapMailActions</code> over a shared <code>ImapSession</code> that is read-only for the reading transport (BRD-169/170)</td><td><code>HttpClient</code>, root ingestion</td></tr>
 <tr><td><code>Web</code></td><td>URL fetch, site crawl with depth and link caps, page reading, <code>WebIngestionExtensions</code></td><td>HtmlAgilityPack, <code>HttpClient</code></td></tr>
 <tr><td><code>Persistence</code></td><td>SQLite and PostgreSQL conversation and workspace stores over one relational base</td><td>Microsoft.Data.Sqlite, Npgsql</td></tr>
 <tr><td><code>Reranking</code></td><td><code>CohereReranker</code>, <code>JinaReranker</code> (API rerankers)</td><td><code>HttpClient</code></td></tr>
