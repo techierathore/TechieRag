@@ -1,20 +1,20 @@
 ---
 project: TechieRag
-last_updated: 2026-10-01
-current_phase: Phase 2 of 2 · UAT — handoff done, 85 of 85 verified, 1 not applicable
+last_updated: 2026-10-03
+current_phase: Phase 2 of 2 · UAT — handoff done, 87 of 87 verified, 1 not applicable
 last_verified_build: PASS
-last_verified_date: 2026-10-01
+last_verified_date: 2026-10-03
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 85 rows Verified; awaiting UAT per the UsageGuide. Handoff refreshed on 2026-10-01 for the OpenCode Go headers (BRD-168), the sign-in-required code and keys only through code: UsageGuide, phase-2 DevGuide, the AI reference and both installed `/techierag` agent files.
+Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 87 rows Verified. Mail actions for Sevak (REQ-RAG-110/111) passed live against the Gmail test account on 2026-10-03. Four local-model rows keep their 2026-09-25 result: this host lacks the memory to re-run them. Awaiting UAT per the UsageGuide.
 
 ## Next command to run
 
-Manual UAT: open `docs/TechieRag-UsageGuide.md` and work through "How to test, screen by screen"; when it passes, change the phase line at the top of this file from UAT to Released by hand. No agent command is next.
+Manual UAT: open `docs/TechieRag-UsageGuide.md` and work through "How to test, screen by screen"; when it passes, change the phase line at the top of this file from UAT to Released by hand.
 
 Claude Code:
 ```
@@ -40,13 +40,14 @@ Why: every row in this phase's scope is terminal and handoff has run; waiting on
 
 ## Known blockers
 
-- 🔶 **Chatur:** publish the next package after 1.0.8; Chatur then re-checks TR-RAG-003, 004, 005.
-- 🔶 **Breaking change:** an app with a key in its appsettings section fails at startup after the next package; check Sevak.
-- 🔶 **OpenCode Go key:** pasted in chat 2026-10-01; rotate it if the transcript is shared. Live test reads `TechieRagOpenCodeGoKey`.
-- 🔶 **Local model tests:** 13 TechieRag.Local tests fail here: phi-3-mini needs 4.6 GB free, WSL had 3.5 GB. Not caused by this change.
-- 🔶 **Verify boot:** the Windows probe has no web view, so the DevTools port never opens; screenless rows were graded by tests.
-- 🔶 **iPhone run (REQ-FN-060):** Developer Mode is off and no Apple ID is in Xcode. Steps: `docs/TechieRag-iPhone-Setup.md`.
-- 🔶 **Framework:** feedback checks match TR-RAG ids across apps (MISS-TechieRag-20261001-04, wrongly logged as fixed; still open).
+- 🔶 **Sevak:** manage mode needs a package release with `ImapMailActions`; publish after UAT.
+- 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 need 4.6 GB free; WSL has 7.8 GB total. Raise `memory=` in `.wslconfig`.
+- 🔶 **Postgres (REQ-RAG-044):** live test skipped; `TechieRagTestPostgres` is not visible in WSL.
+- 🔶 **Chatur:** publish the package after 1.0.8; Chatur re-checks TR-RAG-003, 004, 005.
+- 🔶 **Breaking change:** an appsettings key fails startup after the next package; check Sevak.
+- 🔶 **Keys in chat:** OpenCode Go key (2026-10-01) and Gmail app password (2026-10-03); rotate if shared.
+- 🔶 **iPhone run (REQ-FN-060):** Developer Mode off, no Apple ID in Xcode: `docs/TechieRag-iPhone-Setup.md`.
+- 🔶 **Framework:** feedback checks match TR-RAG ids across apps (MISS-TechieRag-20261001-04).
 - 🔶 **Owner git:** commit today's work.
 
 ## Verification log
@@ -55,11 +56,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-01 | triage-and-fix | 85/85 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
-| 2026-10-01 | amend-docs | 85/85 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
-| 2026-10-01 | amend-docs | 84/85 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 | 2026-10-01 | build-phase | 85/85 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 | 2026-10-01 | handoff-phase | 85/85 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-10-03 | amend-docs | 85/87 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-10-03 | build-phase | 86/87 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-10-03 | verify-phase | 87/87 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -68,7 +69,7 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 ## Standards compliance
 
-- Last check 2026-10-01: 0 findings, see the checklist Remarks.
+- Last check 2026-10-03: 0 findings, see the checklist Remarks.
 
 ## Deferred / future
 

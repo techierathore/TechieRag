@@ -66,6 +66,9 @@ public sealed class AiReferenceDocsTests
         "ConnectorRunner",
         "RepositoryConnector",
         "EmailConnector",
+        "ImapMailActions.Create",
+        "DryRunAsync",
+        "MailActionCodes",
         "ConnectorErrorCodes",
         "LimitCode",
         "ReachedLimit",
@@ -160,7 +163,7 @@ public sealed class AiReferenceDocsTests
             Assert.Contains(feature, command, StringComparison.Ordinal);
         }
 
-        foreach (var member in new[] { "UseLocalLlm", "TechieRagAgentBuilder", "AddTechieRagAgent", "UseChatGptSubscriptionLlm", "ChatStreamEventsAsync", "RunStreamAsync", "IngestSiteAsync" })
+        foreach (var member in new[] { "UseLocalLlm", "TechieRagAgentBuilder", "AddTechieRagAgent", "UseChatGptSubscriptionLlm", "ChatStreamEventsAsync", "RunStreamAsync", "IngestSiteAsync", "ImapMailActions", "DryRunAsync" })
         {
             Assert.Contains(member, command, StringComparison.Ordinal);
         }

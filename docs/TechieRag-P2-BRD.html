@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 2: Agents, platforms, local model, and the harvested v3 library</h1>
-    <div class="subtitle">Rendered 2026-10-01 &middot; source <code>TechieRag-P2-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-03 &middot; source <code>TechieRag-P2-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -145,7 +145,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-168 (BRD-166 and BRD-167 added on 2026-09-25, BRD-168 on 2026-10-01). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-170 (BRD-166 and 167 added 2026-09-25, 168 on 2026-10-01, 169 and 170 on 2026-10-03). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
 <h2 id="screens-and-flow">2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -160,7 +160,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Typed streaming</td><td><code>ILlmProvider</code> typed streaming method, <code>AgentLoopRunner</code> streaming run</td><td>Developer</td><td>— (library, no mockup)</td><td>LlmTextDelta, LlmToolCallEvent, LlmStreamCompleted</td></tr>
 <tr><td>Subscription sign-in</td><td><code>UseChatGptSubscriptionLlm(callback)</code>, <code>LlmConnectorCatalog</code></td><td>App developer</td><td>— (library, no mockup)</td><td>URL, user code, session store, VendorTerms</td></tr>
 <tr><td>Ingestion breadth</td><td><code>IChunker</code>, <code>Processors/</code>, <code>Web/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>chunking strategy, XLSX/PPTX/CSV/audio, URL, crawl</td></tr>
-<tr><td>Data connectors</td><td><code>IDataConnector</code>, <code>ConnectorRunner</code>, <code>Connectors/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>repository, Confluence, email, sync state, transport guards</td></tr>
+<tr><td>Data connectors</td><td><code>IDataConnector</code>, <code>ConnectorRunner</code>, <code>Connectors/</code></td><td>Developer</td><td>— (library, no mockup)</td><td>repository, Confluence, email, sync state, transport guards, mail move / label / Trash with dry run</td></tr>
 <tr><td>MCP tools</td><td><code>McpClient</code>, <code>McpToolHandler</code>, <code>IMcpServerRegistry</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>stdio, HTTP, trust policy</td></tr>
 <tr><td>Flow orchestration</td><td><code>FlowRunner</code>, <code>FlowRuntime</code>, <code>IFlowGuardrail</code>, <code>AgentToolHandler</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>nodes, conditions, MaxSteps, guardrails, FlowMessage</td></tr>
 <tr><td>Workspaces and memory</td><td><code>WorkspaceManager</code>, <code>IWorkspaceStore</code>, <code>IConversationStore</code>, <code>DbConversationMemory</code></td><td>Developer</td><td>— (library, no mockup)</td><td>threads, pinning, threshold, chat mode, dedupe</td></tr>
@@ -556,6 +556,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-169</strong> — A developer can act on mail over the same IMAP login the mail connector reads with (password, Gmail app password or XOAUTH2 token): move a message to a folder, add or remove a Gmail label, and move a message to Trash, getting back one result per message (done, skipped or failed, with the reason). The actions live in their own type, so the reading connector (BRD-125) stays read-only. Trash means moving to the server's Trash folder (the <code>\Trash</code> special-use folder, or Gmail's <code>[Gmail]/Trash</code>); the library never deletes a message permanently. Move uses <code>MOVE</code> where the server offers it, otherwise copy, flag and <code>UID EXPUNGE</code> of that one message only; a server offering neither is refused with a coded result, never a plain <code>EXPUNGE</code>. Labels use Gmail's label extension; on any other server a label request returns a coded "labels not supported" result <em>(added 2026-10-03; paired with <code>Sevak#REQ-RAG-056</code> (Sevak BRD-161, ADR-024); closes Sevak feedback TR-RAG-046)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a developer moves, labels and trashes three messages on a Gmail mailbox, then each message is where it was sent and each has its own result.
+</li>
+</ul>
+</li>
+<li><strong>BRD-170</strong> — The mail actions of BRD-169 shall offer a dry run that returns the planned action per message and sends no command that changes the mailbox <em>(added 2026-10-03; paired with <code>Sevak#REQ-RAG-056</code>; TR-RAG-046)</em> <em>Screen:</em> Data connectors
+<ul>
+<li><em>Acceptance:</em> When a developer dry-runs the same three actions, then the plan comes back per message and the mailbox is unchanged.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="mcp-tools">MCP tools<a class="anchor-link" href="#mcp-tools">#</a></h3>
 <p>Consumes Model Context Protocol tool servers inside the agent loop.</p>
@@ -761,7 +773,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </table>
 <h2 id="development-status">5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-01.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-10-03.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -781,6 +793,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Surface: Reranking</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Installed agent files</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>F-LLM</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>RAG / AI requirements</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
 <h2 id="where-the-rest-lives">6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>

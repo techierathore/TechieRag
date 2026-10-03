@@ -18,7 +18,12 @@ namespace TechieRag.Connectors.Email;
 /// server behaviour surfaces as an operator-facing failure, not as silently missing mail.</para>
 /// <para><b>Read-only by construction.</b> Every fetch uses <c>BODY.PEEK</c> rather than
 /// <c>BODY</c>, so ingesting a mailbox does not mark it as read. A connector that silently marked a
-/// year of mail as read would be an unrecoverable act on someone's inbox.</para>
+/// year of mail as read would be an unrecoverable act on someone's inbox. Beyond that, the session
+/// this type talks through is created read-only: it refuses, before anything reaches the wire, every
+/// command outside <c>CAPABILITY</c>, <c>LOGIN</c>, <c>AUTHENTICATE</c>, <c>LIST</c>, <c>SELECT</c>,
+/// <c>EXAMINE</c>, <c>SEARCH</c>, <c>FETCH</c> and their read-only kin, and any non-<c>PEEK</c> body
+/// fetch. Acting on mail (move, label, Trash) is a separate type, <see cref="ImapMailActions"/>
+/// (REQ-RAG-110 / BRD-169), so ingesting a mailbox can never change it.</para>
 /// <para><b>Searching happens on the server.</b> Date, sender and subject are IMAP <c>SEARCH</c>
 /// keys, so the scope filters are evaluated before anything is transferred. Only the UIDs of
 /// matching messages come back, and headers are fetched a page at a time from that list.</para>
@@ -27,7 +32,7 @@ namespace TechieRag.Connectors.Email;
 /// <para><b>Nothing a caller supplies reaches the wire unchecked.</b> IMAP is a line protocol, so a
 /// folder name, filter or account name carrying a carriage return is not a badly-formed argument —
 /// it is a second command, executed with this account's credentials. Every such value is refused
-/// before it is sent, and <see cref="RunAsync"/> refuses a composed command line containing a line
+/// before it is sent, and the shared session refuses a composed command line containing a line
 /// break as a last resort, so a future call site that forgets cannot reintroduce the hole.</para>
 /// <para><b>Every response is bounded.</b> The server declares how many bytes a literal will carry
 /// and how many untagged lines it will send, and both are numbers the server chooses. Neither is
@@ -42,14 +47,11 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
     /// accumulated until the process runs out of memory. No real LIST, SEARCH or FETCH response is
     /// within two orders of magnitude of this.
     /// </remarks>
-    public const int MaxResponseLines = 100_000;
+    public const int MaxResponseLines = ImapSession.MaxResponseLines;
 
-    private readonly Func<IImapConnection> connectionFactory;
     private readonly ImapMailboxOptions options;
-    private readonly ILogger<ImapMailTransport> logger;
     private readonly Dictionary<string, List<string>> searchCache = new(StringComparer.Ordinal);
-    private IImapConnection? connection;
-    private int tagCounter;
+    private readonly ImapSession session;
     private string? selectedFolder;
     private string uidValidity = "0";
 
@@ -62,9 +64,13 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
         ImapMailboxOptions options,
         ILogger<ImapMailTransport>? logger = null)
     {
-        this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+        ArgumentNullException.ThrowIfNull(connectionFactory);
         this.options = options ?? throw new ArgumentNullException(nameof(options));
-        this.logger = logger ?? NullLogger<ImapMailTransport>.Instance;
+
+        // Read-only by construction: this session refuses every verb outside the non-mutating
+        // allowlist, so no code path in this type can change the mailbox it reads.
+        session = new ImapSession(
+            connectionFactory, options, logger ?? NullLogger<ImapMailTransport>.Instance, readOnly: true);
     }
 
     /// <summary>Creates a transport that connects to a real server over TLS.</summary>
@@ -91,9 +97,9 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
     /// <inheritdoc />
     public async Task<IReadOnlyList<string>> ListFoldersAsync(CancellationToken cancellationToken = default)
     {
-        await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
-        var result = await RunAsync("LIST \"\" \"*\"", cancellationToken).ConfigureAwait(false);
-        Ensure(result, "list folders");
+        await session.EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
+        var result = await session.RunAsync("LIST \"\" \"*\"", cancellationToken).ConfigureAwait(false);
+        session.Ensure(result, "list folders");
 
         var folders = new List<string>();
         foreach (var line in result.Lines)
@@ -132,8 +138,8 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
         // MimeParser, which already decodes encoded words and unfolds continuations, instead of
         // needing a second parser for IMAP's own parenthesised envelope grammar.
         var command = $"UID FETCH {string.Join(",", slice)} (UID INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER])";
-        var result = await RunAsync(command, cancellationToken).ConfigureAwait(false);
-        Ensure(result, $"read headers from '{folder}'");
+        var result = await session.RunAsync(command, cancellationToken).ConfigureAwait(false);
+        session.Ensure(result, $"read headers from '{folder}'");
 
         var headers = new List<MailHeader>(slice.Count);
         foreach (var line in result.Lines)
@@ -156,8 +162,8 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
         var uid = RequireUid(header.Uid);
 
         await SelectAsync(header.Folder, cancellationToken).ConfigureAwait(false);
-        var result = await RunAsync($"UID FETCH {uid} (BODY.PEEK[])", cancellationToken).ConfigureAwait(false);
-        Ensure(result, $"read message {header.Uid}");
+        var result = await session.RunAsync($"UID FETCH {uid} (BODY.PEEK[])", cancellationToken).ConfigureAwait(false);
+        session.Ensure(result, $"read message {header.Uid}");
 
         foreach (var line in result.Lines)
         {
@@ -174,89 +180,18 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
     }
 
     /// <inheritdoc />
-    public void Dispose()
-    {
-        connection?.Dispose();
-        connection = null;
-    }
-
-    private async Task EnsureConnectedAsync(CancellationToken cancellationToken)
-    {
-        if (connection is not null)
-        {
-            return;
-        }
-
-        var opened = connectionFactory()
-            ?? throw new ConnectorException("email", "The IMAP connection factory returned nothing.");
-
-        connection = opened;
-        await opened.OpenAsync(cancellationToken).ConfigureAwait(false);
-
-        // Checked before a single credential byte is written. BRD-135 requires plaintext to be
-        // refused rather than warned about, and this is the point at which refusing still helps.
-        if (!opened.IsSecure)
-        {
-            connection = null;
-            opened.Dispose();
-            throw new ConnectorException(
-                "email",
-                $"{options.Host} did not establish an encrypted session. Plaintext IMAP is refused; use port 993.");
-        }
-
-        await AuthenticateAsync(cancellationToken).ConfigureAwait(false);
-        logger.LogInformation("Authenticated to {Host} as {User}", options.Host, options.Username);
-    }
-
-    private async Task AuthenticateAsync(CancellationToken cancellationToken)
-    {
-        ImapResult result;
-
-        if (options.UseOAuthBearer)
-        {
-            // The SASL XOAUTH2 initial response. Gmail and Microsoft 365 accept nothing else over
-            // IMAP any more, so a password-only client cannot read the two largest mail providers.
-            // The U+0001 separators are part of the mechanism rather than formatting: the server
-            // splits the decoded blob on them, and a payload joined any other way authenticates
-            // as nobody while reporting only a generic failure.
-            RequireNoControlCharacters(options.Username, "account name");
-            RequireNoControlCharacters(options.Password, "access token");
-
-            var payload = Convert.ToBase64String(
-                Encoding.UTF8.GetBytes($"user={options.Username}\u0001auth=Bearer {options.Password}\u0001\u0001"));
-
-            result = await RunAsync($"AUTHENTICATE XOAUTH2 {payload}", cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            result = await RunAsync(
-                $"LOGIN {Quote(options.Username, "account name")} {Quote(options.Password, "password")}",
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        if (result.IsOk)
-        {
-            return;
-        }
-
-        // The server's own text is not repeated: it can echo the account name and, on some servers,
-        // part of the credential.
-        throw new ConnectorException(
-            "email",
-            $"{options.Host} rejected the credentials supplied for '{options.Username}'. Check the password or token, and whether the account requires an app password.",
-            401);
-    }
+    public void Dispose() => session.Dispose();
 
     private async Task SelectAsync(string folder, CancellationToken cancellationToken)
     {
-        await EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
+        await session.EnsureConnectedAsync(cancellationToken).ConfigureAwait(false);
 
         if (string.Equals(selectedFolder, folder, StringComparison.Ordinal))
         {
             return;
         }
 
-        var result = await RunAsync($"SELECT {Quote(folder, "folder name")}", cancellationToken).ConfigureAwait(false);
+        var result = await session.RunAsync($"SELECT {Quote(folder, "folder name")}", cancellationToken).ConfigureAwait(false);
         if (!result.IsOk)
         {
             throw new ConnectorException(
@@ -288,8 +223,8 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
             return cached;
         }
 
-        var result = await RunAsync($"UID SEARCH {BuildSearchKeys(criteria)}", cancellationToken).ConfigureAwait(false);
-        Ensure(result, $"search '{folder}'");
+        var result = await session.RunAsync($"UID SEARCH {BuildSearchKeys(criteria)}", cancellationToken).ConfigureAwait(false);
+        session.Ensure(result, $"search '{folder}'");
 
         var uids = new List<long>();
         foreach (var line in result.Lines)
@@ -414,161 +349,17 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
             headers.TryGetValue("Message-ID", out var id) ? id : null);
     }
 
-    private async Task<ImapResult> RunAsync(string command, CancellationToken cancellationToken)
-    {
-        var pipe = connection ?? throw new ConnectorException("email", "The IMAP connection is not open.");
-        var tag = $"T{++tagCounter:D4}";
-
-        // The last line of defence against command injection. Every value that reaches a command is
-        // checked at the point it is composed, where the failure can name what was wrong; this
-        // catches the call site that forgets, and it costs one scan of a short string.
-        RequireNoControlCharacters(command, "command");
-
-        // Deliberately not logged: LOGIN and AUTHENTICATE commands carry the credential inline.
-        await pipe.WriteLineAsync($"{tag} {command}", cancellationToken).ConfigureAwait(false);
-
-        var lines = new List<ImapLine>();
-        var continuations = 0;
-        var literalBudget = options.MaxMessageBytes;
-
-        while (true)
-        {
-            if (lines.Count > MaxResponseLines)
-            {
-                throw new ConnectorException(
-                    "email",
-                    $"{options.Host} sent more than {MaxResponseLines} untagged lines without completing the command. The connection was dropped.");
-            }
-
-            var raw = await pipe.ReadLineAsync(cancellationToken).ConfigureAwait(false)
-                      ?? throw new ConnectorException("email", $"{options.Host} closed the connection mid-command.");
-
-            // A "+" line is the server asking for more input. The only case reached here is a failed
-            // SASL exchange, which the RFC says to end by sending an empty line.
-            if (raw.StartsWith("+ ", StringComparison.Ordinal) || raw == "+")
-            {
-                if (++continuations > 3)
-                {
-                    throw new ConnectorException("email", $"{options.Host} kept asking for input this client cannot supply.");
-                }
-
-                await pipe.WriteLineAsync(string.Empty, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-
-            var text = new StringBuilder();
-            var literals = new List<byte[]>();
-            var current = raw;
-
-            // A trailing {n} means exactly n bytes follow, newlines and all. Reading them by count
-            // is the only way to keep the frame; scanning for a newline would read into the body.
-            while (TryReadLiteralLength(current, out var length))
-            {
-                // The length is the server's claim, and it is acted on by allocating before a byte
-                // has been read. A declared {2000000000} is a two-gigabyte allocation the server
-                // chose, so it is checked against a budget rather than honoured.
-                if (length > literalBudget)
-                {
-                    throw new ConnectorException(
-                        "email",
-                        $"{options.Host} announced {length:N0} bytes of message content, beyond the {options.MaxMessageBytes:N0}-byte limit for one response. Raise ImapMailboxOptions.MaxMessageBytes if this mailbox genuinely holds mail that large.")
-                    {
-                        ErrorCode = ConnectorErrorCodes.ImapLiteralTooLarge,
-                    };
-                }
-
-                literalBudget -= length;
-                text.Append(current);
-                literals.Add(await pipe.ReadExactAsync(length, cancellationToken).ConfigureAwait(false));
-                current = await pipe.ReadLineAsync(cancellationToken).ConfigureAwait(false)
-                          ?? throw new ConnectorException("email", $"{options.Host} closed the connection inside a literal.");
-            }
-
-            text.Append(current);
-            var full = text.ToString();
-
-            if (full.StartsWith(tag + " ", StringComparison.Ordinal))
-            {
-                return new ImapResult(
-                    full.StartsWith($"{tag} OK", StringComparison.OrdinalIgnoreCase), full, lines);
-            }
-
-            lines.Add(new ImapLine(full, literals));
-        }
-    }
-
-    private void Ensure(ImapResult result, string what)
-    {
-        if (!result.IsOk)
-        {
-            throw new ConnectorException("email", $"{options.Host} refused to {what}.");
-        }
-    }
-
     /// <summary>Reads the byte count of a trailing IMAP literal.</summary>
     /// <param name="line">A response line.</param>
     /// <param name="length">The literal's length when one is present.</param>
     /// <returns>True when the line ends in a literal marker.</returns>
-    internal static bool TryReadLiteralLength(string line, out int length)
-    {
-        length = 0;
-        var match = LiteralPattern().Match(line);
-        return match.Success
-               && int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out length);
-    }
+    internal static bool TryReadLiteralLength(string line, out int length) =>
+        ImapSession.TryReadLiteralLength(line, out length);
 
     /// <summary>Splits an IMAP response fragment into quoted strings and bare atoms.</summary>
     /// <param name="value">The fragment.</param>
     /// <returns>The tokens, with quotes removed and escapes resolved.</returns>
-    internal static List<string> Tokenize(string value)
-    {
-        var tokens = new List<string>();
-        var current = new StringBuilder();
-        var inQuotes = false;
-
-        for (var index = 0; index < value.Length; index++)
-        {
-            var character = value[index];
-
-            if (inQuotes && character == '\\' && index + 1 < value.Length)
-            {
-                current.Append(value[++index]);
-                continue;
-            }
-
-            if (character == '"')
-            {
-                if (inQuotes)
-                {
-                    tokens.Add(current.ToString());
-                    current.Clear();
-                }
-
-                inQuotes = !inQuotes;
-                continue;
-            }
-
-            if (!inQuotes && char.IsWhiteSpace(character))
-            {
-                if (current.Length > 0)
-                {
-                    tokens.Add(current.ToString());
-                    current.Clear();
-                }
-
-                continue;
-            }
-
-            current.Append(character);
-        }
-
-        if (current.Length > 0)
-        {
-            tokens.Add(current.ToString());
-        }
-
-        return tokens;
-    }
+    internal static List<string> Tokenize(string value) => ImapSession.Tokenize(value);
 
     private static DateTimeOffset? ParseInternalDate(string line)
     {
@@ -597,65 +388,9 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
     private static string Read(IReadOnlyDictionary<string, string> headers, string name) =>
         headers.TryGetValue(name, out var value) ? value : string.Empty;
 
-    /// <summary>Renders a caller-supplied value as an IMAP quoted string.</summary>
-    /// <param name="value">The value.</param>
-    /// <param name="what">What the value is, for the failure message.</param>
-    /// <returns>The value, escaped and quoted.</returns>
-    /// <exception cref="ConnectorException">The value contains a control character.</exception>
-    /// <remarks>
-    /// <para>Escaping <c>\</c> and <c>"</c> keeps the quoted string well-formed; it does nothing at
-    /// all about a line break, and a line break is the whole attack. IMAP frames commands by line,
-    /// so <c>INBOX\r\nT9 STORE 1:* +FLAGS (\Deleted)</c> as a folder name is not a folder with an
-    /// odd name — it is a delete issued with this account's credentials, on a connector whose entire
-    /// read-only promise rests on only ever sending <c>BODY.PEEK</c>.</para>
-    /// <para>The check is on control characters rather than on CR and LF alone: U+0001 is the field
-    /// separator inside the <c>XOAUTH2</c> SASL payload, where it lets a supplied account name forge
-    /// the token field. No folder, mailbox, account name or search term legitimately contains any of
-    /// them, so refusing the value outright loses nothing and needs no escaping rules to be right.</para>
-    /// </remarks>
-    private static string Quote(string value, string what)
-    {
-        RequireNoControlCharacters(value, what);
-        return "\"" + value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal) + "\"";
-    }
+    private static string Quote(string value, string what) => ImapSession.Quote(value, what);
 
-    private static void RequireNoControlCharacters(string value, string what)
-    {
-        foreach (var character in value)
-        {
-            if (!char.IsControl(character))
-            {
-                continue;
-            }
-
-            throw new ConnectorException(
-                "email",
-                $"The {what} contains a control character (U+{(int)character:X4}), which IMAP would read as the end of the command line. Remove it and try again.");
-        }
-    }
-
-    /// <summary>Checks that a value is an IMAP UID before it is spliced into a command.</summary>
-    /// <param name="uid">The UID from a <see cref="MailHeader"/>.</param>
-    /// <returns>The UID.</returns>
-    /// <exception cref="ConnectorException">The value is not a bare positive integer.</exception>
-    /// <remarks>
-    /// A UID is a number in the protocol and is never quoted, so unlike a folder name there is no
-    /// escaping that would make an arbitrary string safe here. A header built by hand — or by a
-    /// different transport, whose UIDs are Message-IDs — must not be able to append a command.
-    /// </remarks>
-    private static string RequireUid(string uid)
-    {
-        if (uid.Length == 0 || uid.Length > 20 || !uid.All(char.IsAsciiDigit))
-        {
-            throw new ConnectorException(
-                "email", "A message identifier that is not a bare IMAP UID cannot be fetched over IMAP.");
-        }
-
-        return uid;
-    }
-
-    [GeneratedRegex(@"\{(\d+)\}\s*$", RegexOptions.CultureInvariant)]
-    private static partial Regex LiteralPattern();
+    private static string RequireUid(string uid) => ImapSession.RequireUid(uid);
 
     [GeneratedRegex(@"UIDVALIDITY\s+(\d+)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex UidValidityPattern();
@@ -671,8 +406,4 @@ public sealed partial class ImapMailTransport : IMailTransport, IDisposable
 
     [GeneratedRegex(@"INTERNALDATE\s+""([^""]+)""", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex InternalDatePattern();
-
-    private sealed record ImapLine(string Text, IReadOnlyList<byte[]> Literals);
-
-    private sealed record ImapResult(bool IsOk, string Completion, IReadOnlyList<ImapLine> Lines);
 }

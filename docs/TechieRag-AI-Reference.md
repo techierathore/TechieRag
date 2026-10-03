@@ -14,7 +14,7 @@ TechieRag is a complete RAG (Retrieval-Augmented Generation) + LLM management pl
 - **Agents** - Microsoft Agent Framework over TechieRag (`TechieRag.Agents`), and agentic retrieval on the classic loop
 - **Local Model** - Qwen2.5 0.5B on phones, Phi-3 mini on desktops, any ONNX Runtime GenAI model by name (`TechieRag.Local`)
 - **Provider Routing** - `UseLlmForModel("claude-sonnet-4-5")` picks the service from the model name
-- **Connectors and Web** - GitHub/GitLab repositories, IMAP/mbox mail, Confluence; URL and site ingestion behind an SSRF guard
+- **Connectors and Web** - GitHub/GitLab repositories, IMAP/mbox mail (plus mail actions: move, Gmail label, Trash, dry run), Confluence; URL and site ingestion behind an SSRF guard
 - **Reranking** - Cohere, Jina, or the embedded ONNX cross-encoder
 - **Workspaces and Persistence** - SQLite/PostgreSQL conversation and workspace stores
 - **Token Management** - Usage tracking, cost estimation, budgets
@@ -871,6 +871,18 @@ public sealed class ImapMailboxOptions { string Host; int Port = 993; string Use
 public MboxMailTransport(string path);
 public sealed class EmailConnectorOptions { IList<string> Folders = ["INBOX"]; DateTimeOffset? SinceUtc; string? SenderContains; string? SubjectContains; string? AccountAddress; bool IncludeSentByMe; bool IncludeSpam; bool IncludeAttachments; IList<string> AttachmentExtensions; long MaxAttachmentBytes = 8 MB; bool StripQuotedReplies = true; bool StripSignatures = true; int PageSize = 50; }
 
+// TechieRag.Connectors.Email - mail actions on the same IMAP login (the reader above stays read-only)
+public static ImapMailActions ImapMailActions.Create(ImapMailboxOptions options, ILogger<ImapMailActions>? logger = null);
+public Task<IReadOnlyList<MailActionResult>> ApplyAsync(IEnumerable<MailAction> actions, CancellationToken cancellationToken = default);
+public Task<IReadOnlyList<MailActionPlan>> DryRunAsync(IEnumerable<MailAction> actions, CancellationToken cancellationToken = default);   // sends no command that changes the mailbox
+public Task<IReadOnlyList<MailActionResult>> MoveAsync / TrashAsync / AddLabelAsync / RemoveLabelAsync(IEnumerable<MailMessageRef> messages, ...);
+public sealed record MailMessageRef(string Folder, string Uid, string? UidValidity = null) { static FromHeader(MailHeader); static FromConnectorItemId(string); }
+public sealed record MailAction(MailMessageRef Message, MailActionKind Kind, string? Target = null) { static Move(m, folder); AddLabel(m, label); RemoveLabel(m, label); Trash(m); }
+public sealed record MailActionResult(MailAction Action, MailActionOutcome Outcome /* Done, Skipped, Failed */, MailMoveStrategy Strategy, string? TargetFolder, string? Code, string? Reason);
+public sealed record MailActionPlan(MailAction Action, MailActionOutcome Outcome, MailMoveStrategy Strategy /* Move, CopyAndExpunge */, string? TargetFolder, IReadOnlyList<string> Commands, string? Code, string? Reason);
+// MailActionCodes: MoveNotSupported, LabelsNotSupported, TrashFolderNotFound, TargetFolderNotFound, MessageNotFound, UidValidityChanged, AlreadyInFolder, ServerRefused, CopiedNotRemoved, InvalidArgument, FolderNotFound, ConnectionLost
+// Trash = the \Trash special-use folder or [Gmail]/Trash, never a permanent delete; move = UID MOVE, else UID COPY + \Deleted + UID EXPUNGE of that UID; labels = Gmail X-GM-LABELS only
+
 // TechieRag.Web.WebIngestionExtensions
 public static Task<string> IngestUrlAsync(this ITechieRag rag, string url, IWebContentFetcher fetcher, CancellationToken cancellationToken = default);   // returns the document id
 public static Task<WebIngestionResult> IngestSiteAsync(this ITechieRag rag, string seedUrl, IWebContentFetcher fetcher,
@@ -915,6 +927,17 @@ var mail = new EmailConnector(
     ImapMailTransport.Create(new ImapMailboxOptions { Host = "imap.example.com", Username = user, Password = secret }),
     new EmailConnectorOptions { Folders = ["INBOX"], SinceUtc = DateTimeOffset.UtcNow.AddDays(-30), IncludeAttachments = true });
 await rag.IngestConnectorAsync(mail);
+
+// Act on mail over the same login: dry run first, then apply; one result per message
+var mailActions = ImapMailActions.Create(new ImapMailboxOptions { Host = "imap.gmail.com", Username = user, Password = appPassword });
+var message = MailMessageRef.FromConnectorItemId(item.Id);   // or MailMessageRef.FromHeader(header)
+MailAction[] actions = [MailAction.Move(message, "Archive"), MailAction.AddLabel(message, "Receipts"), MailAction.Trash(other)];
+var plans = await mailActions.DryRunAsync(actions);          // plans[i].Commands, .Strategy, .TargetFolder; mailbox unchanged
+var results = await mailActions.ApplyAsync(actions);
+foreach (var failed in results.Where(r => r.Outcome == MailActionOutcome.Failed))
+{
+    // switch on failed.Code, e.g. MailActionCodes.LabelsNotSupported on a non-Gmail server
+}
 
 // Web pages: one URL, or a crawl from a seed; both go through the SSRF guard
 var fetcher = new HttpWebContentFetcher(HttpWebContentFetcher.CreateDefaultClient());
@@ -1826,7 +1849,7 @@ When generating code that uses TechieRag, follow these conventions:
 | `TechieRag.Llm` | OllamaLlmProvider, LmStudioLlmProvider, OpenAICompatibleLlmProvider, AzureAIFoundryLlmProvider, GoogleGeminiLlmProvider, AnthropicLlmProvider, ChatGptSubscriptionLlmProvider, ChatGptSubscriptionOptions, SubscriptionSignInException, LlmProviderFactory, ModelRouter, ModelRoute, LlmConnectorCatalog, LlmConnectorDescriptor, LlmStreamEventExtensions |
 | `TechieRag.Services` | TokenUsageTracker, InMemoryConversationMemory, AgentLoopRunner, ToolRegistry, PromptTemplateEngine, RetryHandler, FallbackLlmHandler, WorkspaceManager |
 | `TechieRag.Agentic` | RegisterKnowledgeBase (ToolRegistry extension), TechieRagRetrievalSource, IRetrievalSource, RetrievalToolOptions, RetrievalTurnState, RetrievalTrace, AgenticInstructions, KnowledgeBaseTools |
-| `TechieRag.Connectors` (+ `.Repository`, `.Email`, `.Http`) | ConnectorRunner, IngestConnectorAsync, ConnectorRunOptions, ConnectorSyncState, ConnectorErrorCodes, RepositoryConnector, EmailConnector, ImapMailTransport, MboxMailTransport, HttpConnectorTransport |
+| `TechieRag.Connectors` (+ `.Repository`, `.Email`, `.Http`) | ConnectorRunner, IngestConnectorAsync, ConnectorRunOptions, ConnectorSyncState, ConnectorErrorCodes, RepositoryConnector, EmailConnector, ImapMailTransport, ImapMailActions, MailActionCodes, MboxMailTransport, HttpConnectorTransport |
 | `TechieRag.Web` | IngestUrlAsync, IngestSiteAsync, HttpWebContentFetcher, WebCrawlOptions, WebIngestionResult |
 | `TechieRag.Mcp` | McpClient, McpServerConfig, McpTrustPolicy, McpToolHandler |
 | `TechieRag.Orchestration` | FlowDefinition, FlowSerializer, FlowRunner, FlowRuntime, FlowAgent, InMemoryFlowAgentResolver, FlowMessage |

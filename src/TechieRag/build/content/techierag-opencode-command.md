@@ -360,6 +360,7 @@ Core package, namespaces `TechieRag.Connectors` (+ `.Repository`, `.Email`, `.Ht
 3. `var result = await rag.IngestConnectorAsync(connector, previousSync, new ConnectorRunOptions { MaxItems, MaxTotalBytes })`; keep `result.Sync`; or `new ConnectorRunner().RunAsync(connector, previousSync, options)` to inspect first
 4. Check `result.ReachedLimit` and switch on `result.LimitCode` against `ConnectorErrorCodes`; `ConnectorException.ErrorCode` for failures
 5. Web: `var fetcher = new HttpWebContentFetcher(HttpWebContentFetcher.CreateDefaultClient()); await rag.IngestUrlAsync(url, fetcher); await rag.IngestSiteAsync(seedUrl, fetcher, new WebCrawlOptions { MaxDepth = 1, MaxPages = 25 })`; the SSRF guard stays on
+6. Mail actions on the same IMAP login (the reader stays read-only): `var mailActions = ImapMailActions.Create(imapOptions); var plans = await mailActions.DryRunAsync(actions); var results = await mailActions.ApplyAsync(actions);` with `actions` built from `MailAction.Move(msg, "Archive")`, `MailAction.AddLabel(msg, "Receipts")`, `MailAction.Trash(msg)` and `msg = MailMessageRef.FromConnectorItemId(item.Id)`; one result per message, switch on `MailActionCodes`; Trash is never a permanent delete and the dry run changes nothing
 
 ## Working from Implementation Documents
 
