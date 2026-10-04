@@ -176,7 +176,7 @@ TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=
 - Web page and site-crawl ingestion are the web routes; transcript ingestion was removed by owner decision on 2026-09-24 (REQ-RAG-076 N/A, code deleted under BRD-164).
 - The email connector has only run against mbox files, not a live IMAP server (REQ-RAG-081).
 - IMAP connects to the server you name, LAN or loopback included: the SSRF guard covers fetched URLs, which can come from content, not a configured mail server (REQ-RAG-082).
-- The probe ran on 2026-09-25 on the owner's Mac (Mac Catalyst head and the iPhone 17 Pro simulator) and Galaxy S23 (Android head); a physical iPhone has not run it yet (runbook step 1 is the owner's).
+- On the iPhone a model download can stop with "The network connection was lost", most likely when the phone auto-locks; press again unlocked and it resumes.
 - `TechieRag.Local` has no engine on an Intel Mac (GenAI ships none): `PlatformNotSupportedException`. Subscription sign-in: REQ-RAG-069 and REQ-RAG-070.
 - `TechieRag.Agents`: citation refs live in memory against the `AgentSession` object, so a serialized and restored session restarts at S1; a traced agent (`WithTrace`) runs one turn at a time; MAF approval requests (`PendingApprovals`) are surfaced, not resumed for you.
 - Keys are refused in an appsettings section (any `ApiKey` or `Headers`); pass them in code with `AddTechieRag(section, rag => rag.WithApiKeys(...))` (REQ-FN-066). An app that kept keys there fails at startup after upgrading.
@@ -191,13 +191,13 @@ Each cell reads **supported** (built for it, no recorded run there yet), **teste
 
 | Package | Windows | macOS / Mac Catalyst | Android | iOS |
 |---|---|---|---|---|
-| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, 2026-09-25) | tested (Galaxy S23, probe, 2026-09-25) | supported |
-| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, bge-m3, 2026-09-25) | tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25) | supported |
+| `TechieRag` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, 2026-09-25) | tested (Galaxy S23, probe, 2026-09-25) | tested (iPhone 17 Pro, probe, 2026-10-04) |
+| `TechieRag.Embedded` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, bge-m3, 2026-09-24) | tested (owner's Mac, Apple M4 Max, probe Mac Catalyst head, bge-m3, 2026-09-25) | tested (Galaxy S23, probe, all-MiniLM-L6-v2, 2026-09-25) | tested (iPhone 17 Pro, probe, all-MiniLM-L6-v2, 2026-10-04) |
 | `TechieRag.Agents` | supported ² | supported ² | supported ² | supported ² |
-| `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³ | supported ³ |
+| `TechieRag.Local` | tested (Windows 11 laptop, Mi NoteBook Pro, probe Windows head, Phi-3 mini, 2026-09-25) ³ | tested (owner's Mac, Apple M4 Max 36 GB, macOS 27, probe Mac Catalyst head, Phi-3 mini, 2026-09-25) | tested (Galaxy S23, probe, Qwen2.5 0.5B, 2026-09-25) ³ | tested (iPhone 17 Pro, probe, Qwen2.5 0.5B, 2026-10-04) ³ |
 
 2. Shipped 2026-09-24 (REQ-RAG-016); plain .NET, no native code; the probe does not exercise it.
-3. ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25; Mac Catalyst wiring REQ-FN-058). Windows and the Galaxy S23 generated through the probe; iOS ran on a **simulator** only, so its cell waits for the owner's iPhone. Numbers: "Local model: measured per platform".
+3. ONNX Runtime GenAI 0.16.0 on all four platforms (`DECISIONS.md` 2026-09-25; Mac Catalyst wiring REQ-FN-058). Windows, the Galaxy S23 and the owner's iPhone generated through the probe. Numbers: "Local model: measured per platform".
 
 ### Local model: measured per platform (REQ-FN-060, BRD-108)
 
@@ -210,11 +210,11 @@ One recorded run per row (device, date); change a row only from another (runbook
 | macOS | owner's Apple M4 Max (36 GB, macOS 27) | 2026-09-25 | Qwen2.5 0.5B (TechieRag's conversion) | GenAI 0.16.0 directly, plain process | 0.03 | 329–359 | 610 MB |
 | macOS | owner's Apple M4 Max (36 GB, macOS 27) | 2026-09-25 | Phi-3 mini 4k | GenAI 0.16.0 directly, plain process | 0.12 | 61–69 | 2.7 GB |
 | Mac Catalyst | owner's Apple M4 Max (36 GB, macOS 27) | 2026-09-25 | Phi-3 mini 4k (Catalyst default) | probe, second button, Debug, through `TechieRag.Local`; two runs | 0.11–0.52 | 65–73 | 1.96–2.17 GB |
-| iOS (simulator) | iPhone 17 Pro simulator (iOS 26.1) on the owner's Mac, not a device | 2026-09-25 | Qwen2.5 0.5B (phone default, TechieRag's conversion) | probe, second button, Debug, through `TechieRag.Local` | 0.10 | 301 | 460 MB |
+| iOS (simulator) | iPhone 17 Pro simulator (iOS 26.1) on the owner's Mac | 2026-09-25 | Qwen2.5 0.5B (phone default, TechieRag's conversion) | probe, second button, Debug, through `TechieRag.Local` | 0.10 | 301 | 460 MB |
 | Windows 11 | Mi NoteBook Pro (Core i5-11300H, 16 GB) | 2026-09-25 | Phi-3 mini 4k (desktop default) | probe, second button, Debug, through `TechieRag.Local`; after the 2.7 GB download and a fresh launch | 0.26–0.32 | 7.4–12.9 | 3.41–3.44 GB |
 | Android (emulator) | emulator `pixel_5_-_api_32` (Android 12, x86_64, 2 GB) on the Windows 11 laptop | 2026-09-25 | Qwen2.5 0.5B | probe, second button, Debug; after the download and a fresh launch | 0.41 | 22.5–43.2 | 737–775 MB |
 | Android | owner's Samsung Galaxy S23 (SM-S911B, Snapdragon 8 Gen 2, 8 GB, Android 16) | 2026-09-25 | Qwen2.5 0.5B (phone default) | probe, second button, Debug; after the 333 MB download and two fresh launches | 0.06–0.10 | 112–114 | 703–763 MB |
-| iOS | owner's iPhone | not yet run | — | — | — | — | — |
+| iOS | owner's iPhone 17 Pro (iOS 27.0.1) | 2026-10-04 | Qwen2.5 0.5B (phone default) | probe, second button, Debug; two fresh launches | 0.07–0.08 | 155 | 485 MB |
 
 Peak memory: Windows, peak working set; macOS, peak resident set; Mac Catalyst and iOS, peak physical footprint. First token includes reading the prompt. Evidence: `tests/.artifacts/probe/` and `tests/.artifacts/local-llm-bench/`.
 
@@ -269,7 +269,7 @@ Recorded runs:
 | Android | emulator, Pixel 5 profile, Android 12 x86_64 | 2026-09-24 | all-MiniLM-L6-v2 | Paris (0.824) | first press 113,914 (incl. 91 MB download) / 1,268 / 2,753 / 4,040; second press 0 / 1,334 / 208 / 217 | `tests/.artifacts/probe/android-*` |
 | Mac Catalyst | owner's Mac (Apple M4 Max) | 2026-09-25 | bge-m3 | Paris (0.796) | first press 107,208 (incl. 2.3 GB download) / 64 / 32 / 35; re-run 3,959 / 90 / 45 / 37 | `tests/.artifacts/probe/maccatalyst/` on the Mac |
 | Android | owner's Galaxy S23 (Android 16) | 2026-09-25 | all-MiniLM-L6-v2 | Paris (0.824) | 8,243 / 53 / 122 / 222 | `tests/.artifacts/probe/android-phone-20260925/` |
-| iOS | owner's iPhone | — | — | — | — | not run yet |
+| iOS | owner's iPhone 17 Pro | 2026-10-04 | all-MiniLM-L6-v2 | Paris (0.824) | first press 9,703 (incl. 91 MB download) / 13 / 21 / 16; second press 0 / 29 / 4 / 5 | `tests/.artifacts/probe/ios-device-20261004/` |
 
 CI (`.github/workflows/probe.yml`, REQ-FN-057) builds all four heads on every push (Mac Catalyst and iOS on the macOS runner, iOS for the simulator), presses the button on the Windows runner through UI Automation and on an Android emulator through the `autorun` intent, and ends with a "Probe heads" table on the run page: each head built, failed or not run.
 
@@ -301,9 +301,9 @@ Run every command from the repository root. Each head needs the .NET 10 SDK and 
 
 **iPhone**
 
-1. Once, on the Mac: sign Xcode in to your Apple ID (Xcode, Settings, Accounts); `sudo dotnet workload install maui-ios`; connect the iPhone by USB, trust the Mac, and turn on Developer Mode (Settings, Privacy and Security). In Xcode create any iOS app with bundle identifier `com.techierathore.techierag.probe` and run it once on the phone: that creates the provisioning profile the probe signs with. Step by step, with a separate developer Apple ID: `docs/TechieRag-iPhone-Setup.md`.
-2. Build: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64`. When the Mac's Xcode is not the one .NET for iOS asks for (Xcode 27.0 with .NET for iOS 26.5, 2026-09-25) add `-p:ValidateXcodeVersion=false`; `bash samples/TechieRag.Probe/scripts/select-xcode.sh ios` says whether you need it.
-3. Deploy and run: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 -t:Run -p:_DeviceName=<the iPhone's UDID, from Finder or xcrun devicectl list devices>` (same flag as step 2). Signing needs step 1 done. On the phone trust the developer if asked (Settings, General, VPN and Device Management), open **TechieRag Probe**, press **Embed, store, search** (91 MB on the first press), then press it again.
+1. Once, on the Mac: sign Xcode in to your Apple ID (Xcode, Settings, Accounts); `sudo dotnet workload install maui-ios`; connect the iPhone by USB, trust the Mac, and turn on Developer Mode (Settings, Privacy and Security). In Xcode create any iOS app with bundle identifier `com.techierathore.techierag.probe` and run it once on the phone: that creates the provisioning profile the probe signs with. Step by step: `docs/TechieRag-iPhone-Setup.md`.
+2. Build: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64`. When the Mac's Xcode is not the one .NET for iOS asks for, add `-p:ValidateXcodeVersion=false`; `bash samples/TechieRag.Probe/scripts/select-xcode.sh ios` says whether you need it.
+3. Deploy and run: `dotnet build samples/TechieRag.Probe/TechieRag.Probe.csproj -f net10.0-ios -p:RuntimeIdentifier=ios-arm64 -t:Run -p:_DeviceName=<UDID from xcrun devicectl list devices>` (same flag as step 2). Signing needs step 1 done. On the phone trust the developer if asked (Settings, General, VPN and Device Management), open **TechieRag Probe**, press **Embed, store, search** (91 MB on the first press), then press it again.
 4. Record: step "Record".
 
 **Record (every device)**
@@ -311,7 +311,7 @@ Run every command from the repository root. Each head needs the .NET 10 SDK and 
 1. Keep the `ResultLineLabel` text of both presses (a screenshot is enough) and note the device model and the date.
 2. Add a row to "Recorded runs" above: head, device, date, model, top result, the four timings of both presses.
 3. When the status is `Done` and the top result is the Paris sentence, change that platform's `TechieRag` and `TechieRag.Embedded` cells in the matrix above and in the phase-1 BRD §9 to `tested (<device>, <date>)`. If it failed, leave `supported` and write the error in the Remarks of REQ-FN-056.
-4. Press **Generate one sentence** (AutomationId `RunGenerateButton`, REQ-FN-059) the same way, accept the model's terms in the dialog, and record the time to first token, tokens per second and peak memory from `GenerationTimingsLabel` in that platform's row of "Local model: measured per platform" above (device, date, model), and set the `TechieRag.Local` cell to `tested (<device>, <date>)`. Phones and the iPhone download Qwen2.5 0.5B (333 MB) from its default address on Hugging Face (`techierathore/Qwen2.5-0.5B-Instruct-onnx-genai`, pinned commit); no `TECHIERAG_MODEL_BASE_URL` is needed.
+4. Press **Generate one sentence** (AutomationId `RunGenerateButton`, REQ-FN-059) the same way, accept the model's terms in the dialog, and record the time to first token, tokens per second and peak memory from `GenerationTimingsLabel` in that platform's row of "Local model: measured per platform" above (device, date, model), and set the `TechieRag.Local` cell to `tested (<device>, <date>)`. Phones download Qwen2.5 0.5B (333 MB) from its default address on Hugging Face (`techierathore/Qwen2.5-0.5B-Instruct-onnx-genai`, pinned commit); no `TECHIERAG_MODEL_BASE_URL` is needed.
 5. Or paste the result lines to an agent with "record this probe run"; it makes the same edits.
 
 ## How to call it

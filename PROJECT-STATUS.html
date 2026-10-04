@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-10-03</div>
+    <div class="sub">Last rendered: 2026-10-04</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,7 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-10-03 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-10-04 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
       <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) set current_phase to Released after UAT — no agent command</div>
@@ -129,7 +129,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-10-03</td></tr>
+<tr><th>last_updated</th><td>2026-10-04</td></tr>
 <tr><th>current_phase</th><td>Phase 2 of 2 · UAT — handoff done, 87 of 87 verified, 1 not applicable</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
 <tr><th>last_verified_date</th><td>2026-10-03</td></tr>
@@ -149,9 +149,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 87 rows Verified. Mail actions for Sevak (REQ-RAG-110/111) passed live against the Gmail test account on 2026-10-03. Four local-model rows keep their 2026-09-25 result: this host lacks the memory to re-run them. Awaiting UAT per the UsageGuide.</p>
+<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 87 rows Verified. On 2026-10-04 the probe ran on the owner's iPhone 17 Pro (iOS 27.0.1), both buttons: Paris (0.824); Qwen2.5 0.5B at 155 tokens per second, 485 MB peak. All four platforms now read tested in the UsageGuide and BRD matrices. Four local-model rows keep their 2026-09-25 result. Awaiting UAT.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
-<p>Manual UAT: open <code>docs/TechieRag-UsageGuide.md</code> and work through "How to test, screen by screen"; when it passes, change the phase line at the top of this file from UAT to Released by hand.</p>
 <p>Claude Code:</p>
 <pre><code>(owner) set current_phase to Released after UAT — no agent command</code></pre>
 <p>OpenCode:</p>
@@ -186,7 +185,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>🔶 <strong>Keys in chat:</strong> OpenCode Go key (2026-10-01) and Gmail app password (2026-10-03); rotate if shared.
 </li>
-<li>🔶 <strong>iPhone run (REQ-FN-060):</strong> Developer Mode off, no Apple ID in Xcode: <code>docs/TechieRag-iPhone-Setup.md</code>.
+<li>🔶 <strong>iPhone evidence:</strong> <code>tests/.artifacts/probe/ios-device-20261004/</code> is swept after 7 days; copy it to keep it.
 </li>
 <li>🔶 <strong>Framework:</strong> feedback checks match TR-RAG ids across apps (MISS-TechieRag-20261001-04).
 </li>
@@ -198,11 +197,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-01</td><td>build-phase</td><td>85/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-01</td><td>handoff-phase</td><td>85/85 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-03</td><td>amend-docs</td><td>85/87 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-03</td><td>build-phase</td><td>86/87 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-03</td><td>verify-phase</td><td>87/87 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-04</td><td>probe-run</td><td>87/87 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-04</td><td>record-probe</td><td>87/87 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -219,8 +218,6 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="deferred-future">Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
-<li>The physical iPhone row of the UsageGuide's per-platform table.
-</li>
 <li>OS built-in models (Apple, Android Gemini Nano) as a later <code>ILocalLlmRuntime</code>.
 </li>
 <li>LLamaSharp with Metal on the Mac (decision 2 option B).
