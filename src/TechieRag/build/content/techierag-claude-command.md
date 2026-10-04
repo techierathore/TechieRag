@@ -247,6 +247,8 @@ Implements LLM-powered chat:
 4. Add conversation memory (WithConversationMemory)
 5. Implement multi-turn conversation with history management
 6. Add UI for chat bubbles, streaming text, sources display (if Blazor)
+7. Detect truncation: `response.FinishReason == "length"` (or the streamed `Completed` event's `FinishReason`) means the answer was cut off at `MaxTokens`; show it or continue, never present it as complete. Every provider reports it, Ollama included
+8. On Ollama, size the context window: set `"Llm": { "MaxContextTokens": 32768 }` (or `LlmProviderFactory.Create(route, null, contextTokens: 32768)`), sent as `options.num_ctx`. Unset, Ollama keeps its own small default (2k–4k tokens) and silently drops the front of a long prompt; do not set it larger than the model and machine can hold, since Ollama allocates the whole window up front
 
 ### *add-tool-calling
 
@@ -294,7 +296,7 @@ Implements an agent (package `TechieRag.Agents`, namespaces `TechieRag.Agents`, 
 
 Implements typed streaming (core package; see "Phase-2 Features, 1"):
 
-1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))` and switch on `e.Kind`: `LlmStreamEventKind.TextDelta` (`e.Text`), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last
+1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))` and switch on `e.Kind`: `LlmStreamEventKind.TextDelta` (`e.Text`), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last; `FinishReason` is `stop`, `tool_calls` or `length` (cut off at `MaxTokens`)
 2. For the agent loop: `new AgentLoopRunner(llm, registry).RunStreamAsync(messages, options, progress)` yields `AgentStreamEvent` (`AgentStreamEventKind.TextDelta`, `ToolCallRequested`, `ToolExecuted`, `Completed` with `Response` and `MaxIterationsReached`)
 3. In Blazor call `StateHasChanged()` per event; keep a `CancellationTokenSource` per run
 4. A custom `ILlmProvider` that builds `ChatStreamAsync` on the typed method must override `ChatStreamEventsAsync` too; `events.ToTextStreamAsync()` is the text projection
@@ -341,7 +343,7 @@ Shows all available providers:
 **LLM Providers:**
 | Provider | Builder Method | Default Endpoint | Auth | Tools | Streaming |
 |----------|---------------|------------------|------|-------|-----------|
-| Ollama | UseOllamaLlm() | localhost:11434 | None | Yes | Yes |
+| Ollama | UseOllamaLlm() (context window: `Llm.MaxContextTokens`) | localhost:11434 | None | Yes | Yes |
 | LM Studio | UseLmStudioLlm() | localhost:1234 | None | Limited | Yes |
 | OpenAI-Compatible | UseOpenAICompatibleLlm() | Any URL | Bearer | Yes | Yes |
 | Azure AI Foundry | UseAzureAIFoundryLlm() | Azure URL | api-key | Yes | Yes |

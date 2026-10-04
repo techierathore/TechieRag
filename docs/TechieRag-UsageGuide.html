@@ -121,6 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-techierag-local-generation-and-limits">Local model (TechieRag.Local): generation and limits</a></li>
         <li class="h3"><a href="#llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output</a></li>
         <li class="h3"><a href="#openai-compatible-headers-and-opencode-go">OpenAI-compatible headers and OpenCode Go</a></li>
+        <li class="h3"><a href="#ollama-context-window-and-cut-off-answers">Ollama: context window and cut-off answers</a></li>
         <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
         <li class="h3"><a href="#typed-streaming-and-the-streaming-agent-loop">Typed streaming and the streaming agent loop</a></li>
         <li class="h3"><a href="#subscription-catalog">Subscription catalog</a></li>
@@ -162,6 +163,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-techierag-local-generation-and-limits">Local model (TechieRag.Local): generation and limits</a></li>
         <li class="h3"><a href="#llm-providers-rag-generation-and-structured-output">LLM providers, RAG generation and structured output</a></li>
         <li class="h3"><a href="#openai-compatible-headers-and-opencode-go">OpenAI-compatible headers and OpenCode Go</a></li>
+        <li class="h3"><a href="#ollama-context-window-and-cut-off-answers">Ollama: context window and cut-off answers</a></li>
         <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
         <li class="h3"><a href="#typed-streaming-and-the-streaming-agent-loop">Typed streaming and the streaming agent loop</a></li>
         <li class="h3"><a href="#subscription-catalog">Subscription catalog</a></li>
@@ -271,7 +273,7 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Covers:</strong> REQ-RAG-005, REQ-RAG-053, REQ-RAG-054, REQ-RAG-055
 </li>
 </ul>
-<h3 id="local-model-techierag-local-terms-and-download">Local model (TechieRag.Local): terms and download<a class="anchor-link" href="#local-model-techierag-local-terms-and-download">#</a></h3>
+<h3 id="local-model-techierag-local-terms-and-download"><a id="local-model-techieraglocal-terms-and-download"></a>Local model (TechieRag.Local): terms and download<a class="anchor-link" href="#local-model-techierag-local-terms-and-download">#</a></h3>
 <ul>
 <li><strong>Sign in as:</strong> user 1
 </li>
@@ -282,7 +284,7 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Covers:</strong> REQ-RAG-057, REQ-RAG-061, REQ-RAG-062, REQ-RAG-064, REQ-RAG-066
 </li>
 </ul>
-<h3 id="local-model-techierag-local-generation-and-limits">Local model (TechieRag.Local): generation and limits<a class="anchor-link" href="#local-model-techierag-local-generation-and-limits">#</a></h3>
+<h3 id="local-model-techierag-local-generation-and-limits"><a id="local-model-techieraglocal-generation-and-limits"></a>Local model (TechieRag.Local): generation and limits<a class="anchor-link" href="#local-model-techierag-local-generation-and-limits">#</a></h3>
 <ul>
 <li><strong>Sign in as:</strong> user 1, with the model downloaded
 </li>
@@ -313,6 +315,17 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Expected:</strong> 1)–2) answers, not 400 <code>MissingSessionID</code>; both requests carry the same <code>x-opencode-session</code>; 3) every request carries <code>x-tag</code> and <code>x-session</code>.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-109
+</li>
+</ul>
+<h3 id="ollama-context-window-and-cut-off-answers">Ollama: context window and cut-off answers<a class="anchor-link" href="#ollama-context-window-and-cut-off-answers">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1, with Ollama serving <code>llama3.2</code>
+</li>
+<li><strong>Steps:</strong> 1) <code>LlmProviderFactory.Create(ModelRouter.Require("ollama/llama3.2"), null, contextTokens: 32768)</code>; ask about the first sentence of a 6,000-word prompt 2) repeat without <code>contextTokens</code> 3) <code>MaxTokens = 20</code> on "Write a long story", chat and stream
+</li>
+<li><strong>Expected:</strong> 1) quoted; 2) not, Ollama kept its small window; 3) <code>FinishReason</code> <code>length</code> on the reply and on <code>Completed</code>.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-112, REQ-RAG-113
 </li>
 </ul>
 <h3 id="agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows<a class="anchor-link" href="#agent-loop-mcp-tools-and-flows">#</a></h3>
@@ -435,9 +448,8 @@ bash .tfcore/utils/tf-build.sh test tests/TechieRag.Local.Tests/TechieRag.Local.
 TechieRagLiveLocalModel=qwen2.5-0.5b-instruct dotnet test tests/TechieRag.Local.Tests --filter LiveLocalLlmTests
 TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter LiveHuggingFaceTests   # downloads about 900 MB
 TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=LiveOpenCodeGo"</code></pre>
-<p><code>TechieRag.Local.Tests</code> runs the conformance suite against a scripted runtime and the download tests against a loopback server; its live tests skip with a reason until a model is downloaded, and never download.
-<code>TechieRag.Agents.Tests</code> runs the builder and seam adapters against a scripted <code>IChatClient</code>; its LM Studio tests skip unless <code>TechieRagLiveLmStudioModel</code> is set.
-1,125 xUnit tests across the three test projects (952 core, 143 local model, 30 agents); 41 live tests skip with a reason when their environment is absent. Core and agents PASS on 2026-10-01; local-model tests need about 4.6 GB of free memory for phi-3-mini and fail with <code>LocalModelMemoryException</code> below that.</p>
+<p>Local-model live tests skip until a model is downloaded and never download; agents' LM Studio tests skip unless <code>TechieRagLiveLmStudioModel</code> is set.
+1,151 xUnit tests across the three test projects (978 core, 143 local model, 30 agents); 41 live tests skip with a reason when their environment is absent. Core and agents PASS on 2026-10-04; local-model tests need about 4.6 GB of free memory for phi-3-mini and fail with <code>LocalModelMemoryException</code> below that.</p>
 <h2 id="known-limitations">Known limitations<a class="anchor-link" href="#known-limitations">#</a></h2>
 <ul>
 <li>SQLite search is an exact managed scan by design (no sqlite-vec, no approximate index): 0.24 s at 50,000 chunks of 1024 dimensions on a desktop (Platform notes). Past a few hundred thousand chunks, use pgvector or Qdrant.
@@ -463,6 +475,8 @@ TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=
 <li>The <code>opencode-go</code> connector reaches OpenCode Go's <code>chat/completions</code> models only; its <code>/responses</code> and <code>/messages</code> models are not reached (REQ-RAG-109).
 </li>
 <li>Ollama's request mapping sends no <code>tool_calls</code> on assistant messages and Gemini's sends tool results as a <code>tool</code> role, not <code>functionResponse</code>; multi-turn tool use there relies on the server tolerating that (unchanged by REQ-RAG-067).
+</li>
+<li><code>LlmConfig.MaxContextTokens</code> is <code>int?</code>, unset by default (was <code>int</code>, 128000); code that reads it into an <code>int</code> stops compiling after upgrading (REQ-RAG-113).
 </li>
 </ul>
 <h2 id="platform-notes">Platform notes<a class="anchor-link" href="#platform-notes">#</a></h2>
@@ -525,9 +539,9 @@ TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=
 </li>
 <li><strong>Download size and progress (REQ-RAG-055).</strong> <code>ModelDownloadService.Instance.DownloadSizeKnown</code> fires once per download with the bytes still to fetch, before the first byte; set <code>e.Decline = true</code> to stop (for example off Wi-Fi) and the call throws <code>ModelDownloadDeclinedException</code>. <code>ProgressChanged</code> then reports <code>BytesDownloaded</code> of <code>TotalBytes</code>. Interrupted downloads resume from <code>&lt;file&gt;.part</code>. The reranker uses the same service.
 </li>
-<li><strong>Local model (REQ-RAG-057 to REQ-RAG-066).</strong> <code>UseLocalLlm()</code> picks Qwen2.5 0.5B Instruct (Apache-2.0) on Android and iOS with a 2,048-token context, and Phi-3 mini 4k Instruct (MIT) elsewhere with 4,096; <code>UseLocalLlm("phi-3-mini-4k-instruct")</code> on a phone throws <code>NotSupportedException</code>. Nothing downloads until the host accepts the model's terms (<code>LocalLlmOptions.TermsAccepted</code> or <code>ConfirmTermsAsync</code>, which receives the licence, its URL and the download size); the files then come once from Hugging Face (Qwen: <code>techierathore/Qwen2.5-0.5B-Instruct-onnx-genai</code>; each pinned to a commit) through <code>ModelDownloadService</code> (size first, resumable, <code>TECHIERAG_MODEL_BASE_URL</code> as <code>&lt;mirror&gt;/&lt;model&gt;-&lt;format&gt;/&lt;file&gt;</code>) into <code>&lt;ModelRoot&gt;/&lt;model&gt;-&lt;format&gt;</code>, each checked against its SHA-256; after that the model works offline. Before loading, free memory is compared with weights + context + 256 MB, and a shortfall throws <code>LocalModelMemoryException</code> instead of letting the system end the app.
+<li><strong>Local model (REQ-RAG-057 to REQ-RAG-066).</strong> <code>UseLocalLlm()</code> picks Qwen2.5 0.5B Instruct (Apache-2.0) on Android and iOS with a 2,048-token context, and Phi-3 mini 4k Instruct (MIT) elsewhere with 4,096; <code>UseLocalLlm("phi-3-mini-4k-instruct")</code> on a phone throws <code>NotSupportedException</code>. Nothing downloads until the host accepts the model's terms (<code>LocalLlmOptions.TermsAccepted</code> or <code>ConfirmTermsAsync</code>, which receives the licence, its URL and the download size); the files then come once from Hugging Face (Qwen: <code>techierathore/Qwen2.5-0.5B-Instruct-onnx-genai</code>; each pinned to a commit) through <code>ModelDownloadService</code> (size first, resumable, <code>TECHIERAG_MODEL_BASE_URL</code> as <code>&lt;mirror&gt;/&lt;model&gt;-&lt;format&gt;/&lt;file&gt;</code>) into <code>&lt;ModelRoot&gt;/&lt;model&gt;-&lt;format&gt;</code>, SHA-256 checked; then it works offline. Free memory below weights + context + 256 MB throws <code>LocalModelMemoryException</code> before loading.
 </li>
-<li><strong>Any Hugging Face model (REQ-RAG-108).</strong> <code>UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))</code> runs any public ONNX Runtime GenAI model by name (optional <code>folder</code> and <code>version</code>). The model card's licence, terms URL and size reach <code>ConfirmTermsAsync</code> (or <code>GetTermsAsync()</code>) before any file; only the engine's files download, each checked against Hugging Face's fingerprint (SHA-256, or the git SHA-1 of a small file). An unpinned name is pinned to one commit once, so later starts are offline. Gated or private models are refused (no token); <code>TECHIERAG_MODEL_BASE_URL</code> does not apply. The model's own chat template and <code>genai_config.json</code> limits are used.
+<li><strong>Any Hugging Face model (REQ-RAG-108).</strong> <code>UseLocalLlm(LocalModel.FromHuggingFace("Arm/gemma-3-1b-instruct-onnx-genai-int4-emb-int8"))</code> runs any public ONNX Runtime GenAI model by name (optional <code>folder</code> and <code>version</code>). The model card's licence, terms URL and size reach <code>ConfirmTermsAsync</code> (or <code>GetTermsAsync()</code>) before any file; only the engine's files download, each checked against Hugging Face's fingerprint (SHA-256, or the git SHA-1 of a small file). An unpinned name is pinned once, so later starts are offline. Gated or private models are refused (no token); <code>TECHIERAG_MODEL_BASE_URL</code> does not apply. The model's own chat template and <code>genai_config.json</code> limits are used.
 </li>
 <li><strong>Native ONNX Runtime (REQ-FN-055).</strong> <code>TechieRag.Embedded</code> ships <code>buildTransitive/TechieRag.Embedded.targets</code>: on Mac Catalyst it links ONNX Runtime's static xcframework (ONNX Runtime's own package links nothing there); on iOS and Mac Catalyst Debug builds it compiles a <code>RegisterCustomOps</code> stub; on Android it checks ONNX Runtime's <code>.aar</code> (arm64-v8a, x86_64) arrived. A consuming app writes no native wiring. Properties: <code>TechieRagOnnxRuntimeVersion</code> (when the app pins another ONNX Runtime), <code>TechieRagDisableOnnxNativeWiring</code>, <code>TechieRagDisableOnnxCustomOpsStub</code>.
 </li>
@@ -549,7 +563,7 @@ TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=
 </table>
 <p>Raw output: <code>tests/.artifacts/benchmarks/sqlite-search.md</code> and <code>.json</code>. Re-run: <code>TechieRagSearchBenchmark=1 dotnet test tests/TechieRag.Tests --filter SqliteSearchBenchmarkTests</code>.</p>
 <h3 id="the-probe-app-req-fn-056">The probe app (REQ-FN-056)<a class="anchor-link" href="#the-probe-app-req-fn-056">#</a></h3>
-<p><code>samples/TechieRag.Probe</code> is a .NET MAUI app with Windows, Mac Catalyst, Android and iOS heads. Its one screen shows the platform, the model <code>UseEmbedded()</code> picks there and the model root; the button <strong>Embed, store, search</strong> (AutomationId <code>RunEmbedButton</code>) embeds three sentences, stores them in SQLite, searches "What is the capital of France?" and shows the top result (<code>TopResultLabel</code>), the load, embed, store and search timings (<code>TimingsLabel</code>) and one result line (<code>ResultLineLabel</code>, also written to the console with the prefix <code>TECHIERAG_PROBE_RESULT:</code> and to <code>probe-result.txt</code> in the app data folder). A pass is <code>Done</code> with the top result "Paris is the capital city of France." The first press includes the model download; press again for warm timings. The second button, <strong>Generate one sentence</strong> (AutomationId <code>RunGenerateButton</code>, REQ-FN-059), loads the platform's default local model through <code>TechieRag.Local</code> (a terms dialog before the one-time download), asks for one sentence about the sea and shows it (<code>GeneratedSentenceLabel</code>), the load time, time to first token, tokens per second and peak memory (<code>GenerationTimingsLabel</code>) and its own status (<code>GenerateStatusLabel</code>); the result line gets the prefix <code>OK generate</code>. Unattended: <code>TECHIERAG_PROBE_AUTORUN=local</code> (Android: the intent extra <code>--ez autorunlocal true</code>) presses it once the page appears; a first run still waits on the terms dialog's <strong>Accept</strong>, pressed through the app's own automation, never skipped. Devices, dates and numbers: "Local model: measured per platform".</p>
+<p><code>samples/TechieRag.Probe</code> is a .NET MAUI app (Windows, Mac Catalyst, Android, iOS). Its screen shows the platform, the model <code>UseEmbedded()</code> picks and the model root. <strong>Embed, store, search</strong> (<code>RunEmbedButton</code>) embeds three sentences, stores them in SQLite, searches "What is the capital of France?" and shows the top result (<code>TopResultLabel</code>), load, embed, store and search timings (<code>TimingsLabel</code>) and a result line (<code>ResultLineLabel</code>; also on the console as <code>TECHIERAG_PROBE_RESULT:</code> and in <code>probe-result.txt</code> in app data). Pass: <code>Done</code>, top result "Paris is the capital city of France." The first press downloads the model; press again for warm timings. <strong>Generate one sentence</strong> (<code>RunGenerateButton</code>, REQ-FN-059) loads the platform's default local model through <code>TechieRag.Local</code> (terms dialog before the one-time download), writes one sentence about the sea (<code>GeneratedSentenceLabel</code>), with load time, time to first token, tokens per second and peak memory (<code>GenerationTimingsLabel</code>) and status (<code>GenerateStatusLabel</code>); result prefix <code>OK generate</code>. Unattended: <code>TECHIERAG_PROBE_AUTORUN=local</code> (Android: <code>--ez autorunlocal true</code>) presses it; a first run still waits for <strong>Accept</strong> on the terms dialog, pressed through the app's automation, never skipped. Numbers: "Local model: measured per platform".</p>
 <p>Recorded runs:</p>
 <table>
 <thead><tr><th>Head</th><th>Device</th><th>Date</th><th>Model</th><th>Top result</th><th>Load / embed / store / search (ms)</th><th>Evidence</th></tr></thead>
@@ -562,7 +576,7 @@ TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=
 </tbody>
 </table>
 <p>CI (<code>.github/workflows/probe.yml</code>, REQ-FN-057) builds all four heads on every push (Mac Catalyst and iOS on the macOS runner, iOS for the simulator), presses the button on the Windows runner through UI Automation and on an Android emulator through the <code>autorun</code> intent, and ends with a "Probe heads" table on the run page: each head built, failed or not run.</p>
-<h3 id="owner-s-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165">Owner's runbook: build, deploy, run and record the probe (REQ-FN-069, BRD-165)<a class="anchor-link" href="#owner-s-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165">#</a></h3>
+<h3 id="owner-s-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165"><a id="owners-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165"></a>Owner's runbook: build, deploy, run and record the probe (REQ-FN-069, BRD-165)<a class="anchor-link" href="#owner-s-runbook-build-deploy-run-and-record-the-probe-req-fn-069-brd-165">#</a></h3>
 <p>Run every command from the repository root. Each head needs the .NET 10 SDK and its MAUI workload (<code>dotnet workload install maui</code> installs all of them).</p>
 <p><strong>Windows (any Windows 10 or 11 PC)</strong></p>
 <ol>

@@ -522,7 +522,11 @@ public class LlmConfig
     public string? ProjectId { get; set; }
 
     /// <summary>Gets or sets the maximum context window size in tokens.</summary>
-    public int MaxContextTokens { get; set; } = 128000;
+    /// <remarks>Null (the default) leaves the runtime's own window in place. Ollama receives a set
+    /// value as <c>options.num_ctx</c> (TR-RAG-003); it is left unset by default because Ollama
+    /// allocates the whole window up front, and an unasked-for 128k window can stop a local model
+    /// from loading.</remarks>
+    public int? MaxContextTokens { get; set; }
 
     /// <summary>
     /// Gets or sets the named connector from <c>LlmConnectorCatalog</c> to use, e.g. <c>groq</c>

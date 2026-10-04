@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-170 (BRD-166 and 167 added 2026-09-25, 168 on 2026-10-01, 169 and 170 on 2026-10-03). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
+Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-172 (BRD-166 to 172 added 2026-09-25 to 2026-10-04). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
 
 ## 2. Screens and flow
 
@@ -290,6 +290,10 @@ Widens the provider set: model-name routing, more embedders, images, prompt cach
   - *Acceptance:* When a developer adds `TechieRag.Telemetry` with defaults on a host app, then nothing is exported; with `EnableTracing` and a loopback endpoint, spans reach it.
 - **BRD-168** — A developer can send extra request headers to an OpenAI-compatible model (`LlmConfig.Headers`, a `UseOpenAICompatibleLlm` overload) and a per-conversation session id (`LlmCompletionOptions.SessionId`) in the service's session header; the `opencode-go` catalog connector sends OpenCode Go's `x-opencode-session` *(F-LLM; added 2026-10-01; closes Chatur TR-RAG-003)* *Screen:* Provider breadth
   - *Acceptance:* When a developer uses the `opencode-go` connector with a conversation's `SessionId`, then each request carries `x-opencode-session` and OpenCode Go answers instead of 400 `MissingSessionID`.
+- **BRD-171** — The Ollama provider shall report a generation cut off at the token limit as finish reason `length`, mapped from Ollama's `done_reason`, on `ChatAsync` and on the streamed `Completed` event *(added 2026-10-04; closes Lekhak feedback TR-RAG-002)* *Screen:* Provider breadth
+  - *Acceptance:* When an Ollama reply ends with `done_reason: "length"`, then `FinishReason` is `length` from chat and stream.
+- **BRD-172** — The Ollama provider shall send `options.num_ctx` when a context size is configured (`LlmConfig.MaxContextTokens`, now nullable and unset by default, or the `contextTokens` argument of `LlmProviderFactory.Create` / `CreateForModel`); with none configured no `num_ctx` is sent, so Ollama keeps its own default *(added 2026-10-04; closes Lekhak feedback TR-RAG-003)* *Screen:* Provider breadth
+  - *Acceptance:* When a developer creates an Ollama provider with context size 32768, then each request carries `options.num_ctx: 32768`.
 
 ## 4. Non-functional requirements
 
@@ -323,7 +327,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: Reranking | 2 | 2 | 0 | Done |
 | Installed agent files | 1 | 1 | 0 | Done |
 | F-LLM | 1 | 1 | 0 | Done |
-| RAG / AI requirements | 2 | 2 | 0 | Done |
+| RAG / AI requirements | 4 | 4 | 0 | Done |
 
 ## 6. Where the rest lives
 

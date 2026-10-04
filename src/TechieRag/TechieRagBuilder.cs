@@ -936,7 +936,8 @@ public class TechieRagBuilder
             LlmSource.Ollama => new OllamaLlmProvider(
                 llmConfig.Endpoint ?? "http://localhost:11434",
                 llmConfig.Model,
-                config.LoggerFactory?.CreateLogger<OllamaLlmProvider>()),
+                config.LoggerFactory?.CreateLogger<OllamaLlmProvider>(),
+                llmConfig.MaxContextTokens),
 
             LlmSource.LmStudio => new LmStudioLlmProvider(
                 llmConfig.Endpoint ?? "http://localhost:1234",
