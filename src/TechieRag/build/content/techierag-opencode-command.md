@@ -193,6 +193,18 @@ private async Task AskQuestion()
 }
 ```
 
+### 6. Treating a cut-off answer as complete, or leaving Ollama on its small context window
+
+```csharp
+// CORRECT - size Ollama's context window (sent as options.num_ctx; unset = Ollama's 2k-4k default,
+// which silently drops the front of a long prompt). Ollama allocates the whole window up front.
+var ollama = LlmProviderFactory.Create(ModelRouter.Require("ollama/llama3.2"), null, contextTokens: 32768);
+// or in appsettings: "Llm": { "Source": "Ollama", "Model": "llama3.2", "MaxContextTokens": 32768 }
+
+var reply = await ollama.ChatAsync(messages, new LlmCompletionOptions { MaxTokens = 4000 });
+if (reply.FinishReason == "length") { /* cut off at MaxTokens: say so, or continue */ }
+```
+
 ## Integrating TechieRag into an Existing .NET Application
 
 ### Step 1: Confirm the NuGet Source (usually nothing to do)
@@ -336,7 +348,7 @@ Package `TechieRag.Agents`, namespaces `TechieRag.Agents`, `TechieRag.Agents.Int
 
 Core package (AI reference: "Phase-2 Features, 1"):
 
-1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))`; switch on `e.Kind`: `TextDelta` (`e.Text`), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last
+1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))`; switch on `e.Kind`: `TextDelta` (`e.Text`), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last; `FinishReason` is `stop`, `tool_calls` or `length` (cut off at `MaxTokens`)
 2. Agent loop: `new AgentLoopRunner(llm, registry).RunStreamAsync(messages, options, progress)` yields `AgentStreamEvent` (`TextDelta`, `ToolCallRequested`, `ToolExecuted`, `Completed` with `Response` and `MaxIterationsReached`)
 3. Blazor: `StateHasChanged()` per event; a `CancellationTokenSource` per run
 4. A custom `ILlmProvider` that builds `ChatStreamAsync` on the typed method must override `ChatStreamEventsAsync` too; `events.ToTextStreamAsync()` is the text projection
@@ -379,7 +391,7 @@ When the user provides a requirements document (PRD, spec, story, or any structu
 
 | Method | Provider |
 |--------|----------|
-| `UseOllamaLlm(endpoint?, model?)` | Ollama (default: localhost:11434, llama3.2) |
+| `UseOllamaLlm(endpoint?, model?)` | Ollama (default: localhost:11434, llama3.2); set `Llm.MaxContextTokens` (or `contextTokens` on `LlmProviderFactory.Create`) for the context window, sent as `num_ctx`; unset keeps Ollama's small default |
 | `UseLmStudioLlm(endpoint?, model?)` | LM Studio (default: localhost:1234) |
 | `UseOpenAICompatibleLlm(endpoint, apiKey, model?)` | OpenAI/compatible REST API |
 | `UseAzureAIFoundryLlm(endpoint, apiKey, model, apiVersion?)` | Azure AI Foundry |

@@ -1,0 +1,2046 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag v3 - AI Agent Reference Guide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieRag v3 - AI Agent Reference Guide</h1>
+    <div class="sub">Last rendered: 2026-10-04</div>
+    <div class="group">Contents</div>
+    <ol>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#package-information">Package Information</a></li>
+        <li class="h3"><a href="#nuget-source">NuGet Source</a></li>
+        <li class="h3"><a href="#available-packages">Available Packages</a></li>
+        <li class="h3"><a href="#install-commands">Install Commands</a></li>
+        <li class="h3"><a href="#nuget-configuration">NuGet Configuration</a></li>
+        <li class="h3"><a href="#github-packages-optional-internal-pre-release-feed">GitHub Packages (optional, internal pre-release feed)</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#quick-start-examples">Quick Start Examples</a></li>
+        <li class="h3"><a href="#minimal-setup-embedding-vector-store-only">1. Minimal Setup (Embedding + Vector Store Only)</a></li>
+        <li class="h3"><a href="#full-rag-llm-ask-questions-about-documents">2. Full RAG + LLM (Ask Questions About Documents)</a></li>
+        <li class="h3"><a href="#streaming-rag-chat">3. Streaming RAG Chat</a></li>
+        <li class="h3"><a href="#direct-llm-access-no-rag">4. Direct LLM Access (No RAG)</a></li>
+        <li class="h3"><a href="#tool-calling-with-agent-loop">5. Tool Calling with Agent Loop</a></li>
+        <li class="h3"><a href="#token-budget-management">6. Token Budget Management</a></li>
+        <li class="h3"><a href="#primary-fallback-llm">7. Primary + Fallback LLM</a></li>
+        <li><a href="#techieragbuilder-methods-fluent-api">TechieRagBuilder Methods (Fluent API)</a></li>
+        <li class="h3"><a href="#embedding-providers">Embedding Providers</a></li>
+        <li class="h3"><a href="#vector-stores">Vector Stores</a></li>
+        <li class="h3"><a href="#llm-providers">LLM Providers</a></li>
+        <li class="h3"><a href="#supporting-features">Supporting Features</a></li>
+        <li><a href="#phase-2-features-v3">Phase-2 Features (v3)</a></li>
+        <li class="h3"><a href="#typed-streaming-chatstreameventsasync-and-runstreamasync">1. Typed streaming: ChatStreamEventsAsync and RunStreamAsync</a></li>
+        <li class="h3"><a href="#local-model-techierag-local">2. Local model: TechieRag.Local</a></li>
+        <li class="h3"><a href="#embedded-embeddings-on-phones-and-desktops-techierag-embedded">3. Embedded embeddings on phones and desktops: TechieRag.Embedded</a></li>
+        <li class="h3"><a href="#agents-package-techierag-agents">4. Agents package: TechieRag.Agents</a></li>
+        <li class="h3"><a href="#subscription-sign-in-usechatgptsubscriptionllm">5. Subscription sign-in: UseChatGptSubscriptionLlm</a></li>
+        <li class="h3"><a href="#provider-routing-usellmformodel-modelrouter-llmproviderfactory-createformodel">6. Provider routing: UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel</a></li>
+        <li class="h3"><a href="#connectors-and-web-ingestion">7. Connectors and web ingestion</a></li>
+        <li class="h3"><a href="#reranking-withreranker-useembeddedreranker-searchoptions-rerank">8. Reranking: WithReranker, UseEmbeddedReranker, SearchOptions.Rerank</a></li>
+        <li class="h3"><a href="#workspaces-and-persistence-withpersistence-getworkspacemanager">9. Workspaces and persistence: WithPersistence, GetWorkspaceManager</a></li>
+        <li class="h3"><a href="#mcp-tool-servers-and-flows">10. MCP tool servers and flows</a></li>
+        <li class="h3"><a href="#telemetry-techierag-telemetry">11. Telemetry: TechieRag.Telemetry</a></li>
+        <li class="h3"><a href="#configuration-addtechierag-iconfiguration-maps-every-field-except-keys">12. Configuration: AddTechieRag(IConfiguration) maps every field except keys</a></li>
+        <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
+        <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
+        <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
+        <li class="h3"><a href="#direct-access-v2">Direct Access (v2)</a></li>
+        <li class="h3"><a href="#added-in-v3">Added in v3</a></li>
+        <li><a href="#illmprovider-interface">ILlmProvider Interface</a></li>
+        <li><a href="#models-reference">Models Reference</a></li>
+        <li class="h3"><a href="#chatmessage">ChatMessage</a></li>
+        <li class="h3"><a href="#llmcompletionoptions">LlmCompletionOptions</a></li>
+        <li class="h3"><a href="#llmresponse">LlmResponse</a></li>
+        <li class="h3"><a href="#ragresponse">RagResponse</a></li>
+        <li class="h3"><a href="#tokenusage-budget">TokenUsage &amp;amp; Budget</a></li>
+        <li class="h3"><a href="#tooldefinition-toolcall-toolresult">ToolDefinition, ToolCall, ToolResult</a></li>
+        <li><a href="#configuration-via-appsettings-json">Configuration via appsettings.json</a></li>
+        <li class="h3"><a href="#full-configuration">Full Configuration</a></li>
+        <li class="h3"><a href="#minimal-configuration-embedding-only">Minimal Configuration (Embedding Only)</a></li>
+        <li class="h3"><a href="#llm-source-values">LLM Source Values</a></li>
+        <li><a href="#dependency-injection-asp-net-core">Dependency Injection (ASP.NET Core)</a></li>
+        <li class="h3"><a href="#option-a-using-appsettings-json">Option A: Using appsettings.json</a></li>
+        <li class="h3"><a href="#option-b-using-builder-fluent-api">Option B: Using Builder (Fluent API)</a></li>
+        <li class="h3"><a href="#injecting-into-services-pages">Injecting into Services/Pages</a></li>
+        <li><a href="#itoolhandler-interface">IToolHandler Interface</a></li>
+        <li class="h3"><a href="#toolregistry-built-in-implementation">ToolRegistry (Built-in Implementation)</a></li>
+        <li><a href="#iconversationmemory-interface">IConversationMemory Interface</a></li>
+        <li><a href="#itokentracker-interface">ITokenTracker Interface</a></li>
+        <li><a href="#iprompttemplate-interface">IPromptTemplate Interface</a></li>
+        <li><a href="#common-implementation-patterns">Common Implementation Patterns</a></li>
+        <li class="h3"><a href="#pattern-1-rag-powered-chat-page-blazor">Pattern 1: RAG-Powered Chat Page (Blazor)</a></li>
+        <li class="h3"><a href="#pattern-2-streaming-chat-blazor">Pattern 2: Streaming Chat (Blazor)</a></li>
+        <li class="h3"><a href="#pattern-3-multi-turn-conversation">Pattern 3: Multi-Turn Conversation</a></li>
+        <li class="h3"><a href="#pattern-4-background-service-with-rag">Pattern 4: Background Service with RAG</a></li>
+        <li class="h3"><a href="#pattern-5-custom-tool-handler-class">Pattern 5: Custom Tool Handler Class</a></li>
+        <li><a href="#coding-standards">Coding Standards</a></li>
+        <li><a href="#backward-compatibility">Backward Compatibility</a></li>
+        <li><a href="#namespace-reference">Namespace Reference</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieRag v3 - AI Agent Reference Guide</h1>
+    <div class="subtitle">Rendered 2026-10-04 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#package-information">Package Information</a></li>
+        <li class="h3"><a href="#nuget-source">NuGet Source</a></li>
+        <li class="h3"><a href="#available-packages">Available Packages</a></li>
+        <li class="h3"><a href="#install-commands">Install Commands</a></li>
+        <li class="h3"><a href="#nuget-configuration">NuGet Configuration</a></li>
+        <li class="h3"><a href="#github-packages-optional-internal-pre-release-feed">GitHub Packages (optional, internal pre-release feed)</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#quick-start-examples">Quick Start Examples</a></li>
+        <li class="h3"><a href="#minimal-setup-embedding-vector-store-only">1. Minimal Setup (Embedding + Vector Store Only)</a></li>
+        <li class="h3"><a href="#full-rag-llm-ask-questions-about-documents">2. Full RAG + LLM (Ask Questions About Documents)</a></li>
+        <li class="h3"><a href="#streaming-rag-chat">3. Streaming RAG Chat</a></li>
+        <li class="h3"><a href="#direct-llm-access-no-rag">4. Direct LLM Access (No RAG)</a></li>
+        <li class="h3"><a href="#tool-calling-with-agent-loop">5. Tool Calling with Agent Loop</a></li>
+        <li class="h3"><a href="#token-budget-management">6. Token Budget Management</a></li>
+        <li class="h3"><a href="#primary-fallback-llm">7. Primary + Fallback LLM</a></li>
+        <li><a href="#techieragbuilder-methods-fluent-api">TechieRagBuilder Methods (Fluent API)</a></li>
+        <li class="h3"><a href="#embedding-providers">Embedding Providers</a></li>
+        <li class="h3"><a href="#vector-stores">Vector Stores</a></li>
+        <li class="h3"><a href="#llm-providers">LLM Providers</a></li>
+        <li class="h3"><a href="#supporting-features">Supporting Features</a></li>
+        <li><a href="#phase-2-features-v3">Phase-2 Features (v3)</a></li>
+        <li class="h3"><a href="#typed-streaming-chatstreameventsasync-and-runstreamasync">1. Typed streaming: ChatStreamEventsAsync and RunStreamAsync</a></li>
+        <li class="h3"><a href="#local-model-techierag-local">2. Local model: TechieRag.Local</a></li>
+        <li class="h3"><a href="#embedded-embeddings-on-phones-and-desktops-techierag-embedded">3. Embedded embeddings on phones and desktops: TechieRag.Embedded</a></li>
+        <li class="h3"><a href="#agents-package-techierag-agents">4. Agents package: TechieRag.Agents</a></li>
+        <li class="h3"><a href="#subscription-sign-in-usechatgptsubscriptionllm">5. Subscription sign-in: UseChatGptSubscriptionLlm</a></li>
+        <li class="h3"><a href="#provider-routing-usellmformodel-modelrouter-llmproviderfactory-createformodel">6. Provider routing: UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel</a></li>
+        <li class="h3"><a href="#connectors-and-web-ingestion">7. Connectors and web ingestion</a></li>
+        <li class="h3"><a href="#reranking-withreranker-useembeddedreranker-searchoptions-rerank">8. Reranking: WithReranker, UseEmbeddedReranker, SearchOptions.Rerank</a></li>
+        <li class="h3"><a href="#workspaces-and-persistence-withpersistence-getworkspacemanager">9. Workspaces and persistence: WithPersistence, GetWorkspaceManager</a></li>
+        <li class="h3"><a href="#mcp-tool-servers-and-flows">10. MCP tool servers and flows</a></li>
+        <li class="h3"><a href="#telemetry-techierag-telemetry">11. Telemetry: TechieRag.Telemetry</a></li>
+        <li class="h3"><a href="#configuration-addtechierag-iconfiguration-maps-every-field-except-keys">12. Configuration: AddTechieRag(IConfiguration) maps every field except keys</a></li>
+        <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
+        <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
+        <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
+        <li class="h3"><a href="#direct-access-v2">Direct Access (v2)</a></li>
+        <li class="h3"><a href="#added-in-v3">Added in v3</a></li>
+        <li><a href="#illmprovider-interface">ILlmProvider Interface</a></li>
+        <li><a href="#models-reference">Models Reference</a></li>
+        <li class="h3"><a href="#chatmessage">ChatMessage</a></li>
+        <li class="h3"><a href="#llmcompletionoptions">LlmCompletionOptions</a></li>
+        <li class="h3"><a href="#llmresponse">LlmResponse</a></li>
+        <li class="h3"><a href="#ragresponse">RagResponse</a></li>
+        <li class="h3"><a href="#tokenusage-budget">TokenUsage &amp;amp; Budget</a></li>
+        <li class="h3"><a href="#tooldefinition-toolcall-toolresult">ToolDefinition, ToolCall, ToolResult</a></li>
+        <li><a href="#configuration-via-appsettings-json">Configuration via appsettings.json</a></li>
+        <li class="h3"><a href="#full-configuration">Full Configuration</a></li>
+        <li class="h3"><a href="#minimal-configuration-embedding-only">Minimal Configuration (Embedding Only)</a></li>
+        <li class="h3"><a href="#llm-source-values">LLM Source Values</a></li>
+        <li><a href="#dependency-injection-asp-net-core">Dependency Injection (ASP.NET Core)</a></li>
+        <li class="h3"><a href="#option-a-using-appsettings-json">Option A: Using appsettings.json</a></li>
+        <li class="h3"><a href="#option-b-using-builder-fluent-api">Option B: Using Builder (Fluent API)</a></li>
+        <li class="h3"><a href="#injecting-into-services-pages">Injecting into Services/Pages</a></li>
+        <li><a href="#itoolhandler-interface">IToolHandler Interface</a></li>
+        <li class="h3"><a href="#toolregistry-built-in-implementation">ToolRegistry (Built-in Implementation)</a></li>
+        <li><a href="#iconversationmemory-interface">IConversationMemory Interface</a></li>
+        <li><a href="#itokentracker-interface">ITokenTracker Interface</a></li>
+        <li><a href="#iprompttemplate-interface">IPromptTemplate Interface</a></li>
+        <li><a href="#common-implementation-patterns">Common Implementation Patterns</a></li>
+        <li class="h3"><a href="#pattern-1-rag-powered-chat-page-blazor">Pattern 1: RAG-Powered Chat Page (Blazor)</a></li>
+        <li class="h3"><a href="#pattern-2-streaming-chat-blazor">Pattern 2: Streaming Chat (Blazor)</a></li>
+        <li class="h3"><a href="#pattern-3-multi-turn-conversation">Pattern 3: Multi-Turn Conversation</a></li>
+        <li class="h3"><a href="#pattern-4-background-service-with-rag">Pattern 4: Background Service with RAG</a></li>
+        <li class="h3"><a href="#pattern-5-custom-tool-handler-class">Pattern 5: Custom Tool Handler Class</a></li>
+        <li><a href="#coding-standards">Coding Standards</a></li>
+        <li><a href="#backward-compatibility">Backward Compatibility</a></li>
+        <li><a href="#namespace-reference">Namespace Reference</a></li>
+      </ol>
+    </div>
+<p>Updated 2026-09-25 for the phase-2 packages (<code>TechieRag.Telemetry</code>, <code>TechieRag.Local</code>, <code>TechieRag.Agents</code>) and the phase-2 features of the core; 2026-10-01 for OpenAI-compatible request headers and the OpenCode Go connector, the <code>CodeSignInRequired</code> sign-in code, and keys only through code (an appsettings section holding a key is refused). Every signature below is copied from the source; the section "Phase-2 Features (v3)" gives one call example per feature.</p>
+<h2 id="overview">Overview<a class="anchor-link" href="#overview">#</a></h2>
+<p>TechieRag is a complete RAG (Retrieval-Augmented Generation) + LLM management platform for .NET. It provides:</p>
+<ul>
+<li><strong>Embeddings</strong> - Generate vector embeddings from text (8 API providers, plus the embedded ONNX models)
+</li>
+<li><strong>Vector Storage</strong> - Store and search vectors (3 backends)
+</li>
+<li><strong>Document Processing</strong> - Ingest PDFs, Office files, Markdown, text, HTML, code, etc. (13 processors)
+</li>
+<li><strong>LLM Completions</strong> - Chat, streaming, structured output (6 API providers, a local in-process model, a ChatGPT subscription)
+</li>
+<li><strong>Typed Streaming</strong> - <code>LlmStreamEvent</code> (text delta, tool call, completed) from every provider, and the streaming agent loop
+</li>
+<li><strong>Tool/Function Calling</strong> - Full agent loop with tool execution, MCP tool servers, flows
+</li>
+<li><strong>Agents</strong> - Microsoft Agent Framework over TechieRag (<code>TechieRag.Agents</code>), and agentic retrieval on the classic loop
+</li>
+<li><strong>Local Model</strong> - Qwen2.5 0.5B on phones, Phi-3 mini on desktops, any ONNX Runtime GenAI model by name (<code>TechieRag.Local</code>)
+</li>
+<li><strong>Provider Routing</strong> - <code>UseLlmForModel("claude-sonnet-4-5")</code> picks the service from the model name
+</li>
+<li><strong>Connectors and Web</strong> - GitHub/GitLab repositories, IMAP/mbox mail (plus mail actions: move, Gmail label, Trash, dry run), Confluence; URL and site ingestion behind an SSRF guard
+</li>
+<li><strong>Reranking</strong> - Cohere, Jina, or the embedded ONNX cross-encoder
+</li>
+<li><strong>Workspaces and Persistence</strong> - SQLite/PostgreSQL conversation and workspace stores
+</li>
+<li><strong>Token Management</strong> - Usage tracking, cost estimation, budgets
+</li>
+<li><strong>Conversation Memory</strong> - Multi-turn conversation history management
+</li>
+<li><strong>Resilience</strong> - Retry, fallback, circuit breaker
+</li>
+<li><strong>Telemetry</strong> - Opt-in OpenTelemetry exporters (<code>TechieRag.Telemetry</code>)
+</li>
+</ul>
+<h2 id="package-information">Package Information<a class="anchor-link" href="#package-information">#</a></h2>
+<h3 id="nuget-source">NuGet Source<a class="anchor-link" href="#nuget-source">#</a></h3>
+<p>Packages are published on <strong>nuget.org</strong> — the default feed every .NET SDK already has. No account, no token, no <code>nuget.config</code> edit is needed to install them.</p>
+<h3 id="available-packages">Available Packages<a class="anchor-link" href="#available-packages">#</a></h3>
+<table>
+<thead><tr><th>Package</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>TechieRag</code></td><td>Core library - embeddings, vector stores, document processing, LLM providers, tools and agent loop, MCP, flows, connectors, web ingestion, persistence, all services (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
+<tr><td><code>TechieRag.Embedded</code></td><td>ONNX-based embedded embedding provider and reranker (no external API; the models download once, then work offline). Carries the native ONNX Runtime wiring for MAUI heads (<code>net10.0</code>)</td></tr>
+<tr><td><code>TechieRag.Telemetry</code></td><td>Opt-in OpenTelemetry exporters (OTLP, console) for the core's traces and metrics; the core links no exporter (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
+<tr><td><code>TechieRag.Local</code></td><td>In-process local language model behind <code>UseLocalLlm()</code> on ONNX Runtime GenAI: Windows, Apple-silicon macOS, Linux, Android, iOS, Mac Catalyst. Depends on <code>TechieRag.Embedded</code> for downloads and native wiring (<code>net10.0</code>)</td></tr>
+<tr><td><code>TechieRag.Agents</code></td><td>Agents on Microsoft Agent Framework over TechieRag: <code>TechieRagAgentBuilder</code>, <code>ITechieRagAgent</code>, the seam adapters, <code>AddTechieRagAgent</code> (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
+</tbody>
+</table>
+<h3 id="install-commands">Install Commands<a class="anchor-link" href="#install-commands">#</a></h3>
+<pre><code class="language-bash">dotnet add package TechieRag
+# Optional: embedded embeddings and reranker (no Ollama/API needed; the model downloads once, then works offline)
+dotnet add package TechieRag.Embedded
+# Optional: OpenTelemetry exporters (opt-in; nothing is exported until tracing or metrics is enabled)
+dotnet add package TechieRag.Telemetry
+# Optional: in-process local language model (the model downloads once after the user accepts its terms)
+dotnet add package TechieRag.Local
+# Optional: agents on Microsoft Agent Framework over TechieRag
+dotnet add package TechieRag.Agents</code></pre>
+<h3 id="nuget-configuration">NuGet Configuration<a class="anchor-link" href="#nuget-configuration">#</a></h3>
+<p>No <code>nuget.config</code> change is required. If the project already has a <code>nuget.config</code> with <code>&lt;clear /&gt;</code>, make sure nuget.org is listed — that is the only source TechieRag needs:</p>
+<pre><code class="language-xml">&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;configuration&gt;
+  &lt;packageSources&gt;
+    &lt;clear /&gt;
+    &lt;add key="nuget.org" value="https://api.nuget.org/v3/index.json" /&gt;
+    &lt;!-- Optional, maintainers only: internal pre-release feed (see below). Public consumers do not add this. --&gt;
+    &lt;!-- &lt;add key="github-techierathore" value="https://nuget.pkg.github.com/techierathore/index.json" /&gt; --&gt;
+  &lt;/packageSources&gt;
+&lt;/configuration&gt;</code></pre>
+<h3 id="github-packages-optional-internal-pre-release-feed">GitHub Packages (optional, internal pre-release feed)<a class="anchor-link" href="#github-packages-optional-internal-pre-release-feed">#</a></h3>
+<p>Public consumers never need this. It is an internal development feed for maintainers working on TechieRag itself who want pre-release builds. Only configure it when the human explicitly asks for internal pre-release builds:</p>
+<ul>
+<li>Source URL: <code>https://nuget.pkg.github.com/techierathore/index.json</code>
+</li>
+<li>Authentication: GitHub PAT with <code>read:packages</code> scope (username = GitHub username)
+</li>
+<li>Install: <code>dotnet add package TechieRag --source github-techierathore --prerelease</code>
+</li>
+</ul>
+<hr>
+<h2 id="architecture">Architecture<a class="anchor-link" href="#architecture">#</a></h2>
+<pre><code>YOUR APPLICATION
+    |
+    v
+ITechieRag (Public API - all RAG + LLM methods)        TechieRag.Agents: ITechieRagAgent (Microsoft Agent Framework over ITechieRag)
+    |
+    +-- IEmbeddingProvider (embeddings)               &lt;-- TechieRag.Embedded: UseEmbedded() (bge-m3 desktops, all-MiniLM-L6-v2 phones)
+    +-- IVectorStore (vector storage)
+    +-- IDocumentProcessor[] (document ingestion)     &lt;-- Connectors (repository, email, Confluence), Web (URL, site crawl, SSRF guard)
+    +-- IReranker (optional rerank stage)             &lt;-- Cohere, Jina, or TechieRag.Embedded's ONNX cross-encoder
+    +-- ILlmProvider (completions, chat, typed streaming, tools)
+    |       6 API providers | TechieRag.Local: LocalLlmProvider | ChatGptSubscriptionLlmProvider | ModelRouter (UseLlmForModel)
+    +-- IToolHandler (ToolRegistry, McpToolHandler, RegisterKnowledgeBase) --&gt; AgentLoopRunner (RunAsync / RunStreamAsync), FlowRunner
+    +-- ITokenTracker (usage tracking)
+    +-- IConversationMemory / IConversationStore / IWorkspaceStore (memory, persistence, workspaces)
+    +-- IPromptTemplate (RAG prompt construction)
+    +-- TechieRagTelemetry (ActivitySource + Meter)   &lt;-- TechieRag.Telemetry: AddTechieRagTelemetry() exports them</code></pre>
+<hr>
+<h2 id="quick-start-examples">Quick Start Examples<a class="anchor-link" href="#quick-start-examples">#</a></h2>
+<h3 id="minimal-setup-embedding-vector-store-only"><a id="1-minimal-setup-embedding--vector-store-only"></a>1. Minimal Setup (Embedding + Vector Store Only)<a class="anchor-link" href="#minimal-setup-embedding-vector-store-only">#</a></h3>
+<pre><code class="language-csharp">using TechieRag;
+
+var rag = new TechieRagBuilder()
+    .UseOllama()                // Embedding via Ollama
+    .UseSqliteVec()             // SQLite vector store
+    .Build();
+
+await rag.InitializeAsync();
+await rag.IngestAsync("./documents/myfile.pdf");
+var results = await rag.SearchAsync("search query", topK: 5);</code></pre>
+<h3 id="full-rag-llm-ask-questions-about-documents"><a id="2-full-rag--llm-ask-questions-about-documents"></a>2. Full RAG + LLM (Ask Questions About Documents)<a class="anchor-link" href="#full-rag-llm-ask-questions-about-documents">#</a></h3>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()                                    // Embedding
+    .UseSqliteVec()                                 // Vector Store
+    .UseOpenAICompatibleLlm(                        // LLM
+        "https://api.openai.com/v1", "sk-...", "gpt-4o")
+    .WithUsageTracking()                            // Token tracking
+    .Build();
+
+await rag.InitializeAsync();
+await rag.IngestDirectoryAsync("./documents");
+
+// Auto-RAG: search + generate
+var response = await rag.AskAsync("What is this project about?");
+Console.WriteLine(response.Answer);
+Console.WriteLine($"Sources: {string.Join(", ", response.Sources.Select(s =&gt; s.Chunk.Metadata["SourceFile"]))}");
+Console.WriteLine($"Tokens: {response.Usage.TotalTokens}");</code></pre>
+<h3 id="streaming-rag-chat"><a id="3-streaming-rag-chat"></a>3. Streaming RAG Chat<a class="anchor-link" href="#streaming-rag-chat">#</a></h3>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseAnthropicLlm("sk-ant-...", "claude-sonnet-4-5-20250929")
+    .WithConversationMemory()
+    .Build();
+
+await rag.InitializeAsync();
+
+await foreach (var token in rag.AskStreamAsync("Explain vector databases"))
+{
+    Console.Write(token);
+}</code></pre>
+<h3 id="direct-llm-access-no-rag"><a id="4-direct-llm-access-no-rag"></a>4. Direct LLM Access (No RAG)<a class="anchor-link" href="#direct-llm-access-no-rag">#</a></h3>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseGeminiLlm("AIza...", "gemini-2.0-flash")
+    .Build();
+
+var llm = rag.GetLlmProvider()!;
+
+// Simple completion
+var response = await llm.CompleteAsync("Write a haiku about coding");
+Console.WriteLine(response.Content);
+
+// Streaming completion
+await foreach (var token in llm.CompleteStreamAsync("Tell me a story"))
+{
+    Console.Write(token);
+}
+
+// Typed/structured output
+var analysis = await llm.CompleteAsync&lt;SentimentAnalysis&gt;(
+    "Analyze: 'I love this library!'");
+
+public class SentimentAnalysis
+{
+    public string Sentiment { get; set; } = "";
+    public float Score { get; set; }
+    public string Explanation { get; set; } = "";
+}</code></pre>
+<h3 id="tool-calling-with-agent-loop"><a id="5-tool-calling-with-agent-loop"></a>5. Tool Calling with Agent Loop<a class="anchor-link" href="#tool-calling-with-agent-loop">#</a></h3>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseOpenAICompatibleLlm("https://api.openai.com/v1", "sk-...", "gpt-4o")
+    .WithTools(tools =&gt;
+    {
+        tools.Register(
+            "get_weather",
+            "Gets current weather for a city",
+            """{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}""",
+            async (argsJson, ct) =&gt;
+            {
+                var args = JsonSerializer.Deserialize&lt;WeatherArgs&gt;(argsJson)!;
+                return $"Weather in {args.City}: 25C, Sunny";
+            });
+
+        tools.Register(
+            "calculate",
+            "Evaluates a math expression",
+            """{"type":"object","properties":{"expression":{"type":"string"}},"required":["expression"]}""",
+            async (argsJson, ct) =&gt;
+            {
+                var args = JsonSerializer.Deserialize&lt;CalcArgs&gt;(argsJson)!;
+                var result = new DataTable().Compute(args.Expression, null);
+                return result?.ToString() ?? "Error";
+            });
+    })
+    .Build();
+
+// Agent loop runs automatically - LLM decides which tools to call
+var response = await rag.AskAsync(
+    "What's the weather in Delhi and what is 42 * 17?");
+Console.WriteLine(response.Answer);</code></pre>
+<h3 id="token-budget-management"><a id="6-token-budget-management"></a>6. Token Budget Management<a class="anchor-link" href="#token-budget-management">#</a></h3>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseOpenAICompatibleLlm("https://api.openai.com/v1", "sk-...", "gpt-4o")
+    .WithUsageTracking(tracking =&gt;
+    {
+        tracking.MaxCostUsd = 10.00m;
+        tracking.AlertThreshold = 0.8f;
+        tracking.BlockOnExceeded = true;
+    })
+    .Build();
+
+var tracker = rag.GetTokenTracker();
+tracker.OnBudgetAlert += (_, alert) =&gt;
+{
+    Console.WriteLine(alert.IsExceeded
+        ? "BUDGET EXCEEDED!"
+        : $"Warning: {alert.Status.CostUtilization:P0} of budget used.");
+};
+
+var usage = tracker.GetSessionUsage();
+Console.WriteLine($"Tokens: {usage.TotalTokens:N0}, Cost: ${usage.TotalEstimatedCostUsd:F2}");</code></pre>
+<h3 id="primary-fallback-llm"><a id="7-primary--fallback-llm"></a>7. Primary + Fallback LLM<a class="anchor-link" href="#primary-fallback-llm">#</a></h3>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseOpenAICompatibleLlm("https://api.openai.com/v1", "sk-...", "gpt-4o")
+    .WithFallbackLlm(fallback =&gt;
+    {
+        fallback.Source = LlmSource.Ollama;
+        fallback.Endpoint = "http://localhost:11434";
+        fallback.Model = "llama3.2";
+    })
+    .WithResilience(r =&gt;
+    {
+        r.MaxRetries = 3;
+        r.CircuitBreakerThreshold = 5;
+    })
+    .Build();
+
+// If OpenAI fails, automatically falls back to local Ollama
+var response = await rag.AskAsync("What is quantum computing?");</code></pre>
+<hr>
+<h2 id="techieragbuilder-methods-fluent-api">TechieRagBuilder Methods (Fluent API)<a class="anchor-link" href="#techieragbuilder-methods-fluent-api">#</a></h2>
+<h3 id="embedding-providers">Embedding Providers<a class="anchor-link" href="#embedding-providers">#</a></h3>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>UseOllama(endpoint, model)</code></td><td>Ollama embedding (default: localhost:11434, bge-m3)</td></tr>
+<tr><td><code>UseLmStudio(endpoint, model)</code></td><td>LM Studio embedding</td></tr>
+<tr><td><code>UseOnnx(modelPath)</code></td><td>ONNX Runtime local embedding</td></tr>
+<tr><td><code>UseAzureOpenAI(endpoint, apiKey, model)</code></td><td>Azure OpenAI embedding</td></tr>
+<tr><td><code>UseHttpEmbedding(endpoint, apiKey, model)</code></td><td>Generic HTTP embedding API</td></tr>
+<tr><td><code>UseEmbedded()</code></td><td>ONNX embedded (requires TechieRag.Embedded package)</td></tr>
+</tbody>
+</table>
+<h3 id="vector-stores">Vector Stores<a class="anchor-link" href="#vector-stores">#</a></h3>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>UseSqliteVec(connectionString)</code></td><td>SQLite with vec extension (default: "Data Source=techierag.db")</td></tr>
+<tr><td><code>UsePgVector(connectionString)</code></td><td>PostgreSQL with pgvector extension</td></tr>
+<tr><td><code>UseQdrant(endpoint, apiKey)</code></td><td>Qdrant vector database</td></tr>
+</tbody>
+</table>
+<h3 id="llm-providers">LLM Providers<a class="anchor-link" href="#llm-providers">#</a></h3>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>UseOllamaLlm(endpoint, model)</code></td><td>Ollama (default: localhost:11434, llama3.2)</td></tr>
+<tr><td><code>UseLmStudioLlm(endpoint, model)</code></td><td>LM Studio (default: localhost:1234)</td></tr>
+<tr><td><code>UseOpenAICompatibleLlm(endpoint, apiKey, model)</code></td><td>OpenAI-compatible REST API</td></tr>
+<tr><td><code>UseOpenAICompatibleLlm(endpoint, apiKey, model, headers, sessionHeader?)</code></td><td>v3: same, with extra request headers and a per-conversation session header (Phase-2 Features, 6)</td></tr>
+<tr><td><code>UseAzureAIFoundryLlm(endpoint, apiKey, model, apiVersion)</code></td><td>Azure AI Foundry</td></tr>
+<tr><td><code>UseGeminiLlm(apiKey, model)</code></td><td>Google Gemini (default: gemini-2.0-flash)</td></tr>
+<tr><td><code>UseAnthropicLlm(apiKey, model)</code></td><td>Anthropic Claude (default: claude-sonnet-4-5-20250929)</td></tr>
+<tr><td><code>UseCustomLlmProvider(factory)</code></td><td>Custom ILlmProvider implementation</td></tr>
+<tr><td><code>UseLlm(source, endpoint, apiKey, model, temperature, maxTokens)</code></td><td>Generic LLM configuration</td></tr>
+<tr><td><code>UseLlmForModel(modelName, apiKey?)</code></td><td>v3: route by model name through <code>ModelRouter</code> (see Phase-2 Features, 7)</td></tr>
+<tr><td><code>UseChatGptSubscriptionLlm(signInCallback, options?)</code></td><td>v3: the user's ChatGPT subscription, device-code sign-in (Phase-2 Features, 6)</td></tr>
+<tr><td><code>UseLocalLlm(...)</code></td><td>v3: in-process local model, <code>TechieRag.Local</code> package (Phase-2 Features, 2)</td></tr>
+</tbody>
+</table>
+<h3 id="supporting-features">Supporting Features<a class="anchor-link" href="#supporting-features">#</a></h3>
+<table>
+<thead><tr><th>Method</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td><code>WithFallbackLlm(configure)</code></td><td>Configure fallback LLM provider</td></tr>
+<tr><td><code>WithApiKeys(llm?, embedding?, vectorStore?, rerank?, llmFallback?)</code></td><td>v3: set the keys of configured sections in code; the way keys reach an <code>AddTechieRag(section, rag =&gt; ...)</code> setup, since a section may hold none</td></tr>
+<tr><td><code>WithLlmHeaders(headers)</code></td><td>v3: extra request headers for the OpenAI-compatible LLM, in code</td></tr>
+<tr><td><code>WithUsageTracking(configure?)</code></td><td>Enable token usage tracking and budgets</td></tr>
+<tr><td><code>WithConversationMemory()</code></td><td>Enable conversation history management</td></tr>
+<tr><td><code>WithPromptTemplate(systemPrompt?, contextTemplate?)</code></td><td>Customize RAG prompt templates</td></tr>
+<tr><td><code>WithCustomPromptTemplate(factory)</code></td><td>Custom IPromptTemplate implementation</td></tr>
+<tr><td><code>WithResilience(configure?)</code></td><td>Configure retry, timeout, circuit breaker</td></tr>
+<tr><td><code>WithToolHandler(handler)</code></td><td>Register IToolHandler for tool calling (a <code>ToolRegistry</code>, an <code>McpToolHandler</code>, a composite)</td></tr>
+<tr><td><code>WithTools(configure)</code></td><td>Register tools with delegate-based handlers</td></tr>
+<tr><td><code>WithLogging(loggerFactory)</code></td><td><code>ILoggerFactory</code> for every component</td></tr>
+<tr><td><code>WithReranker(source, apiKey, model?, endpoint?, topN, candidateCount)</code></td><td>v3: Cohere or Jina rerank stage (Phase-2 Features, 9)</td></tr>
+<tr><td><code>WithReranker(factory, topN, candidateCount)</code></td><td>v3: custom <code>IReranker</code></td></tr>
+<tr><td><code>UseEmbeddedReranker(modelDirectory?, topN, candidateCount)</code></td><td>v3: ONNX cross-encoder rerank, <code>RerankSource.LocalOnnx</code> (<code>TechieRag.Embedded</code>)</td></tr>
+<tr><td><code>WithPersistence(provider, connectionString, defaultUserId)</code></td><td>v3: SQLite/PostgreSQL conversation and workspace stores (Phase-2 Features, 10)</td></tr>
+<tr><td><code>UseModelRoot(path)</code></td><td>v3: the folder every local model downloads to (<code>TechieRag.Embedded</code>; Phase-2 Features, 3)</td></tr>
+</tbody>
+</table>
+<hr>
+<h2 id="phase-2-features-v3">Phase-2 Features (v3)<a class="anchor-link" href="#phase-2-features-v3">#</a></h2>
+<p>One subsection per feature: the package and namespaces it needs, the public signatures (copied from the source), and one call example. <code>rag</code> is an <code>ITechieRag</code> built as in the Quick Start.</p>
+<h3 id="typed-streaming-chatstreameventsasync-and-runstreamasync"><a id="1-typed-streaming-chatstreameventsasync-and-runstreamasync"></a>1. Typed streaming: <code>ChatStreamEventsAsync</code> and <code>RunStreamAsync</code><a class="anchor-link" href="#typed-streaming-chatstreameventsasync-and-runstreamasync">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Abstractions</code>, <code>TechieRag.Models</code>, <code>TechieRag.Services</code>, <code>TechieRag.Llm</code>.</p>
+<pre><code class="language-csharp">// ILlmProvider - additive with a default implementation; the six built-in providers, the local model
+// and the subscription provider override it. Order: TextDelta*, ToolCall*, then exactly one Completed.
+IAsyncEnumerable&lt;LlmStreamEvent&gt; ChatStreamEventsAsync(IReadOnlyList&lt;ChatMessage&gt; messages,
+    LlmCompletionOptions? options = null, CancellationToken cancellationToken = default);
+
+public enum LlmStreamEventKind { TextDelta, ToolCall, Completed }
+public sealed class LlmStreamEvent
+{
+    public required LlmStreamEventKind Kind { get; init; }
+    public string? Text { get; init; }          // TextDelta
+    public ToolCall? ToolCall { get; init; }    // ToolCall: id, name, complete arguments JSON
+    public TokenUsage? Usage { get; init; }     // Completed
+    public string? FinishReason { get; init; }  // Completed
+    public string? ModelName { get; init; }     // Completed
+    public static LlmStreamEvent FromText(string text);
+    public static LlmStreamEvent FromToolCall(ToolCall toolCall);
+    public static LlmStreamEvent FromCompleted(TokenUsage usage, string finishReason, string modelName);
+}
+
+// TechieRag.Llm.LlmStreamEventExtensions - the text-only projection (what ChatStreamAsync returns)
+public static IAsyncEnumerable&lt;string&gt; ToTextStreamAsync(this IAsyncEnumerable&lt;LlmStreamEvent&gt; events,
+    CancellationToken cancellationToken = default);
+
+// TechieRag.Services.AgentLoopRunner - the classic and the streaming agent loop
+public AgentLoopRunner(ILlmProvider llmProvider, IToolHandler toolHandler,
+    ILogger&lt;AgentLoopRunner&gt;? logger = null, int maxIterations = 10);
+public Task&lt;LlmResponse&gt; RunAsync(List&lt;ChatMessage&gt; messages, LlmCompletionOptions? options = null,
+    IProgress&lt;AgentStep&gt;? progress = null, CancellationToken cancellationToken = default);
+public IAsyncEnumerable&lt;AgentStreamEvent&gt; RunStreamAsync(List&lt;ChatMessage&gt; messages, LlmCompletionOptions? options = null,
+    IProgress&lt;AgentStep&gt;? progress = null, CancellationToken cancellationToken = default);
+
+public enum AgentStreamEventKind { TextDelta, ToolCallRequested, ToolExecuted, Completed }
+public sealed class AgentStreamEvent
+{
+    public required AgentStreamEventKind Kind { get; init; }
+    public required int Iteration { get; init; }
+    public string? Text { get; init; }             // TextDelta
+    public ToolCall? ToolCall { get; init; }       // ToolCallRequested, ToolExecuted
+    public ToolResult? ToolResult { get; init; }   // ToolExecuted
+    public LlmResponse? Response { get; init; }    // Completed: the final answer; Usage is summed over the run
+    public bool MaxIterationsReached { get; init; }
+}</code></pre>
+<pre><code class="language-csharp">var llm = rag.GetLlmProvider()!;
+var messages = new List&lt;ChatMessage&gt; { ChatMessage.User("Summarise the release notes") };
+
+await foreach (var e in llm.ChatStreamEventsAsync(messages))
+{
+    switch (e.Kind)
+    {
+        case LlmStreamEventKind.TextDelta: Console.Write(e.Text); break;
+        case LlmStreamEventKind.ToolCall: Console.WriteLine($"tool requested: {e.ToolCall!.Name}"); break;
+        case LlmStreamEventKind.Completed: Console.WriteLine($"{e.Usage!.TotalTokens} tokens, {e.FinishReason}"); break;
+    }
+}
+
+// The streaming agent loop: text arrives as it is written, tools run as the model asks for them
+var runner = new AgentLoopRunner(llm, toolRegistry);
+await foreach (var step in runner.RunStreamAsync(messages))
+{
+    if (step.Kind == AgentStreamEventKind.TextDelta) Console.Write(step.Text);
+    else if (step.Kind == AgentStreamEventKind.ToolExecuted) Console.WriteLine($"[{step.ToolCall!.Name}: {step.ToolResult!.Content}]");
+    else if (step.Kind == AgentStreamEventKind.Completed) Console.WriteLine($"done: {step.Response!.Usage.TotalTokens} tokens");
+}</code></pre>
+<p>A custom <code>ILlmProvider</code> that implements <code>ChatStreamAsync</code> on top of the typed method must override <code>ChatStreamEventsAsync</code> too, or the two defaults call each other.</p>
+<h3 id="local-model-techierag-local"><a id="2-local-model-techieraglocal"></a>2. Local model: <code>TechieRag.Local</code><a class="anchor-link" href="#local-model-techierag-local">#</a></h3>
+<p>Package <code>TechieRag.Local</code> (depends on <code>TechieRag.Embedded</code>); namespace <code>TechieRag.Local</code>. One provider, <code>LocalLlmProvider : ILlmProvider</code>, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws <code>PlatformNotSupportedException</code> on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. <code>SupportsToolCalling</code> is false; a request with tools is refused. A MAUI app writes no native wiring: the package's <code>buildTransitive</code> targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.</p>
+<table>
+<thead><tr><th>Model</th><th>Id</th><th>Where it is the default</th><th>Download</th><th>Licence</th></tr></thead>
+<tbody>
+<tr><td>Qwen2.5 0.5B Instruct</td><td><code>qwen2.5-0.5b-instruct</code> (<code>LocalModel.Qwen25Instruct05B</code>)</td><td>Android and iOS (phones)</td><td>333 MB</td><td>Apache-2.0</td></tr>
+<tr><td>Phi-3 mini 4k Instruct</td><td><code>phi-3-mini-4k-instruct</code> (<code>LocalModel.Phi3Mini4kInstruct</code>)</td><td>Windows, macOS, Linux, Mac Catalyst</td><td>2.7 GB</td><td>MIT</td></tr>
+</tbody>
+</table>
+<pre><code class="language-csharp">// TechieRag.Local.LocalLlmBuilderExtensions - four overloads
+public static TechieRagBuilder UseLocalLlm(this TechieRagBuilder builder, Action&lt;LocalLlmOptions&gt;? configure = null);   // LocalModel.PlatformDefault
+public static TechieRagBuilder UseLocalLlm(this TechieRagBuilder builder, string modelId, Action&lt;LocalLlmOptions&gt;? configure = null);
+public static TechieRagBuilder UseLocalLlm(this TechieRagBuilder builder, DirectoryInfo modelFolder, LocalChatTemplate chatTemplate,
+    int contextLength = 4_096, Action&lt;LocalLlmOptions&gt;? configure = null);   // a folder the host placed: nothing downloaded, no terms asked
+public static TechieRagBuilder UseLocalLlm(this TechieRagBuilder builder, LocalModel model, Action&lt;LocalLlmOptions&gt;? configure = null);
+
+// TechieRag.Local.LocalLlm
+public static void Register(Action&lt;LocalLlmOptions&gt;? configure = null);   // makes LlmSource.Local and the "local/&lt;model&gt;" route work from configuration
+public static LocalLlmProvider Create(string? modelId = null, ILoggerFactory? loggerFactory = null, Action&lt;LocalLlmOptions&gt;? configure = null);
+
+// TechieRag.Local.LocalModel
+public static LocalModel Qwen25Instruct05B { get; }
+public static LocalModel Phi3Mini4kInstruct { get; }
+public static LocalModel PlatformDefault { get; }
+public static IReadOnlyList&lt;LocalModel&gt; All { get; }
+public static bool IsPhonePlatform { get; }
+public static LocalModel? FromId(string? id);
+public static LocalModel FromHuggingFace(string repository, string? folder = null, string? version = null);   // any ONNX Runtime GenAI model by name
+public string Id { get; }  public string DisplayName { get; }  public string LicenceName { get; }  public Uri? TermsUrl { get; }
+public LocalChatTemplate ChatTemplate { get; }  public int ContextLength { get; }  public bool RunsOnPhones { get; }
+public LocalModelTerms GetTerms();
+public Task&lt;LocalModelTerms&gt; GetTermsAsync(CancellationToken cancellationToken = default);
+
+public enum LocalChatTemplate { ChatMl, Phi3, Llama3, Gemma, ModelDefined }
+
+// TechieRag.Local.LocalLlmOptions
+public sealed class LocalLlmOptions
+{
+    public ILoggerFactory? LoggerFactory { get; set; }
+    public LocalModel? Model { get; set; }
+    public int? ContextSize { get; set; }
+    public int? Threads { get; set; }
+    public int MaxTokens { get; set; } = 512;
+    public float Temperature { get; set; } = 0.7f;
+    public float TopP { get; set; } = 0.95f;
+    public bool TermsAccepted { get; set; }                                                        // the host already showed the terms
+    public Func&lt;LocalModelTerms, CancellationToken, Task&lt;bool&gt;&gt;? ConfirmTermsAsync { get; set; }   // ask the user before the first download
+}
+public sealed record LocalModelTerms(string ModelId, string DisplayName, string LicenceName, Uri? TermsUrl) { public long DownloadBytes { get; init; } }
+
+// Exceptions (namespace TechieRag.Local)
+public sealed class LocalModelTermsNotAcceptedException : InvalidOperationException { public LocalModelTerms Terms { get; } }   // no request was sent
+public sealed class LocalModelMemoryException : InvalidOperationException { public string ModelId { get; } public long RequiredBytes { get; } public long AvailableBytes { get; } }
+public sealed class LocalPromptTooLongException : ArgumentException { public string ModelId { get; } public int PromptTokens { get; } public int ContextTokens { get; } }   // thrown before inference
+public sealed class LocalModelIntegrityException : IOException   // a downloaded file's hash did not match; the file was deleted</code></pre>
+<pre><code class="language-csharp">using TechieRag.Local;
+
+var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec()
+    .UseLocalLlm(o =&gt; o.ConfirmTermsAsync = (terms, ct) =&gt;
+        ShowTermsDialogAsync(terms.DisplayName, terms.LicenceName, terms.TermsUrl, terms.DownloadBytes, ct))
+    .Build();
+
+try
+{
+    var answer = await rag.AskAsync("What does the contract say about notice periods?");
+}
+catch (LocalModelTermsNotAcceptedException ex) { /* the user declined ex.Terms; nothing was downloaded */ }
+catch (LocalModelMemoryException ex) { /* ex.RequiredBytes &gt; ex.AvailableBytes: pick a smaller model */ }
+catch (LocalPromptTooLongException ex) { /* ex.PromptTokens &gt; ex.ContextTokens: trim the prompt or topK */ }
+
+// A named model instead of the default: by id, or any ONNX Runtime GenAI model on Hugging Face
+// (licence shown through ConfirmTermsAsync first, every file checked against Hugging Face's fingerprint)
+builder.UseLocalLlm("qwen2.5-0.5b-instruct");
+builder.UseLocalLlm(LocalModel.FromHuggingFace("microsoft/Phi-3-mini-4k-instruct-onnx",
+    folder: "cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4", version: null), o =&gt; o.TermsAccepted = true);
+
+// From configuration: call once at startup, then "Llm": { "Source": "Local", "Model": "qwen2.5-0.5b-instruct" }
+LocalLlm.Register();</code></pre>
+<h3 id="embedded-embeddings-on-phones-and-desktops-techierag-embedded"><a id="3-embedded-embeddings-on-phones-and-desktops-techieragembedded"></a>3. Embedded embeddings on phones and desktops: <code>TechieRag.Embedded</code><a class="anchor-link" href="#embedded-embeddings-on-phones-and-desktops-techierag-embedded">#</a></h3>
+<p>Package <code>TechieRag.Embedded</code>; namespace <code>TechieRag.Embedded</code> (<code>ModelRoot</code> is in the core's <code>TechieRag.Models</code>). <code>UseEmbedded()</code> picks the platform default: <strong>bge-m3</strong> (1024 dimensions, multilingual, a 2.3 GB first download) on Windows, macOS, Mac Catalyst and Linux; <strong>all-MiniLM-L6-v2</strong> (384 dimensions, English, 91 MB) on Android and iOS, where bge-m3 is refused with <code>NotSupportedException</code>. The files go to <code>&lt;ModelRoot&gt;/&lt;model&gt;</code>; the size is raised before the first byte; a cancelled download resumes from its <code>.part</code> file. A MAUI app writes <strong>no native wiring</strong>: the package's <code>buildTransitive</code> targets add the ONNX Runtime native library on Android, iOS and Mac Catalyst (knobs <code>TechieRagDisableOnnxNativeWiring</code>, <code>TechieRagDisableOnnxCustomOpsStub</code>, <code>TechieRagOnnxRuntimeVersion</code>). <code>TECHIERAG_MODEL_BASE_URL</code> redirects every download to a mirror.</p>
+<pre><code class="language-csharp">// TechieRag.Embedded.TechieRagBuilderExtensions
+public static TechieRagBuilder UseEmbedded(this TechieRagBuilder builder);                        // EmbeddedModel.PlatformDefault
+public static TechieRagBuilder UseEmbedded(this TechieRagBuilder builder, EmbeddedModel model);   // EmbeddedModel.BgeM3 or EmbeddedModel.MiniLM
+public static TechieRagBuilder UseModelRoot(this TechieRagBuilder builder, string modelRoot);     // same as ModelRoot.Set(path); call before the first model loads
+public static TechieRagBuilder UseEmbeddedModel(this TechieRagBuilder builder, string modelDirectory, int dimensions = 384, int maxSequenceLength = 512);
+public static TechieRagBuilder UseEmbeddedReranker(this TechieRagBuilder builder, string? modelDirectory = null, int topN = 0, int candidateCount = 20);
+
+// TechieRag.Embedded.EmbeddedModel
+public static EmbeddedModel BgeM3 { get; }       // "bge-m3", 1024 dimensions, desktops only
+public static EmbeddedModel MiniLM { get; }      // "all-minilm-l6-v2", 384 dimensions, allowed on phones
+public static EmbeddedModel PlatformDefault { get; }
+public static IReadOnlyList&lt;EmbeddedModel&gt; All { get; }
+public static bool IsPhonePlatform { get; }
+public static EmbeddedModel? FromName(string? name);
+public string Name { get; }  public int Dimensions { get; }  public int MaxSequenceLength { get; }  public bool RunsOnPhones { get; }
+public long DownloadBytes { get; }  public string DownloadSize { get; }
+public string GetModelDirectory();  public bool IsDownloaded();  public IReadOnlyList&lt;ModelDownloadFile&gt; GetDownloadFiles();
+
+// TechieRag.Models.ModelRoot (core) - one folder for every local model: embedder, reranker, local LLM
+public const string EnvironmentVariable = "TECHIERAG_MODEL_ROOT";   // host override without code
+public static string DefaultPath { get; }     // &lt;LocalApplicationData&gt;/TechieRag/models
+public static string Current { get; }
+public static void Set(string? path);
+public static string GetModelDirectory(string modelName);
+
+// TechieRag.Embedded.ModelDownloadService - the one downloader (embedder, reranker, local model)
+public static ModelDownloadService Instance { get; }
+public event EventHandler&lt;ModelDownloadSizeEventArgs&gt;? DownloadSizeKnown;   // before the first byte; set e.Decline = true to refuse
+public event EventHandler&lt;ModelDownloadProgress&gt;? ProgressChanged;
+public ModelDownloadProgress Progress { get; }
+public bool IsDownloading { get; }  public bool IsModelReady { get; }
+public Task DownloadAsync(string modelName, string destinationDirectory, IReadOnlyList&lt;ModelDownloadFile&gt; files, CancellationToken cancellationToken = default);
+
+public sealed class ModelDownloadSizeEventArgs : EventArgs
+{ public string ModelName { get; } public long TotalBytes { get; } public string DisplaySize { get; } public int FileCount { get; } public string DestinationDirectory { get; } public bool Decline { get; set; } }
+public class ModelDownloadProgress
+{ public ModelDownloadStatus Status; public string? CurrentFile; public long BytesDownloaded; public long TotalBytes; public int OverallBytesProgressPercent; public string StatusMessage; public string? ErrorMessage; }
+public enum ModelDownloadStatus { NotStarted, Checking, Downloading, Completed, Failed }
+public sealed class ModelDownloadDeclinedException : OperationCanceledException { public string ModelName { get; } public long TotalBytes { get; } }</code></pre>
+<pre><code class="language-csharp">using TechieRag.Embedded;
+
+ModelDownloadService.Instance.DownloadSizeKnown += (_, e) =&gt;
+    e.Decline = !UserAgreesToDownload(e.ModelName, e.DisplaySize);      // "91 MB" on a phone, "2.3 GB" on a desktop, before any byte
+ModelDownloadService.Instance.ProgressChanged += (_, p) =&gt;
+    progressBar.Value = p.OverallBytesProgressPercent;                  // a cancelled download resumes from its .part file
+
+var rag = new TechieRagBuilder()
+    .UseModelRoot(Path.Combine(FileSystem.AppDataDirectory, "models"))   // optional; the default is the per-user app-data folder
+    .UseEmbedded()                                                       // bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS
+    .UseSqliteVec()
+    .Build();
+await rag.InitializeAsync();</code></pre>
+<h3 id="agents-package-techierag-agents"><a id="4-agents-package-techieragagents"></a>4. Agents package: <code>TechieRag.Agents</code><a class="anchor-link" href="#agents-package-techierag-agents">#</a></h3>
+<p>Package <code>TechieRag.Agents</code> (Microsoft Agent Framework); namespaces <code>TechieRag.Agents</code>, <code>TechieRag.Agents.Interop</code>, <code>TechieRag.Agents.DependencyInjection</code>. The agent retrieves from the same <code>ITechieRag</code> through the core's agentic contract (<code>TechieRag.Agentic</code>, below), so the classic loop and the MAF agent share one tested retrieval behaviour.</p>
+<pre><code class="language-csharp">// TechieRag.Agents.TechieRagAgentBuilder
+public TechieRagAgentBuilder(ITechieRag rag);
+public TechieRagAgentBuilder UseLmStudio(string endpoint, string model);
+public TechieRagAgentBuilder UseOllama(string endpoint = "http://localhost:11434", string model = "llama3.2");
+public TechieRagAgentBuilder UseOpenAI(string apiKey, string model = "gpt-4o-mini", string endpoint = "https://api.openai.com");
+public TechieRagAgentBuilder UseOpenAICompatible(string endpoint, string model, string? apiKey = null);
+public TechieRagAgentBuilder UseConfiguredLlm();                          // rag's own ILlmProvider through LlmProviderChatClient
+public TechieRagAgentBuilder UseCustomChatClient(Func&lt;IChatClient&gt; factory);
+public TechieRagAgentBuilder UseRetrievalSource(IRetrievalSource source);
+public TechieRagAgentBuilder WithRetrieval(Action&lt;RetrievalToolOptions&gt; configure);
+public TechieRagAgentBuilder WithToolHandler(IToolHandler handler);       // any TechieRag tool handler, adapted
+public TechieRagAgentBuilder WithTools(params AITool[] tools);
+public TechieRagAgentBuilder WithInstructions(string value);
+public TechieRagAgentBuilder WithAdditionalInstructions(string? value);
+public TechieRagAgentBuilder WithMaxToolIterations(int max = 8);
+public TechieRagAgentBuilder WithTrace(IProgress&lt;AgentStep&gt; progress);
+public TechieRagAgentBuilder WithChatOptions(Action&lt;ChatOptions&gt; configure);
+public TechieRagAgentBuilder WithChatHistoryProvider(ChatHistoryProvider provider);
+public TechieRagAgentBuilder WithPrefetch(bool enabled = true);
+public TechieRagAgentBuilder WithLogging(ILoggerFactory factory);
+public TechieRagAgentBuilder WithName(string value);
+public ITechieRagAgent Build();
+
+// TechieRag.Agents.ITechieRagAgent
+AIAgent Agent { get; }
+ITechieRag Rag { get; }
+Task&lt;AgentSession&gt; CreateSessionAsync(CancellationToken cancellationToken = default);
+Task&lt;AgentRagResponse&gt; AskAsync(string question, AgentSession? session = null, CancellationToken cancellationToken = default);
+Task&lt;AgentRagResponse&gt; AskAsync(IEnumerable&lt;Microsoft.Extensions.AI.ChatMessage&gt; messages, AgentSession? session = null, CancellationToken cancellationToken = default);
+IAsyncEnumerable&lt;RagStreamEvent&gt; AskStreamAsync(string question, AgentSession? session = null, CancellationToken cancellationToken = default);
+
+public sealed class AgentRagResponse
+{
+    public required string Answer { get; init; }
+    public required IReadOnlyList&lt;SearchResult&gt; Sources { get; init; }
+    public required IReadOnlyList&lt;RetrievalTrace&gt; Searches { get; init; }
+    public required IReadOnlyList&lt;ToolApprovalRequestContent&gt; PendingApprovals { get; init; }
+    public required AgentResponse Raw { get; init; }
+}
+
+// TechieRag.Agents.DependencyInjection - registers ITechieRagAgent and a keyed AIAgent ("techierag"); needs AddTechieRag first
+public static IServiceCollection AddTechieRagAgent(this IServiceCollection services, Action&lt;TechieRagAgentBuilder&gt; configure);
+
+// TechieRag.Agents.Interop - the seam adapters, public API
+public LlmProviderChatClient(ILlmProvider provider);                                   // ILlmProvider -&gt; IChatClient (streams over ChatStreamEventsAsync)
+public static IList&lt;AITool&gt; ToolHandlerFunctions.From(IToolHandler handler);           // IToolHandler -&gt; AITool[] (RequiresConfirmation -&gt; approval)
+public AIToolHandler(IEnumerable&lt;AITool&gt; tools);                                       // AITool[] -&gt; IToolHandler
+public static AIToolHandler AIToolHandler.FromAgent(AIAgent agent, AgentSession? session = null);   // an agent as one tool
+public static AIAgent AgentStepReporter.WithAgentSteps(this AIAgent agent, IProgress&lt;AgentStep&gt; progress, int? maxIterations = null);
+public ConversationMemoryChatHistoryProvider(IConversationMemory memory);              // IConversationMemory -&gt; ChatHistoryProvider</code></pre>
+<pre><code class="language-csharp">using TechieRag.Agents;
+using TechieRag.Agents.Interop;
+
+var agent = new TechieRagAgentBuilder(rag)
+    .UseLmStudio("http://localhost:1234", "qwen3-8b")   // or .UseConfiguredLlm() to reuse rag's ILlmProvider
+    .WithToolHandler(toolRegistry)
+    .WithTrace(new Progress&lt;AgentStep&gt;(step =&gt; Console.WriteLine(step)))
+    .Build();
+
+var session = await agent.CreateSessionAsync();
+var reply = await agent.AskAsync("Which invoices are overdue?", session);
+Console.WriteLine(reply.Answer);
+Console.WriteLine($"{reply.Searches.Count} searches, {reply.Sources.Count} sources");
+
+await foreach (var ev in agent.AskStreamAsync("And last month?", session))
+{
+    if (ev.Type == RagStreamEventType.Token) Console.Write(ev.Token);
+}
+
+// ASP.NET Core
+builder.Services.AddTechieRag(builder.Configuration.GetSection("TechieRag"));
+builder.Services.AddTechieRagAgent(a =&gt; a.UseConfiguredLlm().WithMaxToolIterations(6));
+
+// Seam adapters: one provider configuration and one tool catalogue for both worlds
+IChatClient client = new LlmProviderChatClient(rag.GetLlmProvider()!);
+IList&lt;AITool&gt; tools = ToolHandlerFunctions.From(toolRegistry);
+IToolHandler agentAsTool = AIToolHandler.FromAgent(agent.Agent);</code></pre>
+<p><strong>Agentic retrieval on the classic loop</strong> (core, namespace <code>TechieRag.Agentic</code>, no extra package). The model decides when and how often to search; every search is traced and every chunk gets a stable reference (<code>S1</code>, <code>S2</code>, ...).</p>
+<pre><code class="language-csharp">public static ToolRegistry RegisterKnowledgeBase(this ToolRegistry registry, IRetrievalSource source, RetrievalToolOptions? options, RetrievalTurnState state);
+public TechieRagRetrievalSource(ITechieRag rag, bool rerank = false);          // IRetrievalSource over ITechieRag
+public sealed class RetrievalToolOptions { TopK = 5; MaxTopK = 20; MaxSearchesPerTurn = 4; WeakScoreThreshold = 0.55f; NoneScoreThreshold = 0.35f; Rerank; MaxChunkChars = 1500; DocumentFilter; IncludeScores = true; }
+public sealed class RetrievalTurnState { void BeginTurn(); int SearchesUsed; IReadOnlyList&lt;SearchResult&gt; Collected; IReadOnlyList&lt;RetrievalTrace&gt; Searches; string? GetRef(string chunkId); }
+public static class AgenticInstructions { public const string Default; public static string WithDomainGuidance(string? extra); }</code></pre>
+<pre><code class="language-csharp">using TechieRag.Agentic;
+
+var state = new RetrievalTurnState();
+var registry = new ToolRegistry()
+    .RegisterKnowledgeBase(new TechieRagRetrievalSource(rag), new RetrievalToolOptions { TopK = 5 }, state);
+var runner = new AgentLoopRunner(rag.GetLlmProvider()!, registry);
+
+state.BeginTurn();                                               // once per user turn
+var messages = new List&lt;ChatMessage&gt;
+{
+    ChatMessage.System(AgenticInstructions.Default),
+    ChatMessage.User("Who signed the 2025 lease?")
+};
+var response = await runner.RunAsync(messages);
+// state.Collected: the chunks the model retrieved (cite by state.GetRef(chunk.Id)); state.Searches: the trace</code></pre>
+<h3 id="subscription-sign-in-usechatgptsubscriptionllm"><a id="5-subscription-sign-in-usechatgptsubscriptionllm"></a>5. Subscription sign-in: <code>UseChatGptSubscriptionLlm</code><a class="anchor-link" href="#subscription-sign-in-usechatgptsubscriptionllm">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag</code>, <code>TechieRag.Llm</code>, <code>TechieRag.Models</code>, <code>TechieRag.Abstractions</code>. The user's own ChatGPT subscription is the LLM, reached through OpenAI's device-code sign-in instead of an API key. The host drives the browser; the library waits for the authorisation and keeps the session in an <code>ISubscriptionSessionStore</code> the host supplies (in-memory by default). <strong>Only ChatGPT permits this today</strong> (checked 2026-09-24): the other vendors in the catalog are rows with <code>Permitted = false</code> and have no builder method. Vendor terms are dated facts in <code>LlmConnectorCatalog</code>, never rules in code; show them before sign-in.</p>
+<pre><code class="language-csharp">// TechieRag.TechieRagBuilder
+public TechieRagBuilder UseChatGptSubscriptionLlm(Func&lt;SubscriptionSignInPrompt, CancellationToken, Task&gt; signInCallback,
+    ChatGptSubscriptionOptions? options = null);
+
+public sealed record SubscriptionSignInPrompt { string ConnectorName; Uri VerificationUri; string UserCode; DateTimeOffset ExpiresAt; }   // TechieRag.Models
+
+// TechieRag.Llm.ChatGptSubscriptionOptions
+public sealed class ChatGptSubscriptionOptions
+{
+    public string Model { get; set; } = "gpt-6-luna";
+    public ISubscriptionSessionStore? SessionStore { get; set; }          // null: InMemorySubscriptionSessionStore (lost on restart)
+    public string ClientId { get; set; } = CodexPublicClientId;
+    public Uri Issuer { get; set; } = new("https://auth.openai.com");
+    public Uri BackendEndpoint { get; set; } = new("https://chatgpt.com/backend-api/codex");
+    public TimeSpan SignInTimeout { get; set; } = TimeSpan.FromMinutes(15);
+    public string DefaultInstructions { get; set; } = "You are a helpful assistant.";
+}
+
+// TechieRag.Abstractions.ISubscriptionSessionStore - implement over the platform's secure store
+Task&lt;SubscriptionSession?&gt; LoadAsync(string connectorName, CancellationToken cancellationToken = default);
+Task SaveAsync(SubscriptionSession session, CancellationToken cancellationToken = default);
+Task ClearAsync(string connectorName, CancellationToken cancellationToken = default);
+public sealed record SubscriptionSession { string ConnectorName; string AccessToken; string? RefreshToken; string? IdToken; ... }   // TechieRag.Models
+
+// TechieRag.Llm.ChatGptSubscriptionLlmProvider : ILlmProvider
+public Task SignInAsync(CancellationToken cancellationToken = default);    // sign in ahead of the first model call
+public Task SignOutAsync(CancellationToken cancellationToken = default);
+
+// TechieRag.Llm.SubscriptionSignInException : InvalidOperationException - switch on Code, never on the message
+public string Code { get; }
+public const string CodeExpired = "SubscriptionSignInExpired";
+public const string CodeRejected = "SubscriptionSignInRejected";
+public const string CodeSessionRejected = "SubscriptionSessionRejected";
+public const string CodeSignInRequired = "SubscriptionSignInRequired";   // the sign-in callback threw (e.g. no window during a model turn); InnerException is the callback's
+public const string CodeNotPermitted = "SubscriptionNotPermitted";
+
+// The sign-in callback MAY throw when it cannot show the prompt now; the model call then fails with
+// CodeSignInRequired (a SubscriptionSignInException the callback throws keeps its own code).
+public const string LlmConnectorCatalog.ChatGptSubscriptionName = "chatgpt-subscription";   // the connector key; never hardcode the string
+
+// TechieRag.Llm.LlmConnectorCatalog rows with Source == LlmSource.Subscription carry the vendor's terms
+public sealed record SubscriptionTerms { bool Permitted; string Terms; string AppliesTo; DateOnly CheckedOn; IReadOnlyList&lt;string&gt; Sources; string? BuilderMethod; }
+public static ILlmProvider LlmProviderFactory.CreateSubscription(ModelRoute route, Func&lt;SubscriptionSignInPrompt, CancellationToken, Task&gt; signInCallback,
+    ISubscriptionSessionStore? sessionStore = null, ILoggerFactory? loggerFactory = null);</code></pre>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec()
+    .UseChatGptSubscriptionLlm(
+        async (prompt, ct) =&gt;
+        {
+            // Open prompt.VerificationUri in the system browser, show prompt.UserCode, and return; the library waits.
+            await Browser.OpenAsync(prompt.VerificationUri);
+            ShowSignInCode(prompt.UserCode, prompt.ExpiresAt);
+        },
+        new ChatGptSubscriptionOptions { Model = "gpt-6-luna", SessionStore = new SecureStorageSessionStore() })
+    .Build();
+
+try
+{
+    var reply = await rag.AskAsync("Summarise my notes from this week");
+}
+catch (SubscriptionSignInException ex) when (ex.Code == SubscriptionSignInException.CodeExpired)
+{
+    // the code expired before the user finished; ask again
+}
+catch (SubscriptionSignInException ex) when (ex.Code == SubscriptionSignInException.CodeSignInRequired)
+{
+    // the session is gone and the callback could not show a code now: tell the user to sign in again
+}
+
+// Which vendors permit it: dated facts from the catalog, shown before sign-in
+foreach (var connector in LlmConnectorCatalog.All.Where(c =&gt; c.Source == LlmSource.Subscription))
+{
+    var terms = connector.Subscription!;
+    Console.WriteLine($"{connector.DisplayName}: {(terms.Permitted ? "permitted" : "not permitted")} (checked {terms.CheckedOn})");
+}</code></pre>
+<h3 id="provider-routing-usellmformodel-modelrouter-llmproviderfactory-createformodel"><a id="6-provider-routing-usellmformodel-modelrouter-llmproviderfactorycreateformodel"></a>6. Provider routing: <code>UseLlmForModel</code>, <code>ModelRouter</code>, <code>LlmProviderFactory.CreateForModel</code><a class="anchor-link" href="#provider-routing-usellmformodel-modelrouter-llmproviderfactory-createformodel">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code>. An application persists one string, the model name, and the catalog picks the service: <code>claude-sonnet-4-5</code> routes to Anthropic, <code>gemini-2.0-flash</code> to Google, <code>gpt-4o</code> to OpenAI. Open-weight names are served by several services, so they must be qualified with the connector (<code>groq/llama-3.3-70b-versatile</code>, <code>local/qwen2.5-0.5b-instruct</code>); an unqualified one throws <code>InvalidOperationException</code>.</p>
+<pre><code class="language-csharp">// TechieRag.TechieRagBuilder
+public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey = null);
+
+// TechieRag.Llm.ModelRouter
+public static ModelRoute? Resolve(string? modelName);
+public static ModelRoute Require(string modelName);
+public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId) { string? Endpoint; LlmSource Source; }
+
+// TechieRag.Llm.LlmProviderFactory
+public static ILlmProvider Create(ModelRoute route, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
+public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
+
+// TechieRag.Llm.LlmConnectorCatalog
+public static IReadOnlyList&lt;LlmConnectorDescriptor&gt; All { get; }
+public static LlmConnectorDescriptor? Find(string? name);
+public static LlmConnectorDescriptor Require(string name);
+public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList&lt;string&gt; ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; string? SessionHeader; SubscriptionTerms? Subscription; }
+public const string OpenCodeGoName = "opencode-go";   // OpenCode Go: https://opencode.ai/zen/go/v1, session header x-opencode-session
+
+// TechieRag.LlmConfig - configuration can name the connector instead of pasting its URL
+public string? Connector { get; set; }   // e.g. "groq"; an explicit Endpoint still wins
+public Dictionary&lt;string, string&gt; Headers { get; set; }   // extra headers on every OpenAI-compatible request; set in code (WithLlmHeaders), refused in a configuration section; one named here replaces the library's own
+public string? SessionHeader { get; set; }   // header carrying LlmCompletionOptions.SessionId; null = the connector's own (opencode-go: x-opencode-session)
+public int? MaxContextTokens { get; set; }   // context window; Ollama gets it as options.num_ctx; null (default) = the runtime's own
+
+// TechieRag.Models.LlmCompletionOptions
+public string? SessionId { get; set; }   // stable per conversation; sent in the session header; null = one id per provider instance
+
+// TechieRag.TechieRagBuilder - any OpenAI-compatible service that needs more than a key
+public TechieRagBuilder UseOpenAICompatibleLlm(string endpoint, string apiKey, string model,
+    IReadOnlyDictionary&lt;string, string&gt;? headers, string? sessionHeader = null);</code></pre>
+<p>OpenCode Go refuses a request without <code>x-opencode-session</code> (HTTP 400 <code>MissingSessionID</code>). The <code>opencode-go</code> connector sends it; pass the same <code>SessionId</code> on every turn of one conversation. Only Go's <code>chat/completions</code> models work through it (Kimi, GLM, DeepSeek, …); its <code>/responses</code> and <code>/messages</code> models need those wire formats. OpenAI-compatible requests carry <code>User-Agent: TechieRag/&lt;version&gt;</code> unless <code>Headers</code> names another, as OpenCode Go asks each client to name itself.</p>
+<p>Ollama sizes its context window per request and defaults to a small one (2k–4k tokens), silently dropping the front of a longer prompt. Set <code>LlmConfig.MaxContextTokens</code>, or pass <code>contextTokens</code> to <code>Create</code> / <code>CreateForModel</code>, and the Ollama provider sends it as <code>options.num_ctx</code>. It is unset by default because Ollama allocates the whole window up front. A reply Ollama cut off at the token limit reports <code>FinishReason == "length"</code>, as the other providers do.</p>
+<pre><code class="language-csharp">var route = ModelRouter.Require("ollama/llama3.2");
+var ollama = LlmProviderFactory.Create(route, null, contextTokens: 32768);   // sends options.num_ctx: 32768
+var reply = await ollama.ChatAsync(messages, new LlmCompletionOptions { MaxTokens = 4000 });
+if (reply.FinishReason == "length") { /* truncated: raise MaxTokens or continue */ }</code></pre>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, openCodeGoKey, "kimi-k2.7-code")
+    .Build();
+
+var provider = LlmProviderFactory.CreateForModel("opencode-go/kimi-k3", openCodeGoKey);
+var reply = await provider.ChatAsync(messages, new LlmCompletionOptions { SessionId = conversation.Id });</code></pre>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseOllama()
+    .UseSqliteVec()
+    .UseLlmForModel("claude-sonnet-4-5", apiKey: anthropicKey)   // routes to Anthropic
+    .Build();
+
+var route = ModelRouter.Require("groq/llama-3.3-70b-versatile");   // Connector.Name "groq", Source OpenAICompatible
+var gemini = LlmProviderFactory.CreateForModel("gemini-2.0-flash", googleKey);</code></pre>
+<h3 id="connectors-and-web-ingestion"><a id="7-connectors-and-web-ingestion"></a>7. Connectors and web ingestion<a class="anchor-link" href="#connectors-and-web-ingestion">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Connectors</code>, <code>TechieRag.Connectors.Repository</code>, <code>TechieRag.Connectors.Email</code>, <code>TechieRag.Connectors.Http</code>, <code>TechieRag.Web</code>. A connector lists items, keeps a <code>ConnectorSyncState</code> so the next run fetches only what changed, and stops cleanly at a budget with a <code>LimitCode</code> (the state is kept; the next run resumes). Every outbound HTTP call goes through the connect-time SSRF guard: private, loopback and link-local targets are refused, also after a redirect or a DNS rebinding.</p>
+<pre><code class="language-csharp">// TechieRag.Connectors.ConnectorRunner
+public ConnectorRunner(ILogger&lt;ConnectorRunner&gt;? logger = null, TimeProvider? timeProvider = null);
+public Task&lt;ConnectorRunResult&gt; RunAsync(IDataConnector connector, ConnectorSyncState? previousSync = null,
+    ConnectorRunOptions? options = null, CancellationToken cancellationToken = default);
+public Task&lt;ConnectorRunResult&gt; RunAsync(IDataConnector connector, ConnectorSyncState? previousSync, ConnectorRunOptions? options,
+    Func&lt;ConnectorDocument, CancellationToken, Task&gt; onDocument, CancellationToken cancellationToken = default);
+public sealed record ConnectorRunResult(IReadOnlyList&lt;ConnectorDocument&gt; Documents, IReadOnlyList&lt;ConnectorItem&gt; Unchanged,
+    IReadOnlyList&lt;ConnectorItemFailure&gt; Failures, ConnectorSyncState Sync, bool ReachedLimit = false) { public string? LimitCode { get; init; } }
+
+// TechieRag.Connectors.ConnectorIngestionExtensions - run and ingest into rag in one call
+public static Task&lt;ConnectorIngestionResult&gt; IngestConnectorAsync(this ITechieRag rag, IDataConnector connector,
+    ConnectorSyncState? previousSync = null, ConnectorRunOptions? options = null, CancellationToken cancellationToken = default);
+public sealed record ConnectorIngestionResult(IReadOnlyList&lt;string&gt; DocumentIds, IReadOnlyList&lt;ConnectorItemFailure&gt; Skipped,
+    ConnectorSyncState Sync, bool ReachedLimit = false) { public string? LimitCode { get; init; } }
+
+public sealed class ConnectorRunOptions { MaxItems = 500; MaxPages = 200; MaxItemBytes = 2 MB; MaxTotalBytes = 64 MB; RequestDelay = 100 ms; MaxConsecutiveFailures = 25; ReportUnchanged; }
+
+// TechieRag.Connectors.ConnectorErrorCodes - switch on these, never on the English message
+public const string RunByteBudgetReached = "ConnectorRunByteBudgetReached";     // LimitCode
+public const string RunItemLimitReached = "ConnectorRunItemLimitReached";       // LimitCode
+public const string RunPageLimitReached = "ConnectorRunPageLimitReached";       // LimitCode
+public const string ImapLiteralTooLarge = "ConnectorImapLiteralTooLarge";       // ConnectorException.ErrorCode
+public const string ImapResponseLineTooLong = "ConnectorImapResponseLineTooLong";   // ConnectorException.ErrorCode
+
+// TechieRag.Connectors.Repository - GitHub or GitLab
+public RepositoryConnector(IConnectorTransport transport, RepositoryConnectorOptions options, ILogger&lt;RepositoryConnector&gt;? logger = null);
+public sealed class RepositoryConnectorOptions { RepositoryHost Host = GitHub; string ProjectPath; string? Branch; string? ApiBaseUrl; string? WebBaseUrl; string? AccessToken; IList&lt;string&gt; IncludeGlobs; IList&lt;string&gt; ExcludeGlobs; int PageSize = 100; }
+public enum RepositoryHost { GitHub, GitLab }
+public HttpConnectorTransport(HttpClient httpClient, ILogger&lt;HttpConnectorTransport&gt;? logger = null, bool blockPrivateTargets = true);   // TechieRag.Connectors.Http
+
+// TechieRag.Connectors.Email - IMAP or mbox
+public EmailConnector(IMailTransport transport, EmailConnectorOptions options, IEnumerable&lt;IDocumentProcessor&gt;? attachmentProcessors = null, ILogger&lt;EmailConnector&gt;? logger = null);
+public static ImapMailTransport ImapMailTransport.Create(ImapMailboxOptions options, ILogger&lt;ImapMailTransport&gt;? logger = null);
+public sealed class ImapMailboxOptions { string Host; int Port = 993; string Username; string Password; bool UseOAuthBearer; TimeSpan Timeout = 60 s; long MaxMessageBytes = 64 MB; }
+public MboxMailTransport(string path);
+public sealed class EmailConnectorOptions { IList&lt;string&gt; Folders = ["INBOX"]; DateTimeOffset? SinceUtc; string? SenderContains; string? SubjectContains; string? AccountAddress; bool IncludeSentByMe; bool IncludeSpam; bool IncludeAttachments; IList&lt;string&gt; AttachmentExtensions; long MaxAttachmentBytes = 8 MB; bool StripQuotedReplies = true; bool StripSignatures = true; int PageSize = 50; }
+
+// TechieRag.Connectors.Email - mail actions on the same IMAP login (the reader above stays read-only)
+public static ImapMailActions ImapMailActions.Create(ImapMailboxOptions options, ILogger&lt;ImapMailActions&gt;? logger = null);
+public Task&lt;IReadOnlyList&lt;MailActionResult&gt;&gt; ApplyAsync(IEnumerable&lt;MailAction&gt; actions, CancellationToken cancellationToken = default);
+public Task&lt;IReadOnlyList&lt;MailActionPlan&gt;&gt; DryRunAsync(IEnumerable&lt;MailAction&gt; actions, CancellationToken cancellationToken = default);   // sends no command that changes the mailbox
+public Task&lt;IReadOnlyList&lt;MailActionResult&gt;&gt; MoveAsync / TrashAsync / AddLabelAsync / RemoveLabelAsync(IEnumerable&lt;MailMessageRef&gt; messages, ...);
+public sealed record MailMessageRef(string Folder, string Uid, string? UidValidity = null) { static FromHeader(MailHeader); static FromConnectorItemId(string); }
+public sealed record MailAction(MailMessageRef Message, MailActionKind Kind, string? Target = null) { static Move(m, folder); AddLabel(m, label); RemoveLabel(m, label); Trash(m); }
+public sealed record MailActionResult(MailAction Action, MailActionOutcome Outcome /* Done, Skipped, Failed */, MailMoveStrategy Strategy, string? TargetFolder, string? Code, string? Reason);
+public sealed record MailActionPlan(MailAction Action, MailActionOutcome Outcome, MailMoveStrategy Strategy /* Move, CopyAndExpunge */, string? TargetFolder, IReadOnlyList&lt;string&gt; Commands, string? Code, string? Reason);
+// MailActionCodes: MoveNotSupported, LabelsNotSupported, TrashFolderNotFound, TargetFolderNotFound, MessageNotFound, UidValidityChanged, AlreadyInFolder, ServerRefused, CopiedNotRemoved, InvalidArgument, FolderNotFound, ConnectionLost
+// Trash = the \Trash special-use folder or [Gmail]/Trash, never a permanent delete; move = UID MOVE, else UID COPY + \Deleted + UID EXPUNGE of that UID; labels = Gmail X-GM-LABELS only
+
+// TechieRag.Web.WebIngestionExtensions
+public static Task&lt;string&gt; IngestUrlAsync(this ITechieRag rag, string url, IWebContentFetcher fetcher, CancellationToken cancellationToken = default);   // returns the document id
+public static Task&lt;WebIngestionResult&gt; IngestSiteAsync(this ITechieRag rag, string seedUrl, IWebContentFetcher fetcher,
+    WebCrawlOptions? options = null, CancellationToken cancellationToken = default);
+public sealed class WebCrawlOptions { int MaxDepth = 1; int MaxPages = 25; bool SameHostOnly = true; TimeSpan RequestDelay = 250 ms; bool BlockPrivateNetworkTargets = true; }
+
+// TechieRag.Web.HttpWebContentFetcher : IWebContentFetcher (8 MB page cap)
+public HttpWebContentFetcher(HttpClient httpClient, ILogger&lt;HttpWebContentFetcher&gt;? logger = null, bool blockPrivateTargets = true);
+public static HttpClient CreateDefaultClient(bool blockPrivateTargets = true);          // an HttpClient over the guarded handler
+public static SocketsHttpHandler CreateGuardedHandler(bool blockPrivateTargets = true);  // the SSRF guard, for your own HttpClient</code></pre>
+<pre><code class="language-csharp">using TechieRag.Connectors;
+using TechieRag.Connectors.Email;
+using TechieRag.Connectors.Http;
+using TechieRag.Connectors.Repository;
+using TechieRag.Web;
+
+// A GitHub repository, incrementally: keep result.Sync and pass it back as previousSync next time
+var transport = new HttpConnectorTransport(new HttpClient());
+var repo = new RepositoryConnector(transport, new RepositoryConnectorOptions
+{
+    Host = RepositoryHost.GitHub,
+    ProjectPath = "techierathore/TechieRag",
+    Branch = "main",
+    AccessToken = config["GitHub:Token"],
+    IncludeGlobs = ["docs/**/*.md"]
+});
+var result = await rag.IngestConnectorAsync(repo, previousSync: savedState, new ConnectorRunOptions { MaxItems = 200 });
+if (result.ReachedLimit &amp;&amp; result.LimitCode == ConnectorErrorCodes.RunItemLimitReached)
+{
+    // the budget ended the run early; result.Sync resumes it next time
+}
+savedState = result.Sync;
+
+// Run without ingesting, to inspect the documents first
+var run = await new ConnectorRunner().RunAsync(repo, savedState, new ConnectorRunOptions());
+
+// Email over IMAP (or new MboxMailTransport("archive.mbox") for an exported mailbox)
+var mail = new EmailConnector(
+    ImapMailTransport.Create(new ImapMailboxOptions { Host = "imap.example.com", Username = user, Password = secret }),
+    new EmailConnectorOptions { Folders = ["INBOX"], SinceUtc = DateTimeOffset.UtcNow.AddDays(-30), IncludeAttachments = true });
+await rag.IngestConnectorAsync(mail);
+
+// Act on mail over the same login: dry run first, then apply; one result per message
+var mailActions = ImapMailActions.Create(new ImapMailboxOptions { Host = "imap.gmail.com", Username = user, Password = appPassword });
+var message = MailMessageRef.FromConnectorItemId(item.Id);   // or MailMessageRef.FromHeader(header)
+MailAction[] actions = [MailAction.Move(message, "Archive"), MailAction.AddLabel(message, "Receipts"), MailAction.Trash(other)];
+var plans = await mailActions.DryRunAsync(actions);          // plans[i].Commands, .Strategy, .TargetFolder; mailbox unchanged
+var results = await mailActions.ApplyAsync(actions);
+foreach (var failed in results.Where(r =&gt; r.Outcome == MailActionOutcome.Failed))
+{
+    // switch on failed.Code, e.g. MailActionCodes.LabelsNotSupported on a non-Gmail server
+}
+
+// Web pages: one URL, or a crawl from a seed; both go through the SSRF guard
+var fetcher = new HttpWebContentFetcher(HttpWebContentFetcher.CreateDefaultClient());
+var documentId = await rag.IngestUrlAsync("https://example.com/handbook", fetcher);
+var site = await rag.IngestSiteAsync("https://example.com/docs/", fetcher, new WebCrawlOptions { MaxDepth = 2, MaxPages = 50 });</code></pre>
+<h3 id="reranking-withreranker-useembeddedreranker-searchoptions-rerank"><a id="8-reranking-withreranker-useembeddedreranker-searchoptionsrerank"></a>8. Reranking: <code>WithReranker</code>, <code>UseEmbeddedReranker</code>, <code>SearchOptions.Rerank</code><a class="anchor-link" href="#reranking-withreranker-useembeddedreranker-searchoptions-rerank">#</a></h3>
+<p>Package <code>TechieRag</code> (Cohere, Jina, custom) or <code>TechieRag.Embedded</code> (the ONNX cross-encoder bge-reranker-v2-m3, <code>RerankSource.LocalOnnx</code>, downloaded once). The vector search fetches <code>candidateCount</code> chunks, the reranker orders them and returns <code>topN</code>. Configuration alone cannot select <code>LocalOnnx</code>: <code>"Rerank": { "Source": "LocalOnnx" }</code> throws at <code>Build()</code> unless the Embedded package's <code>UseEmbeddedReranker()</code> supplied the reranker.</p>
+<pre><code class="language-csharp">// TechieRag.TechieRagBuilder
+public TechieRagBuilder WithReranker(RerankSource source, string apiKey, string? model = null, string? endpoint = null, int topN = 0, int candidateCount = 20);   // Cohere or Jina
+public TechieRagBuilder WithReranker(Func&lt;IReranker&gt; factory, int topN = 0, int candidateCount = 20);                                                       // RerankSource.Custom
+public enum RerankSource { None, Cohere, Jina, LocalOnnx, Custom }
+
+// TechieRag.Embedded.TechieRagBuilderExtensions
+public static TechieRagBuilder UseEmbeddedReranker(this TechieRagBuilder builder, string? modelDirectory = null, int topN = 0, int candidateCount = 20);   // sets RerankSource.LocalOnnx
+
+// TechieRag.ITechieRag
+Task&lt;IReadOnlyList&lt;SearchResult&gt;&gt; SearchAsync(string query, SearchOptions? options, CancellationToken cancellationToken = default);
+IReranker? GetReranker();
+public class SearchOptions { public int TopK { get; set; } = 5; public string? DocumentFilter { get; set; } public bool? Rerank { get; set; } }   // TechieRag.Models</code></pre>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec()
+    .UseEmbeddedReranker()                                       // RerankSource.LocalOnnx: bge-reranker-v2-m3, downloads once
+    // .WithReranker(RerankSource.Cohere, apiKey: cohereKey)   // or an API reranker
+    .Build();
+
+var hits = await rag.SearchAsync("termination clause", new SearchOptions { TopK = 5, Rerank = true });</code></pre>
+<h3 id="workspaces-and-persistence-withpersistence-getworkspacemanager"><a id="9-workspaces-and-persistence-withpersistence-getworkspacemanager"></a>9. Workspaces and persistence: <code>WithPersistence</code>, <code>GetWorkspaceManager</code><a class="anchor-link" href="#workspaces-and-persistence-withpersistence-getworkspacemanager">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag</code>, <code>TechieRag.Services</code>, <code>TechieRag.Models</code>. Conversation threads and workspaces (a name, a system prompt, a model, pinned documents) are stored in SQLite or PostgreSQL in tables the library creates on first use (<code>TrThread</code>, <code>TrMessage</code>, <code>TrWorkspace</code>, <code>TrWorkspaceDocument</code>).</p>
+<pre><code class="language-csharp">// TechieRag.TechieRagBuilder
+public TechieRagBuilder WithPersistence(StoreProvider provider, string connectionString, string defaultUserId = "default");
+public enum StoreProvider { None, Sqlite, Postgres }
+
+// TechieRag.ITechieRag - null when WithPersistence was not called
+IConversationStore? GetConversationStore();
+Services.WorkspaceManager? GetWorkspaceManager();
+
+// TechieRag.Services.WorkspaceManager
+public Task&lt;Workspace&gt; CreateWorkspaceAsync(string name, Action&lt;Workspace&gt;? configure = null, CancellationToken cancellationToken = default);
+public Task&lt;IReadOnlyList&lt;Workspace&gt;&gt; ListWorkspacesAsync(CancellationToken cancellationToken = default);
+public Task&lt;Workspace?&gt; GetWorkspaceAsync(string workspaceId, CancellationToken cancellationToken = default);
+public Task UpdateWorkspaceAsync(Workspace workspace, CancellationToken cancellationToken = default);
+public Task DeleteWorkspaceAsync(string workspaceId, CancellationToken cancellationToken = default);
+public Task&lt;string&gt; IngestTextAsync(...);  public Task&lt;string&gt; IngestFileAsync(...);  public Task AddExistingDocumentAsync(...);
+public IWorkspaceStore GetStore();
+public event EventHandler&lt;ContextTruncatedEventArgs&gt;? ContextTruncated;</code></pre>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec("Data Source=app.db")
+    .UseOllamaLlm()
+    .WithPersistence(StoreProvider.Sqlite, "Data Source=ws.db")
+    .Build();
+await rag.InitializeAsync();
+
+var workspaces = rag.GetWorkspaceManager()!;
+var contracts = await workspaces.CreateWorkspaceAsync("Contracts", w =&gt; w.SystemPrompt = "Answer from the contracts only.");
+var all = await workspaces.ListWorkspacesAsync();</code></pre>
+<h3 id="mcp-tool-servers-and-flows"><a id="10-mcp-tool-servers-and-flows"></a>10. MCP tool servers and flows<a class="anchor-link" href="#mcp-tool-servers-and-flows">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Mcp</code>, <code>TechieRag.Orchestration</code>. An MCP server's tools join the agent loop as one <code>IToolHandler</code>; a trust policy decides what a server may do. A flow is a persisted graph of agent, tool, condition, handoff and terminal nodes, serialised as JSON and run by <code>FlowRunner</code>; its refusals are <code>FlowMessage</code> codes with arguments, never English sentences, so the host can localise.</p>
+<pre><code class="language-csharp">// TechieRag.Mcp
+public sealed class McpServerConfig
+{
+    public required string Name { get; init; }
+    public required McpTransportKind Transport { get; init; }        // Stdio or Http
+    public string? Command { get; init; }                            // Stdio
+    public IReadOnlyList&lt;string&gt; Arguments { get; init; } = [];      // Stdio
+    public IReadOnlyDictionary&lt;string, string&gt; EnvironmentVariables { get; init; }
+    public string? WorkingDirectory { get; init; }
+    public string? Endpoint { get; init; }                           // Http
+    public IReadOnlyDictionary&lt;string, string&gt; Headers { get; init; }
+    public int TimeoutSeconds { get; init; } = 60;
+    public IReadOnlyList&lt;string&gt; AllowedTools { get; init; } = [];   // empty: every tool the server lists
+}
+public sealed class McpTrustPolicy { public static McpTrustPolicy Strict { get; } bool AllowLocalProcessLaunch; IReadOnlyList&lt;string&gt; AllowedCommandDirectories; bool AllowPlaintextHttp; int MaxToolResultCharacters = 100000; }
+public static McpClient McpClient.Create(McpServerConfig config, McpTrustPolicy policy, ILoggerFactory? loggerFactory = null);
+public static Task&lt;McpToolHandler&gt; McpToolHandler.CreateAsync(IEnumerable&lt;McpClient&gt; clients, McpTrustPolicy policy,
+    ILogger&lt;McpToolHandler&gt;? logger = null, CancellationToken cancellationToken = default);   // McpToolHandler : IToolHandler, IAsyncDisposable
+public static string McpToolHandler.QualifyToolName(string serverName, string toolName);
+
+// TechieRag.Orchestration
+public static FlowDefinition FlowSerializer.FromJson(string json);
+public static string FlowSerializer.ToJson(FlowDefinition flow);
+public static bool FlowSerializer.TryFromJson(string? json, out FlowDefinition? flow, out string? error);
+public FlowAgent(string id, ILlmProvider llmProvider, IToolHandler? tools = null);
+public InMemoryFlowAgentResolver(params FlowAgent[] agents);            // IFlowAgentResolver
+public FlowRuntime(IFlowAgentResolver agents);
+public FlowRunner(FlowDefinition flow, FlowRuntime runtime, ILogger&lt;FlowRunner&gt;? logger = null, int depth = 0);
+public Task&lt;FlowRunResult&gt; RunAsync(string input, IReadOnlyDictionary&lt;string, string&gt;? variables = null,
+    IProgress&lt;AgentStep&gt;? progress = null, CancellationToken cancellationToken = default);</code></pre>
+<pre><code class="language-csharp">using TechieRag.Mcp;
+using TechieRag.Orchestration;
+
+// MCP: a local server over stdio (the policy must allow launching a process)
+var policy = new McpTrustPolicy { AllowLocalProcessLaunch = true };
+var server = McpClient.Create(new McpServerConfig
+{
+    Name = "filesystem",
+    Transport = McpTransportKind.Stdio,
+    Command = "npx",
+    Arguments = ["-y", "@modelcontextprotocol/server-filesystem", "./docs"]
+}, policy);
+await using var mcpTools = await McpToolHandler.CreateAsync([server], policy);
+
+var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec()
+    .UseOllamaLlm()
+    .WithToolHandler(mcpTools)          // the server's tools, named "&lt;server&gt;.&lt;tool&gt;", in every AskAsync agent loop
+    .Build();
+
+// Flows: a persisted graph, run with the agents it names
+var flow = FlowSerializer.FromJson(await File.ReadAllTextAsync("triage.flow.json"));
+var runtime = new FlowRuntime(new InMemoryFlowAgentResolver(new FlowAgent("triage", rag.GetLlmProvider()!, mcpTools)));
+var outcome = await new FlowRunner(flow, runtime).RunAsync("A customer reports a login failure");</code></pre>
+<h3 id="telemetry-techierag-telemetry"><a id="11-telemetry-techieragtelemetry"></a>11. Telemetry: <code>TechieRag.Telemetry</code><a class="anchor-link" href="#telemetry-techierag-telemetry">#</a></h3>
+<p>Package <code>TechieRag.Telemetry</code>; namespace <code>TechieRag.Telemetry</code>. The core records traces and metrics through one <code>ActivitySource</code> and one <code>Meter</code>, both named <code>TechieRag</code> (<code>techierag.llm.*</code>, <code>techierag.ingestion.*</code>, <code>techierag.search.*</code>; the activity <code>TechieRag.Search</code>), gated by <code>TechieRagTelemetry.Enabled</code> (<code>EnableTelemetry</code> in configuration). Nothing leaves the process until this package is installed and tracing or metrics is enabled; a non-local endpoint is refused unless <code>AllowRemoteEndpoint</code> is set.</p>
+<pre><code class="language-csharp">// TechieRag.Telemetry.TechieRagTelemetryServiceCollectionExtensions
+public static IServiceCollection AddTechieRagTelemetry(this IServiceCollection services, Action&lt;TechieRagTelemetryOptions&gt;? configure = null);
+
+public sealed class TechieRagTelemetryOptions
+{
+    public const string DefaultEndpoint = "http://localhost:4318";
+    public bool EnableTracing { get; set; }                                            // off by default: nothing is exported
+    public bool EnableMetrics { get; set; }
+    public TechieRagTelemetrySink Sink { get; set; } = TechieRagTelemetrySink.Otlp;   // or TechieRagTelemetrySink.Console
+    public Uri Endpoint { get; set; } = new(DefaultEndpoint);
+    public bool AllowRemoteEndpoint { get; set; }
+    public TimeSpan MetricExportInterval { get; set; } = TimeSpan.FromSeconds(15);
+    public string ServiceName { get; set; } = "TechieRag";
+}</code></pre>
+<pre><code class="language-csharp">using TechieRag.Telemetry;
+
+builder.Services.AddTechieRag(builder.Configuration.GetSection("TechieRag"));
+builder.Services.AddTechieRagTelemetry(o =&gt;
+{
+    o.EnableTracing = true;
+    o.EnableMetrics = true;
+    o.Endpoint = new Uri("http://localhost:4318");   // an OTLP collector; Sink = TechieRagTelemetrySink.Console prints instead
+});</code></pre>
+<h3 id="configuration-addtechierag-iconfiguration-maps-every-field-except-keys"><a id="12-configuration-addtechieragiconfiguration-maps-every-field-except-keys"></a>12. Configuration: <code>AddTechieRag(IConfiguration)</code> maps every field except keys<a class="anchor-link" href="#configuration-addtechierag-iconfiguration-maps-every-field-except-keys">#</a></h3>
+<p><code>AddTechieRag(IConfiguration)</code> and <code>AddTechieRag(TechieRagConfig)</code> go through one mapper, so every bound field reaches the builder: the embedding <code>Dimensions</code>, <code>ApiFormat</code>, <code>ApiPath</code> and <code>RequestDelayMs</code>, the whole <code>Prompt</code> section, <code>Rerank</code>, <code>Persistence</code>, <code>Resilience</code>, <code>UsageTracking</code>, <code>LlmFallback</code>, <code>EnableTelemetry</code> and <code>Llm.Connector</code>. Pass the <code>TechieRag</code> section, not the root configuration.</p>
+<p><strong>Keys and dependencies are injected only through code.</strong> A section holding any <code>ApiKey</code> (embedding, vector store, LLM, fallback LLM, reranker) or <code>Headers</code> value is refused with an <code>InvalidOperationException</code> naming the setting, never its value. Pass keys with the second overload, which maps the section and then runs your code:</p>
+<pre><code class="language-csharp">// TechieRag.DependencyInjection.ServiceCollectionExtensions
+public static IServiceCollection AddTechieRag(this IServiceCollection services, IConfiguration configuration, Action&lt;TechieRagBuilder&gt; configure);
+
+// TechieRag.TechieRagBuilder
+public TechieRagBuilder WithApiKeys(string? llm = null, string? embedding = null, string? vectorStore = null, string? rerank = null, string? llmFallback = null);
+public TechieRagBuilder WithLlmHeaders(IReadOnlyDictionary&lt;string, string&gt; headers);
+
+builder.Services.AddTechieRag(
+    builder.Configuration.GetSection("TechieRag"),
+    rag =&gt; rag.WithApiKeys(llm: secrets.OpenAiKey, vectorStore: secrets.QdrantKey));</code></pre>
+<p><code>Llm.Source</code> accepts two new values:</p>
+<ul>
+<li><code>Local</code> - the in-process model from <code>TechieRag.Local</code>. Call <code>LocalLlm.Register()</code> once at startup, before the first <code>Build()</code>; then <code>"Llm": { "Source": "Local", "Model": "qwen2.5-0.5b-instruct" }</code> needs no endpoint and no key. <code>"Model": "local/qwen2.5-0.5b-instruct"</code> reaches it through <code>UseLlmForModel</code> as well.
+</li>
+<li><code>Subscription</code> - a consumer subscription reached through the vendor's sign-in flow. <strong>It cannot be configured from appsettings alone</strong>: the library needs the sign-in callback only the host can provide (open the browser, show the code), so register it in code with <code>UseChatGptSubscriptionLlm</code> inside <code>AddTechieRag(Action&lt;TechieRagBuilder&gt;)</code>.
+</li>
+</ul>
+<pre><code class="language-csharp">// Program.cs
+LocalLlm.Register();                                                              // only when appsettings says "Source": "Local"
+builder.Services.AddTechieRag(builder.Configuration.GetSection("TechieRag"));
+
+// A subscription needs the host's sign-in callback, so it is registered in code, not from appsettings alone
+builder.Services.AddTechieRag(rag =&gt; rag
+    .UseEmbedded()
+    .UseSqliteVec()
+    .UseChatGptSubscriptionLlm(async (prompt, ct) =&gt; await OpenSignInAsync(prompt.VerificationUri, prompt.UserCode, ct)));</code></pre>
+<hr>
+<h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
+<h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>
+<pre><code class="language-csharp">// Initialize the client (must be called before other operations)
+Task InitializeAsync(CancellationToken ct = default);
+
+// Ingest a single file
+Task&lt;IngestionStats&gt; IngestAsync(string filePath, CancellationToken ct = default);
+
+// Ingest all files in a directory
+Task&lt;IngestionStats&gt; IngestDirectoryAsync(string directoryPath, string searchPattern = "*.*",
+    CancellationToken ct = default);
+
+// Ingest raw text directly
+Task&lt;IngestionStats&gt; IngestTextAsync(string text, string documentId,
+    Dictionary&lt;string, string&gt;? metadata = null, CancellationToken ct = default);
+
+// Search for similar content
+Task&lt;IReadOnlyList&lt;SearchResult&gt;&gt; SearchAsync(string query, int topK = 5,
+    string? documentFilter = null, CancellationToken ct = default);
+
+// Delete a document and its vectors
+Task DeleteDocumentAsync(string documentId, CancellationToken ct = default);</code></pre>
+<h3 id="auto-rag-methods-v2">Auto-RAG Methods (v2)<a class="anchor-link" href="#auto-rag-methods-v2">#</a></h3>
+<pre><code class="language-csharp">// RAG: search + generate answer
+Task&lt;RagResponse&gt; AskAsync(string question, int topK = 5,
+    string? systemPrompt = null, string? documentFilter = null,
+    LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+// RAG with streaming response
+IAsyncEnumerable&lt;string&gt; AskStreamAsync(string question, int topK = 5,
+    string? systemPrompt = null, string? documentFilter = null,
+    LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+// RAG chat with conversation history
+Task&lt;RagResponse&gt; ChatWithRagAsync(string userMessage,
+    IReadOnlyList&lt;ChatMessage&gt;? conversationHistory = null,
+    int topK = 5, string? systemPrompt = null,
+    LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+// RAG chat with streaming
+IAsyncEnumerable&lt;string&gt; ChatWithRagStreamAsync(string userMessage,
+    IReadOnlyList&lt;ChatMessage&gt;? conversationHistory = null,
+    int topK = 5, string? systemPrompt = null,
+    LlmCompletionOptions? options = null, CancellationToken ct = default);</code></pre>
+<h3 id="direct-access-v2">Direct Access (v2)<a class="anchor-link" href="#direct-access-v2">#</a></h3>
+<pre><code class="language-csharp">// Get the LLM provider for direct use
+ILlmProvider? GetLlmProvider();
+
+// Get the token usage tracker
+ITokenTracker GetTokenTracker();
+
+// Get conversation memory (if configured)
+IConversationMemory? GetConversationMemory();</code></pre>
+<h3 id="added-in-v3">Added in v3<a class="anchor-link" href="#added-in-v3">#</a></h3>
+<pre><code class="language-csharp">// Search with options (Rerank = true runs the configured reranker)
+Task&lt;IReadOnlyList&lt;SearchResult&gt;&gt; SearchAsync(string query, SearchOptions? options,
+    CancellationToken cancellationToken = default);
+
+// Streaming RAG that yields the sources first, then tokens, then the completed answer
+IAsyncEnumerable&lt;RagStreamEvent&gt; AskStreamWithSourcesAsync(...);   // RagStreamEventType: Sources, Token, Completed
+
+// Optional stages and stores (null when not configured)
+IReranker? GetReranker();
+IConversationStore? GetConversationStore();
+Services.WorkspaceManager? GetWorkspaceManager();
+
+// Extension methods from other namespaces
+Task&lt;string&gt; IngestUrlAsync(string url, IWebContentFetcher fetcher, CancellationToken ct = default);                                  // TechieRag.Web
+Task&lt;WebIngestionResult&gt; IngestSiteAsync(string seedUrl, IWebContentFetcher fetcher, WebCrawlOptions? options = null, CancellationToken ct = default);   // TechieRag.Web
+Task&lt;ConnectorIngestionResult&gt; IngestConnectorAsync(IDataConnector connector, ConnectorSyncState? previousSync = null,
+    ConnectorRunOptions? options = null, CancellationToken ct = default);                                                            // TechieRag.Connectors</code></pre>
+<hr>
+<h2 id="illmprovider-interface">ILlmProvider Interface<a class="anchor-link" href="#illmprovider-interface">#</a></h2>
+<p>Access via <code>rag.GetLlmProvider()</code> for direct LLM operations without RAG context.</p>
+<pre><code class="language-csharp">public interface ILlmProvider
+{
+    string Name { get; }
+    string ModelName { get; }
+    bool SupportsToolCalling { get; }
+    bool SupportsStreaming { get; }
+
+    // Single prompt completion
+    Task&lt;LlmResponse&gt; CompleteAsync(string prompt,
+        LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+    // Streaming completion
+    IAsyncEnumerable&lt;string&gt; CompleteStreamAsync(string prompt,
+        LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+    // Multi-turn chat
+    Task&lt;LlmResponse&gt; ChatAsync(IReadOnlyList&lt;ChatMessage&gt; messages,
+        LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+    // Streaming chat
+    IAsyncEnumerable&lt;string&gt; ChatStreamAsync(IReadOnlyList&lt;ChatMessage&gt; messages,
+        LlmCompletionOptions? options = null, CancellationToken ct = default);
+
+    // Typed/structured output (JSON deserialization)
+    Task&lt;T&gt; CompleteAsync&lt;T&gt;(string prompt,
+        LlmCompletionOptions? options = null, CancellationToken ct = default) where T : class;
+
+    // Token estimation
+    int EstimateTokenCount(string text);
+
+    // Telemetry event
+    event EventHandler&lt;LlmCompletionEventArgs&gt;? OnCompletionCompleted;
+}</code></pre>
+<hr>
+<h2 id="models-reference">Models Reference<a class="anchor-link" href="#models-reference">#</a></h2>
+<h3 id="chatmessage">ChatMessage<a class="anchor-link" href="#chatmessage">#</a></h3>
+<pre><code class="language-csharp">public class ChatMessage
+{
+    public required string Role { get; set; }    // "system", "user", "assistant", "tool"
+    public string? Content { get; set; }
+    public IReadOnlyList&lt;ToolCall&gt;? ToolCalls { get; set; }
+    public string? ToolCallId { get; set; }
+    public string? Name { get; set; }
+    public DateTime CreatedAt { get; init; }
+
+    // Factory methods
+    public static ChatMessage System(string content);
+    public static ChatMessage User(string content);
+    public static ChatMessage Assistant(string content);
+    public static ChatMessage Tool(string toolCallId, string content);
+}</code></pre>
+<h3 id="llmcompletionoptions">LlmCompletionOptions<a class="anchor-link" href="#llmcompletionoptions">#</a></h3>
+<pre><code class="language-csharp">public class LlmCompletionOptions
+{
+    public float? Temperature { get; set; }           // 0.0 - 2.0
+    public int? MaxTokens { get; set; }
+    public float? TopP { get; set; }
+    public float? FrequencyPenalty { get; set; }
+    public float? PresencePenalty { get; set; }
+    public IReadOnlyList&lt;string&gt;? StopSequences { get; set; }
+    public string? SystemPrompt { get; set; }
+    public bool JsonMode { get; set; }
+    public string? JsonSchema { get; set; }
+    public IReadOnlyList&lt;ToolDefinition&gt;? Tools { get; set; }
+    public string? ToolChoice { get; set; }           // "auto", "none", "required"
+    public int? Seed { get; set; }
+}</code></pre>
+<h3 id="llmresponse">LlmResponse<a class="anchor-link" href="#llmresponse">#</a></h3>
+<pre><code class="language-csharp">public class LlmResponse
+{
+    public string? Content { get; set; }
+    public IReadOnlyList&lt;ToolCall&gt;? ToolCalls { get; set; }
+    public bool HasToolCalls { get; }
+    public required TokenUsage Usage { get; set; }
+    public string FinishReason { get; set; }          // "stop", "tool_calls", "length"
+    public string ModelName { get; set; }
+    public ChatMessage ToChatMessage();
+}</code></pre>
+<h3 id="ragresponse">RagResponse<a class="anchor-link" href="#ragresponse">#</a></h3>
+<pre><code class="language-csharp">public class RagResponse
+{
+    public required string Answer { get; set; }
+    public required IReadOnlyList&lt;SearchResult&gt; Sources { get; set; }
+    public required TokenUsage Usage { get; set; }
+    public required string Query { get; set; }
+    public string ModelName { get; set; }
+}</code></pre>
+<h3 id="tokenusage-budget"><a id="tokenusage--budget"></a>TokenUsage &amp; Budget<a class="anchor-link" href="#tokenusage-budget">#</a></h3>
+<pre><code class="language-csharp">public class TokenUsage
+{
+    public int InputTokens { get; set; }
+    public int OutputTokens { get; set; }
+    public int TotalTokens { get; }
+    public decimal EstimatedCostUsd { get; set; }
+    public string ModelName { get; set; }
+    public string ProviderName { get; set; }
+    public DateTime Timestamp { get; set; }
+}
+
+public class TokenUsageSummary
+{
+    public long TotalInputTokens { get; set; }
+    public long TotalOutputTokens { get; set; }
+    public long TotalTokens { get; }
+    public decimal TotalEstimatedCostUsd { get; set; }
+    public int OperationCount { get; set; }
+}
+
+public class UsageBudget
+{
+    public long MaxTotalTokens { get; set; }          // 0 = unlimited
+    public decimal MaxCostUsd { get; set; }           // 0 = unlimited
+    public float AlertThreshold { get; set; }         // 0.0-1.0, default 0.8
+    public bool BlockOnExceeded { get; set; }
+}</code></pre>
+<h3 id="tooldefinition-toolcall-toolresult">ToolDefinition, ToolCall, ToolResult<a class="anchor-link" href="#tooldefinition-toolcall-toolresult">#</a></h3>
+<pre><code class="language-csharp">public class ToolDefinition
+{
+    public required string Name { get; set; }
+    public required string Description { get; set; }
+    public required string ParametersSchema { get; set; }  // JSON Schema
+    public bool RequiresConfirmation { get; set; }
+}
+
+public class ToolCall
+{
+    public required string Id { get; set; }
+    public required string Name { get; set; }
+    public required string ArgumentsJson { get; set; }
+    public T GetArguments&lt;T&gt;() where T : class;
+}
+
+public class ToolResult
+{
+    public required string ToolCallId { get; set; }
+    public required string Content { get; set; }
+    public bool IsSuccess { get; set; }
+    public string? ErrorMessage { get; set; }
+}</code></pre>
+<hr>
+<h2 id="configuration-via-appsettings-json"><a id="configuration-via-appsettingsjson"></a>Configuration via appsettings.json<a class="anchor-link" href="#configuration-via-appsettings-json">#</a></h2>
+<h3 id="full-configuration">Full Configuration<a class="anchor-link" href="#full-configuration">#</a></h3>
+<pre><code class="language-json">{
+  "TechieRag": {
+    "Embedding": {
+      "Source": "Ollama",
+      "Endpoint": "http://localhost:11434",
+      "Model": "bge-m3"
+    },
+    "VectorStore": {
+      "Type": "SqliteVec",
+      "ConnectionString": "Data Source=techierag.db"
+    },
+    "Processing": {
+      "DefaultChunkSize": 500,
+      "DefaultChunkOverlap": 50
+    },
+    "Llm": {
+      "Source": "OpenAICompatible",
+      "Endpoint": "https://api.openai.com/v1",
+      "Model": "gpt-4o",
+      "Temperature": 0.7,
+      "MaxTokens": 2048
+    },
+    "LlmFallback": {
+      "Source": "Ollama",
+      "Endpoint": "http://localhost:11434",
+      "Model": "llama3.2",
+      "MaxContextTokens": 32768
+    },
+    "UsageTracking": {
+      "Enabled": true,
+      "MaxTotalTokens": 1000000,
+      "MaxCostUsd": 50.00,
+      "AlertThreshold": 0.8,
+      "BlockOnExceeded": false
+    },
+    "Prompt": {
+      "SystemPrompt": "You are a helpful assistant. Answer based on the provided context.",
+      "MaxContextChunks": 5,
+      "MaxContextTokens": 4000
+    },
+    "Resilience": {
+      "MaxRetries": 3,
+      "InitialRetryDelayMs": 1000,
+      "MaxRetryDelayMs": 30000,
+      "BackoffMultiplier": 2.0,
+      "HandleRateLimiting": true,
+      "CircuitBreakerThreshold": 5,
+      "CircuitBreakerRecoverySeconds": 30,
+      "TimeoutSeconds": 120
+    },
+    "Rerank": {
+      "Enabled": true,
+      "Source": "Cohere",
+      "Model": null,
+      "TopN": 0,
+      "CandidateCount": 20
+    },
+    "Persistence": {
+      "Provider": "Sqlite",
+      "ConnectionString": "Data Source=ws.db",
+      "DefaultUserId": "default"
+    },
+    "EnableTelemetry": true
+  }
+}</code></pre>
+<p><strong>Keys never go in this section.</strong> <code>AddTechieRag(IConfiguration)</code> refuses any <code>ApiKey</code> or <code>Headers</code> value with an error naming the setting (never its value). Pass keys in code:</p>
+<pre><code class="language-csharp">builder.Services.AddTechieRag(
+    builder.Configuration.GetSection("TechieRag"),
+    rag =&gt; rag.WithApiKeys(llm: secrets.OpenAiKey, rerank: secrets.CohereKey)   // also embedding:, vectorStore:, llmFallback:
+              .WithLlmHeaders(new Dictionary&lt;string, string&gt; { ["User-Agent"] = "myapp/1.0" }));</code></pre>
+<p><code>AddTechieRag(TechieRagConfig)</code> with a config object built in code may carry keys. The library reads no key from an environment variable.</p>
+<p>v3 notes: <code>Embedding.Dimensions</code>, the <code>Prompt</code> section, <code>Rerank</code> and <code>Persistence</code> are all bound and applied. <code>Llm.Connector</code> names a catalog connector (<code>"groq"</code>) instead of pasting its URL. <code>Llm.Source: "Local"</code> needs <code>LocalLlm.Register()</code> at startup; <code>Llm.Source: "Subscription"</code> cannot be configured from appsettings alone (see Phase-2 Features, 12).</p>
+<h3 id="minimal-configuration-embedding-only">Minimal Configuration (Embedding Only)<a class="anchor-link" href="#minimal-configuration-embedding-only">#</a></h3>
+<pre><code class="language-json">{
+  "TechieRag": {
+    "Embedding": {
+      "Source": "Ollama",
+      "Endpoint": "http://localhost:11434",
+      "Model": "bge-m3"
+    },
+    "VectorStore": {
+      "Type": "SqliteVec",
+      "ConnectionString": "Data Source=techierag.db"
+    }
+  }
+}</code></pre>
+<h3 id="llm-source-values">LLM Source Values<a class="anchor-link" href="#llm-source-values">#</a></h3>
+<table>
+<thead><tr><th>LlmSource Value</th><th>Provider</th></tr></thead>
+<tbody>
+<tr><td><code>None</code></td><td>No LLM (embedding/retrieval only - v1 compatibility)</td></tr>
+<tr><td><code>Ollama</code></td><td>Ollama local server</td></tr>
+<tr><td><code>LmStudio</code></td><td>LM Studio local server</td></tr>
+<tr><td><code>OpenAICompatible</code></td><td>OpenAI-compatible REST API</td></tr>
+<tr><td><code>AzureAIFoundry</code></td><td>Azure AI Foundry</td></tr>
+<tr><td><code>GoogleGemini</code></td><td>Google Gemini API</td></tr>
+<tr><td><code>Anthropic</code></td><td>Anthropic Claude API</td></tr>
+<tr><td><code>Subscription</code></td><td>v3: a consumer subscription through the vendor's sign-in flow (ChatGPT today). Needs the host's sign-in callback, so it is registered in code with <code>UseChatGptSubscriptionLlm</code>, not from appsettings alone</td></tr>
+<tr><td><code>Local</code></td><td>v3: the in-process model from <code>TechieRag.Local</code>; no endpoint, no key. Call <code>LocalLlm.Register()</code> once before <code>Build()</code></td></tr>
+</tbody>
+</table>
+<hr>
+<h2 id="dependency-injection-asp-net-core"><a id="dependency-injection-aspnet-core"></a>Dependency Injection (ASP.NET Core)<a class="anchor-link" href="#dependency-injection-asp-net-core">#</a></h2>
+<h3 id="option-a-using-appsettings-json"><a id="option-a-using-appsettingsjson"></a>Option A: Using appsettings.json<a class="anchor-link" href="#option-a-using-appsettings-json">#</a></h3>
+<pre><code class="language-csharp">// Program.cs - pass the TechieRag section
+builder.Services.AddTechieRag(builder.Configuration.GetSection("TechieRag"));</code></pre>
+<h3 id="option-b-using-builder-fluent-api">Option B: Using Builder (Fluent API)<a class="anchor-link" href="#option-b-using-builder-fluent-api">#</a></h3>
+<pre><code class="language-csharp">// Program.cs
+builder.Services.AddTechieRag(rag =&gt;
+{
+    rag.UseOllama()
+       .UseSqliteVec()
+       .UseOpenAICompatibleLlm("https://api.openai.com/v1", "sk-...", "gpt-4o")
+       .WithUsageTracking()
+       .WithConversationMemory();
+});</code></pre>
+<h3 id="injecting-into-services-pages"><a id="injecting-into-servicespages"></a>Injecting into Services/Pages<a class="anchor-link" href="#injecting-into-services-pages">#</a></h3>
+<pre><code class="language-csharp">// In a Blazor page or service:
+@inject ITechieRag Rag
+
+// Or via constructor injection:
+public class MyService
+{
+    private readonly ITechieRag rag;
+
+    public MyService(ITechieRag rag)
+    {
+        this.rag = rag;
+    }
+
+    public async Task&lt;string&gt; GetAnswer(string question)
+    {
+        var response = await rag.AskAsync(question);
+        return response.Answer;
+    }
+}</code></pre>
+<hr>
+<h2 id="itoolhandler-interface">IToolHandler Interface<a class="anchor-link" href="#itoolhandler-interface">#</a></h2>
+<p>For custom tool handler implementations:</p>
+<pre><code class="language-csharp">public interface IToolHandler
+{
+    IReadOnlyList&lt;ToolDefinition&gt; ToolDefinitions { get; }
+    Task&lt;ToolResult&gt; ExecuteToolAsync(ToolCall toolCall, CancellationToken ct = default);
+}</code></pre>
+<h3 id="toolregistry-built-in-implementation">ToolRegistry (Built-in Implementation)<a class="anchor-link" href="#toolregistry-built-in-implementation">#</a></h3>
+<pre><code class="language-csharp">// Register tools with lambda handlers via the builder:
+builder.WithTools(tools =&gt;
+{
+    tools.Register(
+        name: "tool_name",
+        description: "What this tool does (helps LLM decide when to use it)",
+        parametersSchema: """{"type":"object","properties":{"param1":{"type":"string"}},"required":["param1"]}""",
+        handler: async (argumentsJson, cancellationToken) =&gt;
+        {
+            // Parse arguments
+            var args = JsonSerializer.Deserialize&lt;MyArgs&gt;(argumentsJson)!;
+            // Execute logic
+            var result = DoSomething(args.Param1);
+            // Return string result (will be sent back to LLM)
+            return JsonSerializer.Serialize(result);
+        });
+});</code></pre>
+<hr>
+<h2 id="iconversationmemory-interface">IConversationMemory Interface<a class="anchor-link" href="#iconversationmemory-interface">#</a></h2>
+<pre><code class="language-csharp">public interface IConversationMemory
+{
+    string ConversationId { get; }
+    Task AddMessageAsync(ChatMessage message, CancellationToken ct = default);
+    Task&lt;IReadOnlyList&lt;ChatMessage&gt;&gt; GetHistoryAsync(CancellationToken ct = default);
+    Task&lt;IReadOnlyList&lt;ChatMessage&gt;&gt; GetTrimmedHistoryAsync(int maxTokens,
+        Func&lt;string, int&gt; tokenCounter, CancellationToken ct = default);
+    Task ClearAsync(CancellationToken ct = default);
+    Task StartNewConversationAsync(string? conversationId = null,
+        string? systemMessage = null, CancellationToken ct = default);
+}</code></pre>
+<hr>
+<h2 id="itokentracker-interface">ITokenTracker Interface<a class="anchor-link" href="#itokentracker-interface">#</a></h2>
+<pre><code class="language-csharp">public interface ITokenTracker
+{
+    void RecordUsage(TokenUsage usage);
+    TokenUsageSummary GetSessionUsage();
+    IReadOnlyDictionary&lt;string, TokenUsageSummary&gt; GetUsageByModel();
+    decimal GetEstimatedCost();
+    void SetBudget(UsageBudget budget);
+    BudgetStatus? GetBudgetStatus();
+    void Reset();
+    event EventHandler&lt;BudgetAlertEventArgs&gt;? OnBudgetAlert;
+    event EventHandler&lt;TokenUsage&gt;? OnUsageRecorded;
+}</code></pre>
+<hr>
+<h2 id="iprompttemplate-interface">IPromptTemplate Interface<a class="anchor-link" href="#iprompttemplate-interface">#</a></h2>
+<pre><code class="language-csharp">public interface IPromptTemplate
+{
+    IReadOnlyList&lt;ChatMessage&gt; BuildRagPrompt(string userQuery,
+        IReadOnlyList&lt;SearchResult&gt; searchResults, string? systemPrompt = null);
+
+    IReadOnlyList&lt;ChatMessage&gt; BuildRagChatPrompt(string userMessage,
+        IReadOnlyList&lt;SearchResult&gt; searchResults,
+        IReadOnlyList&lt;ChatMessage&gt;? conversationHistory = null,
+        string? systemPrompt = null);
+}</code></pre>
+<hr>
+<h2 id="common-implementation-patterns">Common Implementation Patterns<a class="anchor-link" href="#common-implementation-patterns">#</a></h2>
+<h3 id="pattern-1-rag-powered-chat-page-blazor">Pattern 1: RAG-Powered Chat Page (Blazor)<a class="anchor-link" href="#pattern-1-rag-powered-chat-page-blazor">#</a></h3>
+<pre><code class="language-csharp">@page "/chat"
+@inject ITechieRag Rag
+
+&lt;h1&gt;Ask a Question&lt;/h1&gt;
+&lt;input @bind="question" /&gt;
+&lt;button @onclick="AskQuestion"&gt;Ask&lt;/button&gt;
+
+@if (answer != null)
+{
+    &lt;div&gt;@answer&lt;/div&gt;
+    &lt;h4&gt;Sources:&lt;/h4&gt;
+    @foreach (var source in sources)
+    {
+        &lt;p&gt;@source.Chunk.Metadata["SourceFile"] (Relevance: @source.Score:P0)&lt;/p&gt;
+    }
+}
+
+@code {
+    private string question = "";
+    private string? answer;
+    private IReadOnlyList&lt;SearchResult&gt; sources = [];
+
+    private async Task AskQuestion()
+    {
+        var response = await Rag.AskAsync(question, topK: 5);
+        answer = response.Answer;
+        sources = response.Sources;
+    }
+}</code></pre>
+<h3 id="pattern-2-streaming-chat-blazor">Pattern 2: Streaming Chat (Blazor)<a class="anchor-link" href="#pattern-2-streaming-chat-blazor">#</a></h3>
+<pre><code class="language-csharp">@code {
+    private string currentResponse = "";
+    private bool isStreaming;
+
+    private async Task StreamAnswer()
+    {
+        isStreaming = true;
+        currentResponse = "";
+
+        await foreach (var token in Rag.AskStreamAsync(question))
+        {
+            currentResponse += token;
+            StateHasChanged();
+        }
+
+        isStreaming = false;
+    }
+}</code></pre>
+<h3 id="pattern-3-multi-turn-conversation">Pattern 3: Multi-Turn Conversation<a class="anchor-link" href="#pattern-3-multi-turn-conversation">#</a></h3>
+<pre><code class="language-csharp">@code {
+    private List&lt;ChatMessage&gt; history = new();
+
+    private async Task SendMessage(string userMessage)
+    {
+        history.Add(ChatMessage.User(userMessage));
+
+        var response = await Rag.ChatWithRagAsync(
+            userMessage,
+            conversationHistory: history,
+            topK: 5);
+
+        history.Add(ChatMessage.Assistant(response.Answer));
+    }
+}</code></pre>
+<h3 id="pattern-4-background-service-with-rag">Pattern 4: Background Service with RAG<a class="anchor-link" href="#pattern-4-background-service-with-rag">#</a></h3>
+<pre><code class="language-csharp">public class RagBackgroundService : BackgroundService
+{
+    private readonly ITechieRag rag;
+
+    public RagBackgroundService(ITechieRag rag) =&gt; this.rag = rag;
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await rag.InitializeAsync(stoppingToken);
+        await rag.IngestDirectoryAsync("./knowledge-base", cancellationToken: stoppingToken);
+
+        // Ready to answer queries
+    }
+}</code></pre>
+<h3 id="pattern-5-custom-tool-handler-class">Pattern 5: Custom Tool Handler Class<a class="anchor-link" href="#pattern-5-custom-tool-handler-class">#</a></h3>
+<pre><code class="language-csharp">public class AstrologyToolHandler : IToolHandler
+{
+    public IReadOnlyList&lt;ToolDefinition&gt; ToolDefinitions =&gt; new[]
+    {
+        new ToolDefinition
+        {
+            Name = "calculate_birth_chart",
+            Description = "Calculates astrological birth chart for given date and location",
+            ParametersSchema = """
+            {
+                "type": "object",
+                "properties": {
+                    "birthDate": { "type": "string", "description": "Date in YYYY-MM-DD" },
+                    "birthTime": { "type": "string", "description": "Time in HH:MM" },
+                    "location": { "type": "string", "description": "City name" }
+                },
+                "required": ["birthDate", "location"]
+            }
+            """
+        }
+    };
+
+    public async Task&lt;ToolResult&gt; ExecuteToolAsync(ToolCall toolCall, CancellationToken ct)
+    {
+        var args = toolCall.GetArguments&lt;BirthChartArgs&gt;();
+        var chart = await CalculateChart(args.BirthDate, args.BirthTime, args.Location);
+
+        return new ToolResult
+        {
+            ToolCallId = toolCall.Id,
+            Content = JsonSerializer.Serialize(chart),
+            IsSuccess = true
+        };
+    }
+}
+
+// Register:
+builder.WithToolHandler(new AstrologyToolHandler());</code></pre>
+<hr>
+<h2 id="coding-standards">Coding Standards<a class="anchor-link" href="#coding-standards">#</a></h2>
+<p>When generating code that uses TechieRag, follow these conventions:</p>
+<ol>
+<li><strong>PascalCase</strong> for classes, methods, properties, constants
+</li>
+<li><strong>camelCase</strong> for private fields: <code>private readonly ITechieRag rag;</code>
+</li>
+<li><strong>No underscores</strong> in any names
+</li>
+<li><strong>Async suffix</strong> on all async methods
+</li>
+<li><strong>XML documentation</strong> on public members
+</li>
+<li><strong>File-scoped namespaces</strong>
+</li>
+<li><strong>Nullable reference types</strong> enabled
+</li>
+<li><strong>ConfigureAwait(false)</strong> in library code (not in Blazor/UI code)
+</li>
+<li><strong>Early returns</strong> for validation
+</li>
+<li><strong>One class per file</strong>, file name matches class name
+</li>
+</ol>
+<hr>
+<h2 id="backward-compatibility">Backward Compatibility<a class="anchor-link" href="#backward-compatibility">#</a></h2>
+<ul>
+<li>All v1 methods (IngestAsync, SearchAsync, etc.) work unchanged
+</li>
+<li>When <code>Llm.Source</code> is <code>None</code> (default), LLM methods throw <code>InvalidOperationException</code>
+</li>
+<li>No changes needed to existing v1 code
+</li>
+<li>v2 upgrade: just add LLM configuration to existing builder
+</li>
+</ul>
+<hr>
+<h2 id="namespace-reference">Namespace Reference<a class="anchor-link" href="#namespace-reference">#</a></h2>
+<table>
+<thead><tr><th>Namespace</th><th>Contains</th></tr></thead>
+<tbody>
+<tr><td><code>TechieRag</code></td><td>ITechieRag, TechieRagClient, TechieRagBuilder, TechieRagConfig, LlmSource, RerankSource, StoreProvider</td></tr>
+<tr><td><code>TechieRag.Abstractions</code></td><td>ILlmProvider, IToolHandler, IConversationMemory, ITokenTracker, IPromptTemplate, IVectorStore, IEmbeddingProvider, IReranker, IConversationStore, IWorkspaceStore, ISubscriptionSessionStore</td></tr>
+<tr><td><code>TechieRag.Models</code></td><td>ChatMessage, LlmResponse, RagResponse, RagStreamEvent, LlmStreamEvent, AgentStreamEvent, LlmCompletionOptions, SearchOptions, ToolDefinition, ToolCall, ToolResult, TokenUsage, UsageBudget, SearchResult, Workspace, SubscriptionSignInPrompt, SubscriptionSession, ModelRoot</td></tr>
+<tr><td><code>TechieRag.Llm</code></td><td>OllamaLlmProvider, LmStudioLlmProvider, OpenAICompatibleLlmProvider, AzureAIFoundryLlmProvider, GoogleGeminiLlmProvider, AnthropicLlmProvider, ChatGptSubscriptionLlmProvider, ChatGptSubscriptionOptions, SubscriptionSignInException, LlmProviderFactory, ModelRouter, ModelRoute, LlmConnectorCatalog, LlmConnectorDescriptor, LlmStreamEventExtensions</td></tr>
+<tr><td><code>TechieRag.Services</code></td><td>TokenUsageTracker, InMemoryConversationMemory, AgentLoopRunner, ToolRegistry, PromptTemplateEngine, RetryHandler, FallbackLlmHandler, WorkspaceManager</td></tr>
+<tr><td><code>TechieRag.Agentic</code></td><td>RegisterKnowledgeBase (ToolRegistry extension), TechieRagRetrievalSource, IRetrievalSource, RetrievalToolOptions, RetrievalTurnState, RetrievalTrace, AgenticInstructions, KnowledgeBaseTools</td></tr>
+<tr><td><code>TechieRag.Connectors</code> (+ <code>.Repository</code>, <code>.Email</code>, <code>.Http</code>)</td><td>ConnectorRunner, IngestConnectorAsync, ConnectorRunOptions, ConnectorSyncState, ConnectorErrorCodes, RepositoryConnector, EmailConnector, ImapMailTransport, ImapMailActions, MailActionCodes, MboxMailTransport, HttpConnectorTransport</td></tr>
+<tr><td><code>TechieRag.Web</code></td><td>IngestUrlAsync, IngestSiteAsync, HttpWebContentFetcher, WebCrawlOptions, WebIngestionResult</td></tr>
+<tr><td><code>TechieRag.Mcp</code></td><td>McpClient, McpServerConfig, McpTrustPolicy, McpToolHandler</td></tr>
+<tr><td><code>TechieRag.Orchestration</code></td><td>FlowDefinition, FlowSerializer, FlowRunner, FlowRuntime, FlowAgent, InMemoryFlowAgentResolver, FlowMessage</td></tr>
+<tr><td><code>TechieRag.DependencyInjection</code></td><td>ServiceCollectionExtensions (AddTechieRag)</td></tr>
+<tr><td><code>TechieRag.Embedded</code> (package <code>TechieRag.Embedded</code>)</td><td>UseEmbedded, UseModelRoot, UseEmbeddedReranker, EmbeddedModel, ModelDownloadService, OnnxCrossEncoderReranker</td></tr>
+<tr><td><code>TechieRag.Local</code> (package <code>TechieRag.Local</code>)</td><td>UseLocalLlm, LocalLlm, LocalLlmProvider, LocalModel, LocalLlmOptions, LocalModelTerms, LocalChatTemplate, LocalModelTermsNotAcceptedException, LocalModelMemoryException, LocalPromptTooLongException</td></tr>
+<tr><td><code>TechieRag.Agents</code> (+ <code>.Interop</code>, <code>.DependencyInjection</code>; package <code>TechieRag.Agents</code>)</td><td>TechieRagAgentBuilder, ITechieRagAgent, AgentRagResponse, LlmProviderChatClient, ToolHandlerFunctions, AIToolHandler, AgentStepReporter, ConversationMemoryChatHistoryProvider, AddTechieRagAgent</td></tr>
+<tr><td><code>TechieRag.Telemetry</code> (package <code>TechieRag.Telemetry</code>)</td><td>AddTechieRagTelemetry, TechieRagTelemetryOptions, TechieRagTelemetrySink</td></tr>
+</tbody>
+</table>
+<hr>
+<p><em>This reference describes TechieRag v3 (2026-09-25): the v2 core plus the phase-2 features and the <code>TechieRag.Telemetry</code>, <code>TechieRag.Local</code> and <code>TechieRag.Agents</code> packages. The consumer-facing guide is <code>docs/TechieRag-UsageGuide.md</code>; the maintainer's map is <code>docs/TechieRag-DevGuide.md</code>.</em></p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

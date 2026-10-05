@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 2: Agents, platforms, local model, and the harvested v3 library</h1>
-    <div class="subtitle">Rendered 2026-10-03 &middot; source <code>TechieRag-P2-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-04 &middot; source <code>TechieRag-P2-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -144,9 +144,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Date</td><td>2026-09-24</td></tr>
 </tbody>
 </table>
-<h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-170 (BRD-166 and 167 added 2026-09-25, 168 on 2026-10-01, 169 and 170 on 2026-10-03). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
-<h2 id="screens-and-flow">2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
+<h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-172 (BRD-166 to 172 added 2026-09-25 to 2026-10-04). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
+<h2 id="screens-and-flow"><a id="2-screens-and-flow"></a>2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
 <thead><tr><th>Screen</th><th>Route</th><th>Role</th><th>Mockup</th><th>Fields</th></tr></thead>
@@ -177,7 +177,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li>A tool-using chat turn streams its text while tool calls run through the guards; a user with a permitting vendor subscription signs in once through the browser.
 </li>
 </ol>
-<h2 id="requirements">3. Requirements<a class="anchor-link" href="#requirements">#</a></h2>
+<h2 id="requirements"><a id="3-requirements"></a>3. Requirements<a class="anchor-link" href="#requirements">#</a></h2>
 <p>One item per thing the verifier will test, grouped by surface. Same rules as the phase-1 BRD. Items 83 to 114 are carried verbatim from the previous BRD; items 115 to 163 were harvested on 2026-09-24 and are attributed in their text.</p>
 <h3 id="agents-package">Agents package<a class="anchor-link" href="#agents-package">#</a></h3>
 <p>Agents on Microsoft Agent Framework over TechieRag, with the retrieval contract in core.</p>
@@ -762,8 +762,20 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-171</strong> — The Ollama provider shall report a generation cut off at the token limit as finish reason <code>length</code>, mapped from Ollama's <code>done_reason</code>, on <code>ChatAsync</code> and on the streamed <code>Completed</code> event <em>(added 2026-10-04; closes Lekhak feedback TR-RAG-002)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When an Ollama reply ends with <code>done_reason: "length"</code>, then <code>FinishReason</code> is <code>length</code> from chat and stream.
+</li>
 </ul>
-<h2 id="non-functional-requirements">4. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
+</li>
+<li><strong>BRD-172</strong> — The Ollama provider shall send <code>options.num_ctx</code> when a context size is configured (<code>LlmConfig.MaxContextTokens</code>, now nullable and unset by default, or the <code>contextTokens</code> argument of <code>LlmProviderFactory.Create</code> / <code>CreateForModel</code>); with none configured no <code>num_ctx</code> is sent, so Ollama keeps its own default <em>(added 2026-10-04; closes Lekhak feedback TR-RAG-003)</em> <em>Screen:</em> Provider breadth
+<ul>
+<li><em>Acceptance:</em> When a developer creates an Ollama provider with context size 32768, then each request carries <code>options.num_ctx: 32768</code>.
+</li>
+</ul>
+</li>
+</ul>
+<h2 id="non-functional-requirements"><a id="4-non-functional-requirements"></a>4. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
 <p>Only what this phase adds. The ones that apply to the whole library are in the phase-1 BRD.</p>
 <table>
 <thead><tr><th>Id</th><th>Area</th><th>Requirement</th><th>Measure</th></tr></thead>
@@ -771,9 +783,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>(none)</td><td>—</td><td>This phase adds no library-wide non-functional item; performance of the local model is recorded per device under BRD-108, never as a budget the owner has not stated</td><td>—</td></tr>
 </tbody>
 </table>
-<h2 id="development-status">5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
+<h2 id="development-status"><a id="5-development-status"></a>5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-03.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-10-04.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P2-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -793,10 +805,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Surface: Reranking</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Installed agent files</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>F-LLM</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>RAG / AI requirements</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+<tr><td>RAG / AI requirements</td><td>4</td><td>4</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
-<h2 id="where-the-rest-lives">6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>
+<h2 id="where-the-rest-lives"><a id="6-where-the-rest-lives"></a>6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>
 <table>
 <thead><tr><th>What</th><th>Where</th></tr></thead>
 <tbody>

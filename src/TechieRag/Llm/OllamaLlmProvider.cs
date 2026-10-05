@@ -25,6 +25,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     private readonly HttpClient httpClient;
     private readonly string endpoint;
     private readonly ILogger<OllamaLlmProvider> logger;
+    private readonly int? contextTokens;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -60,7 +61,9 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="endpoint">Ollama API endpoint (e.g., http://localhost:11434).</param>
     /// <param name="model">Model name to use (e.g., "llama3.2", "mistral").</param>
     /// <param name="logger">Logger instance.</param>
-    public OllamaLlmProvider(string endpoint, string model, ILogger<OllamaLlmProvider>? logger = null)
+    /// <param name="contextTokens">Context window sent as <c>options.num_ctx</c>; null leaves Ollama's
+    /// own default in place (TR-RAG-003).</param>
+    public OllamaLlmProvider(string endpoint, string model, ILogger<OllamaLlmProvider>? logger = null, int? contextTokens = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(endpoint);
         ArgumentException.ThrowIfNullOrEmpty(model);
@@ -68,6 +71,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         this.endpoint = endpoint.TrimEnd('/');
         ModelName = model;
         this.logger = logger ?? NullLogger<OllamaLlmProvider>.Instance;
+        this.contextTokens = contextTokens;
         httpClient = new HttpClient
         {
             BaseAddress = new Uri(this.endpoint),
@@ -82,13 +86,15 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="httpClient">Pre-configured HTTP client (BaseAddress must be set).</param>
     /// <param name="model">Model name to use.</param>
     /// <param name="logger">Logger instance.</param>
-    internal OllamaLlmProvider(HttpClient httpClient, string model, ILogger<OllamaLlmProvider>? logger = null)
+    /// <param name="contextTokens">Context window sent as <c>options.num_ctx</c>, or null.</param>
+    internal OllamaLlmProvider(HttpClient httpClient, string model, ILogger<OllamaLlmProvider>? logger = null, int? contextTokens = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
         endpoint = httpClient.BaseAddress?.ToString().TrimEnd('/') ?? "http://localhost:11434";
         ModelName = model;
         this.logger = logger ?? NullLogger<OllamaLlmProvider>.Instance;
+        this.contextTokens = contextTokens;
     }
 
     /// <inheritdoc/>
@@ -149,7 +155,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
                 ModelName = ModelName,
                 ProviderName = Name
             },
-            FinishReason = toolCalls is { Count: > 0 } ? "tool_calls" : "stop",
+            FinishReason = MapFinishReason(ollamaResponse.DoneReason, toolCalls is { Count: > 0 }),
             ModelName = ModelName
         };
 
@@ -183,6 +189,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         int totalOutputTokens = 0;
         var outputText = new StringBuilder();
         var toolCalls = new List<ToolCall>();
+        string? doneReason = null;
 
         // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
         while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
@@ -204,6 +211,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
             {
                 totalInputTokens = chunk.PromptEvalCount ?? totalInputTokens;
                 totalOutputTokens = chunk.EvalCount ?? totalOutputTokens;
+                doneReason = chunk.DoneReason;
                 break;
             }
         }
@@ -218,7 +226,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         sw.Stop();
         RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, toolCalls.Count > 0);
 
-        yield return LlmStreamEvent.FromCompleted(usage, toolCalls.Count > 0 ? "tool_calls" : "stop", ModelName);
+        yield return LlmStreamEvent.FromCompleted(usage, MapFinishReason(doneReason, toolCalls.Count > 0), ModelName);
     }
 
     /// <inheritdoc/>
@@ -288,6 +296,10 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         if (options?.TopP is not null) ollamaOptions["top_p"] = options.TopP.Value;
         if (options?.Seed is not null) ollamaOptions["seed"] = options.Seed.Value;
 
+        // TR-RAG-003: without num_ctx Ollama uses its own small default and silently drops the
+        // front of a long prompt.
+        if (contextTokens is not null) ollamaOptions["num_ctx"] = contextTokens.Value;
+
         if (ollamaOptions.Count > 0)
             request["options"] = ollamaOptions;
 
@@ -351,6 +363,19 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return images;
     }
 
+    /// <summary>
+    /// Maps Ollama's <c>done_reason</c> onto the OpenAI-style vocabulary the other providers report,
+    /// so a generation cut off at the token limit reads as <c>length</c>, not <c>stop</c> (TR-RAG-002).
+    /// </summary>
+    /// <param name="doneReason">Ollama's <c>done_reason</c>, absent on servers older than 0.1.33.</param>
+    /// <param name="hasToolCalls">Whether the reply carried tool calls.</param>
+    /// <returns><c>tool_calls</c>, <c>length</c>, or <c>stop</c>.</returns>
+    private static string MapFinishReason(string? doneReason, bool hasToolCalls)
+    {
+        if (hasToolCalls) return "tool_calls";
+        return string.Equals(doneReason, "length", StringComparison.OrdinalIgnoreCase) ? "length" : "stop";
+    }
+
     private static List<ToolCall>? ParseToolCalls(List<OllamaToolCall>? ollamaToolCalls)
     {
         if (ollamaToolCalls is not { Count: > 0 }) return null;
@@ -389,6 +414,9 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         [JsonPropertyName("done")]
         public bool? Done { get; set; }
+
+        [JsonPropertyName("done_reason")]
+        public string? DoneReason { get; set; }
 
         [JsonPropertyName("prompt_eval_count")]
         public int? PromptEvalCount { get; set; }

@@ -423,7 +423,7 @@ Where the other providers (under `src/TechieRag/Llm/`) emit `ToolCall`:
 
 - **OpenAI-compatible** — `OpenAICompatibleLlmProvider.cs:228-249`, reader line 245.
 - **Azure AI Foundry** — `AzureAIFoundryLlmProvider.cs:165-186`, reader line 182.
-- **Ollama** — `OllamaLlmProvider.cs:168-222`; `ParseToolCalls` (line 195), emitted at 211-214.
+- **Ollama** — `OllamaLlmProvider.cs:174-230`; `ParseToolCalls` (line 202), emitted at 219-222; `Completed` carries `MapFinishReason(doneReason, …)` (line 229).
 - **Google Gemini** — `GoogleGeminiLlmProvider.cs:166-225`; `ExtractToolCalls` (line 204), emitted at 214-217.
 - **Anthropic** — `AnthropicLlmProvider.cs:171-215`; fragments append until `content_block_stop` (`AnthropicStreamState.cs:108-123`); `tool_use` becomes `tool_calls` (line 213).
 - **ChatGPT subscription** — `ChatGptSubscriptionLlmProvider.cs:139-140,167-186`; `OpenAIResponsesStreamReader.cs:82-84,99-109` at `response.output_item.done`.
@@ -548,6 +548,31 @@ Static-only: the July 2026 Sevak screen that called an OpenAI-compatible model; 
 `SessionHeaderName` (`OpenAICompatibleLlmProvider.cs:151`) is the internal test seam the connector tests read.
 
 **Calculations on this service:** none; `defaultSessionId` is `Guid.NewGuid().ToString("N")`, fixed for the provider's lifetime.
+
+---
+
+### Ollama: finish reason and context window (`TechieRag`)
+
+REQ-RAG-112 / BRD-171 and REQ-RAG-113 / BRD-172, from Lekhak's TR-RAG-002 and TR-RAG-003. `OllamaLlmProvider` reads Ollama's `done_reason` and reports a reply cut off at the token limit as `length`, as the other providers do. It sends `options.num_ctx` when a context size was given; with none, the request carries no `num_ctx` and Ollama keeps its own default, because Ollama allocates the whole window up front.
+
+![Sevak's LLM playground, July 2026: one chat with a model, the kind of call whose context window and finish reason this sets](screenshots/TechieRag/llm-playground.png)
+
+Static-only: a library change with no screen; covered by `tests/TechieRag.Tests/Llm/OllamaRequestOptionsTests.cs` (five tests; a stub handler answers in Ollama's `/api/chat` shape and records the request body).
+
+**Runtime:** static-only (unconfirmed)
+
+**Call chain:** builder: `TechieRagBuilder.Build()` → `CreateLlmProvider` → `CreateLlmProviderFromConfig` → `new OllamaLlmProvider(endpoint, model, logger, llmConfig.MaxContextTokens)`. Route: `LlmProviderFactory.CreateForModel(name, key, …, contextTokens)` → `Create(route, …, contextTokens)` → `new OllamaLlmProvider(…, contextTokens)`. Per call: `ChatAsync` / `ChatStreamEventsAsync` → `BuildRequest` → POST `/api/chat` → `OllamaChatResponse.DoneReason` → `MapFinishReason`.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/TechieRagBuilder.cs:936` | `CreateLlmProviderFromConfig` | `llmConfig.MaxContextTokens` | null unless configured; the primary and fallback LLM share this path |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:64` | `Create` (Ollama arm) | `contextTokens` | the caller's value, or null |
+| `src/TechieRag/Llm/OllamaLlmProvider.cs:301` | `BuildRequest` | `ollamaOptions["num_ctx"]` | present only when `contextTokens` has a value |
+| `src/TechieRag/Llm/OllamaLlmProvider.cs:158` | `ChatAsync` | `ollamaResponse.DoneReason` | `length` when cut off at `num_predict`, else `stop` |
+| `src/TechieRag/Llm/OllamaLlmProvider.cs:214` | `ChatStreamEventsAsync` | `doneReason` | taken from the final chunk (`done: true`) |
+| `src/TechieRag/Llm/OllamaLlmProvider.cs:373` | `MapFinishReason` | return value | `tool_calls` when tools were called, `length` for `done_reason: "length"`, otherwise `stop` |
+
+**Calculations on this service:** none.
 
 ---
 

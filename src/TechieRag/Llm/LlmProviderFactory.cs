@@ -26,6 +26,8 @@ public static class LlmProviderFactory
     /// <param name="apiKey">The API key, or null/empty for local runtimes that need none.</param>
     /// <param name="loggerFactory">Optional logger factory.</param>
     /// <param name="maxTokens">Default max output tokens, used by providers that require it up front.</param>
+    /// <param name="contextTokens">Context window for runtimes that size it per request (Ollama's
+    /// <c>num_ctx</c>); null leaves the runtime's own default (TR-RAG-003).</param>
     /// <returns>A provider configured for the route.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="route"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the connector needs an API key and none was supplied.</exception>
@@ -33,7 +35,8 @@ public static class LlmProviderFactory
         ModelRoute route,
         string? apiKey,
         ILoggerFactory? loggerFactory = null,
-        int maxTokens = 2048)
+        int maxTokens = 2048,
+        int? contextTokens = null)
     {
         ArgumentNullException.ThrowIfNull(route);
 
@@ -61,7 +64,8 @@ public static class LlmProviderFactory
             LlmSource.Ollama => new OllamaLlmProvider(
                 connector.Endpoint ?? "http://localhost:11434",
                 route.ModelId,
-                loggerFactory?.CreateLogger<OllamaLlmProvider>()),
+                loggerFactory?.CreateLogger<OllamaLlmProvider>(),
+                contextTokens),
 
             LlmSource.LmStudio => new LmStudioLlmProvider(
                 connector.Endpoint ?? "http://localhost:1234",
@@ -93,14 +97,16 @@ public static class LlmProviderFactory
     /// <param name="apiKey">The API key, or null/empty for local runtimes that need none.</param>
     /// <param name="loggerFactory">Optional logger factory.</param>
     /// <param name="maxTokens">Default max output tokens.</param>
+    /// <param name="contextTokens">Context window for runtimes that size it per request; null for the runtime default.</param>
     /// <returns>A provider for the service the model name resolves to.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the model name identifies no single service.</exception>
     public static ILlmProvider CreateForModel(
         string modelName,
         string? apiKey,
         ILoggerFactory? loggerFactory = null,
-        int maxTokens = 2048) =>
-        Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens);
+        int maxTokens = 2048,
+        int? contextTokens = null) =>
+        Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens, contextTokens);
 
     /// <summary>
     /// Creates a provider for a <see cref="LlmSource.Subscription"/> route, signing in through the

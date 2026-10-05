@@ -783,7 +783,8 @@ public static ModelRoute Require(string modelName);
 public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId) { string? Endpoint; LlmSource Source; }
 
 // TechieRag.Llm.LlmProviderFactory
-public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048);
+public static ILlmProvider Create(ModelRoute route, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
+public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
 
 // TechieRag.Llm.LlmConnectorCatalog
 public static IReadOnlyList<LlmConnectorDescriptor> All { get; }
@@ -796,6 +797,7 @@ public const string OpenCodeGoName = "opencode-go";   // OpenCode Go: https://op
 public string? Connector { get; set; }   // e.g. "groq"; an explicit Endpoint still wins
 public Dictionary<string, string> Headers { get; set; }   // extra headers on every OpenAI-compatible request; set in code (WithLlmHeaders), refused in a configuration section; one named here replaces the library's own
 public string? SessionHeader { get; set; }   // header carrying LlmCompletionOptions.SessionId; null = the connector's own (opencode-go: x-opencode-session)
+public int? MaxContextTokens { get; set; }   // context window; Ollama gets it as options.num_ctx; null (default) = the runtime's own
 
 // TechieRag.Models.LlmCompletionOptions
 public string? SessionId { get; set; }   // stable per conversation; sent in the session header; null = one id per provider instance
@@ -806,6 +808,15 @@ public TechieRagBuilder UseOpenAICompatibleLlm(string endpoint, string apiKey, s
 ```
 
 OpenCode Go refuses a request without `x-opencode-session` (HTTP 400 `MissingSessionID`). The `opencode-go` connector sends it; pass the same `SessionId` on every turn of one conversation. Only Go's `chat/completions` models work through it (Kimi, GLM, DeepSeek, …); its `/responses` and `/messages` models need those wire formats. OpenAI-compatible requests carry `User-Agent: TechieRag/<version>` unless `Headers` names another, as OpenCode Go asks each client to name itself.
+
+Ollama sizes its context window per request and defaults to a small one (2k–4k tokens), silently dropping the front of a longer prompt. Set `LlmConfig.MaxContextTokens`, or pass `contextTokens` to `Create` / `CreateForModel`, and the Ollama provider sends it as `options.num_ctx`. It is unset by default because Ollama allocates the whole window up front. A reply Ollama cut off at the token limit reports `FinishReason == "length"`, as the other providers do.
+
+```csharp
+var route = ModelRouter.Require("ollama/llama3.2");
+var ollama = LlmProviderFactory.Create(route, null, contextTokens: 32768);   // sends options.num_ctx: 32768
+var reply = await ollama.ChatAsync(messages, new LlmCompletionOptions { MaxTokens = 4000 });
+if (reply.FinishReason == "length") { /* truncated: raise MaxTokens or continue */ }
+```
 
 ```csharp
 var rag = new TechieRagBuilder()
@@ -1437,13 +1448,13 @@ public class ToolResult
       "Endpoint": "https://api.openai.com/v1",
       "Model": "gpt-4o",
       "Temperature": 0.7,
-      "MaxTokens": 2048,
-      "MaxContextTokens": 128000
+      "MaxTokens": 2048
     },
     "LlmFallback": {
       "Source": "Ollama",
       "Endpoint": "http://localhost:11434",
-      "Model": "llama3.2"
+      "Model": "llama3.2",
+      "MaxContextTokens": 32768
     },
     "UsageTracking": {
       "Enabled": true,
