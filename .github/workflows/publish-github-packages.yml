@@ -84,12 +84,17 @@ jobs:
           dotnet build src/TechieRag.Telemetry/TechieRag.Telemetry.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
           dotnet build src/TechieRag.Agents/TechieRag.Agents.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
           dotnet build src/TechieRag.Local/TechieRag.Local.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release -p:Version=${{ steps.version.outputs.version }}
 
       - name: Run tests
         # Blocking gate: test failures fail the build and prevent publish.
         # Only the library test project is built/tested — the sample (samples/TechieRagWeb)
         # cannot restore in CI (private TrBlazeUI feed), so never test the .slnx or globs.
-        run: dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release --verbosity normal
+        # --no-build (TR-RAG-048 / REQ-FN-071): the test project is built above with the same
+        # -p:Version. A `dotnet test` that builds rebuilds the net10.0 outputs of every project it
+        # references WITHOUT the version, over the release build, and `pack --no-build` then packed
+        # those 1.0.0.0 assemblies - 1.0.9 to 1.1.1 shipped that way.
+        run: dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release --no-build --verbosity normal
 
       - name: Pack NuGet packages
         run: |
@@ -98,6 +103,12 @@ jobs:
           dotnet pack src/TechieRag.Telemetry/TechieRag.Telemetry.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
           dotnet pack src/TechieRag.Agents/TechieRag.Agents.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
           dotnet pack src/TechieRag.Local/TechieRag.Local.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+
+      - name: Check assembly versions
+        # TR-RAG-048 / REQ-FN-071: every lib/*/TechieRag*.dll in every package must carry the
+        # package version, and every TechieRag-to-TechieRag reference must bind to it. The package
+        # file name alone proves nothing - 1.0.9 to 1.1.1 had the right names and 1.0.0.0 inside.
+        run: dotnet run .github/workflows/scripts/check-package-assembly-versions.cs -- ./nupkgs ${{ steps.version.outputs.version }}
 
       - name: List created packages
         run: ls -la ./nupkgs/

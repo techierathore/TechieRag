@@ -220,8 +220,12 @@ touches nuget.org not at all, and is the last chance to see what would ship.
    nuget.org, or is not greater than the latest published, the run fails **here**, before restore. On
    a dry run from a non-tag ref it reports the `-dryrun.<run>` version instead. On a real run from a
    non-tag ref it fails with *"A public release is cut from a v* tag…"* — dispatch the release tag instead.
-3. **Restore / Build / Test** — tests are a blocking gate. Red tests, no release. Every `dotnet`
-   invocation carries `-p:Version=<tag version>`.
+3. **Restore / Build / Test** — tests are a blocking gate. Red tests, no release. Every `dotnet build`
+   and `dotnet pack` carries `-p:Version=<tag version>`. The test project is built in the Build step,
+   and Test runs `--no-build`. A test run that builds re-stamps the net10.0 outputs it references, and
+   Pack (`--no-build`) ships whatever is on disk. That is how 1.0.9 to 1.1.1 reached GitHub Packages
+   with net10.0 `TechieRag.dll`, `TechieRag.Embedded.dll` and `TechieRag.Telemetry.dll` at 1.0.0.0
+   (Sevak TR-RAG-048, REQ-FN-071).
 4. **Pack** — `Successfully created package …/TechieRag.<version>.nupkg` (and `.snupkg`), likewise for
    `TechieRag.Embedded`, `TechieRag.Telemetry` and `TechieRag.Agents`.
 5. **"Confirm packed version"** — verifies the `.nupkg` file names carry exactly the version
@@ -236,6 +240,15 @@ touches nuget.org not at all, and is the last chance to see what would ship.
    ```
    The same facts are written to the run summary page. **Read this before anything else** — it is the
    single most important line in the run.
+   **"Check assembly versions"** follows. It runs
+   `.github/workflows/scripts/check-package-assembly-versions.cs`, which opens every packed
+   `lib/*/TechieRag*.dll` and checks that its AssemblyVersion is `<version>.0` and that every
+   TechieRag-to-TechieRag reference binds to the same number. Expect
+   `PASS 8 assemblies in 5 packages all carry 1.1.2.0`. Any `::error::` line fails the run before
+   the login, so a mis-stamped package never burns a token. The file names alone prove nothing,
+   because 1.0.9 to 1.1.1 had correct names and 1.0.0.0 inside. The internal workflow runs the same
+   step after its Pack. Locally:
+   `dotnet run .github/workflows/scripts/check-package-assembly-versions.cs -- <nupkg folder> <version>`.
 6. **"Inspect package contents"** — a full `unzip -l` file listing of every `.nupkg` and `.snupkg`.
    This is what makes each run self-documenting: months later the job log still shows exactly which
    files shipped in that version. Sanity-check that `README.md`, `lib/net10.0/`, `lib/net8.0/` and the

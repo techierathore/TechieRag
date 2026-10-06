@@ -110,13 +110,16 @@ jobs:
           dotnet build "$TELEMETRY_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
           dotnet build "$AGENTS_PROJECT"   --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
           dotnet build "$LOCAL_PROJECT"    --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$TEST_PROJECT"     --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
 
       - name: Test
         # Blocking gate: no green tests, no public release.
         # Only the library test project is built/tested. Since 2026-09-24 this repository holds the
         # library alone (the application, Sevak, has its own repository); keep testing the project,
         # not the .slnx or a glob, so a future sample or probe app never becomes a release gate.
-        run: dotnet test "$TEST_PROJECT" --configuration Release --verbosity normal -p:Version=${{ steps.version.outputs.version }}
+        # --no-build (TR-RAG-048 / REQ-FN-071): a test run that builds would rebuild the referenced
+        # net10.0 outputs with different global properties, over the assemblies Pack then ships.
+        run: dotnet test "$TEST_PROJECT" --configuration Release --no-build --verbosity normal
 
       - name: Pack
         run: |
@@ -158,6 +161,12 @@ jobs:
             echo "| **Commit** | \`$(git rev-parse HEAD)\` |"
             echo "| **Dry run** | \`${{ inputs.dry_run }}\` |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check assembly versions
+        # TR-RAG-048 / REQ-FN-071: every lib/*/TechieRag*.dll in every package must carry the
+        # package version, and every TechieRag-to-TechieRag reference must bind to it. Runs before
+        # the OIDC login, so a mis-stamped package never burns a token or reaches nuget.org.
+        run: dotnet run .github/workflows/scripts/check-package-assembly-versions.cs -- ./artifacts ${{ steps.version.outputs.version }}
 
       - name: Inspect package contents
         # Every run self-documents exactly what shipped: the file list of each .nupkg goes into

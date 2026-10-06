@@ -71,9 +71,11 @@ public sealed class LibraryDocumentationAcceptanceTests
     }
 
     /// <summary>
-    /// REQ-FN-006: the Sevak application, checked out beside this repository, consumes the released
-    /// <c>TechieRag</c> and <c>TechieRag.Embedded</c> 1.0.7 packages and has no ProjectReference into
-    /// this repository. Skipped with a reason on a host without the sibling Sevak checkout.
+    /// REQ-FN-006: the Sevak application, checked out beside this repository, consumes released
+    /// <c>TechieRag</c> and <c>TechieRag.Embedded</c> packages (a plain release version, the same for
+    /// both) and has no ProjectReference into this repository. Which release Sevak pins is Sevak's
+    /// choice, so no number is fixed here: it moved 1.0.7 → 1.0.8 on 2026-10-05 and waits for 1.1.2
+    /// (TR-RAG-048). Skipped with a reason on a host without the sibling Sevak checkout.
     /// </summary>
     [SiblingSevakFact(DisplayName = "REQ-FN-006 SevakConsumesReleasedPackages")]
     public void SevakConsumesReleasedPackages()
@@ -81,8 +83,10 @@ public sealed class LibraryDocumentationAcceptanceTests
         var sevak = SiblingSevakFactAttribute.SevakRoot()!;
         var props = XDocument.Load(Path.Combine(sevak, "Directory.Packages.props"));
         string? Pinned(string id) => props.Descendants("PackageVersion").FirstOrDefault(p => (string?)p.Attribute("Include") == id)?.Attribute("Version")?.Value;
-        Assert.Equal("1.0.7", Pinned("TechieRag"));
-        Assert.Equal("1.0.7", Pinned("TechieRag.Embedded"));
+        var core = Pinned("TechieRag");
+        Assert.NotNull(core);
+        Assert.Matches(@"^\d+\.\d+\.\d+$", core);
+        Assert.Equal(core, Pinned("TechieRag.Embedded"));
 
         var separator = Path.DirectorySeparatorChar;
         var intoLibrary = Directory.GetFiles(sevak, "*.csproj", SearchOption.AllDirectories)
