@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag NuGet Publishing</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout">
+  <nav class="side">
+    <h1>TechieRag NuGet Publishing</h1>
+    <div class="sub">Last rendered: 2026-10-06</div>
+    <div class="group">Contents</div>
+    <ol>
+        <li><a href="#the-dual-feed-model">1. The dual-feed model</a></li>
+        <li class="h3"><a href="#packages-published">Packages published</a></li>
+        <li class="h3"><a href="#a-note-on-the-workflow-file-names">A note on the workflow file names</a></li>
+        <li><a href="#trusted-publishing-oidc-why-there-is-no-api-key">2. Trusted Publishing (OIDC) — why there is no API key</a></li>
+        <li class="h3"><a href="#the-thing-that-will-break-this">The thing that will break this</a></li>
+        <li class="h3"><a href="#temporarily-active-7-days">&quot;Temporarily active (7 days)&quot;</a></li>
+        <li><a href="#package-metadata-checklist">3. Package metadata checklist</a></li>
+        <li><a href="#running-a-public-release">4. Running a public release</a></li>
+        <li class="h3"><a href="#step-1-publish-a-github-release-creates-the-tag-feeds-github-packages">Step 1 — publish a GitHub Release (creates the tag, feeds GitHub Packages)</a></li>
+        <li class="h3"><a href="#step-2-dispatch-the-public-workflow-against-that-tag">Step 2 — dispatch the public workflow against that tag</a></li>
+        <li class="h3"><a href="#recommended-rehearse-before-the-real-run">Recommended: rehearse before the real run</a></li>
+        <li class="h3"><a href="#what-the-log-should-show">What the log should show</a></li>
+        <li class="h3"><a href="#after-the-push">After the push</a></li>
+        <li><a href="#verification">5. Verification</a></li>
+        <li><a href="#troubleshooting">6. Troubleshooting</a></li>
+        <li><a href="#backlog">7. Backlog</a></li>
+    </ol>
+  </nav>
+  <main>
+    <h1>TechieRag NuGet Publishing</h1>
+    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>NUGET-PUBLISHING.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#the-dual-feed-model">1. The dual-feed model</a></li>
+        <li class="h3"><a href="#packages-published">Packages published</a></li>
+        <li class="h3"><a href="#a-note-on-the-workflow-file-names">A note on the workflow file names</a></li>
+        <li><a href="#trusted-publishing-oidc-why-there-is-no-api-key">2. Trusted Publishing (OIDC) — why there is no API key</a></li>
+        <li class="h3"><a href="#the-thing-that-will-break-this">The thing that will break this</a></li>
+        <li class="h3"><a href="#temporarily-active-7-days">&quot;Temporarily active (7 days)&quot;</a></li>
+        <li><a href="#package-metadata-checklist">3. Package metadata checklist</a></li>
+        <li><a href="#running-a-public-release">4. Running a public release</a></li>
+        <li class="h3"><a href="#step-1-publish-a-github-release-creates-the-tag-feeds-github-packages">Step 1 — publish a GitHub Release (creates the tag, feeds GitHub Packages)</a></li>
+        <li class="h3"><a href="#step-2-dispatch-the-public-workflow-against-that-tag">Step 2 — dispatch the public workflow against that tag</a></li>
+        <li class="h3"><a href="#recommended-rehearse-before-the-real-run">Recommended: rehearse before the real run</a></li>
+        <li class="h3"><a href="#what-the-log-should-show">What the log should show</a></li>
+        <li class="h3"><a href="#after-the-push">After the push</a></li>
+        <li><a href="#verification">5. Verification</a></li>
+        <li><a href="#troubleshooting">6. Troubleshooting</a></li>
+        <li><a href="#backlog">7. Backlog</a></li>
+      </ol>
+    </div>
+<p>How TechieRag packages get to consumers, and how to cut a public release.</p>
+<p>TechieRag ships to <strong>two feeds</strong>. They are separate pipelines with separate credentials, separate
+triggers, and separate audiences. This document is the runbook for both, with most of its weight on
+the public one, because that is the one that is irreversible.</p>
+<blockquote>
+<p>Scope note: this file covers <em>publishing</em>. <code>docs/NUGET-PUBLISHING-GUIDE.md</code> is an older,
+broader tutorial about NuGet packaging in general; where the two disagree, <strong>this file wins</strong>.</p>
+</blockquote>
+<hr>
+<h2 id="the-dual-feed-model"><a id="1-the-dual-feed-model"></a>1. The dual-feed model<a class="anchor-link" href="#the-dual-feed-model">#</a></h2>
+<table>
+<thead><tr><th></th><th>GitHub Packages (internal)</th><th>NuGet.org (public)</th></tr></thead>
+<tbody>
+<tr><td><strong>Purpose</strong></td><td>Internal dev / pre-release feed</td><td>The public feed consumers install from</td></tr>
+<tr><td><strong>Audience</strong></td><td>Maintainers working on TechieRag itself</td><td>Everyone — <code>dotnet add package TechieRag</code>, no credentials</td></tr>
+<tr><td><strong>Workflow</strong></td><td><code>.github/workflows/publish-github-packages.yml</code></td><td><code>.github/workflows/publish-nuget.yml</code></td></tr>
+<tr><td><strong>Trigger</strong></td><td>Automatic — push to <code>main</code>/<code>master</code>, <code>v*</code> tags (GitHub Releases), PRs (PRs build and pack only)</td><td><strong>Manual only</strong> — <code>workflow_dispatch</code> against a release tag (dry run from any ref; real run only from a tag)</td></tr>
+<tr><td><strong>Credential</strong></td><td><code>GITHUB_TOKEN</code> (built in)</td><td>None stored — OIDC temp key (see §2)</td></tr>
+<tr><td><strong>Cadence</strong></td><td>Every merge and every release</td><td>When the owner decides a release goes public</td></tr>
+<tr><td><strong>Reversible?</strong></td><td>Yes — versions can be deleted</td><td><strong>No</strong> — see "unlist, not delete" in §6</td></tr>
+</tbody>
+</table>
+<p>Three rules hold this together:</p>
+<ol>
+<li><strong>Public versions are always a subset of internal-feed versions.</strong> Nothing reaches NuGet.org that has not already existed on the GitHub feed. There is no NuGet.org-only build. (The internal workflow fires on the <code>v*</code> tag, so the version lands on GitHub Packages first; the public dispatch later builds the same tag, so both feeds carry the same commit.)
+</li>
+<li><strong>Same version number = same commit.</strong> If <code>1.0.0</code> exists on both feeds, both were built from the same commit. This is what makes the internal feed a usable rehearsal for the public one.
+</li>
+<li><strong>The public feed never publishes itself.</strong> No push trigger, no tag trigger, no schedule. A GitHub Release creates the <code>v*</code> tag and feeds GitHub Packages automatically; nuget.org gets that version only when a human opens Actions → <em>Publish to NuGet.org (Trusted Publishing)</em> → Run workflow with the release tag as <code>ref</code>. (Reaffirmed 2026-09-03 after a one-day experiment with a tag trigger — see <code>DECISIONS.md</code> 2026-09-03, second entry — so the ceremony matches the owner's other libraries.) What changed on 2026-09-03 and stays: the version is derived from that tag, and the run refuses a version already on nuget.org or one not greater than the latest. <strong>Exactly one path reaches nuget.org</strong> (REQ-FN-067 / BRD-160, 2026-09-24): the manual dispatch of <code>publish-nuget.yml</code>. <code>publish-github-packages.yml</code> has no nuget.org job at all — pushing a <code>v*</code> tag feeds GitHub Packages and nothing else.
+</li>
+</ol>
+<h3 id="packages-published">Packages published<a class="anchor-link" href="#packages-published">#</a></h3>
+<p>All four packable projects go to both feeds, listed by path in the Restore, Build and Pack steps of
+both workflows:</p>
+<ul>
+<li><strong><code>TechieRag</code></strong> — <code>src/TechieRag/TechieRag.csproj</code> (targets <code>net10.0;net8.0</code>)
+</li>
+<li><strong><code>TechieRag.Embedded</code></strong> — <code>src/TechieRag.Embedded/TechieRag.Embedded.csproj</code> (targets <code>net10.0</code>)
+</li>
+<li><strong><code>TechieRag.Telemetry</code></strong> — <code>src/TechieRag.Telemetry/TechieRag.Telemetry.csproj</code> (targets <code>net10.0;net8.0</code>; REQ-FN-065, added 2026-09-24)
+</li>
+<li><strong><code>TechieRag.Agents</code></strong> — <code>src/TechieRag.Agents/TechieRag.Agents.csproj</code> (REQ-FN-005, added 2026-09-24)
+</li>
+</ul>
+<p>The three satellites depend on <code>TechieRag</code>, so all four are pushed in the same run and always share a
+version number (<code>publish-nuget.yml</code> checks every one in <code>Determine version</code> and <code>Confirm packed
+version</code>). Symbol packages (<code>.snupkg</code>) are pushed alongside to NuGet.org's symbol server. Adding a
+fifth package means adding its path to both workflows and its id to <code>PACKAGE_IDS</code>;
+<code>PublishingWorkflowTests</code> fails until both workflows pack every packable <code>src/</code> project.</p>
+<h3 id="a-note-on-the-workflow-file-names">A note on the workflow file names<a class="anchor-link" href="#a-note-on-the-workflow-file-names">#</a></h3>
+<p>The private-feed workflow used to live at <code>.github/workflows/publish-nuget.yml</code>. It was <strong>renamed to
+<code>publish-github-packages.yml</code> with its contents byte-for-byte unchanged</strong> — same <code>name:</code> header, same
+triggers, same jobs, same behaviour. The rename was forced: the trusted publishing policy on
+nuget.org is bound to the file name <code>publish-nuget.yml</code> (§2), and that name had to be freed for the
+public pipeline. The only consequence is cosmetic — pre-rename runs are listed in the Actions
+sidebar under the old file name.</p>
+<p>The old private workflow used to contain a dormant <code>publish-nuget-org</code> job gated on a <code>NUGET_API_KEY</code>
+secret. It was <strong>removed on 2026-09-24</strong> (REQ-FN-067 / BRD-160): a second path to the public feed,
+even a dormant one, was one created secret away from publishing on every tag push. <strong>The
+<code>NUGET_API_KEY</code> secret must never be created.</strong> The only public path is <code>publish-nuget.yml</code> and OIDC.</p>
+<hr>
+<h2 id="trusted-publishing-oidc-why-there-is-no-api-key"><a id="2-trusted-publishing-oidc--why-there-is-no-api-key"></a>2. Trusted Publishing (OIDC) — why there is no API key<a class="anchor-link" href="#trusted-publishing-oidc-why-there-is-no-api-key">#</a></h2>
+<p>The public pipeline holds <strong>no long-lived credential</strong>. Not in a secret, not in a variable, not on
+a laptop. Instead:</p>
+<ol>
+<li>The job requests an <strong>OIDC token</strong> from GitHub. This requires <code>permissions: id-token: write</code> on the job — without it the token cannot be issued and the login step fails.
+</li>
+<li>The <code>NuGet/login@v1</code> action presents that token to nuget.org, along with the nuget.org profile name in <code>secrets.NUGET_USER</code>.
+</li>
+<li>nuget.org checks the token's claims against a <strong>trusted publishing policy</strong> already registered on the account. The policy is essentially a pair: <strong>repository + workflow file name</strong> (<code>techierathore/TechieRag</code> + <code>publish-nuget.yml</code>).
+</li>
+<li>If they match, nuget.org mints a <strong>temporary API key</strong> and hands it back as the step output <code>NUGET_API_KEY</code>.
+</li>
+</ol>
+<p>Properties of that temporary key that shape the workflow design:</p>
+<ul>
+<li><strong>It lives about 1 hour.</strong>
+</li>
+<li><strong>Each OIDC token converts to a key exactly once.</strong> A token is not reusable.
+</li>
+</ul>
+<p>Hence the step ordering, which is not stylistic:</p>
+<pre><code>checkout → setup-dotnet → restore → build → test → pack → inspect → [login → push]</code></pre>
+<p>Login sits <strong>immediately before push</strong>, after every gate has already passed. A failing test never
+burns a token, and the key never sits idle while a long build runs. On a dry run, login and push are
+skipped entirely by <code>if:</code> conditions — a dry run makes no OIDC request at all.</p>
+<p><strong><code>secrets.NUGET_USER</code></strong> holds the nuget.org <strong>profile name</strong>, not a password or key. It identifies
+which account's policy to evaluate.</p>
+<h3 id="the-thing-that-will-break-this">The thing that will break this<a class="anchor-link" href="#the-thing-that-will-break-this">#</a></h3>
+<p><strong>Renaming or moving <code>.github/workflows/publish-nuget.yml</code> invalidates the policy.</strong> The policy
+matches on the file name. If the file is renamed, the OIDC exchange is rejected until the policy is
+updated in the nuget.org UI to point at the new name. Treat the file name as part of the published
+contract.</p>
+<h3 id="temporarily-active-7-days">"Temporarily active (7 days)"<a class="anchor-link" href="#temporarily-active-7-days">#</a></h3>
+<p>Because <strong>nothing has ever been published to nuget.org from this account</strong>, the policy may display
+as <em>temporarily active</em> with a 7-day window. That is nuget.org's anti-squatting guard for brand-new
+accounts:</p>
+<ul>
+<li><strong>The first successful publish through the policy locks it permanently.</strong> After that the warning disappears and the policy is durable.
+</li>
+<li><strong>If the 7-day window lapses before that first publish</strong>, the policy goes inactive and OIDC login starts failing. Fix: go to the nuget.org UI → account → Trusted Publishing → restart / re-activate the policy, which opens a fresh window. No code change is needed; the policy content stays the same.
+</li>
+</ul>
+<p>So: once the dry run looks right, do the real run reasonably promptly rather than letting it sit.</p>
+<hr>
+<h2 id="package-metadata-checklist"><a id="3-package-metadata-checklist"></a>3. Package metadata checklist<a class="anchor-link" href="#package-metadata-checklist">#</a></h2>
+<p>Audited and enforced on all four packable projects. Verified by unpacking a locally built <code>.nupkg</code>.</p>
+<table>
+<thead><tr><th>Requirement</th><th>Property</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>Package ID</td><td><code>PackageId</code></td><td><code>TechieRag</code>, <code>TechieRag.Embedded</code>, <code>TechieRag.Telemetry</code>, <code>TechieRag.Agents</code></td></tr>
+<tr><td>Author</td><td><code>Authors</code></td><td><code>Techie Rathor</code></td></tr>
+<tr><td>Description</td><td><code>Description</code></td><td>Present on every package, consumer-facing</td></tr>
+<tr><td>License</td><td><code>PackageLicenseExpression</code></td><td><code>MIT</code> (renders as a license link on nuget.org)</td></tr>
+<tr><td>Project URL</td><td><code>PackageProjectUrl</code></td><td><code>https://github.com/techierathore/TechieRag</code></td></tr>
+<tr><td>Repository URL</td><td><code>RepositoryUrl</code> + <code>RepositoryType</code></td><td><code>…/TechieRag.git</code>, <code>git</code></td></tr>
+<tr><td>Tags</td><td><code>PackageTags</code></td><td>Search terms for nuget.org</td></tr>
+<tr><td>README on the listing page</td><td><code>PackageReadmeFile</code> + <code>&lt;None Include="..\..\README.md" Pack="true" PackagePath="\" /&gt;</code></td><td>Root <code>README.md</code> ships inside the package</td></tr>
+<tr><td>Source stepping</td><td><code>PublishRepositoryUrl</code>, <code>EmbedUntrackedSources</code></td><td><strong>Added</strong></td></tr>
+<tr><td>Symbols</td><td><code>IncludeSymbols</code>, <code>SymbolPackageFormat=snupkg</code></td><td><strong>Added</strong></td></tr>
+<tr><td>No accidental packing</td><td><code>GeneratePackageOnBuild</code></td><td><strong>Added, set to <code>false</code></strong></td></tr>
+<tr><td>XML docs</td><td><code>GenerateDocumentationFile</code></td><td><code>true</code></td></tr>
+</tbody>
+</table>
+<p><strong>SourceLink:</strong> the .NET 8+ SDK bundles the GitHub SourceLink provider, so no
+<code>Microsoft.SourceLink.GitHub</code> PackageReference is needed — the switches above are sufficient. The
+publish workflow additionally passes <code>-p:ContinuousIntegrationBuild=true</code> so recorded source paths
+are deterministic rather than machine-local.</p>
+<p><strong>Verified in a local pack</strong> — the generated <code>.nuspec</code> contains:</p>
+<pre><code class="language-xml">&lt;license type="expression"&gt;MIT&lt;/license&gt;
+&lt;readme&gt;README.md&lt;/readme&gt;
+&lt;repository type="git" url="https://github.com/techierathore/TechieRag.git"
+            branch="refs/heads/main" commit="e2e72183acc736539c9051aec941e27ec8fc0d2f" /&gt;</code></pre>
+<p>That <code>commit=</code> attribute is SourceLink working: consumers can step into the exact sources that built
+the binary.</p>
+<p><strong>The version comes from the tag, never from the csproj.</strong> <code>publish-nuget.yml</code> runs
+<code>.github/workflows/scripts/determine-version.sh</code> as its first step after checkout. That script takes
+the <code>v*</code> tag the run sits on, strips the <code>v</code>, and passes the result as <code>-p:Version=</code> to build, test
+and pack, so the assembly version, the test build and the package all agree. The <code>&lt;Version&gt;</code> in the
+<code>.csproj</code> is a <strong>dev-only number that never ships</strong> to nuget.org — it only surfaces in a dry run from
+a non-tag ref, which packs <code>&lt;csprojVersion&gt;-dryrun.&lt;run&gt;</code> for inspection. Before anything is built,
+the same script queries nuget.org and <strong>fails the run</strong> if the tag's version is already published or
+is not greater than the latest published version for either package — a release increments, and a
+re-run of an old tag is an error, not a no-op. The first public release was <code>1.0.0</code>, the stable
+version TechieRag had been shipping on the internal feed; going public did not restart its history.</p>
+<hr>
+<h2 id="running-a-public-release"><a id="4-running-a-public-release"></a>4. Running a public release<a class="anchor-link" href="#running-a-public-release">#</a></h2>
+<p>Same ceremony as the owner's other libraries: <strong>release first, publish second.</strong></p>
+<h3 id="step-1-publish-a-github-release-creates-the-tag-feeds-github-packages"><a id="step-1--publish-a-github-release-creates-the-tag-feeds-github-packages"></a>Step 1 — publish a GitHub Release (creates the tag, feeds GitHub Packages)<a class="anchor-link" href="#step-1-publish-a-github-release-creates-the-tag-feeds-github-packages">#</a></h3>
+<p>GitHub → <strong>Releases</strong> → <em>Draft a new release</em> → new tag <code>v1.0.7</code> on the merged <code>main</code> commit →
+<em>Publish release</em>. GitHub creates the tag; <code>publish-github-packages.yml</code> fires on it and puts <code>1.0.7</code>
+on the internal feed. Nothing reaches nuget.org yet — that workflow has no nuget.org job, so nothing
+reaches it until Step 2.</p>
+<h3 id="step-2-dispatch-the-public-workflow-against-that-tag"><a id="step-2--dispatch-the-public-workflow-against-that-tag"></a>Step 2 — dispatch the public workflow against that tag<a class="anchor-link" href="#step-2-dispatch-the-public-workflow-against-that-tag">#</a></h3>
+<p>GitHub <strong>Actions</strong> tab → <strong>Publish to NuGet.org (Trusted Publishing)</strong> → <strong>Run workflow</strong>.</p>
+<table>
+<thead><tr><th>Input</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><code>ref</code></td><td><strong>The release tag</strong> (<code>v1.0.7</code>). A real run must be a <code>v*</code> tag — any other ref fails in <code>Determine version</code> before anything is built. A dry run accepts any branch or SHA.</td></tr>
+<tr><td><code>dry_run</code></td><td><code>true</code> = build, test, pack, list package contents, then stop. No OIDC login, no push. From a non-tag ref it packs <code>&lt;csprojVersion&gt;-dryrun.&lt;run&gt;</code>, for inspection only. <code>false</code> = the real thing, and only from a tag.</td></tr>
+</tbody>
+</table>
+<p>The version <code>1.0.7</code> is derived from the tag name (§3), checked against nuget.org, and published only if
+it is new and greater than the latest. Pick the tag deliberately — once the push succeeds, that version
+is on nuget.org for good.</p>
+<h3 id="recommended-rehearse-before-the-real-run">Recommended: rehearse before the real run<a class="anchor-link" href="#recommended-rehearse-before-the-real-run">#</a></h3>
+<p><strong>Pass 1 — <code>dry_run: true</code></strong> on the release tag (or on the commit before tagging). Costs nothing,
+touches nuget.org not at all, and is the last chance to see what would ship.</p>
+<p><strong>Pass 2 — <code>dry_run: false</code></strong> on the same tag. Publishes.</p>
+<h3 id="what-the-log-should-show">What the log should show<a class="anchor-link" href="#what-the-log-should-show">#</a></h3>
+<ol>
+<li><strong>"Checkout &lt;ref&gt;"</strong> — the requested ref. Check the resolved SHA is the commit you meant.
+</li>
+<li><strong>"Determine version"</strong> — <code>determine-version.sh</code> prints where the version came from. On a tag: <code>TechieRag: latest on nuget.org = 1.0.6; 1.0.7 is new and greater.</code> (and the same line for <code>TechieRag.Embedded</code>, <code>TechieRag.Telemetry</code> and <code>TechieRag.Agents</code>; a package never published yet reports <code>&lt;none&gt;</code>). This is the <strong>increment check</strong>: if the tag's version is already on nuget.org, or is not greater than the latest published, the run fails <strong>here</strong>, before restore. On a dry run from a non-tag ref it reports the <code>-dryrun.&lt;run&gt;</code> version instead. On a real run from a non-tag ref it fails with <em>"A public release is cut from a v</em> tag…"* — dispatch the release tag instead.
+</li>
+<li><strong>Restore / Build / Test</strong> — tests are a blocking gate. Red tests, no release. Every <code>dotnet build</code> and <code>dotnet pack</code> carries <code>-p:Version=&lt;tag version&gt;</code>. The test project is built in the Build step, and Test runs <code>--no-build</code>. A test run that builds re-stamps the net10.0 outputs it references, and Pack (<code>--no-build</code>) ships whatever is on disk. That is how 1.0.9 to 1.1.1 reached GitHub Packages with net10.0 <code>TechieRag.dll</code>, <code>TechieRag.Embedded.dll</code> and <code>TechieRag.Telemetry.dll</code> at 1.0.0.0 (Sevak TR-RAG-048, REQ-FN-071).
+</li>
+<li><strong>Pack</strong> — <code>Successfully created package …/TechieRag.&lt;version&gt;.nupkg</code> (and <code>.snupkg</code>), likewise for <code>TechieRag.Embedded</code>, <code>TechieRag.Telemetry</code> and <code>TechieRag.Agents</code>.
+</li>
+<li><strong>"Confirm packed version"</strong> — verifies the <code>.nupkg</code> file names carry exactly the version <code>Determine version</code> decided on (a mismatch means a csproj property fought the <code>-p:Version</code> override, and the run stops), then prints the banner box:
+</li>
+</ol>
+<pre><code>   ==============================================
+     PUBLISHING TechieRag, .Embedded, .Telemetry, .Agents VERSION 1.0.7
+     from ref 'v1.0.7' (e2e7218)
+     dry_run = false
+   ==============================================</code></pre>
+<p>The same facts are written to the run summary page. <strong>Read this before anything else</strong> — it is the
+   single most important line in the run.
+   <strong>"Check assembly versions"</strong> follows. It runs
+   <code>.github/workflows/scripts/check-package-assembly-versions.cs</code>, which opens every packed
+   <code>lib/*/TechieRag*.dll</code> and checks that its AssemblyVersion is <code>&lt;version&gt;.0</code> and that every
+   TechieRag-to-TechieRag reference binds to the same number. Expect
+   <code>PASS 8 assemblies in 5 packages all carry 1.1.2.0</code>. Any <code>::error::</code> line fails the run before
+   the login, so a mis-stamped package never burns a token. The file names alone prove nothing,
+   because 1.0.9 to 1.1.1 had correct names and 1.0.0.0 inside. The internal workflow runs the same
+   step after its Pack. Locally:
+   <code>dotnet run .github/workflows/scripts/check-package-assembly-versions.cs -- &lt;nupkg folder&gt; &lt;version&gt;</code>.</p>
+<ol>
+<li><strong>"Inspect package contents"</strong> — a full <code>unzip -l</code> file listing of every <code>.nupkg</code> and <code>.snupkg</code>. This is what makes each run self-documenting: months later the job log still shows exactly which files shipped in that version. Sanity-check that <code>README.md</code>, <code>lib/net10.0/</code>, <code>lib/net8.0/</code> and the <code>build/</code> + <code>buildTransitive/</code> AI-agent content are present.
+</li>
+<li>On a <strong>dry run</strong>, it stops here with <em>"dry_run was true: no OIDC login was performed and nothing was pushed."</em> That is success.
+</li>
+<li>On a <strong>real run</strong>, next comes <strong>"NuGet.org login (OIDC → temporary API key)"</strong> — the <code>NuGet/login@v1</code> step exchanging the token. It should complete in seconds. The key itself is masked in the log; you will never see it.
+</li>
+<li><strong>"Push to NuGet.org"</strong> — <code>dotnet nuget push …</code> for each package, <strong>without <code>--skip-duplicate</code></strong>. Expect <code>Your package was pushed.</code> A <code>409 Conflict</code> here is a <strong>real failure</strong>, not a skip: <code>Determine version</code> already proved the version was absent, so a duplicate at this point means something raced or the guard was bypassed. Re-running a run is no longer "harmless" — a version that is already up fails in step 2, by design.
+</li>
+</ol>
+<h3 id="after-the-push">After the push<a class="anchor-link" href="#after-the-push">#</a></h3>
+<ul>
+<li>NuGet.org puts the package into <strong>"validating"</strong> — virus scan, signature and metadata checks. Usually a few minutes. You can watch it under your nuget.org profile → <em>Manage packages</em>.
+</li>
+<li>Once validated it is live, but <strong>search indexing lags</strong>: allow up to about <strong>an hour</strong> before <code>TechieRag</code> shows up in nuget.org search or in Visual Studio's package browser. The direct URL <code>https://www.nuget.org/packages/TechieRag</code> works sooner than search does. Do not re-run the workflow because search looks empty.
+</li>
+</ul>
+<hr>
+<h2 id="verification"><a id="5-verification"></a>5. Verification<a class="anchor-link" href="#verification">#</a></h2>
+<p>Once validation completes, verify as a <em>stranger would</em> — from a clean project that knows nothing
+about the private feed:</p>
+<pre><code class="language-bash">cd $(mktemp -d)
+dotnet new console -n PublicFeedCheck
+cd PublicFeedCheck
+
+# Ignore any machine-level NuGet.config; use nuget.org and nothing else.
+cat &gt; NuGet.config &lt;&lt;'EOF'
+&lt;?xml version="1.0" encoding="utf-8"?&gt;
+&lt;configuration&gt;
+  &lt;packageSources&gt;
+    &lt;clear /&gt;
+    &lt;add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" /&gt;
+  &lt;/packageSources&gt;
+&lt;/configuration&gt;
+EOF
+
+dotnet add package TechieRag
+dotnet build</code></pre>
+<p>The <code>&lt;clear /&gt;</code> matters — it guarantees the restore cannot silently fall back to the GitHub Packages
+feed and give a false pass. Also clear the local cache first (<code>dotnet nuget locals http-cache
+--clear</code>) if a previous failed attempt may have cached a 404.</p>
+<p>Checklist on the nuget.org listing page:</p>
+<ul>
+<li>README renders on the package page
+</li>
+<li>License shows <strong>MIT</strong> and links out
+</li>
+<li>Repository / project links resolve to the GitHub repo
+</li>
+<li>Both <code>net10.0</code> and <code>net8.0</code> appear under supported frameworks for <code>TechieRag</code>
+</li>
+<li><code>TechieRag.Embedded</code> lists <code>TechieRag</code> as a dependency at the same version
+</li>
+</ul>
+<hr>
+<h2 id="troubleshooting"><a id="6-troubleshooting"></a>6. Troubleshooting<a class="anchor-link" href="#troubleshooting">#</a></h2>
+<p><strong><code>Determine version</code> failed: "already on nuget.org" / "is not greater than the latest published
+version".</strong> The tag's version has already shipped, or it is lower than / equal to what is live. This
+is the increment guard working, not a bug. A published version is permanent (see "unlist, not
+delete" below), so the fix is always to <strong>bump the tag</strong>: publish a new GitHub Release with the next version
+(<code>v1.0.8</code>) and dispatch against that. Do not delete and re-create the same tag — the guard will
+reject it again.</p>
+<p><strong><code>Determine version</code> failed: "A public release is cut from a v* tag, and '&lt;ref&gt;' is not one".</strong> A
+real (non-dry) dispatch run was started on a branch or SHA. Either push a <code>v*</code> tag on that commit and
+dispatch against that tag, or re-run the dispatch with <code>dry_run: true</code> if you only wanted to
+inspect the packages.</p>
+<p><strong>Login step fails / OIDC rejected.</strong>
+Check in this order: (a) does the job have <code>permissions: id-token: write</code>? (b) is the workflow file
+still named exactly <code>publish-nuget.yml</code>? (c) is <code>secrets.NUGET_USER</code> set to the nuget.org <strong>profile
+name</strong>? (d) is the policy still active on nuget.org, or did the 7-day temporary window lapse (§2)?
+Never "fix" this by adding an API key secret.</p>
+<p><strong>Validation failure on nuget.org.</strong> The package uploads fine and then fails validation minutes
+later; you get an email. Common causes are metadata the validator rejects or a symbol package that
+does not match its <code>.nupkg</code>. Fix the cause, <strong>bump the version</strong>, and publish again — a version that
+failed validation cannot be re-uploaded with different content.</p>
+<p><strong>Package ID conflict.</strong> If <code>TechieRag</code> were already taken, the push would be rejected with a
+403/409. It is not taken today, but note that ID ownership is claimed by first publish. This is one
+more reason not to sit on the temporary policy window.</p>
+<p><strong>Indexing delay.</strong> "It pushed but I can't find it" is almost always the ~1 hour search index lag,
+not a failure. Confirm via the direct package URL before doing anything else.</p>
+<p><strong>Unlist, not delete.</strong> NuGet.org does <strong>not</strong> allow deleting a published version — this is
+deliberate, so that consumers' builds do not break. The most you can do is <em>unlist</em> it, which hides
+it from search and the package browser while leaving it restorable for anyone who already depends on
+it. Treat every public push as permanent. This is precisely what the dry run is for — and why the
+push carries no <code>--skip-duplicate</code>: re-running a version that is already up is refused by the
+<code>Determine version</code> guard rather than quietly skipped, so a failed re-run of an old tag is expected.</p>
+<p><strong>"Policy inactive" warning on nuget.org.</strong> See §2 — restart the policy from the nuget.org UI. No
+repo change required.</p>
+<p><strong><code>NU5129</code> warning during pack.</strong> The build emits
+<code>At least one .targets file was found in 'buildTransitive/', but 'buildTransitive/TechieRag.targets'
+was not.</code> This is <strong>pre-existing</strong> and comes from the AI-agent content <code>PackagePath</code> entries in
+<code>TechieRag.csproj</code> producing doubled slashes; it predates the public pipeline and affects the private
+feed identically. It is a warning, not an error, and does not block publishing. Worth cleaning up
+separately if transitive auto-deploy of the agent files ever misbehaves.</p>
+<p><strong>Break-glass: OIDC unavailable.</strong> If trusted publishing is ever broken on nuget.org's side and a
+release genuinely cannot wait, an API key can be created <strong>manually and ad hoc</strong> on nuget.org, scoped
+as narrowly as possible (single package ID, shortest available expiry), used for that one push, and
+then <strong>deleted immediately</strong>. Conditions on this escape hatch:</p>
+<ul>
+<li>The key is <strong>created at the moment of need and never pre-created</strong>. There is no standing key.
+</li>
+<li>It is never committed to a repo secret if it can be avoided — prefer a local <code>dotnet nuget push</code> from a machine.
+</li>
+<li>It is revoked on nuget.org the moment the push completes.
+</li>
+<li>The incident gets a line in <code>DECISIONS.md</code>.
+</li>
+</ul>
+<p>The default remains: <strong>no long-lived credentials anywhere.</strong></p>
+<hr>
+<h2 id="backlog"><a id="7-backlog"></a>7. Backlog<a class="anchor-link" href="#backlog">#</a></h2>
+<p><strong>Joint ID prefix reservation.</strong> Once both <code>TechieRag*</code> and <code>TrBlazeUI*</code> are live on NuGet.org, apply
+to Microsoft for a <strong>prefix reservation</strong> covering both families in a single application. A reserved
+prefix puts the blue "owner-verified" tick on the listings and blocks anyone else from publishing an
+ID under those prefixes. It requires the packages to already be published, which is why it is backlog
+rather than a prerequisite — hence "after both libraries are live".</p>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

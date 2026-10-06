@@ -148,6 +148,57 @@ public class PublishingWorkflowTests
         Assert.True(gaps.Count == 0, "Missing packaging settings: " + string.Join("; ", gaps));
     }
 
+    /// <summary>
+    /// REQ-FN-071 (Sevak TR-RAG-048): in both workflows every <c>dotnet build</c> and <c>dotnet pack</c>
+    /// carries the release <c>-p:Version</c>, the test project is built in the Build step, and
+    /// <c>dotnet test</c> never builds. A test run that builds rebuilt the net10.0 outputs at 1.0.0.0 over
+    /// the release build, and <c>pack --no-build</c> shipped them in 1.0.9 to 1.1.1.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-071 NoWorkflowStepRebuildsWithoutTheVersion")]
+    public void NoWorkflowStepRebuildsWithoutTheVersion()
+    {
+        const string version = "-p:Version=${{ steps.version.outputs.version }}";
+
+        foreach (var path in new[] { InternalWorkflow, PublicWorkflow })
+        {
+            var workflow = ReadRepoFile(path);
+            var builds = Regex.Matches(workflow, @"dotnet (build|pack) .*").Select(match => match.Value).ToList();
+            var tests = Regex.Matches(workflow, @"dotnet test .*").Select(match => match.Value).ToList();
+
+            Assert.NotEmpty(builds);
+            Assert.All(builds, line => Assert.Contains(version, line));
+            Assert.Contains(builds, line => line.StartsWith("dotnet build", StringComparison.Ordinal)
+                && (line.Contains("tests/TechieRag.Tests/TechieRag.Tests.csproj", StringComparison.Ordinal) || line.Contains("\"$TEST_PROJECT\"", StringComparison.Ordinal)));
+            Assert.NotEmpty(tests);
+            Assert.All(tests, line => Assert.Contains("--no-build", line));
+        }
+    }
+
+    /// <summary>
+    /// REQ-FN-071 (Sevak TR-RAG-048): both workflows run the assembly-version check on the packed
+    /// folder after the last pack and before anything is pushed (or, on the public feed, before the
+    /// OIDC login), and the check script exists.
+    /// </summary>
+    [Fact(DisplayName = "REQ-FN-071 BothWorkflowsCheckAssemblyVersionsBeforePush")]
+    public void BothWorkflowsCheckAssemblyVersionsBeforePush()
+    {
+        const string script = ".github/workflows/scripts/check-package-assembly-versions.cs";
+        Assert.True(File.Exists(Path.Combine(RepoRoot(), script)), script + " is missing");
+
+        foreach (var (path, folder) in new[] { (InternalWorkflow, "./nupkgs"), (PublicWorkflow, "./artifacts") })
+        {
+            var workflow = ReadRepoFile(path);
+            var check = workflow.IndexOf($"dotnet run {script} -- {folder} ${{{{ steps.version.outputs.version }}}}", StringComparison.Ordinal);
+            var lastPack = workflow.LastIndexOf("dotnet pack ", StringComparison.Ordinal);
+            var firstPush = workflow.IndexOf("dotnet nuget push", StringComparison.Ordinal);
+            var login = workflow.IndexOf("uses: NuGet/login", StringComparison.Ordinal);
+
+            Assert.True(check > lastPack, $"{path}: the version check must run after the last pack");
+            Assert.True(check < firstPush, $"{path}: the version check must run before the push");
+            Assert.True(login < 0 || check < login, $"{path}: the version check must run before the OIDC login");
+        }
+    }
+
     private static IEnumerable<string> ExpectedProjectPaths() =>
         PackableProjects().Select(project => project.Path)
             .Append("src/TechieRag.Agents/TechieRag.Agents.csproj")

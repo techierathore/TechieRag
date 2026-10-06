@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 18 logged: 1 open, 17 fixed, 0 will not fix |
+| Count | 20 logged: 1 open, 19 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
-| Updated | 2026-10-01 |
+| Updated | 2026-10-06 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
@@ -15,10 +15,12 @@
 |---|---|---|---|
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 
-## Fixed (17)
+## Fixed (19)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20261006-02 (REQ-FN-006) | 2026-10-06 by owner | 2026-10-06 by fix-issues | the check was too weak | SevakConsumesReleasedPackages hard-codes Sevak's pin as 1.0.7; Sevak moved to 1.0.8 on 2026-10-05, so the row fails although Sevak still consumes released packages only |
+| MISS-TechieRag-20261006-01 (REQ-FN-071) | 2026-10-06 by production | 2026-10-06 by fix-issues | the check was too weak | Every assembly in every package carries the package version; a pack-time check enforces it (Sevak TR-RAG-048) |
 | MISS-TechieRag-20261001-04 | 2026-10-01 by owner | 2026-10-01 by log-miss | the check was too weak | The framework's feedback checks match TR-RAG ids across apps: Chatur's TR-RAG-003/004/005 were reported as already fixed because Sevak's feedback file uses the same ids for different problems, which made the owner think Chatur hit bugs that were fixed earlier |
 | MISS-TechieRag-20261001-03 (REQ-RAG-069) | 2026-10-01 by owner | 2026-10-01 by fix-issues | the check was too weak | Chatur TR-RAG-005: nothing says what happens when the sign-in callback throws during a model turn; there is no coded 'sign in again' exception for the host to catch |
 | MISS-TechieRag-20261001-02 (REQ-RAG-070) | 2026-10-01 by owner | 2026-10-01 by fix-issues | the check was too weak | Chatur TR-RAG-004: the ChatGPT subscription connector's name is not public; a host must hardcode "chatgpt-subscription" |
