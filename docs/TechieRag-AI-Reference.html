@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-04</div>
+    <div class="sub">Last rendered: 2026-10-06</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -143,6 +143,14 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#mcp-tool-servers-and-flows">10. MCP tool servers and flows</a></li>
         <li class="h3"><a href="#telemetry-techierag-telemetry">11. Telemetry: TechieRag.Telemetry</a></li>
         <li class="h3"><a href="#configuration-addtechierag-iconfiguration-maps-every-field-except-keys">12. Configuration: AddTechieRag(IConfiguration) maps every field except keys</a></li>
+        <li><a href="#phase-3-additions-sevak-feedback-cluster-a">Phase-3 Additions (Sevak feedback, cluster A)</a></li>
+        <li class="h3"><a href="#workspaces-one-pinned-search-the-workspace-rerank-rule-iworkspacemanager">Workspaces: one pinned search, the workspace rerank rule, IWorkspaceManager</a></li>
+        <li class="h3"><a href="#connectors-partial-runs-typed-outcomes-public-metadata-builder-re-sync-by-key">Connectors: partial runs, typed outcomes, public metadata builder, re-sync by key</a></li>
+        <li class="h3"><a href="#text-ingestion-under-a-caller-key-ingesttextasync-text-name-sourcekey-metadata">Text ingestion under a caller key: IngestTextAsync(text, name, sourceKey, metadata)</a></li>
+        <li class="h3"><a href="#mail-parsing-notes-parsedmailmessage-notes">Mail parsing notes: ParsedMailMessage.Notes</a></li>
+        <li class="h3"><a href="#tools-registering-a-name-again-replaces-it">Tools: registering a name again replaces it</a></li>
+        <li class="h3"><a href="#per-app-sqlite-database-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite">Per-app SQLite database: DataRoot, UseSqliteVec(), WithPersistence(StoreProvider.Sqlite)</a></li>
+        <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -182,7 +190,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-04 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -221,6 +229,14 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#mcp-tool-servers-and-flows">10. MCP tool servers and flows</a></li>
         <li class="h3"><a href="#telemetry-techierag-telemetry">11. Telemetry: TechieRag.Telemetry</a></li>
         <li class="h3"><a href="#configuration-addtechierag-iconfiguration-maps-every-field-except-keys">12. Configuration: AddTechieRag(IConfiguration) maps every field except keys</a></li>
+        <li><a href="#phase-3-additions-sevak-feedback-cluster-a">Phase-3 Additions (Sevak feedback, cluster A)</a></li>
+        <li class="h3"><a href="#workspaces-one-pinned-search-the-workspace-rerank-rule-iworkspacemanager">Workspaces: one pinned search, the workspace rerank rule, IWorkspaceManager</a></li>
+        <li class="h3"><a href="#connectors-partial-runs-typed-outcomes-public-metadata-builder-re-sync-by-key">Connectors: partial runs, typed outcomes, public metadata builder, re-sync by key</a></li>
+        <li class="h3"><a href="#text-ingestion-under-a-caller-key-ingesttextasync-text-name-sourcekey-metadata">Text ingestion under a caller key: IngestTextAsync(text, name, sourceKey, metadata)</a></li>
+        <li class="h3"><a href="#mail-parsing-notes-parsedmailmessage-notes">Mail parsing notes: ParsedMailMessage.Notes</a></li>
+        <li class="h3"><a href="#tools-registering-a-name-again-replaces-it">Tools: registering a name again replaces it</a></li>
+        <li class="h3"><a href="#per-app-sqlite-database-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite">Per-app SQLite database: DataRoot, UseSqliteVec(), WithPersistence(StoreProvider.Sqlite)</a></li>
+        <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -526,7 +542,7 @@ var response = await rag.AskAsync("What is quantum computing?");</code></pre>
 <table>
 <thead><tr><th>Method</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>UseSqliteVec(connectionString)</code></td><td>SQLite with vec extension (default: "Data Source=techierag.db")</td></tr>
+<tr><td><code>UseSqliteVec(connectionString)</code></td><td>SQLite with vec extension; <code>UseSqliteVec()</code> with no path uses the per-app default database (<code>DataRoot.DefaultDatabasePath</code>)</td></tr>
 <tr><td><code>UsePgVector(connectionString)</code></td><td>PostgreSQL with pgvector extension</td></tr>
 <tr><td><code>UseQdrant(endpoint, apiKey)</code></td><td>Qdrant vector database</td></tr>
 </tbody>
@@ -1278,6 +1294,76 @@ builder.Services.AddTechieRag(rag =&gt; rag
     .UseEmbedded()
     .UseSqliteVec()
     .UseChatGptSubscriptionLlm(async (prompt, ct) =&gt; await OpenSignInAsync(prompt.VerificationUri, prompt.UserCode, ct)));</code></pre>
+<hr>
+<h2 id="phase-3-additions-sevak-feedback-cluster-a">Phase-3 Additions (Sevak feedback, cluster A)<a class="anchor-link" href="#phase-3-additions-sevak-feedback-cluster-a">#</a></h2>
+<p>Every member below is additive: no existing call changes meaning except where a row says so (the per-app SQLite default and the tool-registry replacement).</p>
+<h3 id="workspaces-one-pinned-search-the-workspace-rerank-rule-iworkspacemanager">Workspaces: one pinned search, the workspace rerank rule, <code>IWorkspaceManager</code><a class="anchor-link" href="#workspaces-one-pinned-search-the-workspace-rerank-rule-iworkspacemanager">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Abstractions</code>, <code>TechieRag.Models</code>. Pinned documents are retrieved with ONE search filtered to the whole pinned set (<code>SearchOptions.DocumentFilters</code>, <code>IVectorStore.SearchDocumentsAsync</code>). <strong>Rerank rule:</strong> every workspace retrieval, pinned results included, follows <code>Workspace.RerankEnabled</code>; the library-wide <code>Rerank.Enabled</code> never overrides it inside a workspace. Services built on workspaces take <code>IWorkspaceManager</code>, which <code>WorkspaceManager</code> implements and <code>AddTechieRag</code> registers with <code>TryAdd</code>, so a test double needs no library client.</p>
+<pre><code class="language-csharp">// One search over a set of documents
+var hits = await rag.SearchAsync("refund window", new SearchOptions { TopK = 10, DocumentFilters = ["doc-1", "doc-2"], Rerank = false });
+var raw = await vectorStore.SearchDocumentsAsync(queryVector, 10, ["doc-1", "doc-2"]);
+
+// A host service depends on the interface; a test passes a double
+public sealed class WorkspaceTitles(IWorkspaceManager workspaces)
+{
+    public async Task&lt;IReadOnlyList&lt;string&gt;&gt; AllAsync() =&gt; (await workspaces.ListWorkspacesAsync()).Select(w =&gt; w.Name).ToList();
+}
+IWorkspaceManager manager = rag.GetWorkspaceManager()!;   // GetWorkspaceManager() keeps returning WorkspaceManager</code></pre>
+<h3 id="connectors-partial-runs-typed-outcomes-public-metadata-builder-re-sync-by-key">Connectors: partial runs, typed outcomes, public metadata builder, re-sync by key<a class="anchor-link" href="#connectors-partial-runs-typed-outcomes-public-metadata-builder-re-sync-by-key">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Connectors</code>. A cancelled run throws <code>ConnectorRunCanceledException</code> (still an <code>OperationCanceledException</code>) whose <code>PartialResult</code> carries the sync state and per-item reasons gathered so far; a failing run carries the same on <code>ConnectorException.PartialResult</code>. Through <code>IngestConnectorAsync</code> both also carry <code>PartialIngestion</code>. The partial sync state keeps the previous <code>LastRunUtc</code>, so the next run resumes. Each <code>ConnectorItemFailure</code> has a typed <code>Outcome</code> (<code>ConnectorItemOutcome.Failed</code> or <code>ConnectorItemOutcome.Skipped</code>); byte sizes in reasons are invariant digits with no thousands separator. <code>ConnectorIngestionExtensions.BuildMetadata</code> and <code>ConnectorIngestionExtensions.ConnectorDocumentKey</code> are public, and <code>IngestConnectorAsync</code> ingests each item under its key, so a re-synced item replaces its earlier document.</p>
+<pre><code class="language-csharp">try
+{
+    var result = await rag.IngestConnectorAsync(connector, previousSync, options, ct);
+    await SaveSyncAsync(result.Sync);
+    var skipped = result.Skipped.Where(f =&gt; f.Outcome == ConnectorItemOutcome.Skipped);
+}
+catch (ConnectorRunCanceledException cancelled)
+{
+    await SaveSyncAsync(cancelled.PartialIngestion?.Sync ?? cancelled.PartialResult.Sync);   // resume next time
+}
+catch (ConnectorException failed) when (failed.PartialResult is not null)
+{
+    await SaveSyncAsync(failed.PartialResult.Sync);
+}
+
+var metadata = ConnectorIngestionExtensions.BuildMetadata(connector, item);
+var key = ConnectorIngestionExtensions.ConnectorDocumentKey(connector, item);</code></pre>
+<h3 id="text-ingestion-under-a-caller-key-ingesttextasync-text-name-sourcekey-metadata"><a id="text-ingestion-under-a-caller-key-ingesttextasynctext-name-sourcekey-metadata"></a>Text ingestion under a caller key: <code>IngestTextAsync(text, name, sourceKey, metadata)</code><a class="anchor-link" href="#text-ingestion-under-a-caller-key-ingesttextasync-text-name-sourcekey-metadata">#</a></h3>
+<p>Package <code>TechieRag</code>. Ingesting again under the same key replaces the earlier document (same document id, workspace memberships kept); the key is stored as <code>DocumentMetadataKeys.SourceKey</code>. A null key behaves like the original overload.</p>
+<pre><code class="language-csharp">var id = await rag.IngestTextAsync(noteText, "Meeting notes", sourceKey: "notes/2026-10-06", metadata: null);</code></pre>
+<h3 id="mail-parsing-notes-parsedmailmessage-notes"><a id="mail-parsing-notes-parsedmailmessagenotes"></a>Mail parsing notes: <code>ParsedMailMessage.Notes</code><a class="anchor-link" href="#mail-parsing-notes-parsedmailmessage-notes">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Connectors.Email</code>. A part nested deeper than <code>MimeParser.MaxNestingDepth</code>, or beyond <code>MimeParser.MaxAttachments</code>, is listed as a <code>MailParseNote</code> (<code>Code</code> from <code>MailParseCodes</code>, <code>PartName</code>, <code>Depth</code>) instead of vanishing. Existing callers are unaffected.</p>
+<pre><code class="language-csharp">var parsed = MimeParser.Parse(rawBytes);
+foreach (var note in parsed.Notes.Where(n =&gt; n.Code == MailParseCodes.NestingTooDeep))
+{
+    logger.LogWarning("Skipped {Part} at depth {Depth}", note.PartName, note.Depth);
+}</code></pre>
+<p>Mail synced through <code>EmailConnector</code> carries the same notes on the item, under <code>EmailConnector.ParseNotesMetadataKey</code> (<code>"MailParseNotes"</code>), as <code>code: part name (depth n)</code> entries joined by <code>"; "</code>. The key is absent when the whole message was read.</p>
+<pre><code class="language-csharp">var document = await emailConnector.FetchAsync(item, ct);
+if (document.Item.Metadata?.TryGetValue(EmailConnector.ParseNotesMetadataKey, out var notes) == true)
+{
+    logger.LogWarning("Mail {Name} was not read in full: {Notes}", document.Item.Name, notes);
+}</code></pre>
+<h3 id="tools-registering-a-name-again-replaces-it">Tools: registering a name again replaces it<a class="anchor-link" href="#tools-registering-a-name-again-replaces-it">#</a></h3>
+<p><code>ToolRegistry.Register</code> with a name already registered (case-insensitive) replaces the definition as well as the handler, keeping its position, so the tool list sent to the model holds each name once.</p>
+<pre><code class="language-csharp">tools.Register("get_weather", "Gets the weather", schema, args =&gt; "sunny");
+tools.Register("get_weather", "Gets the weather in Celsius", schema, args =&gt; "21 C");   // one get_weather, the new one</code></pre>
+<h3 id="per-app-sqlite-database-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite"><a id="per-app-sqlite-database-dataroot-usesqlitevec-withpersistencestoreprovidersqlite"></a>Per-app SQLite database: <code>DataRoot</code>, <code>UseSqliteVec()</code>, <code>WithPersistence(StoreProvider.Sqlite)</code><a class="anchor-link" href="#per-app-sqlite-database-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Models</code>. When an app names no database folder, an existing <code>techierag.db</code> in the folder the app runs from is used (a warning names the folder; the file is never moved); otherwise the database is <code>&lt;per-user TechieRag folder&gt;/data/&lt;app name&gt;/techierag.db</code>, beside <code>models/</code>. Order: <code>DataRoot.Set</code> in code, then the data folder beside the model root (so <code>ModelRoot.Set</code> or <code>TECHIERAG_MODEL_ROOT</code> moves it), then <code>&lt;LocalApplicationData&gt;/TechieRag/data</code>. No new environment variable. <code>DataRoot.DefaultDatabasePath</code> returns the location; <code>DataRoot.SetAppName</code> overrides the entry-assembly name. Applies to <code>UseSqliteVec()</code>, the <code>VectorStore.ConnectionString</code> default, <code>WithPersistence(StoreProvider.Sqlite)</code> / Persistence <code>Provider: Sqlite</code> with no connection string, and the parameterless <code>SqliteVecStore(dimensions)</code>, <code>SqliteConversationStore()</code> and <code>SqliteWorkspaceStore()</code>. A path the caller sets is used exactly as given.</p>
+<pre><code class="language-csharp">DataRoot.SetAppName("HelpDesk");                       // optional; defaults to the entry assembly name
+var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec()                                    // no folder: per-app default
+    .WithPersistence(StoreProvider.Sqlite)             // same per-app database
+    .Build();
+Console.WriteLine(DataRoot.DefaultDatabasePath);       // ...\TechieRag\data\HelpDesk\techierag.db</code></pre>
+<h3 id="flows-host-step-names-and-model-use">Flows: host step names and model use<a class="anchor-link" href="#flows-host-step-names-and-model-use">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Orchestration</code>. <code>FlowNodeCatalog.CreateNode(kind, id, stepName)</code> names the node; a host should pass its own, localized name, because the default is the catalogue's English label. <code>FlowDefinition.UsesLanguageModel()</code> and <code>FlowDefinition.GetLanguageModelSteps()</code> say whether, and which, steps call a model (methods, so they are never persisted).</p>
+<pre><code class="language-csharp">var node = FlowNodeCatalog.CreateNode(FlowNodeKind.Agent, id: null, stepName: localizer["StepTriage"]);
+if (flow.UsesLanguageModel())
+{
+    var modelSteps = flow.GetLanguageModelSteps().Select(n =&gt; n.DisplayName);
+}</code></pre>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>

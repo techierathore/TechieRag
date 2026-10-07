@@ -5,13 +5,13 @@
 | App | TechieRag |
 | Kind | library |
 | Size | Medium |
-| Phase | 2 of 2 |
+| Phase | 2 of 3 |
 | Status | Approved |
 | Date | 2026-09-24 |
 
 ## 1. Summary
 
-Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-172 (BRD-166 to 172 added 2026-09-25 to 2026-10-04). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
+Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the `TechieRag.Agents` package on Microsoft Agent Framework, and the repository separation that gave the application, now **Sevak**, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the `TechieRag.Local` package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-173 (BRD-166 to 173 added 2026-09-25 to 2026-10-06). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.
 
 ## 2. Screens and flow
 
@@ -79,6 +79,8 @@ Closes the packaging, configuration and store gaps the 2026-09-24 code scan foun
   - *Acceptance:* When a reader opens the README installation section, then the first path is `dotnet add package TechieRag` from nuget.org with no token.
 - **BRD-167** — The AI reference and the two persona command files the package installs into a consumer's repository (BRD-57, BRD-58) shall describe every package and builder method this phase adds, with one call example each: `TechieRag.Local`, `TechieRag.Agents`, `TechieRag.Telemetry`, typed streaming, the local model and Hugging Face models by name, embedding on phones, agentic retrieval, subscription sign-in, provider routing, connectors and web ingestion, reranking, workspaces, MCP tools, flows and the configuration fields; a structural test fails the build when a shipped method is missing from them, so the files are refreshed in the same phase as the features they describe *(F-AUTODIST; added 2026-09-25 from the owner's report that the installed `/techierag` agent still described v2)* *Screen:* Installed agent files
   - *Acceptance:* When a consumer builds with the new package and opens the installed AI reference, then every phase-2 package and builder method is described with one call example.
+- **BRD-173** — Every assembly in every published package shall carry the package version, every reference between TechieRag packages shall bind to it, and both publishing workflows shall check this after packing and stop before any push when it fails *(added 2026-10-06; Sevak feedback TR-RAG-048; checklist REQ-FN-071)* *Screen:* Packaging and quality follow-ups
+  - *Acceptance:* When a maintainer packs a release at version X, then every packed TechieRag assembly is X.0, and a mismatch stops the run before push.
 
 ### Repository separation
 

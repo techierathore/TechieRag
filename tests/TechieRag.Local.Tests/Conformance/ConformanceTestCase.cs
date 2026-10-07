@@ -41,6 +41,20 @@ public sealed class ConformanceTestCase : XunitTestCase
     }
 
     /// <inheritdoc/>
+    /// <summary>
+    /// Runs the test with short-memory failures reported as skips: on a real runtime the memory gate
+    /// refusing the model means this machine is too small, not that the library is wrong.
+    /// </summary>
+    /// <inheritdoc />
+    public override Task<RunSummary> RunAsync(
+        IMessageSink diagnosticMessageSink,
+        IMessageBus messageBus,
+        object[] constructorArguments,
+        ExceptionAggregator aggregator,
+        CancellationTokenSource cancellationTokenSource) =>
+        ShortMemorySkip.RunAsync(messageBus, bus =>
+            base.RunAsync(diagnosticMessageSink, bus, constructorArguments, aggregator, cancellationTokenSource));
+
     protected override string GetSkipReason(IAttributeInfo factAttribute)
     {
         var testClass = TestMethod.TestClass.Class.ToRuntimeType();

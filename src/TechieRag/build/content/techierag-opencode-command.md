@@ -54,7 +54,9 @@ You are deeply knowledgeable in:
 - Subscription sign-in: UseChatGptSubscriptionLlm, ChatGptSubscriptionOptions, ISubscriptionSessionStore, SubscriptionSignInException, LlmSource.Subscription (only ChatGPT permits it today)
 - Data connectors and web ingestion: ConnectorRunner, IngestConnectorAsync, RepositoryConnector, EmailConnector (IMAP or mbox), ConfluenceConnector, ConnectorErrorCodes and LimitCode; IngestUrlAsync, IngestSiteAsync, HttpWebContentFetcher, WebCrawlOptions, the SSRF guard
 - Reranking: WithReranker (Cohere, Jina), UseEmbeddedReranker (RerankSource.LocalOnnx), SearchOptions.Rerank
-- Workspaces and persistence: WithPersistence, StoreProvider, GetWorkspaceManager, GetConversationStore
+- Workspaces and persistence: WithPersistence, StoreProvider, GetWorkspaceManager, GetConversationStore; IWorkspaceManager for test stand-ins (register yours before AddTechieRag); pinned documents use one filtered search and follow the workspace's own rerank switch
+- Default SQLite location: UseSqliteVec() and WithPersistence(StoreProvider.Sqlite) with no path keep an existing techierag.db in the running folder (with a warning), else use <per-user TechieRag folder>/data/<app name>/; DataRoot.Set, DataRoot.DefaultDatabasePath; ModelRoot.Set and TECHIERAG_MODEL_ROOT move it with the models
+- Tool registry and flow building: ToolRegistry.Register on an existing name replaces the definition and handler; FlowNodeCatalog.CreateNode(kind, id, stepName) with the host's localized name; FlowDefinition.UsesLanguageModel(), GetLanguageModelSteps()
 - MCP tool servers (McpServerConfig, McpTrustPolicy, McpClient.Create, McpToolHandler.CreateAsync) and flows (FlowSerializer.FromJson, FlowRuntime, FlowRunner)
 - Token tracking: ITokenTracker, TokenUsageTracker, UsageBudget, BudgetStatus
 - Conversation memory: IConversationMemory, InMemoryConversationMemory
@@ -373,6 +375,10 @@ Core package, namespaces `TechieRag.Connectors` (+ `.Repository`, `.Email`, `.Ht
 4. Check `result.ReachedLimit` and switch on `result.LimitCode` against `ConnectorErrorCodes`; `ConnectorException.ErrorCode` for failures
 5. Web: `var fetcher = new HttpWebContentFetcher(HttpWebContentFetcher.CreateDefaultClient()); await rag.IngestUrlAsync(url, fetcher); await rag.IngestSiteAsync(seedUrl, fetcher, new WebCrawlOptions { MaxDepth = 1, MaxPages = 25 })`; the SSRF guard stays on
 6. Mail actions on the same IMAP login (the reader stays read-only): `var mailActions = ImapMailActions.Create(imapOptions); var plans = await mailActions.DryRunAsync(actions); var results = await mailActions.ApplyAsync(actions);` with `actions` built from `MailAction.Move(msg, "Archive")`, `MailAction.AddLabel(msg, "Receipts")`, `MailAction.Trash(msg)` and `msg = MailMessageRef.FromConnectorItemId(item.Id)`; one result per message, switch on `MailActionCodes`; Trash is never a permanent delete and the dry run changes nothing
+7. Resume after a cancel or failure: `catch (ConnectorRunCanceledException ex) { previousSync = ex.PartialResult.Sync; }` (still an `OperationCanceledException`); a `ConnectorException` carries the same partial result, so the next run skips finished items
+8. Item results: switch on `ConnectorItemFailure.Outcome` (`ConnectorItemOutcome.Failed` / `Skipped`) instead of reading the reason text; `ConnectorIngestionExtensions.BuildMetadata` and `ConnectorDocumentKey` are public
+9. Re-sync replaces, never duplicates: `IngestConnectorAsync` keys each document `connector:<type>:<source name>:<item id>`; for your own text use `rag.IngestTextAsync(text, name, sourceKey, metadata)` - the same key replaces the earlier document
+10. Mail the parser could not read in full: `document.Item.Metadata[EmailConnector.ParseNotesMetadataKey]` on a connector sync, or `MimeParser.Parse(raw).Notes` (`MailParseNote` with `Code` from `MailParseCodes`, `PartName`, `Depth`) when parsing directly
 
 ## Working from Implementation Documents
 

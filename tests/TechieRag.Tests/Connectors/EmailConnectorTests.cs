@@ -264,6 +264,56 @@ public sealed class EmailConnectorTests
             () => connector.FetchAsync(new ConnectorItem("INBOX/1/99", "ghost", "")));
     }
 
+    /// <summary>
+    /// REQ-RAG-119: mail synced through the connector carries what the parser left out. A message
+    /// nested past the depth limit comes back with the skipped part named in the item's metadata.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-119 ConnectorResultCarriesParseNotes")]
+    public async Task ConnectorResultCarriesParseNotes()
+    {
+        var raw = "From: legal@example.test\r\nTo: bob@example.test\r\nSubject: Nested\r\n"
+            + "Date: Fri, 02 Jan 2026 10:00:00 +0000\r\n" + Nest(0, MimeParser.MaxNestingDepth + 1);
+        var transport = new FakeMailTransport().Message("INBOX", "1", "Nested", "legal@example.test", raw);
+
+        var connector = new EmailConnector(transport, Options());
+        var page = await connector.ListAsync(new ConnectorListRequest());
+        var document = await connector.FetchAsync(page.Items[0]);
+
+        Assert.NotNull(document.Item.Metadata);
+        var notes = document.Item.Metadata![EmailConnector.ParseNotesMetadataKey];
+        Assert.Contains(MailParseCodes.NestingTooDeep, notes, StringComparison.Ordinal);
+        Assert.Contains("deep-note.txt", notes, StringComparison.Ordinal);
+    }
+
+    /// <summary>REQ-RAG-119: a message read in full adds no parse-notes entry.</summary>
+    [Fact(DisplayName = "REQ-RAG-119 FullyReadMailHasNoParseNotesEntry")]
+    public async Task FullyReadMailHasNoParseNotesEntry()
+    {
+        var transport = new FakeMailTransport().Message(
+            "INBOX", "1", "Renewal", "legal@example.test", Raw("Renewal", "legal@example.test", "Approved."));
+
+        var connector = new EmailConnector(transport, Options());
+        var page = await connector.ListAsync(new ConnectorListRequest());
+        var document = await connector.FetchAsync(page.Items[0]);
+
+        Assert.False(document.Item.Metadata?.ContainsKey(EmailConnector.ParseNotesMetadataKey) ?? false);
+    }
+
+    /// <summary>Builds multiparts nested down to a text part at <paramref name="leafDepth"/>.</summary>
+    private static string Nest(int level, int leafDepth)
+    {
+        if (level == leafDepth)
+        {
+            return "Content-Type: text/plain; charset=utf-8; name=\"deep-note.txt\"\r\n"
+                + "Content-Disposition: inline; filename=\"deep-note.txt\"\r\n\r\nhidden text\r\n";
+        }
+
+        var boundary = $"bound-{level:D2}-end";
+        return $"Content-Type: multipart/mixed; boundary=\"{boundary}\"\r\n\r\n--{boundary}\r\n"
+            + Nest(level + 1, leafDepth)
+            + $"\r\n--{boundary}--\r\n";
+    }
+
     private static EmailConnectorOptions Options(Action<EmailConnectorOptions>? configure = null)
     {
         var options = new EmailConnectorOptions();

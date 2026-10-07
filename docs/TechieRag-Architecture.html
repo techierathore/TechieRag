@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Architecture</h1>
-    <div class="sub">Last rendered: 2026-10-04</div>
+    <div class="sub">Last rendered: 2026-10-06</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#stack-decisions">1. Stack decisions</a></li>
@@ -123,7 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Architecture</h1>
-    <div class="subtitle">Rendered 2026-10-04 &middot; source <code>TechieRag-Architecture.md</code></div>
+    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-Architecture.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -486,6 +486,12 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 <tr><td>2026-10-03</td><td>Trash = move to the server's Trash folder (<code>\Trash</code> special-use, or <code>[Gmail]/Trash</code>); the library never deletes a message permanently</td><td>A mistaken action must be recoverable from the user's own mail client</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
 <tr><td>2026-10-03</td><td>Move uses <code>MOVE</code> (RFC 6851) when advertised; otherwise <code>UID COPY</code> + <code>\Deleted</code> + <code>UID EXPUNGE</code> (UIDPLUS) of that message only; a server with neither is refused with a coded result</td><td>A plain <code>EXPUNGE</code> would also purge every other message the user had flagged deleted</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
 <tr><td>2026-10-03</td><td>Labels use Gmail's <code>X-GM-LABELS</code> extension; on any other server a label request returns a coded "labels not supported" result, never an IMAP keyword</td><td>Outlook categories are not exposed over IMAP, and a keyword the user's client never shows would look like it worked when it did not</td><td>done 2026-10-03 (REQ-RAG-110/111, <code>ImapMailActions</code>, <code>ImapSession</code>)</td></tr>
+<tr><td>2026-10-06</td><td>A pack-time check: packed assemblies carry the package version; tests never rebuild</td><td>1.0.9 to 1.1.1 shipped net10.0 at 1.0.0.0</td><td>done (BRD-173)</td></tr>
+<tr><td>2026-10-06</td><td>Sevak's unfixed feedback is phase 3</td><td>Phase 2 awaits UAT and would pass 100 items</td><td>done (<code>TechieRag-P3-BRD.md</code>)</td></tr>
+<tr><td>2026-10-06</td><td>A database with no folder given goes to <code>&lt;TechieRag data root&gt;/data/&lt;app name&gt;/</code>, moved with the models' override; an existing <code>techierag.db</code> in the running folder is kept, with a warning</td><td>Moving files would make an upgraded app look empty; apps never share a database</td><td>planned (BRD-182)</td></tr>
+<tr><td>2026-10-06</td><td>Add <code>IWorkspaceManager</code>; <code>GetWorkspaceManager()</code> keeps its return type</td><td>Testable, no caller breaks</td><td>planned (BRD-176)</td></tr>
+<tr><td>2026-10-06</td><td>Text ingestion takes an optional key that replaces the earlier document</td><td>Re-syncs stored copies</td><td>planned (BRD-179)</td></tr>
+<tr><td>2026-10-06</td><td>Parsed mail gains an optional notes list</td><td>Skipped content vanished; an addition breaks no caller</td><td>planned (BRD-180)</td></tr>
 </tbody>
 </table>
 <h2 id="module-responsibilities"><a id="7-module-responsibilities"></a>7. Module responsibilities<a class="anchor-link" href="#module-responsibilities">#</a></h2>

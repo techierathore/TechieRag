@@ -57,4 +57,22 @@ public sealed class ConnectorException : Exception
     /// </summary>
     /// <remarks>A host switches on this rather than parsing <see cref="Exception.Message"/>, which is English.</remarks>
     public string? ErrorCode { get; init; }
+
+    /// <summary>
+    /// Gets what the run gathered before this failure ended it — per-item reasons and the sync state
+    /// for the next run — when the failure came out of a <see cref="ConnectorRunner"/> walk; null when
+    /// the exception was raised outside a run (REQ-RAG-117 / BRD-177).
+    /// </summary>
+    /// <remarks>
+    /// The sync state keeps the previous run's <see cref="ConnectorSyncState.LastRunUtc"/> and records every
+    /// item finished before the failure, so persisting it lets the next run resume rather than start over.
+    /// </remarks>
+    public ConnectorRunResult? PartialResult { get; internal set; }
+
+    /// <summary>
+    /// Gets what connector ingestion had done before this failure — ingested document ids, skipped
+    /// items and the sync state — when the run came from
+    /// <see cref="ConnectorIngestionExtensions.IngestConnectorAsync"/>; otherwise null (REQ-RAG-117).
+    /// </summary>
+    public ConnectorIngestionResult? PartialIngestion { get; internal set; }
 }

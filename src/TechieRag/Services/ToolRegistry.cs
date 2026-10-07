@@ -34,6 +34,8 @@ public class ToolRegistry : IToolHandler
     /// <param name="description">Tool description for the LLM.</param>
     /// <param name="parametersSchema">JSON Schema for tool parameters.</param>
     /// <param name="handler">Async function: (argumentsJson, cancellationToken) => resultString.</param>
+    /// <remarks>Registering a name that is already registered replaces both its definition and its
+    /// handler, keeping the tool's position in <see cref="ToolDefinitions"/> (REQ-RAG-121).</remarks>
     public void Register(string name, string description, string parametersSchema,
         Func<string, CancellationToken, Task<string>> handler)
     {
@@ -42,12 +44,26 @@ public class ToolRegistry : IToolHandler
         ArgumentException.ThrowIfNullOrEmpty(parametersSchema);
         ArgumentNullException.ThrowIfNull(handler);
 
-        definitions.Add(new ToolDefinition
+        var definition = new ToolDefinition
         {
             Name = name,
             Description = description,
             ParametersSchema = parametersSchema
-        });
+        };
+
+        // REQ-RAG-121 / BRD-181: a second registration of a name replaces the definition in place, as
+        // it always replaced the handler, so the tool list sent to the model names each tool once and
+        // describes the handler that will actually run. Names match case-insensitively, like handlers.
+        var existing = definitions.FindIndex(d => string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (existing >= 0)
+        {
+            definitions[existing] = definition;
+        }
+        else
+        {
+            definitions.Add(definition);
+        }
+
         handlers[name] = handler;
     }
 

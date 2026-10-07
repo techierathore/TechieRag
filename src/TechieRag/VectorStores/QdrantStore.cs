@@ -289,6 +289,61 @@ public class QdrantStore : IVectorStore
             };
         }
 
+        return await SearchWithFilterAsync(queryVector, topK, filter, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Performs one similarity search restricted to a set of documents (REQ-RAG-114 / BRD-174).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return across all the documents.</param>
+    /// <param name="documentIds">The documents to search; an empty set returns no results.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked search results, highest first.</returns>
+    /// <remarks>One search whose filter matches any of the ids (a <c>should</c> clause), never one search per document.</remarks>
+    public async Task<IReadOnlyList<SearchResult>> SearchDocumentsAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string> documentIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documentIds);
+        await EnsureInitializedAsync(cancellationToken);
+
+        if (queryVector == null || queryVector.Length == 0)
+        {
+            throw new ArgumentException("Query vector cannot be null or empty.", nameof(queryVector));
+        }
+
+        if (documentIds.Count == 0)
+        {
+            return [];
+        }
+
+        var filter = new Filter();
+        foreach (var documentId in documentIds.Distinct(StringComparer.Ordinal))
+        {
+            filter.Should.Add(new Condition
+            {
+                Field = new FieldCondition { Key = "DocumentId", Match = new Match { Keyword = documentId } }
+            });
+        }
+
+        return await SearchWithFilterAsync(queryVector, topK, filter, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Runs one search with an optional payload filter and maps the points.</summary>
+    /// <param name="queryVector">The query vector.</param>
+    /// <param name="topK">How many results to return.</param>
+    /// <param name="filter">The payload filter, or null.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Ranked results.</returns>
+    private async Task<IReadOnlyList<SearchResult>> SearchWithFilterAsync(
+        float[] queryVector,
+        int topK,
+        Filter? filter,
+        CancellationToken cancellationToken)
+    {
         var searchResult = await client.SearchAsync(
             collectionName,
             queryVector,

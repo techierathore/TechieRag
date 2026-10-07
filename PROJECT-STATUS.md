@@ -1,7 +1,7 @@
 ---
 project: TechieRag
 last_updated: 2026-10-06
-current_phase: Phase 2 of 2 · UAT — handoff done, 90 of 90 verified, 1 not applicable
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · UAT — handoff done, 11 of 11 verified
 last_verified_build: PASS
 last_verified_date: 2026-10-06
 ---
@@ -10,7 +10,7 @@ last_verified_date: 2026-10-06
 
 ## Where I am
 
-Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 90 rows Verified. On 2026-10-06 the release workflows were fixed so every packed assembly carries the package version, and a check now fails any release that does not (REQ-FN-071, Sevak TR-RAG-048). It ships as 1.1.2 once the owner publishes the v1.1.2 release. Awaiting UAT per the UsageGuide.
+Phase 3 of 3 (Consumer feedback from Sevak). All 11 rows Verified and handed off on 2026-10-06: the UsageGuide has their test plan and limitations, and the new phase-3 DevGuide maps each surface to file and line. The two gaps the handoff found (REQ-RAG-116, REQ-RAG-119) were fixed and re-verified the same day. Phase 2 (90 rows) is also Verified. Both wait for UAT per the UsageGuide, and both ship in the next package with the TR-RAG-048 version fix.
 
 ## Next command to run
 
@@ -22,7 +22,7 @@ OpenCode:
 ```
 (owner) set current_phase to Released after UAT — no agent command
 ```
-Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-P2-Checklist.md.
+Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-P3-Checklist.md.
 
 ## Open requirements
 
@@ -38,15 +38,12 @@ Why: every row in this phase's scope is terminal and handoff has run; waiting on
 
 ## Known blockers
 
-- 🔶 **Release 1.1.2:** Sevak is held at 1.0.8 until the owner publishes the `v1.1.2` GitHub Release (TR-RAG-048).
-- 🔶 **Release notes:** `LlmConfig.MaxContextTokens` is now `int?` (REQ-RAG-113).
-- 🔶 **Next package:** Lekhak re-checks TR-RAG-002/003; Chatur TR-RAG-003/004/005; Sevak needs `ImapMailActions`.
-- 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 need 4.6 GB free; WSL has 7.8 GB total. Raise `memory=` in `.wslconfig`.
-- 🔶 **Postgres (REQ-RAG-044):** container runs, but `TechieRagTestPostgres` is unset in WSL and Windows; live test skipped.
-- 🔶 **Windows head:** the probe built but never answered on its debug port; rows graded by test only.
-- 🔶 **Breaking change:** an appsettings key fails startup after the next package; check Sevak.
-- 🔶 **Keys in chat:** OpenCode Go key (2026-10-01) and Gmail app password (2026-10-03); rotate if shared.
-- 🔶 **Flaky:** 6 `EmbeddingSignatureStampTests` on Windows; live Gmail test once.
+- 🔶 **Release 1.1.2:** publish the `v1.1.2` release; Sevak waits (TR-RAG-048).
+- 🔶 **Behaviour changes:** default SQLite folder and repeat tool registration (REQ-RAG-121/122).
+- 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
+- 🔶 **Postgres (REQ-RAG-044):** `TechieRagTestPostgres` is unset; live test skipped.
+- 🔶 **Breaking change:** an appsettings key fails startup; check Sevak.
+- 🔶 **Keys in chat:** OpenCode Go key and Gmail app password; rotate if shared.
 - 🔶 **Owner git:** commit today's work in TechieRag and Sevak.
 
 ## Verification log
@@ -55,17 +52,17 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-04 | record-probe | 87/87 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
-| 2026-10-04 | amend-docs | 87/89 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
-| 2026-10-04 | verify-phase | 89/89 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
-| 2026-10-04 | handoff-phase | 89/89 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 | 2026-10-06 | triage-and-fix | 90/90 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-10-06 | amend-docs | 90/90 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
+| 2026-10-06 | build-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-06 | handoff-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-06 | fix-issues | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
 - OnnxRuntime: 1 open · 0 closed — docs/TechieRag-OnnxRuntime-Feedback.md
 - OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
-- TechieFlow: 1 open · 0 closed — docs/TechieRag-TechieFlow-Feedback.md
+- TechieFlow: 0 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 
 ## Standards compliance
 

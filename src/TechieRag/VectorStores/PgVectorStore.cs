@@ -360,11 +360,47 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
     /// <returns>Ranked search results ordered by similarity score (highest first).</returns>
     /// <exception cref="ArgumentNullException">Thrown when queryVector is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the store is not initialized.</exception>
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+    public Task<IReadOnlyList<SearchResult>> SearchAsync(
         float[] queryVector,
         int topK = 5,
         string? documentFilter = null,
+        CancellationToken cancellationToken = default) =>
+        SearchCoreAsync(queryVector, topK, documentFilter, null, cancellationToken);
+
+    /// <summary>
+    /// Performs one cosine-distance query restricted to a set of documents (REQ-RAG-114 / BRD-174).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return across all the documents.</param>
+    /// <param name="documentIds">The documents to search; an empty set returns no results.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked search results, highest first.</returns>
+    /// <remarks>One query with <c>DocumentId = ANY(@DocumentIds)</c>, never one per document.</remarks>
+    public Task<IReadOnlyList<SearchResult>> SearchDocumentsAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string> documentIds,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documentIds);
+        return documentIds.Count == 0
+            ? Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>())
+            : SearchCoreAsync(queryVector, topK, null, documentIds.Distinct(StringComparer.Ordinal).ToArray(), cancellationToken);
+    }
+
+    /// <summary>The query shared by the single-document and document-set searches.</summary>
+    /// <param name="queryVector">The query vector.</param>
+    /// <param name="topK">How many results to return.</param>
+    /// <param name="documentFilter">One document to restrict to, or null.</param>
+    /// <param name="documentIds">A set of documents to restrict to, or null; wins over <paramref name="documentFilter"/>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Ranked results.</returns>
+    private async Task<IReadOnlyList<SearchResult>> SearchCoreAsync(
+        float[] queryVector,
+        int topK,
+        string? documentFilter,
+        string[]? documentIds,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(queryVector);
         EnsureInitialized();
@@ -376,7 +412,19 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
 
         // Use <=> operator for cosine distance (lower is more similar)
         // Convert to similarity score: 1 - distance
-        if (documentFilter != null)
+        if (documentIds is not null)
+        {
+            cmd.CommandText = """
+                SELECT Id, DocumentId, Text, Embedding, PageNumber, ChunkIndex, Metadata, CreatedAt,
+                       1 - (Embedding <=> @QueryVector) AS Score
+                FROM Chunks
+                WHERE DocumentId = ANY(@DocumentIds) AND Embedding IS NOT NULL
+                ORDER BY Embedding <=> @QueryVector
+                LIMIT @TopK
+                """;
+            cmd.Parameters.AddWithValue("DocumentIds", documentIds);
+        }
+        else if (documentFilter != null)
         {
             cmd.CommandText = """
                 SELECT Id, DocumentId, Text, Embedding, PageNumber, ChunkIndex, Metadata, CreatedAt,

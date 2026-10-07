@@ -206,10 +206,28 @@ public static class FlowNodeCatalog
     /// <param name="kind">The kind to create.</param>
     /// <param name="id">The id to give it; null generates one.</param>
     /// <returns>A new node with its kind's display name pre-filled.</returns>
-    public static FlowNode CreateNode(FlowNodeKind kind, string? id = null) => new()
+    /// <remarks>
+    /// The pre-filled name is the catalogue's invariant English label. A host that shows the canvas in
+    /// another language should call <see cref="CreateNode(FlowNodeKind, string?, string?)"/> with its own,
+    /// localized step name (REQ-RAG-123).
+    /// </remarks>
+    public static FlowNode CreateNode(FlowNodeKind kind, string? id = null) => CreateNode(kind, id, null);
+
+    /// <summary>
+    /// Creates a node of the given kind with a fresh id and the step name the host chose
+    /// (REQ-RAG-123 / BRD-183, Sevak feedback TR-RAG-042).
+    /// </summary>
+    /// <param name="kind">The kind to create.</param>
+    /// <param name="id">The id to give it; null generates one.</param>
+    /// <param name="stepName">The node's name as the host's user should read it. A host should pass
+    /// its own, localized name here: the library has no localisation, and its default is the
+    /// catalogue's English <see cref="FlowNodeKindDescriptor.DisplayName"/>. Null or blank uses that
+    /// default.</param>
+    /// <returns>A new node carrying <paramref name="stepName"/>, or the English display name when none was given.</returns>
+    public static FlowNode CreateNode(FlowNodeKind kind, string? id, string? stepName) => new()
     {
         Id = string.IsNullOrWhiteSpace(id) ? $"{kind.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}"[..24] : id,
         Kind = kind,
-        Name = Describe(kind).DisplayName
+        Name = string.IsNullOrWhiteSpace(stepName) ? Describe(kind).DisplayName : stepName
     };
 }

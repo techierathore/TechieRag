@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using TechieRag.Abstractions;
 using TechieRag.Llm;
+using TechieRag.Models;
 using TechieRag.Services;
 
 namespace TechieRag;
@@ -230,8 +231,41 @@ public class TechieRagBuilder
         return this;
     }
 
+    /// <summary>Uses the SQLite vector store in the given database file.</summary>
+    /// <param name="databasePath">The database file, absolute or relative; used exactly as given (REQ-RAG-122).</param>
+    /// <returns>The builder instance for method chaining.</returns>
     public TechieRagBuilder UseSqliteVec(string databasePath = "techierag.db")
         => UseVectorStore(VectorStoreType.SqliteVec, $"Data Source={databasePath}");
+
+    /// <summary>
+    /// Uses the SQLite vector store in the per-app default database (REQ-RAG-122 / BRD-182).
+    /// </summary>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>
+    /// <para>The database is <see cref="DataRoot.DefaultDatabasePath"/>: an existing <c>techierag.db</c> in
+    /// the folder the app runs from is kept (with a logged warning naming that folder); otherwise
+    /// <c>&lt;per-user TechieRag folder&gt;/data/&lt;app name&gt;/techierag.db</c>, created at build time.
+    /// Move it with <see cref="DataRoot.Set"/> or with the model root's override.</para>
+    /// <para><see cref="UseSqliteVec(string)"/> with a path keeps that path exactly as given.</para>
+    /// </remarks>
+    public TechieRagBuilder UseSqliteVec() => UseVectorStoreAtDefaultLocation(VectorStoreType.SqliteVec, apiKey: null);
+
+    /// <summary>
+    /// Selects a vector store type without a connection string, so a SQLite store uses the per-app
+    /// default database (REQ-RAG-122).
+    /// </summary>
+    /// <param name="type">The vector store type.</param>
+    /// <param name="apiKey">Optional API key.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    internal TechieRagBuilder UseVectorStoreAtDefaultLocation(VectorStoreType type, string? apiKey)
+    {
+        config.VectorStore = new VectorStoreConfig
+        {
+            Type = type,
+            ApiKey = apiKey
+        };
+        return this;
+    }
 
     public TechieRagBuilder UsePgVector(string connectionString)
     {
@@ -698,6 +732,40 @@ public class TechieRagBuilder
     }
 
     /// <summary>
+    /// Enables SQLite persistence in the per-app default database (REQ-RAG-122 / BRD-182).
+    /// </summary>
+    /// <param name="provider">Must be <see cref="StoreProvider.Sqlite"/>; PostgreSQL needs a connection string.</param>
+    /// <param name="defaultUserId">Default user for persistent conversation memory.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>
+    /// The conversation and workspace tables go into <see cref="DataRoot.DefaultDatabasePath"/>, the same
+    /// per-app database <see cref="UseSqliteVec()"/> uses.
+    /// </remarks>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="provider"/> is not <see cref="StoreProvider.Sqlite"/>.</exception>
+    public TechieRagBuilder WithPersistence(StoreProvider provider, string defaultUserId)
+    {
+        if (provider != StoreProvider.Sqlite)
+        {
+            throw new ArgumentException("Only SQLite has a default database; pass a connection string for any other provider.", nameof(provider));
+        }
+
+        config.Persistence = new PersistenceConfig
+        {
+            Provider = provider,
+            DefaultUserId = defaultUserId
+        };
+        return this;
+    }
+
+    /// <summary>
+    /// Enables SQLite persistence in the per-app default database, for the default user (REQ-RAG-122).
+    /// </summary>
+    /// <param name="provider">Must be <see cref="StoreProvider.Sqlite"/>.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="provider"/> is not <see cref="StoreProvider.Sqlite"/>.</exception>
+    public TechieRagBuilder WithPersistence(StoreProvider provider) => WithPersistence(provider, "default");
+
+    /// <summary>
     /// Sets or overrides the cost-estimation pricing for a model.
     /// </summary>
     /// <param name="modelName">The model name (matched case-insensitively and by substring).</param>
@@ -882,9 +950,21 @@ public class TechieRagBuilder
         _ => throw new InvalidOperationException($"Unsupported persistence provider: {config.Persistence.Provider}")
     };
 
-    private string RequirePersistenceConnectionString() =>
-        config.Persistence.ConnectionString
-        ?? throw new InvalidOperationException("Persistence.ConnectionString is required when a persistence provider is configured.");
+    private string RequirePersistenceConnectionString()
+    {
+        if (!string.IsNullOrEmpty(config.Persistence.ConnectionString))
+        {
+            return config.Persistence.ConnectionString;
+        }
+
+        // REQ-RAG-122: SQLite with no connection string uses the per-app default database.
+        if (config.Persistence.Provider == StoreProvider.Sqlite)
+        {
+            return DataRoot.ResolveDefaultConnectionString(config.LoggerFactory?.CreateLogger(typeof(DataRoot).FullName!));
+        }
+
+        throw new InvalidOperationException("Persistence.ConnectionString is required when a persistence provider is configured.");
+    }
 
     /// <summary>
     /// Creates the configured LLM provider.
@@ -1007,7 +1087,11 @@ public class TechieRagBuilder
 
         return config.VectorStore.Type switch
         {
-            VectorStoreType.SqliteVec => new VectorStores.SqliteVecStore(config.VectorStore.ConnectionString, dimensions),
+            VectorStoreType.SqliteVec => new VectorStores.SqliteVecStore(
+                config.VectorStore.IsConnectionStringSet
+                    ? config.VectorStore.ConnectionString
+                    : DataRoot.ResolveDefaultConnectionString(config.LoggerFactory?.CreateLogger(typeof(DataRoot).FullName!)),
+                dimensions),
             VectorStoreType.PgVector => CreatePgVectorStore(dimensions),
             VectorStoreType.Qdrant => new VectorStores.QdrantStore(config.VectorStore.ConnectionString, dimensions, apiKey: config.VectorStore.ApiKey),
             _ => throw new InvalidOperationException($"Unsupported vector store type: {config.VectorStore.Type}")

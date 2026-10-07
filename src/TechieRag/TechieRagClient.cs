@@ -226,18 +226,63 @@ public class TechieRagClient : ITechieRag
     /// <item><description>Store in vector store</description></item>
     /// </list>
     /// </remarks>
-    public async Task<string> IngestTextAsync(
+    public Task<string> IngestTextAsync(
         string text,
         string documentName,
         Dictionary<string, object>? metadata = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        IngestTextCoreAsync(text, documentName, null, metadata, cancellationToken);
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para><b>Algorithm (REQ-RAG-120 / BRD-179):</b></para>
+    /// <list type="number">
+    /// <item><description>Derive the document id from the key (a name-based GUID), so every call with
+    /// one key addresses the same document and its workspace memberships survive.</description></item>
+    /// <item><description>Chunk and embed the new text first.</description></item>
+    /// <item><description>Only then delete the chunks stored under that id and upsert the new ones, so
+    /// a failed embedding leaves the earlier copy in place rather than nothing.</description></item>
+    /// </list>
+    /// </remarks>
+    public Task<string> IngestTextAsync(
+        string text,
+        string documentName,
+        string? sourceKey,
+        Dictionary<string, object>? metadata,
+        CancellationToken cancellationToken = default) =>
+        IngestTextCoreAsync(text, documentName, string.IsNullOrEmpty(sourceKey) ? null : sourceKey, metadata, cancellationToken);
+
+    /// <summary>
+    /// Derives the stable document id for a caller key (REQ-RAG-120).
+    /// </summary>
+    /// <param name="sourceKey">The caller key.</param>
+    /// <returns>A GUID string built from the SHA-256 of the key, so it is the same in every process.</returns>
+    internal static string DocumentIdForKey(string sourceKey)
+    {
+        var hash = System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes("techierag-source-key:" + sourceKey));
+        return new Guid(hash.AsSpan(0, 16)).ToString();
+    }
+
+    /// <summary>Shared text ingestion: keyed (replacing) when <paramref name="sourceKey"/> is set, plain otherwise.</summary>
+    /// <param name="text">The text.</param>
+    /// <param name="documentName">The document name.</param>
+    /// <param name="sourceKey">The caller key, or null.</param>
+    /// <param name="metadata">Caller metadata, or null.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The document id.</returns>
+    private async Task<string> IngestTextCoreAsync(
+        string text,
+        string documentName,
+        string? sourceKey,
+        Dictionary<string, object>? metadata,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrEmpty(text);
         ArgumentException.ThrowIfNullOrEmpty(documentName);
 
         logger.LogInformation("Ingesting text document '{DocumentName}'", documentName);
 
-        var documentId = Guid.NewGuid().ToString();
+        var documentId = sourceKey is null ? Guid.NewGuid().ToString() : DocumentIdForKey(sourceKey);
 
         // For text ingestion the text IS the artefact — pasted input, a page's readable content, a
         // transcript — so its UTF-8 byte count is the document's size. A caller that knows a truer
@@ -282,6 +327,11 @@ public class TechieRagClient : ITechieRag
                 }
             }
 
+            if (sourceKey is not null)
+            {
+                chunk.Metadata[DocumentMetadataKeys.SourceKey] = sourceKey;
+            }
+
             chunkList.Add(chunk);
         }
 
@@ -294,6 +344,12 @@ public class TechieRagClient : ITechieRag
         // Embed all chunks
         logger.LogDebug("Embedding {ChunkCount} chunks for text document {DocumentId}", chunkList.Count, documentId);
         await EmbedAndStampAsync(chunkList, cancellationToken);
+
+        // REQ-RAG-120: the earlier copy under this key goes only after the new text is embedded.
+        if (sourceKey is not null)
+        {
+            await vectorStore.DeleteByDocumentAsync(documentId, cancellationToken).ConfigureAwait(false);
+        }
 
         // Ensure document record exists
         await EnsureDocumentExistsAsync(documentId, documentName, "text-input", cancellationToken);
@@ -418,9 +474,15 @@ public class TechieRagClient : ITechieRag
 
         var queryVector = await embeddingProvider.EmbedAsync(query, cancellationToken).ConfigureAwait(false);
         var fetchCount = useReranker ? Math.Max(topK, config.Rerank.CandidateCount) : topK;
-        var results = await vectorStore
-            .SearchAsync(queryVector, fetchCount, options.DocumentFilter, cancellationToken)
-            .ConfigureAwait(false);
+
+        // REQ-RAG-114: a document set is one store query, never one per document.
+        var results = options.DocumentFilters is { Count: > 0 } documentSet
+            ? await vectorStore
+                .SearchDocumentsAsync(queryVector, fetchCount, documentSet, cancellationToken)
+                .ConfigureAwait(false)
+            : await vectorStore
+                .SearchAsync(queryVector, fetchCount, options.DocumentFilter, cancellationToken)
+                .ConfigureAwait(false);
 
         if (useReranker && results.Count > 0)
         {

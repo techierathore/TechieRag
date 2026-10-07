@@ -38,6 +38,52 @@ public interface ITechieRag
     Task<string> IngestTextAsync(string text, string documentName, Dictionary<string, object>? metadata = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Ingests raw text under a caller key, replacing the document stored earlier under the same key
+    /// (REQ-RAG-120 / BRD-179, Sevak feedback TR-RAG-026).
+    /// </summary>
+    /// <param name="text">The text content to ingest.</param>
+    /// <param name="documentName">A friendly name for the document.</param>
+    /// <param name="sourceKey">The caller's stable key for this text (a file path, a connector item id).
+    /// Null or empty behaves exactly like <see cref="IngestTextAsync(string, string, Dictionary{string, object}?, CancellationToken)"/>.</param>
+    /// <param name="metadata">Optional metadata to associate with the document; may be null.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The document ID. TechieRagClient derives it from the key, so it is the same on every call with that key.</returns>
+    /// <remarks>
+    /// <para><b>Replace, not add:</b> ingesting twice under one key leaves one document, holding the
+    /// second text. The key is recorded as <see cref="DocumentMetadataKeys.SourceKey"/>.</para>
+    /// <para><b>Default implementation</b> (ADR-005 additive change): deletes every listed document whose
+    /// <see cref="DocumentMetadataKeys.SourceKey"/> equals the key, then ingests with the key in the
+    /// metadata. TechieRagClient overrides it: the new text is embedded before the old chunks are
+    /// removed, so a failed embedding never leaves the key empty, and the document id stays stable, so
+    /// workspace memberships survive the replacement.</para>
+    /// </remarks>
+    async Task<string> IngestTextAsync(
+        string text,
+        string documentName,
+        string? sourceKey,
+        Dictionary<string, object>? metadata,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(sourceKey))
+        {
+            return await IngestTextAsync(text, documentName, metadata, cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var document in await ListDocumentsAsync(cancellationToken).ConfigureAwait(false))
+        {
+            if (document.Metadata.TryGetValue(DocumentMetadataKeys.SourceKey, out var stored)
+                && string.Equals(stored?.ToString(), sourceKey, StringComparison.Ordinal))
+            {
+                await DeleteDocumentAsync(document.Id, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        var keyed = metadata is null ? new Dictionary<string, object>() : new Dictionary<string, object>(metadata);
+        keyed[DocumentMetadataKeys.SourceKey] = sourceKey;
+        return await IngestTextAsync(text, documentName, keyed, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Ingests all matching files from a directory.
     /// </summary>
     /// <param name="directoryPath">Path to the directory containing documents.</param>
@@ -79,12 +125,29 @@ public interface ITechieRag
     /// therefore <b>ignores</b> <see cref="SearchOptions.Rerank"/>; implementers that wrap or
     /// delegate to TechieRagClient should override it and forward the options object intact.
     /// TechieRagClient overrides it with the full implementation.</para>
+    /// <para><b>Document sets (REQ-RAG-114):</b> the default honours
+    /// <see cref="SearchOptions.DocumentFilters"/> with one legacy search per document, merged by
+    /// score; TechieRagClient runs it as one filtered store query.</para>
     /// </remarks>
-    Task<IReadOnlyList<SearchResult>> SearchAsync(
+    async Task<IReadOnlyList<SearchResult>> SearchAsync(
         string query,
         SearchOptions? options,
-        CancellationToken cancellationToken = default) =>
-        SearchAsync(query, options?.TopK ?? 5, options?.DocumentFilter, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        var topK = options?.TopK ?? 5;
+        if (options?.DocumentFilters is not { Count: > 0 } documentSet)
+        {
+            return await SearchAsync(query, topK, options?.DocumentFilter, cancellationToken).ConfigureAwait(false);
+        }
+
+        var merged = new List<SearchResult>();
+        foreach (var documentId in documentSet.Distinct(StringComparer.Ordinal))
+        {
+            merged.AddRange(await SearchAsync(query, topK, documentId, cancellationToken).ConfigureAwait(false));
+        }
+
+        return merged.OrderByDescending(result => result.Score).Take(topK).ToList();
+    }
 
     /// <summary>
     /// Deletes a document and all its chunks from the vector store, and its membership from every

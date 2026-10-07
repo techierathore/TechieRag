@@ -139,13 +139,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>App</td><td>TechieRag</td></tr>
 <tr><td>Kind</td><td>library</td></tr>
 <tr><td>Size</td><td>Medium</td></tr>
-<tr><td>Phase</td><td>2 of 2</td></tr>
+<tr><td>Phase</td><td>2 of 3</td></tr>
 <tr><td>Status</td><td>Approved</td></tr>
 <tr><td>Date</td><td>2026-09-24</td></tr>
 </tbody>
 </table>
 <h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-172 (BRD-166 to 172 added 2026-09-25 to 2026-10-04). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
+<p>Phase 2 adds what makes the library go where its consumers go. From the 2026-09-03 amendments: the agentic retrieval contract in core and the <code>TechieRag.Agents</code> package on Microsoft Agent Framework, and the repository separation that gave the application, now <strong>Sevak</strong>, its own repository (executed 2026-09-24). From the 2026-09-24 amendments: four-platform groundwork inside .NET MAUI apps, the <code>TechieRag.Local</code> package that runs a language model in-process with no server and no network after one download, typed streaming events so a tool-using turn can stream, and subscription sign-in through a browser flow the host app drives. Harvested on 2026-09-24 from the application's ledger, where they had been recorded between July and September 2026: the v3 library features already built and mostly verified (chunking strategies, more formats, web ingestion, data connectors, MCP tools, flow orchestration, workspaces and persistent memory, reranking, provider breadth, the telemetry package), each given its own TechieRag id with its status carried in. Finally, the packaging and configuration gaps the 2026-09-24 code scan found. Ids run on from phase 1: BRD-83 to BRD-173 (BRD-166 to 173 added 2026-09-25 to 2026-10-06). BRD-120 (YouTube transcripts) was removed on 2026-09-24 by owner decision and BRD-164 deletes its code.</p>
 <h2 id="screens-and-flow"><a id="2-screens-and-flow"></a>2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase adds or extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -261,6 +261,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-167</strong> — The AI reference and the two persona command files the package installs into a consumer's repository (BRD-57, BRD-58) shall describe every package and builder method this phase adds, with one call example each: <code>TechieRag.Local</code>, <code>TechieRag.Agents</code>, <code>TechieRag.Telemetry</code>, typed streaming, the local model and Hugging Face models by name, embedding on phones, agentic retrieval, subscription sign-in, provider routing, connectors and web ingestion, reranking, workspaces, MCP tools, flows and the configuration fields; a structural test fails the build when a shipped method is missing from them, so the files are refreshed in the same phase as the features they describe <em>(F-AUTODIST; added 2026-09-25 from the owner's report that the installed <code>/techierag</code> agent still described v2)</em> <em>Screen:</em> Installed agent files
 <ul>
 <li><em>Acceptance:</em> When a consumer builds with the new package and opens the installed AI reference, then every phase-2 package and builder method is described with one call example.
+</li>
+</ul>
+</li>
+<li><strong>BRD-173</strong> — Every assembly in every published package shall carry the package version, every reference between TechieRag packages shall bind to it, and both publishing workflows shall check this after packing and stop before any push when it fails <em>(added 2026-10-06; Sevak feedback TR-RAG-048; checklist REQ-FN-071)</em> <em>Screen:</em> Packaging and quality follow-ups
+<ul>
+<li><em>Acceptance:</em> When a maintainer packs a release at version X, then every packed TechieRag assembly is X.0, and a mismatch stops the run before push.
 </li>
 </ul>
 </li>

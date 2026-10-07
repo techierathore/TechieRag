@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Business Requirements</h1>
-    <div class="sub">Last rendered: 2026-10-04</div>
+    <div class="sub">Last rendered: 2026-10-06</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#summary">1. Summary</a></li>
@@ -143,7 +143,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Business Requirements</h1>
-    <div class="subtitle">Rendered 2026-10-04 &middot; source <code>TechieRag-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -187,15 +187,15 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Kind</td><td>library</td></tr>
 <tr><td>Size</td><td>Large</td></tr>
 <tr><td>Stack answer set</td><td>dotnet</td></tr>
-<tr><td>Phase</td><td>1 of 2</td></tr>
+<tr><td>Phase</td><td>1 of 3</td></tr>
 <tr><td>Status</td><td>Approved</td></tr>
 <tr><td>Date</td><td>2026-09-24</td></tr>
 </tbody>
 </table>
 <p>Phase 1 of 2. This file holds what the whole library shares (scope, users, non-functional requirements, context, constraints, risks) and the phase-1 items, BRD-1 to BRD-82. Phase 2 is <code>docs/TechieRag-P2-BRD.md</code>; the plan is <code>docs/TechieRag-Phases.md</code>. Ids are append-only and were carried verbatim from the previous BRD (2026-06-25, amended to 2026-09-24; now <code>docs/OldDocs/TechieRag-BRD.md</code>). Harvested from that BRD, <code>DECISIONS.md</code>, <code>docs/TechieRag-CompetitorAnalysis.md</code>, <code>docs/TechieRag.Agents-Proposal.md</code>, <code>docs/TechieRag-Update-Brief.md</code>, the two downstream feedback files and a full code scan on 2026-09-24. A "screen" here is a public surface of the library.</p>
-<h2 id="summary">1. Summary<a class="anchor-link" href="#summary">#</a></h2>
+<h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
 <p>TechieRag is a configurable Retrieval-Augmented Generation library for .NET, shipped as NuGet packages: <code>TechieRag</code> (core), <code>TechieRag.Embedded</code> (offline ONNX embeddings and reranking), <code>TechieRag.Telemetry</code> (opt-in exporters), with <code>TechieRag.Agents</code> and <code>TechieRag.Local</code> planned. A .NET developer adds document search, retrieval and question answering to an application with a few builder lines, and swaps embedding providers, vector stores, document formats and language-model backends by configuration, never by code. It exists to remove the RAG plumbing every .NET team rebuilds and to offer a genuinely offline option where data never leaves the machine. Its showcase is <strong>Sevak</strong> (TechieDesk until 2026-09-24), an application in its own repository that consumes the packages exactly as any customer does; its first mobile consumer is MyDiary. Phase 1 is shipped and validated; phase 2 adds agents, four-platform support, an in-process local model, streaming that carries tool calls and subscription sign-in.</p>
-<h2 id="scope">2. Scope<a class="anchor-link" href="#scope">#</a></h2>
+<h2 id="scope"><a id="2-scope"></a>2. Scope<a class="anchor-link" href="#scope">#</a></h2>
 <p><strong>In:</strong></p>
 <ul>
 <li>The <code>TechieRag</code> core: ingestion of 13 formats, four chunking strategies, eight embedding providers, three vector stores, semantic search with reranking, six LLM providers behind one <code>ILlmProvider</code>, auto-RAG single and multi-turn with streaming and sources, structured output, the tool-calling agent loop and flow orchestration, MCP client, data connectors, web ingestion, workspaces and persistent conversation stores, token tracking, resilience, fallback, prompt templates, AI-skill autodistribution.
@@ -222,7 +222,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li>Any user interface, identity, roles, licences or billing.
 </li>
 </ul>
-<h2 id="users-and-roles">3. Users and roles<a class="anchor-link" href="#users-and-roles">#</a></h2>
+<h2 id="users-and-roles"><a id="3-users-and-roles"></a>3. Users and roles<a class="anchor-link" href="#users-and-roles">#</a></h2>
 <table>
 <thead><tr><th>Role</th><th>Who they are</th><th>What they need</th></tr></thead>
 <tbody>
@@ -235,7 +235,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>End user</td><td>A person using Sevak or MyDiary</td><td>Reached only through those applications; their screens are ledgered there</td></tr>
 </tbody>
 </table>
-<h2 id="screens-and-flow">4. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
+<h2 id="screens-and-flow"><a id="4-screens-and-flow"></a>4. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>A library has no routed pages. Each row is a public surface a developer reaches for; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
 <thead><tr><th>Screen</th><th>Route</th><th>Role</th><th>Mockup</th><th>Fields</th></tr></thead>
@@ -271,7 +271,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li>Token usage, budgets, retries and fallback work without further code; events and logs flow through the host's abstractions.
 </li>
 </ol>
-<h2 id="requirements">5. Requirements<a class="anchor-link" href="#requirements">#</a></h2>
+<h2 id="requirements"><a id="5-requirements"></a>5. Requirements<a class="anchor-link" href="#requirements">#</a></h2>
 <p>One item per thing the verifier will test, grouped by surface. Items 62 to 73, 81 and 82 describe the application that moved to Sevak on 2026-09-24 and stay as history. Text is carried verbatim from the previous BRD; acceptance lines were written on 2026-09-24.</p>
 <h3 id="ingestion">Ingestion<a class="anchor-link" href="#ingestion">#</a></h3>
 <p>Turns files, folders and raw text into chunks with metadata, for the developer integrating the library.</p>
@@ -795,7 +795,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 </li>
 </ul>
-<h2 id="non-functional-requirements">6. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
+<h2 id="non-functional-requirements"><a id="6-non-functional-requirements"></a>6. Non-functional requirements<a class="anchor-link" href="#non-functional-requirements">#</a></h2>
 <table>
 <thead><tr><th>Id</th><th>Area</th><th>Requirement</th><th>Measure</th></tr></thead>
 <tbody>
@@ -809,7 +809,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p>No <code>perf-budget:</code> line is written: the owner has stated no numeric budget. The logging requirement records the Stack answer set's Serilog default as overridden for a package: the library takes an <code>ILoggerFactory</code> and pins no sink.</p>
-<h2 id="development-status">7. Development status<a class="anchor-link" href="#development-status">#</a></h2>
+<h2 id="development-status"><a id="7-development-status"></a>7. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
 <p><strong>Snapshot as of 2026-10-01.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
 <table>
@@ -836,7 +836,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Surface: Sevak application (moved)</td><td>0</td><td>0</td><td>0</td><td>Not applicable</td></tr>
 </tbody>
 </table>
-<h2 id="context-diagram">8. Context diagram<a class="anchor-link" href="#context-diagram">#</a></h2>
+<h2 id="context-diagram"><a id="8-context-diagram"></a>8. Context diagram<a class="anchor-link" href="#context-diagram">#</a></h2>
 <div class="diagram">
   <div class="dt">
     <button data-zout title="Zoom out">&minus;</button>
@@ -861,7 +861,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   TR --&gt; Src[("Sources: files, folders, text, URLs, repositories, Confluence, mailboxes, MCP tool servers")]
   TR --&gt; Store[("Conversation and workspace stores (SQLite, PostgreSQL)")]</pre>
 </div>
-<h2 id="constraints-and-assumptions">9. Constraints and assumptions<a class="anchor-link" href="#constraints-and-assumptions">#</a></h2>
+<h2 id="constraints-and-assumptions"><a id="9-constraints-and-assumptions"></a>9. Constraints and assumptions<a class="anchor-link" href="#constraints-and-assumptions">#</a></h2>
 <ul>
 <li>Target runtimes are <code>net10.0</code> and <code>net8.0</code> for <code>TechieRag</code> and <code>TechieRag.Telemetry</code>; <code>TechieRag.Embedded</code> is <code>net10.0</code> only because ONNX Runtime requires it.
 </li>
@@ -899,7 +899,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li>Runs on ONNX Runtime GenAI 0.16.0 on all four platforms (<code>DECISIONS.md</code> 2026-09-25); <code>TechieRag.Local.targets</code> wires the Mac Catalyst library GenAI's own package leaves out (REQ-FN-058). Windows and Android ran through <code>TechieRag.Local</code> in the probe on 2026-09-25 (Android from the default Hugging Face address, every fingerprint matched), and iOS on the owner's iPhone on 2026-10-04. Numbers per platform: UsageGuide, Platform notes, "Local model: measured per platform". Last synced with the UsageGuide 2026-10-04.
 </li>
 </ol>
-<h2 id="risks">10. Risks<a class="anchor-link" href="#risks">#</a></h2>
+<h2 id="risks"><a id="10-risks"></a>10. Risks<a class="anchor-link" href="#risks">#</a></h2>
 <table>
 <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
 <tbody>
@@ -916,7 +916,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Microsoft Agent Framework renames types monthly</td><td>Medium</td><td>Medium</td><td>Exact pin; MAF types exposed rather than wrapped; live-docs check before each bump</td></tr>
 </tbody>
 </table>
-<h2 id="glossary">11. Glossary<a class="anchor-link" href="#glossary">#</a></h2>
+<h2 id="glossary"><a id="11-glossary"></a>11. Glossary<a class="anchor-link" href="#glossary">#</a></h2>
 <ul>
 <li>RAG — Retrieval-Augmented Generation: retrieve relevant context, then generate an answer with a language model.
 </li>

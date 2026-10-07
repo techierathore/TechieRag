@@ -24,6 +24,20 @@ public class SearchOptions
     public string? DocumentFilter { get; set; }
 
     /// <summary>
+    /// Gets or sets a set of document identifiers to restrict the search to, searched together in one
+    /// vector query (REQ-RAG-114 / BRD-174), or null for no set filter.
+    /// </summary>
+    /// <remarks>
+    /// <para>Takes precedence over <see cref="DocumentFilter"/> when it holds at least one id. An empty
+    /// set is treated as no set filter, exactly like null; a caller that wants no results should not
+    /// search.</para>
+    /// <para>Reaches the store through <c>IVectorStore.SearchDocumentsAsync</c>: SqliteVec, PgVector
+    /// and Qdrant filter natively in one query; a third-party store without an override falls back to
+    /// one query per document, merged by score.</para>
+    /// </remarks>
+    public IReadOnlyCollection<string>? DocumentFilters { get; set; }
+
+    /// <summary>
     /// Gets or sets the per-call rerank switch.
     /// </summary>
     /// <remarks>

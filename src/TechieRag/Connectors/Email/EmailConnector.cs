@@ -35,6 +35,13 @@ namespace TechieRag.Connectors.Email;
 /// </remarks>
 public sealed class EmailConnector : IDataConnector
 {
+    /// <summary>
+    /// The item metadata key that lists what the MIME parser left out of a message
+    /// (<see cref="ParsedMailMessage.Notes"/>), as <c>code: part name (depth n)</c> entries joined
+    /// by <c>"; "</c>. Absent when the whole message was read (REQ-RAG-119).
+    /// </summary>
+    public const string ParseNotesMetadataKey = "MailParseNotes";
+
     private readonly IMailTransport transport;
     private readonly EmailConnectorOptions options;
     private readonly IReadOnlyList<IDocumentProcessor> attachmentProcessors;
@@ -230,7 +237,7 @@ public sealed class EmailConnector : IDataConnector
         ParsedMailMessage message,
         List<string> skipped)
     {
-        if (message.Attachments.Count == 0 && skipped.Count == 0)
+        if (message.Attachments.Count == 0 && skipped.Count == 0 && message.Notes.Count == 0)
         {
             return item;
         }
@@ -247,6 +254,17 @@ public sealed class EmailConnector : IDataConnector
         if (skipped.Count > 0)
         {
             metadata["AttachmentsSkipped"] = string.Join("; ", skipped);
+        }
+
+        // REQ-RAG-119: what the parser left out reaches the connector's result, so a host that syncs
+        // mail through a run sees it as well as one that calls MimeParser.Parse itself.
+        if (message.Notes.Count > 0)
+        {
+            metadata[ParseNotesMetadataKey] = string.Join(
+                "; ",
+                message.Notes.Select(note => string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{note.Code}: {note.PartName} (depth {note.Depth})")));
         }
 
         return item with { Metadata = metadata };

@@ -44,7 +44,16 @@ internal static class TechieRagConfigMapper
     {
 
         MapEmbedding(builder, source.Embedding);
-        builder.UseVectorStore(source.VectorStore.Type, source.VectorStore.ConnectionString, source.VectorStore.ApiKey);
+        if (source.VectorStore.IsConnectionStringSet)
+        {
+            builder.UseVectorStore(source.VectorStore.Type, source.VectorStore.ConnectionString, source.VectorStore.ApiKey);
+        }
+        else
+        {
+            // REQ-RAG-122: no connection string configured keeps the per-app default rather than
+            // freezing today's resolution into an explicit value.
+            builder.UseVectorStoreAtDefaultLocation(source.VectorStore.Type, source.VectorStore.ApiKey);
+        }
         builder.WithChunkSize(source.Processing.DefaultChunkSize, source.Processing.DefaultChunkOverlap);
         builder.WithChunking(source.Processing.ChunkingStrategy);
         builder.WithTelemetry(source.EnableTelemetry);
@@ -155,6 +164,13 @@ internal static class TechieRagConfigMapper
         if (source.Provider != StoreProvider.None && !string.IsNullOrEmpty(source.ConnectionString))
         {
             builder.WithPersistence(source.Provider, source.ConnectionString, source.DefaultUserId);
+            return;
+        }
+
+        // REQ-RAG-122: SQLite named with no connection string uses the per-app default database.
+        if (source.Provider == StoreProvider.Sqlite)
+        {
+            builder.WithPersistence(StoreProvider.Sqlite, source.DefaultUserId);
             return;
         }
 

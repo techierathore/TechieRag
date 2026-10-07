@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace TechieRag.DependencyInjection;
@@ -80,6 +81,15 @@ public static class ServiceCollectionExtensions
 
             return builder.Build();
         });
+
+        // REQ-RAG-116: services built on workspaces take IWorkspaceManager. TryAdd keeps a stand-in
+        // the host registered first. Without persistence there is no workspace manager, and the
+        // resolve fails with a message that says so rather than handing out null.
+        services.TryAddSingleton<Abstractions.IWorkspaceManager>(sp =>
+            sp.GetRequiredService<ITechieRag>().GetWorkspaceManager()
+            ?? throw new InvalidOperationException(
+                "IWorkspaceManager is not available: workspaces need persistence. Call WithPersistence(...) "
+                + "on the TechieRag builder, or register your own IWorkspaceManager before AddTechieRag."));
 
         return services;
     }

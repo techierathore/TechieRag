@@ -53,6 +53,40 @@ public interface IVectorStore
     Task<IReadOnlyList<SearchResult>> SearchAsync(float[] queryVector, int topK = 5, string? documentFilter = null, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Performs one vector similarity search restricted to a set of documents (REQ-RAG-114 / BRD-174).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return across all the documents.</param>
+    /// <param name="documentIds">The documents to search; an empty set returns no results.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked search results from any of the documents, highest score first.</returns>
+    /// <remarks>
+    /// <para><b>Default implementation</b> (ADR-005 additive change): one <see cref="SearchAsync"/>
+    /// per document, merged by score and cut to <paramref name="topK"/>. The built-in stores override
+    /// it with a single filtered query; a third-party store should too.</para>
+    /// </remarks>
+    async Task<IReadOnlyList<SearchResult>> SearchDocumentsAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string> documentIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documentIds);
+        if (documentIds.Count == 0 || topK <= 0)
+        {
+            return [];
+        }
+
+        var merged = new List<SearchResult>();
+        foreach (var documentId in documentIds.Distinct(StringComparer.Ordinal))
+        {
+            merged.AddRange(await SearchAsync(queryVector, topK, documentId, cancellationToken).ConfigureAwait(false));
+        }
+
+        return merged.OrderByDescending(result => result.Score).Take(topK).ToList();
+    }
+
+    /// <summary>
     /// Deletes a specific chunk by its ID.
     /// </summary>
     /// <param name="chunkId">The ID of the chunk to delete.</param>
