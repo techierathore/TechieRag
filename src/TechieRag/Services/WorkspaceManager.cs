@@ -22,8 +22,17 @@ namespace TechieRag.Services;
 /// <para><b>Scoping:</b> Workspace-scoped search oversamples the global vector search and
 /// filters the results to the workspace's document set, since the vector stores filter by a
 /// single document ID only.</para>
+/// <para><b>Pinned documents (REQ-RAG-114 / BRD-174):</b> all of a call's in-scope pinned documents
+/// are retrieved with ONE search filtered to the pinned set, not one search per pinned document.</para>
+/// <para><b>Rerank rule (REQ-RAG-115 / BRD-175):</b> every retrieval this manager runs — the workspace
+/// search AND the pinned-document search — passes <see cref="Workspace.RerankEnabled"/> down as
+/// <see cref="SearchOptions.Rerank"/>. The workspace's own switch therefore decides reranking for
+/// pinned results too, in both directions, and the library-wide <c>Rerank.Enabled</c> never overrides
+/// it inside a workspace. Turning reranking on still needs a configured reranker.</para>
+/// <para><b>Testing (REQ-RAG-116 / BRD-176):</b> depend on <see cref="IWorkspaceManager"/> to hand a
+/// service a test double instead of a library client.</para>
 /// </remarks>
-public class WorkspaceManager
+public class WorkspaceManager : IWorkspaceManager
 {
     private const string QueryModeInstruction =
         "Answer ONLY using the provided context. Do not use outside knowledge. " +
@@ -655,7 +664,7 @@ public class WorkspaceManager
         var scope = await ResolveScopeAsync(workspace.WorkspaceId, overrides, cancellationToken).ConfigureAwait(false);
         var retrieved = await SearchInScopeAsync(workspace, question, scope, null, cancellationToken)
             .ConfigureAwait(false);
-        var pinned = await CollectPinnedChunksAsync(question, scope, cancellationToken)
+        var pinned = await CollectPinnedChunksAsync(workspace, question, scope, cancellationToken)
             .ConfigureAwait(false);
 
         var seenChunks = new HashSet<string>(StringComparer.Ordinal);
@@ -668,28 +677,72 @@ public class WorkspaceManager
     }
 
     /// <summary>
-    /// Retrieves the most relevant chunks of every in-scope pinned document.
+    /// Retrieves the most relevant chunks of every in-scope pinned document with one filtered search.
     /// </summary>
+    /// <param name="workspace">The workspace whose rerank switch governs the pinned search.</param>
     /// <param name="question">The question the chunks are scored against.</param>
     /// <param name="scope">The resolved in-scope document set for this call.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>Pinned chunks in pinned-document order, at most
     /// <see cref="PinnedChunksPerDocument"/> per document, not yet de-duplicated.</returns>
+    /// <remarks>
+    /// <para><b>One search (REQ-RAG-114):</b> the pinned set goes down as
+    /// <see cref="SearchOptions.DocumentFilters"/>, so five pinned documents cost one embedding and
+    /// one store query instead of five of each. The query asks for
+    /// <see cref="PinnedChunksPerDocument"/> x <see cref="OversampleFactor"/> chunks per pinned
+    /// document, so a document whose chunks all score low still normally gets its share.</para>
+    /// <para><b>Still always in context (BRD-44):</b> a pinned document that won no slot in the shared
+    /// search — every candidate went to its neighbours, or a reranker cut the list — is searched on
+    /// its own as a fallback. That only happens for the missing documents, so the usual case stays one
+    /// search.</para>
+    /// <para><b>Rerank (REQ-RAG-115):</b> both the shared search and any fallback pass
+    /// <see cref="Workspace.RerankEnabled"/>, so pinned results follow the workspace's switch, not
+    /// the library default.</para>
+    /// </remarks>
     private async Task<List<SearchResult>> CollectPinnedChunksAsync(
+        Workspace workspace,
         string question,
         ScopedDocuments scope,
         CancellationToken cancellationToken)
     {
         var chunks = new List<SearchResult>();
+        if (scope.Pinned.Count == 0) return chunks;
 
-        foreach (var pinned in scope.Pinned)
+        var pinnedIds = scope.Pinned.Select(d => d.DocumentId).Distinct(StringComparer.Ordinal).ToList();
+        var candidates = await rag.SearchAsync(
+            question,
+            new SearchOptions
+            {
+                TopK = pinnedIds.Count * PinnedChunksPerDocument * OversampleFactor,
+                DocumentFilters = pinnedIds,
+                Rerank = workspace.RerankEnabled
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        var byDocument = candidates
+            .Where(r => r.Chunk.DocumentId is not null)
+            .GroupBy(r => r.Chunk.DocumentId, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Take(PinnedChunksPerDocument).ToList(), StringComparer.Ordinal);
+
+        foreach (var documentId in pinnedIds)
         {
-            var pinnedChunks = await rag.SearchAsync(
-                question,
-                PinnedChunksPerDocument,
-                pinned.DocumentId,
-                cancellationToken).ConfigureAwait(false);
-            chunks.AddRange(pinnedChunks);
+            if (!byDocument.TryGetValue(documentId, out var documentChunks))
+            {
+                documentChunks = (await rag.SearchAsync(
+                    question,
+                    new SearchOptions
+                    {
+                        TopK = PinnedChunksPerDocument,
+                        DocumentFilter = documentId,
+                        Rerank = workspace.RerankEnabled
+                    },
+                    cancellationToken).ConfigureAwait(false))
+                    .Where(r => string.Equals(r.Chunk.DocumentId, documentId, StringComparison.Ordinal))
+                    .Take(PinnedChunksPerDocument)
+                    .ToList();
+            }
+
+            chunks.AddRange(documentChunks);
         }
 
         return chunks;

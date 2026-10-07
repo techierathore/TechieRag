@@ -297,7 +297,7 @@ var response = await rag.AskAsync("What is quantum computing?");
 
 | Method | Description |
 |--------|-------------|
-| `UseSqliteVec(connectionString)` | SQLite with vec extension (default: "Data Source=techierag.db") |
+| `UseSqliteVec(connectionString)` | SQLite with vec extension; `UseSqliteVec()` with no path uses the per-app default database (`DataRoot.DefaultDatabasePath`) |
 | `UsePgVector(connectionString)` | PostgreSQL with pgvector extension |
 | `UseQdrant(endpoint, apiKey)` | Qdrant vector database |
 
@@ -1155,6 +1155,118 @@ builder.Services.AddTechieRag(rag => rag
     .UseEmbedded()
     .UseSqliteVec()
     .UseChatGptSubscriptionLlm(async (prompt, ct) => await OpenSignInAsync(prompt.VerificationUri, prompt.UserCode, ct)));
+```
+
+---
+
+## Phase-3 Additions (Sevak feedback, cluster A)
+
+Every member below is additive: no existing call changes meaning except where a row says so (the per-app SQLite default and the tool-registry replacement).
+
+### Workspaces: one pinned search, the workspace rerank rule, `IWorkspaceManager`
+
+Package `TechieRag`; namespaces `TechieRag.Abstractions`, `TechieRag.Models`. Pinned documents are retrieved with ONE search filtered to the whole pinned set (`SearchOptions.DocumentFilters`, `IVectorStore.SearchDocumentsAsync`). **Rerank rule:** every workspace retrieval, pinned results included, follows `Workspace.RerankEnabled`; the library-wide `Rerank.Enabled` never overrides it inside a workspace. Services built on workspaces take `IWorkspaceManager`, which `WorkspaceManager` implements and `AddTechieRag` registers with `TryAdd`, so a test double needs no library client.
+
+```csharp
+// One search over a set of documents
+var hits = await rag.SearchAsync("refund window", new SearchOptions { TopK = 10, DocumentFilters = ["doc-1", "doc-2"], Rerank = false });
+var raw = await vectorStore.SearchDocumentsAsync(queryVector, 10, ["doc-1", "doc-2"]);
+
+// A host service depends on the interface; a test passes a double
+public sealed class WorkspaceTitles(IWorkspaceManager workspaces)
+{
+    public async Task<IReadOnlyList<string>> AllAsync() => (await workspaces.ListWorkspacesAsync()).Select(w => w.Name).ToList();
+}
+IWorkspaceManager manager = rag.GetWorkspaceManager()!;   // GetWorkspaceManager() keeps returning WorkspaceManager
+```
+
+### Connectors: partial runs, typed outcomes, public metadata builder, re-sync by key
+
+Package `TechieRag`; namespace `TechieRag.Connectors`. A cancelled run throws `ConnectorRunCanceledException` (still an `OperationCanceledException`) whose `PartialResult` carries the sync state and per-item reasons gathered so far; a failing run carries the same on `ConnectorException.PartialResult`. Through `IngestConnectorAsync` both also carry `PartialIngestion`. The partial sync state keeps the previous `LastRunUtc`, so the next run resumes. Each `ConnectorItemFailure` has a typed `Outcome` (`ConnectorItemOutcome.Failed` or `ConnectorItemOutcome.Skipped`); byte sizes in reasons are invariant digits with no thousands separator. `ConnectorIngestionExtensions.BuildMetadata` and `ConnectorIngestionExtensions.ConnectorDocumentKey` are public, and `IngestConnectorAsync` ingests each item under its key, so a re-synced item replaces its earlier document.
+
+```csharp
+try
+{
+    var result = await rag.IngestConnectorAsync(connector, previousSync, options, ct);
+    await SaveSyncAsync(result.Sync);
+    var skipped = result.Skipped.Where(f => f.Outcome == ConnectorItemOutcome.Skipped);
+}
+catch (ConnectorRunCanceledException cancelled)
+{
+    await SaveSyncAsync(cancelled.PartialIngestion?.Sync ?? cancelled.PartialResult.Sync);   // resume next time
+}
+catch (ConnectorException failed) when (failed.PartialResult is not null)
+{
+    await SaveSyncAsync(failed.PartialResult.Sync);
+}
+
+var metadata = ConnectorIngestionExtensions.BuildMetadata(connector, item);
+var key = ConnectorIngestionExtensions.ConnectorDocumentKey(connector, item);
+```
+
+### Text ingestion under a caller key: `IngestTextAsync(text, name, sourceKey, metadata)`
+
+Package `TechieRag`. Ingesting again under the same key replaces the earlier document (same document id, workspace memberships kept); the key is stored as `DocumentMetadataKeys.SourceKey`. A null key behaves like the original overload.
+
+```csharp
+var id = await rag.IngestTextAsync(noteText, "Meeting notes", sourceKey: "notes/2026-10-06", metadata: null);
+```
+
+### Mail parsing notes: `ParsedMailMessage.Notes`
+
+Package `TechieRag`; namespace `TechieRag.Connectors.Email`. A part nested deeper than `MimeParser.MaxNestingDepth`, or beyond `MimeParser.MaxAttachments`, is listed as a `MailParseNote` (`Code` from `MailParseCodes`, `PartName`, `Depth`) instead of vanishing. Existing callers are unaffected.
+
+```csharp
+var parsed = MimeParser.Parse(rawBytes);
+foreach (var note in parsed.Notes.Where(n => n.Code == MailParseCodes.NestingTooDeep))
+{
+    logger.LogWarning("Skipped {Part} at depth {Depth}", note.PartName, note.Depth);
+}
+```
+
+Mail synced through `EmailConnector` carries the same notes on the item, under `EmailConnector.ParseNotesMetadataKey` (`"MailParseNotes"`), as `code: part name (depth n)` entries joined by `"; "`. The key is absent when the whole message was read.
+
+```csharp
+var document = await emailConnector.FetchAsync(item, ct);
+if (document.Item.Metadata?.TryGetValue(EmailConnector.ParseNotesMetadataKey, out var notes) == true)
+{
+    logger.LogWarning("Mail {Name} was not read in full: {Notes}", document.Item.Name, notes);
+}
+```
+
+### Tools: registering a name again replaces it
+
+`ToolRegistry.Register` with a name already registered (case-insensitive) replaces the definition as well as the handler, keeping its position, so the tool list sent to the model holds each name once.
+
+```csharp
+tools.Register("get_weather", "Gets the weather", schema, args => "sunny");
+tools.Register("get_weather", "Gets the weather in Celsius", schema, args => "21 C");   // one get_weather, the new one
+```
+
+### Per-app SQLite database: `DataRoot`, `UseSqliteVec()`, `WithPersistence(StoreProvider.Sqlite)`
+
+Package `TechieRag`; namespace `TechieRag.Models`. When an app names no database folder, an existing `techierag.db` in the folder the app runs from is used (a warning names the folder; the file is never moved); otherwise the database is `<per-user TechieRag folder>/data/<app name>/techierag.db`, beside `models/`. Order: `DataRoot.Set` in code, then the data folder beside the model root (so `ModelRoot.Set` or `TECHIERAG_MODEL_ROOT` moves it), then `<LocalApplicationData>/TechieRag/data`. No new environment variable. `DataRoot.DefaultDatabasePath` returns the location; `DataRoot.SetAppName` overrides the entry-assembly name. Applies to `UseSqliteVec()`, the `VectorStore.ConnectionString` default, `WithPersistence(StoreProvider.Sqlite)` / Persistence `Provider: Sqlite` with no connection string, and the parameterless `SqliteVecStore(dimensions)`, `SqliteConversationStore()` and `SqliteWorkspaceStore()`. A path the caller sets is used exactly as given.
+
+```csharp
+DataRoot.SetAppName("HelpDesk");                       // optional; defaults to the entry assembly name
+var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UseSqliteVec()                                    // no folder: per-app default
+    .WithPersistence(StoreProvider.Sqlite)             // same per-app database
+    .Build();
+Console.WriteLine(DataRoot.DefaultDatabasePath);       // ...\TechieRag\data\HelpDesk\techierag.db
+```
+
+### Flows: host step names and model use
+
+Package `TechieRag`; namespace `TechieRag.Orchestration`. `FlowNodeCatalog.CreateNode(kind, id, stepName)` names the node; a host should pass its own, localized name, because the default is the catalogue's English label. `FlowDefinition.UsesLanguageModel()` and `FlowDefinition.GetLanguageModelSteps()` say whether, and which, steps call a model (methods, so they are never persisted).
+
+```csharp
+var node = FlowNodeCatalog.CreateNode(FlowNodeKind.Agent, id: null, stepName: localizer["StepTriage"]);
+if (flow.UsesLanguageModel())
+{
+    var modelSteps = flow.GetLanguageModelSteps().Select(n => n.DisplayName);
+}
 ```
 
 ---

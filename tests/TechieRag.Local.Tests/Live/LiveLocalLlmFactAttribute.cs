@@ -1,5 +1,6 @@
 using TechieRag.Local.Runtime;
 using Xunit;
+using Xunit.Sdk;
 
 namespace TechieRag.Local.Tests.Live;
 
@@ -10,7 +11,10 @@ namespace TechieRag.Local.Tests.Live;
 /// Skipped with a printed reason unless this platform has a runtime and the model under test is fully
 /// downloaded in the model root. The model is <see cref="ModelVariable"/> when set, otherwise the
 /// platform default. The tests never download: staging a multi-gigabyte model is the host's choice.
+/// A test the memory gate refuses (<see cref="LocalModelMemoryException"/>) is reported as skipped
+/// with the gate's message, since a machine short of memory is not a defect.
 /// </remarks>
+[XunitTestCaseDiscoverer("TechieRag.Local.Tests.Conformance.ShortMemorySkippingFactDiscoverer", "TechieRag.Local.Tests")]
 public sealed class LiveLocalLlmFactAttribute : FactAttribute
 {
     /// <summary>Environment variable naming the model id to test (default: the platform default model).</summary>

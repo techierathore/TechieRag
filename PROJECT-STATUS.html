@@ -130,7 +130,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
 <tr><th>last_updated</th><td>2026-10-06</td></tr>
-<tr><th>current_phase</th><td>Phase 2 of 2 · UAT — handoff done, 90 of 90 verified, 1 not applicable</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · UAT — handoff done, 11 of 11 verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
 <tr><th>last_verified_date</th><td>2026-10-06</td></tr>
 </tbody>
@@ -149,13 +149,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 2 of 2 (Agents, separation, platforms, local model, streaming, sign-in, and the v3 library features harvested from the application ledger). All 90 rows Verified. On 2026-10-06 the release workflows were fixed so every packed assembly carries the package version, and a check now fails any release that does not (REQ-FN-071, Sevak TR-RAG-048). It ships as 1.1.2 once the owner publishes the v1.1.2 release. Awaiting UAT per the UsageGuide.</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak). All 11 rows Verified and handed off on 2026-10-06: the UsageGuide has their test plan and limitations, and the new phase-3 DevGuide maps each surface to file and line. The two gaps the handoff found (REQ-RAG-116, REQ-RAG-119) were fixed and re-verified the same day. Phase 2 (90 rows) is also Verified. Both wait for UAT per the UsageGuide, and both ship in the next package with the TR-RAG-048 version fix.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
 <pre><code>(owner) set current_phase to Released after UAT — no agent command</code></pre>
 <p>OpenCode:</p>
 <pre><code>(owner) set current_phase to Released after UAT — no agent command</code></pre>
-<p>Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-P2-Checklist.md.</p>
+<p>Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-P3-Checklist.md.</p>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
 <thead><tr><th>Status</th><th>Count</th></tr></thead>
@@ -173,23 +173,17 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>🔶 <strong>Release 1.1.2:</strong> Sevak is held at 1.0.8 until the owner publishes the <code>v1.1.2</code> GitHub Release (TR-RAG-048).
+<li>🔶 <strong>Release 1.1.2:</strong> publish the <code>v1.1.2</code> release; Sevak waits (TR-RAG-048).
 </li>
-<li>🔶 <strong>Release notes:</strong> <code>LlmConfig.MaxContextTokens</code> is now <code>int?</code> (REQ-RAG-113).
+<li>🔶 <strong>Behaviour changes:</strong> default SQLite folder and repeat tool registration (REQ-RAG-121/122).
 </li>
-<li>🔶 <strong>Next package:</strong> Lekhak re-checks TR-RAG-002/003; Chatur TR-RAG-003/004/005; Sevak needs <code>ImapMailActions</code>.
+<li>🔶 <strong>Local model re-check:</strong> REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
 </li>
-<li>🔶 <strong>Local model re-check:</strong> REQ-RAG-057/059/063/065 need 4.6 GB free; WSL has 7.8 GB total. Raise <code>memory=</code> in <code>.wslconfig</code>.
+<li>🔶 <strong>Postgres (REQ-RAG-044):</strong> <code>TechieRagTestPostgres</code> is unset; live test skipped.
 </li>
-<li>🔶 <strong>Postgres (REQ-RAG-044):</strong> container runs, but <code>TechieRagTestPostgres</code> is unset in WSL and Windows; live test skipped.
+<li>🔶 <strong>Breaking change:</strong> an appsettings key fails startup; check Sevak.
 </li>
-<li>🔶 <strong>Windows head:</strong> the probe built but never answered on its debug port; rows graded by test only.
-</li>
-<li>🔶 <strong>Breaking change:</strong> an appsettings key fails startup after the next package; check Sevak.
-</li>
-<li>🔶 <strong>Keys in chat:</strong> OpenCode Go key (2026-10-01) and Gmail app password (2026-10-03); rotate if shared.
-</li>
-<li>🔶 <strong>Flaky:</strong> 6 <code>EmbeddingSignatureStampTests</code> on Windows; live Gmail test once.
+<li>🔶 <strong>Keys in chat:</strong> OpenCode Go key and Gmail app password; rotate if shared.
 </li>
 <li>🔶 <strong>Owner git:</strong> commit today's work in TechieRag and Sevak.
 </li>
@@ -199,11 +193,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-04</td><td>record-probe</td><td>87/87 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-04</td><td>amend-docs</td><td>87/89 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-04</td><td>verify-phase</td><td>89/89 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-04</td><td>handoff-phase</td><td>89/89 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-06</td><td>triage-and-fix</td><td>90/90 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-06</td><td>amend-docs</td><td>90/90 Verified, 1 N/A</td><td>docs/TechieRag-P2-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-06</td><td>build-phase</td><td>11/11 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-06</td><td>handoff-phase</td><td>11/11 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-06</td><td>fix-issues</td><td>11/11 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -212,7 +206,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
 </li>
-<li>TechieFlow: 1 open · 0 closed — docs/TechieRag-TechieFlow-Feedback.md
+<li>TechieFlow: 0 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 </li>
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>

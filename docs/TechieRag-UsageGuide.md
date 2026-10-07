@@ -157,6 +157,36 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** `TechieRag`, `TechieRag.Embedded`, `TechieRag.Telemetry`, `TechieRag.Local` and `TechieRag.Agents` pack with README, `buildTransitive` targets and symbols; the dry run derives a version and stops before pushing.
 - **Covers:** REQ-FN-003, REQ-FN-004, REQ-FN-005, REQ-FN-065, REQ-FN-067
 
+### Release version check (phase 2, 2026-10-06)
+- **Sign in as:** user 1 (maintainer)
+- **Steps:** 1) build, build the test project, `dotnet test --no-build` and pack all five projects with `-p:Version=1.1.2` into `./nupkgs` 2) `dotnet run .github/workflows/scripts/check-package-assembly-versions.cs -- ./nupkgs 1.1.2`
+- **Expected:** `PASS 8 assemblies in 5 packages all carry 1.1.2.0`; any 1.0.0.0 assembly prints an `::error::` line and exits 1.
+- **Covers:** REQ-FN-071
+
+### Workspace pinning and testing (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) pin five documents in a workspace and ask a question 2) turn the workspace's rerank off while `Rerank.Enabled` is true, ask again 3) register a test double of `IWorkspaceManager` in DI before `AddTechieRag` and resolve a service that uses it
+- **Expected:** 1) one filtered vector search covers the five 2) pinned results come back unreranked 3) the stand-in is used; no library client is built.
+- **Covers:** REQ-RAG-114, REQ-RAG-115, REQ-RAG-116
+
+### Connector run results and re-ingest (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) cancel a 10-item `ConnectorRunner` run after 3 items 2) start the next run with `ex.PartialResult.Sync` 3) skip an item for size on a `de-DE` thread 4) `IngestTextAsync(text, name, sourceKey: "k1", metadata)` twice with different text 5) re-sync a connector whose item changed
+- **Expected:** 1) `ConnectorRunCanceledException` carries the sync state for the 3 items 2) those 3 are not fetched again 3) `Outcome` is `Skipped` and the size has no separator 4) `ListDocumentsAsync` shows one document with the second text 5) the item's document is replaced, not duplicated.
+- **Covers:** REQ-RAG-117, REQ-RAG-118, REQ-RAG-120
+
+### Mail parse notes, tool registry, flows (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) parse a message nested past `MimeParser.MaxNestingDepth` 2) `ToolRegistry.Register` the same name twice and list the tools 3) `FlowNodeCatalog.CreateNode(kind, id, "Zusammenfassen")` 4) ask a flow with one model step `UsesLanguageModel()` and `GetLanguageModelSteps()`
+- **Expected:** 1) `ParsedMailMessage.Notes` names the skipped part 2) the name appears once, with the second definition 3) the node's `Name` is the given name 4) `true`, and the one step.
+- **Covers:** REQ-RAG-119, REQ-RAG-121, REQ-RAG-123, REQ-RAG-124
+
+### Storage defaults (phase 3)
+- **Sign in as:** user 1, in an empty folder
+- **Steps:** 1) build with `.UseSqliteVec()` and no path 2) read `DataRoot.DefaultDatabasePath` 3) put a `techierag.db` in the running folder and build again 4) `DataRoot.Set("<folder>")` and build again
+- **Expected:** 1–2) the database is under `<LocalApplicationData>/TechieRag/data/<app name>/` 3) the running folder's file is used and a warning names it 4) the database is under the given folder.
+- **Covers:** REQ-RAG-122
+
 ## Automated tests
 
 ```
@@ -171,7 +201,7 @@ TechieRagLiveHuggingFace=1 dotnet test tests/TechieRag.Local.Tests --filter Live
 TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=LiveOpenCodeGo"
 ```
 Local-model live tests skip until a model is downloaded and never download; agents' LM Studio tests skip unless `TechieRagLiveLmStudioModel` is set.
-1,151 xUnit tests across the three test projects (978 core, 143 local model, 30 agents); 41 live tests skip with a reason when their environment is absent. Core and agents PASS on 2026-10-04; local-model tests need about 4.6 GB of free memory for phi-3-mini and fail with `LocalModelMemoryException` below that.
+1,207 xUnit tests across the three test projects (1,034 core, 143 local model, 30 agents); 41 live tests skip with a reason when their environment is absent. All three PASS on 2026-10-06, each project run on its own. The local-model conformance and live tests need about 4.6 GB of free memory for phi-3-mini; below that they are skipped with the memory gate's message, not failed.
 
 ## Known limitations
 
@@ -188,6 +218,9 @@ Local-model live tests skip until a model is downloaded and never download; agen
 - The `opencode-go` connector reaches OpenCode Go's `chat/completions` models only; its `/responses` and `/messages` models are not reached (REQ-RAG-109).
 - Ollama's request mapping sends no `tool_calls` on assistant messages and Gemini's sends tool results as a `tool` role, not `functionResponse`; multi-turn tool use there relies on the server tolerating that (unchanged by REQ-RAG-067).
 - `LlmConfig.MaxContextTokens` is `int?`, unset by default (was `int`, 128000); code that reads it into an `int` stops compiling after upgrading (REQ-RAG-113).
+- An app that names no SQLite folder and has no `techierag.db` in its running folder starts with an empty database under `<LocalApplicationData>/TechieRag/data/<app name>/` after upgrading; give a full path to keep the old location (REQ-RAG-122).
+- Registering a tool name twice keeps the last definition; it used to list both (REQ-RAG-121).
+- Connector documents are keyed `connector:<type>:<source name>:<item id>`; documents ingested by an older package have no key, so the first re-sync after upgrading adds one copy per item before replacing works (REQ-RAG-120).
 
 ## Platform notes
 

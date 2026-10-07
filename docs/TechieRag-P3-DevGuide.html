@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TechieRag — Developer Guide</title>
+<script>
+/* Resolve the theme BEFORE first paint (no flash). Saved choice wins; otherwise
+   pick by time of day — light 07:00–19:00 local, softened dark at night. */
+(function(){
+  try{
+    var t = localStorage.getItem('tf-theme');
+    if(t!=='light' && t!=='dark'){ var h = new Date().getHours(); t = (h>=7 && h<19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){ document.documentElement.setAttribute('data-theme','light'); }
+})();
+</script>
+<style>
+/* LIGHT is the default theme — a warm off-white, easy on the eyes (never bright white). */
+:root{
+  --bg:#f4f1e9; --panel:#efe9db; --panel2:#e7e0cd; --line:#d8cfb6;
+  --ink:#2e2a22; --muted:#6f6857; --accent:#2f6f9f; --accent2:#3f7d54;
+  --warn:#9a6b15; --danger:#b03a52; --ok:#3f7d54;
+  --code-bg:#ece5d3; --code-ink:#332f26; --row-alt:#eae2cf;
+  --h3:#3a352b; --h4:#2f6f9f; --quote:#4a4537; --cta-bg:#e6eef5;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* DARK — softened near-black (warmer / less harsh than pure #0f1115). */
+html[data-theme="dark"]{
+  --bg:#11141a; --panel:#171b23; --panel2:#1e2430; --line:#2b3240;
+  --ink:#dfe3ea; --muted:#99a2b1; --accent:#7cc4ff; --accent2:#a6e3a1;
+  --warn:#f9c74f; --danger:#f38ba8; --ok:#a6e3a1;
+  --code-bg:#0c1016; --code-ink:#d8dde8; --row-alt:#141821;
+  --h3:#cfd5e3; --h4:#7cc4ff; --quote:#cfd5e3; --cta-bg:#0d2030;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-size:15px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:13px;background:var(--code-bg);color:var(--code-ink);padding:1px 5px;border-radius:4px;border:1px solid var(--line)}
+pre{font-family:var(--mono);font-size:12.5px;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;color:var(--code-ink);position:relative}
+pre code{background:none;border:none;padding:0}
+.copy{position:absolute;top:8px;right:8px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:11px;font-family:var(--sans);cursor:pointer}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+/* floating light/dark toggle (top-right) */
+.theme-toggle{position:fixed;top:12px;right:14px;z-index:10000;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12.5px;font-family:var(--sans);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+.layout{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+.layout.no-toc{grid-template-columns:1fr}
+nav.side{position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid var(--line);background:var(--panel);padding:18px 14px}
+nav.side h1{font-size:14px;margin:0 0 4px;letter-spacing:.5px;color:var(--ink)}
+nav.side .sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+nav.side ol,nav.side ul{list-style:none;padding:0;margin:0}
+nav.side li{font-size:13px;margin:2px 0}
+nav.side li a{display:block;padding:5px 8px;color:var(--ink);border-radius:6px}
+nav.side li a:hover{background:var(--panel2);text-decoration:none}
+nav.side li.h3 a{padding-left:22px;font-size:12.5px;color:var(--h3)}
+nav.side .group{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:14px 8px 4px}
+
+main{padding:28px 40px 80px;max-width:1100px}
+.layout.no-toc main{margin:0 auto}
+
+h1{font-size:28px;margin:0 0 6px}
+h2{font-size:22px;margin:32px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);scroll-margin-top:16px}
+h3{font-size:17px;margin:22px 0 6px;color:var(--h3);scroll-margin-top:16px}
+h4{font-size:14px;margin:14px 0 4px;color:var(--h4);scroll-margin-top:16px}
+.subtitle{color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:18px}
+p{margin:6px 0 10px}
+blockquote{border-left:3px solid var(--accent);background:var(--panel);margin:8px 0;padding:8px 14px;color:var(--quote)}
+ul,ol{padding-left:22px}
+li{margin:2px 0}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;margin:8px 0}
+th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--panel2);color:var(--h3);font-weight:600}
+tr:nth-child(even) td{background:var(--row-alt)}
+
+hr{border:none;border-top:1px solid var(--line);margin:24px 0}
+.anchor-link{color:var(--muted);font-weight:400;font-size:0.85em;margin-left:8px;opacity:0;transition:opacity .15s;text-decoration:none}
+h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
+
+/* inline TOC at top of main content */
+.toc-inline{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;margin:14px 0 24px}
+.toc-inline > div{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.toc-inline ol,.toc-inline ul{margin:4px 0;padding-left:18px}
+.toc-inline li{font-size:13px;margin:1px 0}
+.toc-inline a{color:var(--h3)}
+
+/* mermaid diagram wrapper + toolbar */
+.diagram{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--code-bg);margin:14px 0;overflow:hidden}
+.diagram .mermaid{padding:14px;margin:0;background:transparent;border:none;overflow:auto}
+.diagram .dt{display:flex;gap:6px;justify-content:flex-end;padding:6px 8px;background:var(--row-alt);border-bottom:1px solid var(--line)}
+.diagram .dt button{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 10px;font-size:12px;font-family:var(--sans);cursor:pointer;min-width:30px}
+.diagram .dt button:hover{color:var(--accent);border-color:var(--accent)}
+.diagram .dt .zlabel{padding:3px 6px;font-size:11px;color:var(--muted);font-family:var(--mono);align-self:center}
+.diagram.fs{position:fixed;inset:0;z-index:9999;border-radius:0;border:none}
+.diagram.fs .mermaid{height:calc(100vh - 40px);display:flex;align-items:center;justify-content:center}
+
+@media(max-width:900px){.layout{grid-template-columns:1fr}nav.side{position:static;height:auto}}
+</style>
+</head>
+<body>
+<button id="themeToggle" class="theme-toggle" title="Toggle light / dark">&#9790; Dark</button>
+<div class="layout no-toc">
+  <main>
+    <h1>TechieRag — Developer Guide</h1>
+    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+
+    <div class="toc-inline">
+      <div>Contents</div>
+      <ol>
+        <li><a href="#architecture-cheat-sheet">Architecture cheat-sheet</a></li>
+        <li><a href="#screen-by-screen-code-map">Screen-by-screen code map</a></li>
+        <li class="h3"><a href="#workspace-pinning-and-testing-workspacemanager-iworkspacemanager-techierag">Workspace pinning and testing: WorkspaceManager, IWorkspaceManager (TechieRag)</a></li>
+        <li class="h3"><a href="#connector-run-results-connectorrunner-connectoritemfailure-mimeparser-techierag">Connector run results: ConnectorRunner, ConnectorItemFailure, MimeParser (TechieRag)</a></li>
+        <li class="h3"><a href="#document-replace-on-re-ingest-itechierag-ingesttextasync-text-name-sourcekey-metadata-techierag">Document replace on re-ingest: ITechieRag.IngestTextAsync(text, name, sourceKey, metadata) (TechieRag)</a></li>
+        <li class="h3"><a href="#tool-registry-toolregistry-register-techierag">Tool registry: ToolRegistry.Register (TechieRag)</a></li>
+        <li class="h3"><a href="#storage-defaults-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite-userid-techierag">Storage defaults: DataRoot, UseSqliteVec(), WithPersistence(StoreProvider.Sqlite, userId) (TechieRag)</a></li>
+        <li class="h3"><a href="#flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag">Flow step names and model use: FlowNodeCatalog.CreateNode, FlowDefinition.UsesLanguageModel (TechieRag)</a></li>
+        <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
+        <li class="h3"><a href="#configuration">Configuration</a></li>
+        <li class="h3"><a href="#logging-and-errors">Logging and errors</a></li>
+        <li><a href="#known-issues">Known issues</a></li>
+      </ol>
+    </div>
+<table>
+<thead><tr><th></th><th></th></tr></thead>
+<tbody>
+<tr><td>App</td><td>TechieRag</td></tr>
+<tr><td>Kind</td><td>library</td></tr>
+<tr><td>Size</td><td>Small</td></tr>
+<tr><td>Phase</td><td>3 of 3</td></tr>
+<tr><td>Verified on</td><td>2026-10-06</td></tr>
+<tr><td>Date</td><td>2026-10-06</td></tr>
+</tbody>
+</table>
+<p>This guide maps the six public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, and flow step names and model use (REQ-RAG-114 to REQ-RAG-124, BRD-174 to BRD-184). Phase-1 services are in <code>docs/TechieRag-DevGuide.md</code>, phase-2 services in <code>docs/TechieRag-P2-DevGuide.md</code>.</p>
+<p>No sample calls any phase-3 surface: the probe (<code>samples/TechieRag.Probe</code>) only embeds, stores, searches and generates. So every entry is <code>static-only (unconfirmed)</code> at runtime. What was run on 2026-10-06 is the build (<code>bash .tfcore/utils/tf-build.sh</code>: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (<code>~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-&lt;id&gt;"</code>): 53 tests, 0 failed. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.</p>
+<h2 id="architecture-cheat-sheet">Architecture cheat-sheet<a class="anchor-link" href="#architecture-cheat-sheet">#</a></h2>
+<div class="diagram">
+  <div class="dt">
+    <button data-zout title="Zoom out">&minus;</button>
+    <span class="zlabel">100%</span>
+    <button data-zin title="Zoom in">+</button>
+    <button data-fit title="Fit to width">Fit</button>
+    <button data-one title="Actual size">1:1</button>
+    <button data-fs title="Fullscreen">&#9166;</button>
+    <button data-pop title="Open in new tab">&#8599;</button>
+  </div>
+  <pre class="mermaid">flowchart LR
+  Host["Host application"] --&gt; DI["AddTechieRag / TechieRagBuilder"]
+  DI --&gt; Client["TechieRagClient : ITechieRag"]
+  DI --&gt; IWM["IWorkspaceManager (stand-in or WorkspaceManager)"]
+  IWM --&gt; Client
+  Client --&gt; Store["IVectorStore.SearchDocumentsAsync (Sqlite, Pg, Qdrant)"]
+  Host --&gt; Ingest["IngestConnectorAsync"] --&gt; Runner["ConnectorRunner"]
+  Ingest --&gt; Client
+  Runner --&gt; Mime["MimeParser (EmailConnector)"]
+  DI --&gt; Data["DataRoot: data/&lt;app&gt;/techierag.db"]
+  Host --&gt; Flow["FlowNodeCatalog / FlowDefinition"]
+  Host --&gt; Tools["ToolRegistry"] --&gt; Loop["AgentLoopRunner"]</pre>
+</div>
+<table>
+<thead><tr><th>Layer</th><th>Project or folder</th><th>What lives here</th></tr></thead>
+<tbody>
+<tr><td>Public entry points</td><td><code>src/TechieRag/ITechieRag.cs</code>, <code>TechieRagBuilder.cs</code>, <code>DependencyInjection/</code></td><td>keyed <code>IngestTextAsync</code>, <code>UseSqliteVec()</code>, the <code>IWorkspaceManager</code> registration</td></tr>
+<tr><td>Workspaces</td><td><code>src/TechieRag/Services/WorkspaceManager.cs</code>, <code>Abstractions/IWorkspaceManager.cs</code></td><td>pinned retrieval, the test seam</td></tr>
+<tr><td>Search</td><td><code>src/TechieRag/TechieRagClient.cs</code>, <code>Models/SearchOptions.cs</code>, <code>VectorStores/</code></td><td>document-set search, rerank resolution</td></tr>
+<tr><td>Connectors</td><td><code>src/TechieRag/Connectors/</code>, <code>Connectors/Email/</code></td><td>partial run results, item outcomes, mail parse notes</td></tr>
+<tr><td>Storage defaults</td><td><code>src/TechieRag/Models/DataRoot.cs</code>, <code>Persistence/Sqlite*Store.cs</code></td><td>the per-app database location</td></tr>
+<tr><td>Tools and flows</td><td><code>src/TechieRag/Services/ToolRegistry.cs</code>, <code>Orchestration/</code></td><td>tool replace, step names, model use</td></tr>
+<tr><td>Tests</td><td><code>tests/TechieRag.Tests</code></td><td>seven phase-3 test files, named per entry</td></tr>
+</tbody>
+</table>
+<h2 id="screen-by-screen-code-map">Screen-by-screen code map<a class="anchor-link" href="#screen-by-screen-code-map">#</a></h2>
+<h3 id="workspace-pinning-and-testing-workspacemanager-iworkspacemanager-techierag">Workspace pinning and testing: <code>WorkspaceManager</code>, <code>IWorkspaceManager</code> (<code>TechieRag</code>)<a class="anchor-link" href="#workspace-pinning-and-testing-workspacemanager-iworkspacemanager-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/chat.png" alt="Sevak's chat screen, July 2026: a workspace answer whose context holds the pinned documents; it predates phase 3" style="max-width:100%"></p>
+<p>REQ-RAG-114, REQ-RAG-115, REQ-RAG-116. Covered by <code>tests/TechieRag.Tests/Services/WorkspacePinnedRetrievalTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-114 4 passed, REQ-RAG-115 4 passed, REQ-RAG-116 3 passed.</p>
+<p><strong>Call chain:</strong> <code>WorkspaceManager.AskAsync</code> / <code>BuildContextAsync</code> → <code>ComposeContextAsync</code> → <code>ResolveScopeAsync</code> → <code>SearchInScopeAsync</code> → <code>CollectPinnedChunksAsync</code> → <code>TechieRagClient.SearchAsync(question, SearchOptions { DocumentFilters, Rerank })</code> → <code>ResolveRerank</code> → <code>IEmbeddingProvider.EmbedAsync</code> → <code>IVectorStore.SearchDocumentsAsync</code> (SQLite <code>DocumentId IN (...)</code>, Postgres <code>= ANY</code>, Qdrant <code>Should</code>) → <code>ApplyRerankAsync</code> when on → <code>ApplyContextBudget</code>. Stand-in: <code>AddTechieRag</code> → <code>TryAddSingleton&lt;IWorkspaceManager&gt;(ITechieRag.GetWorkspaceManager())</code>.</p>
+<p><code>CollectPinnedChunksAsync</code> sends every in-scope pinned id down as <code>DocumentFilters</code>, so five pinned documents cost one embedding and one store query. It asks for ids × 3 × 5 chunks, groups by document and keeps 3 each. A pinned document that won no slot is searched alone as a fallback, so it stays in context (BRD-44). Both searches pass <code>Workspace.RerankEnabled</code>, so the workspace switch decides reranking for pinned results in both directions, never the library default.</p>
+<p><code>IVectorStore.SearchDocumentsAsync</code> is a default interface method that loops per document; the three built-in stores override it with one filtered query. <code>IWorkspaceManager</code> mirrors <code>WorkspaceManager</code>'s public members; <code>GetWorkspaceManager()</code> still returns the concrete type (owner decision 2026-10-06), and <code>TryAdd</code> keeps a stand-in the host registered first.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Services/WorkspaceManager.cs:711</code></td><td><code>CollectPinnedChunksAsync</code></td><td><code>pinnedIds</code></td><td>distinct in-scope pinned ids; empty returns at line 709</td></tr>
+<tr><td><code>src/TechieRag/Services/WorkspaceManager.cs:716</code></td><td><code>CollectPinnedChunksAsync</code></td><td><code>TopK</code>, <code>Rerank</code></td><td><code>pinnedIds.Count × 15</code>; <code>workspace.RerankEnabled</code> (line 718)</td></tr>
+<tr><td><code>src/TechieRag/Services/WorkspaceManager.cs:729</code></td><td><code>CollectPinnedChunksAsync</code></td><td><code>byDocument.TryGetValue</code></td><td>true for every id in the usual case; false runs the fallback search</td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:479</code></td><td><code>SearchAsync</code></td><td><code>options.DocumentFilters</code></td><td>non-empty takes <code>SearchDocumentsAsync</code>; else <code>SearchAsync</code> with <code>DocumentFilter</code></td></tr>
+<tr><td><code>src/TechieRag/VectorStores/SqliteVecStore.cs:389</code></td><td><code>ScoreAllChunks</code></td><td><code>sql</code></td><td><code>... AND DocumentId IN (?1, ..., ?n)</code></td></tr>
+<tr><td><code>src/TechieRag/DependencyInjection/ServiceCollectionExtensions.cs:87</code></td><td><code>AddTechieRag</code></td><td>the registered <code>IWorkspaceManager</code></td><td>the host's stand-in when registered first, else the client's <code>WorkspaceManager</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> pinned <code>TopK</code> = pinned ids × <code>PinnedChunksPerDocument</code> (3) × <code>OversampleFactor</code> (5) (<code>WorkspaceManager.cs:47-48</code>, <code>:716</code>); <code>fetchCount</code> = max(topK, <code>Rerank.CandidateCount</code>) when reranking (<code>TechieRagClient.cs:476</code>).</p>
+<h3 id="connector-run-results-connectorrunner-connectoritemfailure-mimeparser-techierag">Connector run results: <code>ConnectorRunner</code>, <code>ConnectorItemFailure</code>, <code>MimeParser</code> (<code>TechieRag</code>)<a class="anchor-link" href="#connector-run-results-connectorrunner-connectoritemfailure-mimeparser-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/ingestion.png" alt="Sevak's ingestion screen, July 2026: where a host shows a sync's results; it predates phase 3" style="max-width:100%"></p>
+<p>REQ-RAG-117, REQ-RAG-118, REQ-RAG-119. Covered by <code>Connectors/ConnectorPartialRunTests.cs</code> and <code>Connectors/Email/MailParseNotesTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-117 6 passed, REQ-RAG-118 5 passed, REQ-RAG-119 5 passed.</p>
+<p><strong>Call chain:</strong> <code>ConnectorIngestionExtensions.IngestConnectorAsync</code> → <code>ConnectorRunner.RunAsync</code> → <code>RunCoreAsync</code> → <code>IDataConnector.ListAsync</code> → size check → <code>IDataConnector.FetchAsync</code> (<code>EmailConnector.FetchAsync</code> → <code>MimeParser.Parse</code> → <code>ReadPart</code> → <code>AddNote</code>) → <code>onDocument</code> → <code>ITechieRag.IngestTextAsync</code>; on cancel <code>catch OperationCanceledException</code> → <code>BuildPartialResult</code> → <code>throw ConnectorRunCanceledException</code>; on failure <code>ConnectorException.PartialResult</code> set → rethrow; both re-wrapped by <code>IngestConnectorAsync</code> with <code>PartialIngestion</code>.</p>
+<p>A cancelled run throws <code>ConnectorRunCanceledException</code>, an <code>OperationCanceledException</code>, so existing cancel handling still catches it; <code>PartialResult</code> holds the documents, failures and sync state so far. A run that fails part-way puts the same on <code>ConnectorException.PartialResult</code>. The partial sync keeps the previous run's <code>LastRunUtc</code>, since advancing it would hide unreached items, and keeps every item version finished this run, so the next run sees them as unchanged. Nothing is pruned.</p>
+<p><code>ConnectorItemFailure.Outcome</code> is <code>Failed</code> by default; an over-size item and an item with no text are <code>Skipped</code>. The size reason is built with the invariant culture: digits, no separator. <code>BuildMetadata</code> and <code>ConnectorDocumentKey</code> are public.</p>
+<p><code>MimeParser</code> records a part nested past <code>MaxNestingDepth</code> (10) as <code>MailParseCodes.NestingTooDeep</code>, and an attachment past 1,000 as <code>AttachmentLimitReached</code>, on <code>ParsedMailMessage.Notes</code>, at most 100 notes.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:194</code></td><td><code>RunCoreAsync</code></td><td>the <code>Reason</code> string</td><td><code>Skipped: &lt;size&gt; bytes exceeds the &lt;max&gt;-byte limit for one item.</code>, plain digits; <code>Outcome</code> <code>Skipped</code> (198)</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:264</code></td><td><code>RunCoreAsync</code></td><td><code>sync.ItemVersions[item.Id]</code></td><td>set only after a successful fetch and hand-over</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:294</code></td><td><code>RunCoreAsync</code> (cancel catch)</td><td><code>fetchedCount</code></td><td>items finished before the cancel; 3 in the acceptance case</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorRunner.cs:358</code></td><td><code>BuildPartialResult</code></td><td><code>LastRunUtc</code></td><td><code>previousSync?.LastRunUtc</code>, never now</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorIngestionExtensions.cs:87</code></td><td><code>IngestConnectorAsync</code></td><td><code>PartialIngestion</code></td><td>ids ingested so far, run failures then ingestion skips, partial sync</td></tr>
+<tr><td><code>src/TechieRag/Connectors/Email/MimeParser.cs:301</code></td><td><code>ReadPart</code></td><td><code>depth</code></td><td>above 10 adds a <code>NestingTooDeep</code> note (303) and returns</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none beyond counting; the note's <code>PartName</code> is the decoded file name, else the media type, else <code>(unlabelled)</code> (<code>MimeParser.cs:279-283</code>).</p>
+<h3 id="document-replace-on-re-ingest-itechierag-ingesttextasync-text-name-sourcekey-metadata-techierag"><a id="document-replace-on-re-ingest-itechieragingesttextasynctext-name-sourcekey-metadata-techierag"></a>Document replace on re-ingest: <code>ITechieRag.IngestTextAsync(text, name, sourceKey, metadata)</code> (<code>TechieRag</code>)<a class="anchor-link" href="#document-replace-on-re-ingest-itechierag-ingesttextasync-text-name-sourcekey-metadata-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/text-ingestion.png" alt="Sevak's text ingestion screen, July 2026: the text path a keyed re-ingest replaces through; it predates phase 3" style="max-width:100%"></p>
+<p>REQ-RAG-120. Covered by <code>Ingestion/KeyedTextIngestionTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-120 6 passed.</p>
+<p><strong>Call chain:</strong> <code>TechieRagClient.IngestTextAsync(text, documentName, sourceKey, metadata)</code> → <code>IngestTextCoreAsync</code> → <code>DocumentIdForKey(sourceKey)</code> → <code>TextChunker.ChunkText</code> → <code>EmbedAndStampAsync</code> → <code>IVectorStore.DeleteByDocumentAsync(documentId)</code> → <code>IVectorStore.UpsertBatchAsync</code>. Connectors: <code>IngestConnectorAsync</code> → <code>ConnectorDocumentKey(connector, item)</code> → the same overload.</p>
+<p>The new overload sits beside the old one; a null or empty key behaves exactly like it, with a fresh GUID. With a key, the document id is a GUID built from the SHA-256 of <code>techierag-source-key:&lt;key&gt;</code>, so every call with that key addresses one document and its workspace memberships survive. The new text is chunked and embedded first; only then are the old chunks deleted and the new ones stored, so a failed embedding leaves the earlier copy rather than nothing. The key is stamped on each chunk as <code>DocumentMetadataKeys.SourceKey</code>.</p>
+<p><code>ITechieRag</code> carries a default implementation for third-party clients: it lists documents, deletes those whose <code>SourceKey</code> matches, then ingests with the key in the metadata. That order deletes before embedding, and the id is not stable.</p>
+<p>Connector ingestion passes <code>connector:&lt;source type&gt;:&lt;source name&gt;:&lt;item id&gt;</code>, not the bare item id, so two connectors with an item called <code>INBOX/1</code> never replace each other.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:253</code></td><td><code>IngestTextAsync</code> (keyed)</td><td><code>sourceKey</code></td><td>null for empty, otherwise unchanged</td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:285</code></td><td><code>IngestTextCoreAsync</code></td><td><code>documentId</code></td><td>same GUID for the same key on every call and process</td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:332</code></td><td><code>IngestTextCoreAsync</code></td><td><code>chunk.Metadata["SourceKey"]</code></td><td>the caller key</td></tr>
+<tr><td><code>src/TechieRag/TechieRagClient.cs:351</code></td><td><code>IngestTextCoreAsync</code></td><td><code>DeleteByDocumentAsync(documentId)</code></td><td>reached only after <code>EmbedAndStampAsync</code> returned</td></tr>
+<tr><td><code>src/TechieRag/ITechieRag.cs:74</code></td><td><code>IngestTextAsync</code> (default)</td><td><code>stored</code></td><td>the listed document's <code>SourceKey</code>; equal to the key means deleted (77)</td></tr>
+<tr><td><code>src/TechieRag/Connectors/ConnectorIngestionExtensions.cs:130</code></td><td><code>ConnectorDocumentKey</code></td><td>the return</td><td><code>connector:Email:&lt;name&gt;:&lt;item id&gt;</code> for a mail item</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>DocumentIdForKey</code> (<code>TechieRagClient.cs:260</code>): the first 16 bytes of SHA-256(<code>"techierag-source-key:" + key</code>) as a GUID.</p>
+<h3 id="tool-registry-toolregistry-register-techierag"><a id="tool-registry-toolregistryregister-techierag"></a>Tool registry: <code>ToolRegistry.Register</code> (<code>TechieRag</code>)<a class="anchor-link" href="#tool-registry-toolregistry-register-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/tool-demo.png" alt="Sevak's tool demo screen, July 2026: a tool-calling loop whose tool list the registry supplies; it predates phase 3" style="max-width:100%"></p>
+<p>REQ-RAG-121. Covered by <code>Services/ToolRegistryReplaceTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-121 3 passed.</p>
+<p><strong>Call chain:</strong> <code>ToolRegistry.Register(name, description, parametersSchema, handler)</code> (the synchronous overload wraps its delegate and calls it) → <code>definitions.FindIndex</code> (case-insensitive) → replace in place or <code>Add</code> → <code>handlers[name] = handler</code>. At answer time: <code>AgentLoopRunner.BuildToolOptions</code> → <code>LlmCompletionOptions.Tools = toolHandler.ToolDefinitions</code> → the provider's tool list; <code>ToolRegistry.ExecuteToolAsync</code> → <code>handlers.TryGetValue</code>.</p>
+<p>Before phase 3 a second registration replaced the handler but appended a second definition, so the model saw the name twice with the stale description. Now <code>Register</code> looks for an existing definition by name, ignoring case like the handler dictionary, and overwrites it at the same index, so the tool keeps its place in <code>ToolDefinitions</code> and the description the model reads belongs to the handler that runs. A new name is appended.</p>
+<p><code>ToolDefinitions</code> is the live list, not a copy; <code>GuardedToolHandler</code> and <code>CompositeToolHandler</code> read through it, so they see the replacement too.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Services/ToolRegistry.cs:57</code></td><td><code>Register</code></td><td><code>existing</code></td><td>−1 on the first registration; the earlier index on a repeat, any case</td></tr>
+<tr><td><code>src/TechieRag/Services/ToolRegistry.cs:60</code></td><td><code>Register</code></td><td><code>definitions[existing]</code></td><td>the new description and schema</td></tr>
+<tr><td><code>src/TechieRag/Services/ToolRegistry.cs:67</code></td><td><code>Register</code></td><td><code>handlers.Count</code></td><td>unchanged on a repeat (case-insensitive key)</td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:227</code></td><td><code>BuildToolOptions</code></td><td><code>Tools</code></td><td>each registered name once</td></tr>
+<tr><td><code>src/TechieRag/Services/ToolRegistry.cs:90</code></td><td><code>ExecuteToolAsync</code></td><td><code>handler</code></td><td>the last registered delegate for that name</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none.</p>
+<h3 id="storage-defaults-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite-userid-techierag"><a id="storage-defaults-dataroot-usesqlitevec-withpersistencestoreprovidersqlite-userid-techierag"></a>Storage defaults: <code>DataRoot</code>, <code>UseSqliteVec()</code>, <code>WithPersistence(StoreProvider.Sqlite, userId)</code> (<code>TechieRag</code>)<a class="anchor-link" href="#storage-defaults-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite-userid-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/settings.png" alt="Sevak's settings screen, July 2026: where a host would otherwise name a database folder; it predates phase 3" style="max-width:100%"></p>
+<p>REQ-RAG-122. Covered by <code>Persistence/DefaultDatabaseLocationTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-122 10 passed.</p>
+<p><strong>Call chain:</strong> <code>TechieRagBuilder.UseSqliteVec()</code> → <code>UseVectorStoreAtDefaultLocation</code> → <code>Build</code> → <code>CreateVectorStore</code> → <code>config.VectorStore.IsConnectionStringSet</code> false → <code>DataRoot.ResolveDefaultConnectionString(logger)</code> → <code>ResolveDefaultDatabasePath</code> → <code>ResolveDatabasePath(Environment.CurrentDirectory, logger, createDirectory: true)</code> → <code>AppDirectory</code> → <code>Current</code> → <code>BesideModelRoot(ModelRoot.Current)</code> → <code>new SqliteVecStore</code>. Persistence: <code>WithPersistence(Sqlite, userId)</code> → <code>CreateWorkspaceStore</code> → <code>RequirePersistenceConnectionString</code> → the same resolver. Configuration: <code>TechieRagConfigMapper</code> → <code>UseVectorStoreAtDefaultLocation</code> or <code>WithPersistence(Sqlite, userId)</code> when no connection string is given.</p>
+<p>Resolution follows the models' order: a folder set with <code>DataRoot.Set</code>, else <code>data</code> beside <code>ModelRoot.Current</code> (so <code>ModelRoot.Set</code> or <code>TECHIERAG_MODEL_ROOT</code> move data too), else <code>&lt;LocalApplicationData&gt;/TechieRag/data</code> (iOS and Catalyst: <code>&lt;home&gt;/Library/Application Support/TechieRag/data</code>). The database is <code>&lt;root&gt;/&lt;app name&gt;/techierag.db</code>; the app name is <code>SetAppName</code>'s value, else the entry assembly name. An existing <code>techierag.db</code> in the run folder wins, with a warning naming the folder; nothing is moved. An explicit path or connection string, including <code>UseSqliteVec("x.db")</code>, is used as given. <code>DataRoot.DefaultDatabasePath</code> returns the location without creating or logging.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Models/DataRoot.cs:49</code></td><td><code>Current</code></td><td><code>configured</code></td><td>the <code>DataRoot.Set</code> path, else <code>…/TechieRag/data</code></td></tr>
+<tr><td><code>src/TechieRag/Models/DataRoot.cs:73</code></td><td><code>AppName</code></td><td><code>entry</code></td><td>the entry assembly name, invalid characters as <code>_</code></td></tr>
+<tr><td><code>src/TechieRag/Models/DataRoot.cs:154</code></td><td><code>ResolveDatabasePath</code></td><td><code>File.Exists(legacy)</code></td><td>false for a new app; true logs the warning (156) and returns the run-folder file</td></tr>
+<tr><td><code>src/TechieRag/Models/DataRoot.cs:168</code></td><td><code>ResolveDatabasePath</code></td><td>the return</td><td><code>&lt;data root&gt;/&lt;app name&gt;/techierag.db</code>, folder created</td></tr>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:1091</code></td><td><code>CreateVectorStore</code></td><td><code>IsConnectionStringSet</code></td><td>false for <code>UseSqliteVec()</code>; true keeps the caller's string</td></tr>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:961</code></td><td><code>RequirePersistenceConnectionString</code></td><td><code>config.Persistence.Provider</code></td><td><code>Sqlite</code> with no string resolves the default; others throw (966)</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> <code>BesideModelRoot</code> (<code>DataRoot.cs:182</code>): the model root's parent plus <code>data</code>.</p>
+<h3 id="flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag"><a id="flow-step-names-and-model-use-flownodecatalogcreatenode-flowdefinitionuseslanguagemodel-techierag"></a>Flow step names and model use: <code>FlowNodeCatalog.CreateNode</code>, <code>FlowDefinition.UsesLanguageModel</code> (<code>TechieRag</code>)<a class="anchor-link" href="#flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-playground.png" alt="Sevak's LLM playground, July 2026: the configured model a flow with an Agent step needs; it predates phase 3" style="max-width:100%"></p>
+<p>REQ-RAG-123, REQ-RAG-124. Covered by <code>Orchestration/FlowStepNameAndModelUseTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-123 3 passed, REQ-RAG-124 4 passed.</p>
+<p><strong>Call chain:</strong> <code>FlowNodeCatalog.CreateNode(kind, id, stepName)</code> (the two-argument overload passes null) → <code>Describe(kind).DisplayName</code> when the name is blank → <code>new FlowNode { Id, Kind, Name }</code>. Model use: <code>FlowDefinition.UsesLanguageModel()</code> → <code>GetLanguageModelSteps()</code> → <code>FlowNodeCatalog.Kinds</code> → <code>FlowNodeKindDescriptor.UsesLlm</code>.</p>
+<p><code>CreateNode</code> gained an optional step name. The library has no localisation, so its default name is the catalogue's English <code>DisplayName</code>; the doc comment tells a host to pass its own, localized name. A blank name falls back to the English one. The id rule is unchanged: the given id, or <code>&lt;kind&gt;-&lt;guid&gt;</code> cut to 24 characters.</p>
+<p><code>GetLanguageModelSteps()</code> returns, in declaration order, the nodes whose kind the catalogue marks <code>UsesLlm</code>; only <code>Agent</code> is marked (<code>FlowNodeCatalog.cs:123</code>), while <code>Tool</code>, <code>Condition</code>, <code>Handoff</code> and <code>Terminal</code> are not. <code>UsesLanguageModel()</code> is true when that list is not empty. Both are methods rather than properties so <code>FlowSerializer</code> never writes them into saved flow JSON, and they read the same flag the palette shows, so a host can decide whether a flow needs a configured model or may run offline.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Orchestration/FlowNodeCatalog.cs:214</code></td><td><code>CreateNode(kind, id)</code></td><td><code>stepName</code> passed on</td><td>null, so the English display name</td></tr>
+<tr><td><code>src/TechieRag/Orchestration/FlowNodeCatalog.cs:231</code></td><td><code>CreateNode(kind, id, stepName)</code></td><td><code>Name</code></td><td>the host's step name; blank gives <code>Describe(kind).DisplayName</code></td></tr>
+<tr><td><code>src/TechieRag/Orchestration/FlowNodeCatalog.cs:229</code></td><td><code>CreateNode</code></td><td><code>Id</code></td><td>the given id, else <code>agent-&lt;guid&gt;</code> cut to 24 characters</td></tr>
+<tr><td><code>src/TechieRag/Orchestration/FlowDefinition.cs:113</code></td><td><code>GetLanguageModelSteps</code></td><td>the list</td><td>every <code>Agent</code> node; empty for a flow of tools and conditions</td></tr>
+<tr><td><code>src/TechieRag/Orchestration/FlowDefinition.cs:119</code></td><td><code>UsesLanguageModel</code></td><td>the return</td><td>true with one Agent step</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none.</p>
+<h2 id="cross-cutting-flows">Cross-cutting flows<a class="anchor-link" href="#cross-cutting-flows">#</a></h2>
+<p>Phase 1's flows are in <code>docs/TechieRag-DevGuide.md</code> and phase 2's changes in <code>docs/TechieRag-P2-DevGuide.md</code>. Phase 3 changed two.</p>
+<h3 id="configuration">Configuration<a class="anchor-link" href="#configuration">#</a></h3>
+<p><strong>Call chain:</strong> <code>ServiceCollectionExtensions.AddTechieRag(IConfiguration)</code> → <code>TechieRagConfigMapper.Apply</code> → <code>UseVectorStoreAtDefaultLocation</code> when the vector store section names no connection string (<code>TechieRagConfigMapper.cs:55</code>), <code>WithPersistence(StoreProvider.Sqlite, userId)</code> when SQLite persistence names none (<code>:173</code>) → <code>TechieRagBuilder.Build()</code>. <code>AddTechieRag</code> also registers <code>IWorkspaceManager</code> with <code>TryAdd</code> (<code>ServiceCollectionExtensions.cs:87</code>). <code>VectorStoreConfig.ConnectionString</code> reads <code>DataRoot.DefaultConnectionString</code> when never set (<code>TechieRagConfig.cs:221</code>). No new environment variable: <code>TECHIERAG_MODEL_ROOT</code> moves data and models together.</p>
+<h3 id="logging-and-errors">Logging and errors<a class="anchor-link" href="#logging-and-errors">#</a></h3>
+<p><code>DataRoot.ResolveDatabasePath</code> logs one warning when it keeps a run-folder <code>techierag.db</code> (<code>DataRoot.cs:156</code>), under the logger category <code>TechieRag.Models.DataRoot</code>. <code>ConnectorRunner</code> logs the cancel at Information (<code>ConnectorRunner.cs:292</code>). Errors: <code>ConnectorRunCanceledException</code> and <code>ConnectorException</code> now carry <code>PartialResult</code> and <code>PartialIngestion</code>; mail parse losses are codes (<code>MailParseCodes</code>) on <code>ParsedMailMessage.Notes</code>, not exceptions. The rest is unchanged from phase 1.</p>
+<h2 id="known-issues">Known issues<a class="anchor-link" href="#known-issues">#</a></h2>
+<p>Found while reading the code for this guide on 2026-10-06; none contradicts a requirement's acceptance.</p>
+<ul>
+<li>Fixed 2026-10-06 (fix-issues): REQ-RAG-119, <code>EmailConnector</code> now copies <code>ParsedMailMessage.Notes</code> onto the item's metadata under <code>ParseNotesMetadataKey</code> (<code>src/TechieRag/Connectors/Email/EmailConnector.cs:43</code>, written at <code>:263</code>), so a connector sync sees them too. REQ-RAG-116, the <code>IWorkspaceManager</code> registration (<code>ServiceCollectionExtensions.cs:88</code>) throws <code>InvalidOperationException</code> naming <code>WithPersistence</code> when no persistence is configured, instead of returning null.
+</li>
+<li>REQ-RAG-120: connector ingestion keys documents by <code>connector:&lt;type&gt;:&lt;name&gt;:&lt;item id&gt;</code> rather than the bare item id the BRD names; deliberate and documented at <code>ConnectorIngestionExtensions.cs:121-124</code>.
+</li>
+<li>REQ-RAG-118: the byte-budget stop is still logged with <code>{Bytes:N0}</code> (<code>ConnectorRunner.cs:272</code>), culture-formatted; it is a log line, not an item reason, so the requirement holds.
+</li>
+</ul>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+<script>
+// Light/dark toggle. The initial theme was already applied flash-free by the
+// <head> script (saved choice, else time-of-day). Clicking flips it, saves the
+// choice, and reloads so Mermaid re-renders in the matching theme.
+(function(){
+  var btn = document.getElementById('themeToggle');
+  if(!btn) return;
+  var relabel = function(){
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.textContent = dark ? '☀ Light' : '☾ Dark';
+  };
+  relabel();
+  btn.addEventListener('click', function(){
+    var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem('tf-theme', next); }catch(e){}
+    location.reload();
+  });
+})();
+
+// Copy buttons on every code <pre> — but NEVER on a `pre.mermaid`:
+// mermaid reads the <pre>'s textContent as the diagram source, so a button
+// appended here glues "copy" onto the last line and breaks the parse
+// (flowcharts → "Syntax error"; sequence diagrams silently absorb it).
+// Mermaid blocks get copy/export from their own .diagram toolbar instead.
+document.querySelectorAll('pre:not(.mermaid)').forEach(pre => {
+  const btn = document.createElement('button');
+  btn.className = 'copy';
+  btn.textContent = 'copy';
+  btn.addEventListener('click', () => {
+    const text = pre.querySelector('code') ? pre.querySelector('code').innerText : pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied';
+      setTimeout(() => { btn.textContent = 'copy'; }, 1200);
+    });
+  });
+  pre.appendChild(btn);
+});
+
+// Mermaid init — theme follows the resolved light/dark theme
+if (window.mermaid) {
+  var mermaidTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'default';
+  mermaid.initialize({ startOnLoad: true, theme: mermaidTheme, securityLevel: 'loose' });
+}
+
+// Mermaid toolbar wiring — run after mermaid renders
+function wireMermaidToolbars() {
+  document.querySelectorAll('.diagram').forEach(dia => {
+    if (dia.dataset.wired) return;
+    const merm = dia.querySelector('.mermaid');
+    const svg = merm && merm.querySelector('svg');
+    if (!svg) return;
+    dia.dataset.wired = '1';
+    let scale = 1;
+    const label = dia.querySelector('.zlabel');
+    const apply = () => {
+      svg.style.transform = `scale(${scale})`;
+      svg.style.transformOrigin = 'top left';
+      if (label) label.textContent = Math.round(scale * 100) + '%';
+    };
+    const setScale = (s) => { scale = Math.max(0.25, Math.min(4, s)); apply(); };
+    dia.querySelector('[data-zin]').onclick = () => setScale(scale * 1.2);
+    dia.querySelector('[data-zout]').onclick = () => setScale(scale / 1.2);
+    dia.querySelector('[data-fit]').onclick = () => {
+      svg.style.transform = '';
+      svg.removeAttribute('width');
+      svg.style.maxWidth = '100%';
+      svg.style.height = 'auto';
+      scale = 1;
+      if (label) label.textContent = 'Fit';
+    };
+    dia.querySelector('[data-one]').onclick = () => {
+      svg.style.transform = '';
+      svg.style.maxWidth = 'none';
+      svg.style.width = '';
+      svg.style.height = '';
+      scale = 1;
+      if (label) label.textContent = '100%';
+    };
+    dia.querySelector('[data-fs]').onclick = () => {
+      dia.classList.toggle('fs');
+      if (dia.classList.contains('fs')) {
+        document.addEventListener('keydown', escFs);
+      } else {
+        document.removeEventListener('keydown', escFs);
+      }
+    };
+    function escFs(e) { if (e.key === 'Escape') { dia.classList.remove('fs'); document.removeEventListener('keydown', escFs); } }
+    dia.querySelector('[data-pop]').onclick = () => openInNewTab(svg);
+    // Ctrl+wheel zoom
+    merm.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setScale(scale * (e.deltaY < 0 ? 1.1 : 1/1.1));
+    }, { passive: false });
+  });
+}
+
+function openInNewTab(svg) {
+  const svgSource = new XMLSerializer().serializeToString(svg);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Diagram</title>
+<style>
+  html,body{margin:0;height:100%;background:#0f1115;color:#e6e8ee;font-family:system-ui,sans-serif}
+  .bar{position:fixed;top:0;left:0;right:0;padding:8px 12px;background:#161a22;border-bottom:1px solid #2a3142;display:flex;gap:8px;z-index:10}
+  .bar button{background:#1c2230;color:#9aa3b2;border:1px solid #2a3142;border-radius:6px;padding:5px 12px;font-size:13px;cursor:pointer}
+  .bar button:hover{color:#7cc4ff;border-color:#7cc4ff}
+  .bar .hint{margin-left:auto;color:#9aa3b2;font-size:11.5px;align-self:center}
+  #stage{position:absolute;top:42px;bottom:0;left:0;right:0;overflow:hidden}
+  #stage svg{width:100%;height:100%}
+</style>
+</head><body>
+<div class="bar">
+  <button onclick="zpz.zoomIn()">+</button>
+  <button onclick="zpz.zoomOut()">−</button>
+  <button onclick="zpz.fit();zpz.center()">Fit</button>
+  <button onclick="zpz.resetZoom();zpz.center()">1:1</button>
+  <button onclick="window.print()">Print</button>
+  <button onclick="dlPng()">PNG</button>
+  <button onclick="dlSvg()">SVG</button>
+  <span class="hint">Drag to pan · Ctrl+wheel to zoom · + / − keys</span>
+</div>
+<div id="stage">${svgSource}</div>
+<script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"><\/script>
+<script>
+  const el = document.querySelector('#stage svg');
+  const zpz = svgPanZoom(el, { zoomScaleSensitivity: .3, minZoom: .2, maxZoom: 10, controlIconsEnabled: false, fit: true, center: true });
+  document.addEventListener('keydown', e => {
+    if (e.key === '+' || e.key === '=') zpz.zoomIn();
+    if (e.key === '-' || e.key === '_') zpz.zoomOut();
+    if (e.key === '0') { zpz.resetZoom(); zpz.center(); }
+  });
+  function dlSvg() {
+    const blob = new Blob([new XMLSerializer().serializeToString(el)], { type: 'image/svg+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'diagram.svg'; a.click();
+  }
+  function dlPng() {
+    const src = new XMLSerializer().serializeToString(el);
+    const img = new Image();
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(src)));
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = el.clientWidth * 2; c.height = el.clientHeight * 2;
+      const ctx = c.getContext('2d'); ctx.scale(2,2); ctx.drawImage(img, 0, 0);
+      c.toBlob(b => { const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'diagram.png'; a.click(); });
+    };
+    img.src = url;
+  }
+<\/script>
+</body></html>`;
+  const w = window.open();
+  w.document.write(html);
+  w.document.close();
+}
+
+// Run wiring after mermaid finishes (it renders async)
+if (window.mermaid) {
+  setTimeout(wireMermaidToolbars, 400);
+  setTimeout(wireMermaidToolbars, 1200);  // safety re-run for slow renders
+}
+</script>
+</body>
+</html>

@@ -98,4 +98,23 @@ public sealed class FlowDefinition
     /// <summary>Gets the node a run starts at.</summary>
     /// <returns>The declared start node, the first node when none is declared, or null when the flow is empty.</returns>
     public FlowNode? ResolveStartNode() => FindNode(StartNodeId) ?? Nodes.FirstOrDefault();
+
+    /// <summary>
+    /// Gets the steps that call a language model when they run (REQ-RAG-124 / BRD-184, Sevak feedback TR-RAG-043).
+    /// </summary>
+    /// <returns>The nodes whose kind <see cref="FlowNodeCatalog"/> marks <see cref="FlowNodeKindDescriptor.UsesLlm"/>,
+    /// in declaration order; empty when no step calls a model.</returns>
+    /// <remarks>
+    /// A method, not a property, so <see cref="FlowSerializer"/> never writes it into the persisted JSON.
+    /// Derived from the catalogue, so a host deciding whether a flow needs a configured model, or may run
+    /// offline, reads the same fact the palette shows.
+    /// </remarks>
+    public IReadOnlyList<FlowNode> GetLanguageModelSteps() =>
+        Nodes.Where(node => FlowNodeCatalog.Kinds.Any(kind => kind.Kind == node.Kind && kind.UsesLlm)).ToList();
+
+    /// <summary>
+    /// Gets whether any step of this flow calls a language model (REQ-RAG-124 / BRD-184).
+    /// </summary>
+    /// <returns>True when <see cref="GetLanguageModelSteps"/> is not empty.</returns>
+    public bool UsesLanguageModel() => GetLanguageModelSteps().Count > 0;
 }

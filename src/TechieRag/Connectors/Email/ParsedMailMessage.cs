@@ -19,4 +19,16 @@ public sealed record ParsedMailMessage(
     DateTimeOffset? Date,
     string? MessageId,
     string Body,
-    IReadOnlyList<MailAttachment> Attachments);
+    IReadOnlyList<MailAttachment> Attachments)
+{
+    /// <summary>
+    /// Gets the parts the parser did not decode, each with a code and the part's name
+    /// (REQ-RAG-119 / BRD-180). Empty when the whole message was read.
+    /// </summary>
+    /// <remarks>
+    /// An addition, not a change: existing callers that never read it are unaffected. Content nested
+    /// past <see cref="MimeParser.MaxNestingDepth"/> or beyond <see cref="MimeParser.MaxAttachments"/>
+    /// used to vanish without notice; it is now listed here.
+    /// </remarks>
+    public IReadOnlyList<MailParseNote> Notes { get; init; } = [];
+}

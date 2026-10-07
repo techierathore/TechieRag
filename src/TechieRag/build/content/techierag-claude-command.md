@@ -71,7 +71,9 @@ persona:
       - Subscription sign-in (UseChatGptSubscriptionLlm, ChatGptSubscriptionOptions, ISubscriptionSessionStore, SubscriptionSignInException, LlmSource.Subscription; only ChatGPT permits it today)
       - Data connectors and web ingestion (ConnectorRunner, IngestConnectorAsync, RepositoryConnector, EmailConnector over IMAP or mbox, ConfluenceConnector, ConnectorErrorCodes; IngestUrlAsync, IngestSiteAsync, HttpWebContentFetcher, WebCrawlOptions, the SSRF guard)
       - Reranking (WithReranker for Cohere and Jina, UseEmbeddedReranker for RerankSource.LocalOnnx, SearchOptions.Rerank)
-      - Workspaces and persistence (WithPersistence, StoreProvider, GetWorkspaceManager, GetConversationStore)
+      - Workspaces and persistence (WithPersistence, StoreProvider, GetWorkspaceManager, GetConversationStore; IWorkspaceManager for test stand-ins - register yours before AddTechieRag; pinned documents use one filtered search and follow the workspace's own rerank switch)
+      - Default SQLite location (UseSqliteVec() and WithPersistence(StoreProvider.Sqlite) with no path: an existing techierag.db in the running folder is kept with a warning, else <per-user TechieRag folder>/data/<app name>/; DataRoot.Set, DataRoot.DefaultDatabasePath; ModelRoot.Set and TECHIERAG_MODEL_ROOT move it with the models)
+      - Tool registry (ToolRegistry.Register on an existing name replaces the definition and handler) and flow building (FlowNodeCatalog.CreateNode(kind, id, stepName) with the host's localized name; FlowDefinition.UsesLanguageModel(), GetLanguageModelSteps())
       - MCP tool servers (McpServerConfig, McpTrustPolicy, McpClient.Create, McpToolHandler.CreateAsync) and flows (FlowSerializer.FromJson, FlowRuntime, FlowRunner)
       - Token tracking (ITokenTracker, UsageBudget, BudgetStatus)
       - Conversation memory (IConversationMemory, InMemoryConversationMemory)
@@ -321,6 +323,10 @@ Implements data connectors and web ingestion (core package; namespaces `TechieRa
 4. Stop codes: check `result.ReachedLimit` and switch on `result.LimitCode` against `ConnectorErrorCodes` (RunByteBudgetReached, RunItemLimitReached, RunPageLimitReached); `ConnectorException.ErrorCode` for failures
 5. Web: `var fetcher = new HttpWebContentFetcher(HttpWebContentFetcher.CreateDefaultClient()); await rag.IngestUrlAsync(url, fetcher); await rag.IngestSiteAsync(seedUrl, fetcher, new WebCrawlOptions { MaxDepth = 1, MaxPages = 25 })`; the SSRF guard blocks private targets, also after redirects, and stays on unless the user explicitly asks otherwise
 6. Mail actions (move, Gmail label, Trash; never a permanent delete) on the same IMAP login, in their own type so the reader stays read-only: `var mailActions = ImapMailActions.Create(imapOptions); var plans = await mailActions.DryRunAsync([MailAction.Move(MailMessageRef.FromConnectorItemId(item.Id), "Archive"), MailAction.AddLabel(msg, "Receipts"), MailAction.Trash(msg)]); var results = await mailActions.ApplyAsync(actions);` - one result per message (Done, Skipped, Failed); switch on `result.Code` against `MailActionCodes` (MoveNotSupported, LabelsNotSupported on non-Gmail, TrashFolderNotFound, ...); the dry run sends no command that changes the mailbox
+7. Resume after a cancel or failure: `catch (ConnectorRunCanceledException ex) { previousSync = ex.PartialResult.Sync; }` (still an `OperationCanceledException`); a `ConnectorException` carries the same partial result, so the next run skips finished items
+8. Item results: switch on `ConnectorItemFailure.Outcome` (`ConnectorItemOutcome.Failed` / `Skipped`) instead of reading the reason text; `ConnectorIngestionExtensions.BuildMetadata` and `ConnectorDocumentKey` are public
+9. Re-sync replaces, never duplicates: `IngestConnectorAsync` keys each document `connector:<type>:<source name>:<item id>`; for your own text use `rag.IngestTextAsync(text, name, sourceKey, metadata)` - the same key replaces the earlier document
+10. Mail the parser could not read in full: `document.Item.Metadata[EmailConnector.ParseNotesMetadataKey]` on a connector sync, or `MimeParser.Parse(raw).Notes` (`MailParseNote` with `Code` from `MailParseCodes`, `PartName`, `Depth`) when parsing directly
 
 ### *generate-config
 

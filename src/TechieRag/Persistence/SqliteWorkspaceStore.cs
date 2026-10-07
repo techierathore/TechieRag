@@ -18,6 +18,17 @@ public class SqliteWorkspaceStore : RelationalWorkspaceStore
     /// <summary>
     /// Creates a new SQLite workspace store.
     /// </summary>
+    /// <remarks>Uses the per-app default database, <see cref="Models.DataRoot.DefaultDatabasePath"/>
+    /// (REQ-RAG-122 / BRD-182): an existing <c>techierag.db</c> in the folder the app runs from, otherwise
+    /// <c>&lt;per-user TechieRag folder&gt;/data/&lt;app name&gt;/techierag.db</c>, whose folder is created.</remarks>
+    public SqliteWorkspaceStore()
+        : this(Models.DataRoot.ResolveDefaultConnectionString(null))
+    {
+    }
+
+    /// <summary>
+    /// Creates a new SQLite workspace store over the given database.
+    /// </summary>
     /// <param name="connectionString">SQLite connection string (e.g. "Data Source=techierag.db").</param>
     /// <exception cref="ArgumentException">Thrown when connectionString is null or empty.</exception>
     public SqliteWorkspaceStore(string connectionString)

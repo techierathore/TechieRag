@@ -38,6 +38,18 @@ public static partial class MimeParser
     /// </remarks>
     public const int MaxAttachments = 1000;
 
+    /// <summary>The deepest a part may be nested and still be decoded; the top-level message is depth 0.</summary>
+    /// <remarks>
+    /// Real nesting is shallow (a signed message wrapping a mixed message wrapping an alternative). The
+    /// cap stops a malformed or hostile message from recursing forever. A part past it is not decoded
+    /// and is listed on <see cref="ParsedMailMessage.Notes"/> with <see cref="MailParseCodes.NestingTooDeep"/>
+    /// (REQ-RAG-119 / BRD-180).
+    /// </remarks>
+    public const int MaxNestingDepth = 10;
+
+    /// <summary>The most notes one message records, so a hostile message cannot grow the list without bound.</summary>
+    private const int MaxNotes = 100;
+
     private const string DefaultCharset = "utf-8";
 
     /// <summary>Parses a raw message.</summary>
@@ -56,7 +68,8 @@ public static partial class MimeParser
         var texts = new List<string>();
         var htmls = new List<string>();
         var attachments = new List<MailAttachment>();
-        ReadPart(headers, body, texts, htmls, attachments, depth: 0);
+        var notes = new List<MailParseNote>();
+        ReadPart(headers, body, texts, htmls, attachments, notes, depth: 0);
 
         var text = texts.Count > 0
             ? string.Join("\n\n", texts)
@@ -72,7 +85,10 @@ public static partial class MimeParser
             ParseDate(Header(headers, "Date")),
             NullIfEmpty(Header(headers, "Message-ID")),
             text.Trim(),
-            attachments);
+            attachments)
+        {
+            Notes = notes,
+        };
     }
 
     /// <summary>Parses a header block on its own.</summary>
@@ -240,23 +256,53 @@ public static partial class MimeParser
         return null;
     }
 
+    /// <summary>Records one part the parser left out, up to <see cref="MaxNotes"/> per message.</summary>
+    /// <param name="notes">The message's notes.</param>
+    /// <param name="code">Why the part was left out, from <see cref="MailParseCodes"/>.</param>
+    /// <param name="headers">The part's headers.</param>
+    /// <param name="contentType">The part's raw Content-Type.</param>
+    /// <param name="mediaType">The part's media type, lower-case, possibly empty.</param>
+    /// <param name="depth">The part's nesting depth.</param>
+    private static void AddNote(
+        List<MailParseNote> notes,
+        string code,
+        IReadOnlyDictionary<string, string> headers,
+        string contentType,
+        string mediaType,
+        int depth)
+    {
+        if (notes.Count >= MaxNotes)
+        {
+            return;
+        }
+
+        var fileName = ReadParameter(Header(headers, "Content-Disposition"), "filename") ?? ReadParameter(contentType, "name");
+        var partName = fileName is not null
+            ? SafeFileName(DecodeEncodedWords(fileName))
+            : mediaType.Length > 0 ? mediaType : "(unlabelled)";
+        notes.Add(new MailParseNote(code, partName, depth));
+    }
+
     private static void ReadPart(
         IReadOnlyDictionary<string, string> headers,
         string body,
         List<string> texts,
         List<string> htmls,
         List<MailAttachment> attachments,
+        List<MailParseNote> notes,
         int depth)
     {
-        // Nesting is real (a signed message wrapping a mixed message wrapping an alternative), but
-        // it is shallow. A depth cap stops a malformed or hostile message from recursing forever.
-        if (depth > 10)
-        {
-            return;
-        }
-
         var contentType = Header(headers, "Content-Type");
         var mediaType = MediaTypeOf(contentType);
+
+        // Nesting is real (a signed message wrapping a mixed message wrapping an alternative), but
+        // it is shallow. A depth cap stops a malformed or hostile message from recursing forever.
+        // What the cap leaves out is reported, never dropped silently (REQ-RAG-119).
+        if (depth > MaxNestingDepth)
+        {
+            AddNote(notes, MailParseCodes.NestingTooDeep, headers, contentType, mediaType, depth);
+            return;
+        }
 
         if (mediaType.StartsWith("multipart/", StringComparison.Ordinal))
         {
@@ -269,7 +315,7 @@ public static partial class MimeParser
             foreach (var section in SplitMultipart(body, boundary))
             {
                 var (partHeaderBlock, partBody) = SplitHeaders(section);
-                ReadPart(ParseHeaders(partHeaderBlock), partBody, texts, htmls, attachments, depth + 1);
+                ReadPart(ParseHeaders(partHeaderBlock), partBody, texts, htmls, attachments, notes, depth + 1);
             }
 
             return;
@@ -286,6 +332,7 @@ public static partial class MimeParser
         {
             if (attachments.Count >= MaxAttachments)
             {
+                AddNote(notes, MailParseCodes.AttachmentLimitReached, headers, contentType, mediaType, depth);
                 return;
             }
 

@@ -59,6 +59,18 @@ public class SqliteVecStore : IVectorStore
     }
 
     /// <summary>
+    /// Creates a SQLite vector store in the per-app default database (REQ-RAG-122 / BRD-182).
+    /// </summary>
+    /// <param name="dimensions">The vector width.</param>
+    /// <remarks>Uses <see cref="DataRoot.DefaultDatabasePath"/>: an existing <c>techierag.db</c> in the
+    /// folder the app runs from, otherwise <c>&lt;per-user TechieRag folder&gt;/data/&lt;app name&gt;/techierag.db</c>,
+    /// whose folder is created.</remarks>
+    public SqliteVecStore(int dimensions)
+        : this(DataRoot.ResolveDefaultConnectionString(null), dimensions)
+    {
+    }
+
+    /// <summary>
     /// Initializes the database schema, creating tables if they don't exist.
     /// </summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
@@ -268,11 +280,45 @@ public class SqliteVecStore : IVectorStore
     /// <para>A stored vector whose width differs from the query scores 0, and a zero vector scores
     /// 0, as before.</para>
     /// </remarks>
-    public async Task<IReadOnlyList<SearchResult>> SearchAsync(
+    public Task<IReadOnlyList<SearchResult>> SearchAsync(
         float[] queryVector,
         int topK = 5,
         string? documentFilter = null,
+        CancellationToken cancellationToken = default) =>
+        SearchCoreAsync(queryVector, topK, documentFilter is null ? null : [documentFilter], cancellationToken);
+
+    /// <summary>
+    /// Performs one exact cosine scan restricted to a set of documents (REQ-RAG-114 / BRD-174).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return across all the documents.</param>
+    /// <param name="documentIds">The documents to search; an empty set returns no results.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Ranked search results, highest first.</returns>
+    /// <remarks>One scan with <c>DocumentId IN (...)</c>, never one scan per document.</remarks>
+    public Task<IReadOnlyList<SearchResult>> SearchDocumentsAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string> documentIds,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(documentIds);
+        return documentIds.Count == 0
+            ? Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>())
+            : SearchCoreAsync(queryVector, topK, documentIds.Distinct(StringComparer.Ordinal).ToList(), cancellationToken);
+    }
+
+    /// <summary>The two-pass search shared by the single-document and document-set overloads.</summary>
+    /// <param name="queryVector">The query vector.</param>
+    /// <param name="topK">How many results to return.</param>
+    /// <param name="documentIds">The documents to restrict to, or null for all.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Ranked results.</returns>
+    private async Task<IReadOnlyList<SearchResult>> SearchCoreAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyList<string>? documentIds,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(queryVector);
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
@@ -285,7 +331,7 @@ public class SqliteVecStore : IVectorStore
         using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        var winners = ScoreAllChunks(connection, queryVector, topK, documentFilter, cancellationToken);
+        var winners = ScoreAllChunks(connection, queryVector, topK, documentIds, cancellationToken);
         if (winners.Count == 0)
         {
             return Array.Empty<SearchResult>();
@@ -325,22 +371,23 @@ public class SqliteVecStore : IVectorStore
     /// <param name="connection">An open connection.</param>
     /// <param name="queryVector">The query vector.</param>
     /// <param name="topK">How many winners to keep.</param>
-    /// <param name="documentFilter">Optional document ID filter.</param>
+    /// <param name="documentIds">Optional document ID filter: one or more ids, or null for all.</param>
     /// <param name="cancellationToken">Checked every 1,024 rows.</param>
     /// <returns>The winners, best first.</returns>
     private static IReadOnlyList<ManagedVectorSearch.Candidate> ScoreAllChunks(
         SqliteConnection connection,
         float[] queryVector,
         int topK,
-        string? documentFilter,
+        IReadOnlyList<string>? documentIds,
         CancellationToken cancellationToken)
     {
         // Straight to SQLite's C API: sqlite3_column_blob hands back a span over SQLite's own row
         // buffer, so a vector is scored where it lies — no byte[] per row, no copy. SqliteDataReader
         // offers only copying reads (GetBytes, GetFieldValue<byte[]>), which cost more than the maths.
-        var sql = documentFilter is null
+        var sql = documentIds is null
             ? "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL"
-            : "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL AND DocumentId = ?1";
+            : "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL AND DocumentId IN ("
+                + string.Join(", ", Enumerable.Range(1, documentIds.Count).Select(i => "?" + i)) + ")";
 
         var database = connection.Handle!;
         var rc = raw.sqlite3_prepare_v2(database, sql, out var statement);
@@ -352,9 +399,9 @@ public class SqliteVecStore : IVectorStore
 
         using (statement)
         {
-            if (documentFilter is not null)
+            for (var i = 0; documentIds is not null && i < documentIds.Count; i++)
             {
-                SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(statement, 1, documentFilter), database);
+                SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(statement, i + 1, documentIds[i]), database);
             }
 
             while ((rc = raw.sqlite3_step(statement)) == raw.SQLITE_ROW)

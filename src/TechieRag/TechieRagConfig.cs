@@ -207,11 +207,25 @@ public class VectorStoreConfig
     /// Gets or sets the connection string or endpoint URL for the vector store.
     /// </summary>
     /// <remarks>
-    /// For SqliteVec: SQLite connection string (e.g., "Data Source=techierag.db")
+    /// <para>For SqliteVec: SQLite connection string (e.g., "Data Source=techierag.db")
     /// For PgVector: PostgreSQL connection string
-    /// For Qdrant: HTTP endpoint URL (e.g., "http://localhost:6334")
+    /// For Qdrant: HTTP endpoint URL (e.g., "http://localhost:6334")</para>
+    /// <para><b>Default (REQ-RAG-122 / BRD-182):</b> when never set, this reads
+    /// <see cref="Models.DataRoot.DefaultConnectionString"/> — an existing <c>techierag.db</c> in the
+    /// folder the app runs from, otherwise <c>&lt;per-user TechieRag folder&gt;/data/&lt;app name&gt;/techierag.db</c>.
+    /// The builder creates that folder and logs a warning when it keeps the legacy file. A value set
+    /// explicitly, relative or absolute, is used exactly as given.</para>
     /// </remarks>
-    public string ConnectionString { get; set; } = "Data Source=techierag.db";
+    public string ConnectionString
+    {
+        get => connectionString ?? Models.DataRoot.DefaultConnectionString;
+        set => connectionString = value;
+    }
+
+    /// <summary>Gets whether <see cref="ConnectionString"/> was set rather than left to the per-app default.</summary>
+    internal bool IsConnectionStringSet => connectionString is not null;
+
+    private string? connectionString;
 
     /// <summary>
     /// Gets or sets the API key for vector store authentication.
@@ -671,6 +685,12 @@ public class PersistenceConfig
     public StoreProvider Provider { get; set; } = StoreProvider.None;
 
     /// <summary>Gets or sets the database connection string.</summary>
+    /// <remarks>
+    /// With <see cref="Provider"/> set to <see cref="StoreProvider.Sqlite"/> and this left null or empty,
+    /// the stores use <see cref="Models.DataRoot.DefaultDatabasePath"/>: the per-user TechieRag data
+    /// folder for this app, or an existing <c>techierag.db</c> in the folder the app runs from
+    /// (REQ-RAG-122 / BRD-182). PostgreSQL still requires it.
+    /// </remarks>
     public string? ConnectionString { get; set; }
 
     /// <summary>Gets or sets the default user identifier used by persistent conversation memory.</summary>

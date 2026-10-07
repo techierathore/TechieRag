@@ -67,6 +67,12 @@ public static class DocumentMetadataKeys
     public const string EmbeddingSignature = "EmbeddingSignature";
 
     /// <summary>
+    /// The caller key text was ingested under (REQ-RAG-120 / BRD-179): ingesting again under the same
+    /// key replaces that document. Connector ingestion uses <c>ConnectorIngestionExtensions.ConnectorDocumentKey</c>.
+    /// </summary>
+    public const string SourceKey = "SourceKey";
+
+    /// <summary>
     /// Gets every metadata key that describes a document as a whole.
     /// </summary>
     /// <remarks>
@@ -82,7 +88,8 @@ public static class DocumentMetadataKeys
         ContentType,
         ItemId,
         IngestedAtUtc,
-        EmbeddingSignature
+        EmbeddingSignature,
+        SourceKey
     ];
 
     /// <summary>

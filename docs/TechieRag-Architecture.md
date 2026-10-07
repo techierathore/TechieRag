@@ -318,6 +318,12 @@ One row per decision. Every package added to the project has a row saying why.
 | 2026-10-03 | Trash = move to the server's Trash folder (`\Trash` special-use, or `[Gmail]/Trash`); the library never deletes a message permanently | A mistaken action must be recoverable from the user's own mail client | done 2026-10-03 (REQ-RAG-110/111, `ImapMailActions`, `ImapSession`) |
 | 2026-10-03 | Move uses `MOVE` (RFC 6851) when advertised; otherwise `UID COPY` + `\Deleted` + `UID EXPUNGE` (UIDPLUS) of that message only; a server with neither is refused with a coded result | A plain `EXPUNGE` would also purge every other message the user had flagged deleted | done 2026-10-03 (REQ-RAG-110/111, `ImapMailActions`, `ImapSession`) |
 | 2026-10-03 | Labels use Gmail's `X-GM-LABELS` extension; on any other server a label request returns a coded "labels not supported" result, never an IMAP keyword | Outlook categories are not exposed over IMAP, and a keyword the user's client never shows would look like it worked when it did not | done 2026-10-03 (REQ-RAG-110/111, `ImapMailActions`, `ImapSession`) |
+| 2026-10-06 | A pack-time check: packed assemblies carry the package version; tests never rebuild | 1.0.9 to 1.1.1 shipped net10.0 at 1.0.0.0 | done (BRD-173) |
+| 2026-10-06 | Sevak's unfixed feedback is phase 3 | Phase 2 awaits UAT and would pass 100 items | done (`TechieRag-P3-BRD.md`) |
+| 2026-10-06 | A database with no folder given goes to `<TechieRag data root>/data/<app name>/`, moved with the models' override; an existing `techierag.db` in the running folder is kept, with a warning | Moving files would make an upgraded app look empty; apps never share a database | planned (BRD-182) |
+| 2026-10-06 | Add `IWorkspaceManager`; `GetWorkspaceManager()` keeps its return type | Testable, no caller breaks | planned (BRD-176) |
+| 2026-10-06 | Text ingestion takes an optional key that replaces the earlier document | Re-syncs stored copies | planned (BRD-179) |
+| 2026-10-06 | Parsed mail gains an optional notes list | Skipped content vanished; an addition breaks no caller | planned (BRD-180) |
 
 ## 7. Module responsibilities
 
