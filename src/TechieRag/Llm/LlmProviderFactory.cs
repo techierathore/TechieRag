@@ -91,7 +91,37 @@ public static class LlmProviderFactory
     }
 
     /// <summary>
-    /// Routes a model name to a service and creates the provider for it.
+    /// Routes a model name to a service and creates the provider for it, optionally at another endpoint.
+    /// </summary>
+    /// <param name="modelName">A bare model name, or <c>connector/model</c>.</param>
+    /// <param name="apiKey">The API key, or null/empty for local runtimes that need none.</param>
+    /// <param name="loggerFactory">Optional logger factory.</param>
+    /// <param name="maxTokens">Default max output tokens.</param>
+    /// <param name="contextTokens">Context window for runtimes that size it per request; null for the runtime default.</param>
+    /// <param name="endpoint">
+    /// The service's base URL in place of the connector's default, for example an LM Studio or Ollama host on
+    /// another machine (<c>http://192.168.1.20:1234</c>); null keeps the default (REQ-RAG-127, Lekhak TR-RAG-005).
+    /// Ignored by the in-process model, which has no endpoint.
+    /// </param>
+    /// <returns>A provider for the service the model name resolves to.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the model name identifies no single service.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
+    /// <example>
+    /// <code>var llm = LlmProviderFactory.CreateForModel("lmstudio/qwen3", null, endpoint: "http://192.168.1.20:1234");</code>
+    /// </example>
+    public static ILlmProvider CreateForModel(
+        string modelName,
+        string? apiKey,
+        ILoggerFactory? loggerFactory = null,
+        int maxTokens = 2048,
+        int? contextTokens = null,
+        string? endpoint = null) =>
+        Create(WithEndpoint(ModelRouter.Require(modelName), endpoint), apiKey, loggerFactory, maxTokens, contextTokens);
+
+    /// <summary>
+    /// The 1.1.2 shape of <see cref="CreateForModel(string, string?, ILoggerFactory?, int, int?, string?)"/>,
+    /// kept so code compiled against it keeps running. It has no default arguments, so a call that names
+    /// every argument binds here and every shorter call binds to the overload with the endpoint.
     /// </summary>
     /// <param name="modelName">A bare model name, or <c>connector/model</c>.</param>
     /// <param name="apiKey">The API key, or null/empty for local runtimes that need none.</param>
@@ -100,13 +130,93 @@ public static class LlmProviderFactory
     /// <param name="contextTokens">Context window for runtimes that size it per request; null for the runtime default.</param>
     /// <returns>A provider for the service the model name resolves to.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the model name identifies no single service.</exception>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public static ILlmProvider CreateForModel(
         string modelName,
         string? apiKey,
-        ILoggerFactory? loggerFactory = null,
-        int maxTokens = 2048,
-        int? contextTokens = null) =>
+        ILoggerFactory? loggerFactory,
+        int maxTokens,
+        int? contextTokens) =>
         Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens, contextTokens);
+
+    /// <summary>
+    /// Lists the models a route's service reports, for LM Studio, Ollama and every OpenAI-compatible
+    /// connector (REQ-RAG-126, Lekhak TR-RAG-004).
+    /// </summary>
+    /// <param name="route">The route; only its connector is used.</param>
+    /// <param name="apiKey">The API key, or null for a local runtime.</param>
+    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The model ids the service reports, distinct and sorted; Ollama's are the names <c>ollama/&lt;name&gt;</c> takes.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="route"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the connector needs a key and none was given.</exception>
+    /// <exception cref="NotSupportedException">Thrown for Anthropic, Gemini, subscription and in-process connectors.</exception>
+    /// <exception cref="HttpRequestException">Thrown when the service cannot be reached or refuses; never an empty list for a down server.</exception>
+    public static Task<IReadOnlyList<string>> ListModelsAsync(
+        ModelRoute route,
+        string? apiKey,
+        string? endpoint = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        return ListModelsAsync(route.Connector, apiKey, endpoint, cancellationToken);
+    }
+
+    /// <summary>
+    /// Lists the models a connector's service reports, for LM Studio, Ollama and every OpenAI-compatible
+    /// connector (REQ-RAG-126, Lekhak TR-RAG-004).
+    /// </summary>
+    /// <param name="connector">The connector, for example <c>LlmConnectorCatalog.Require("lmstudio")</c>.</param>
+    /// <param name="apiKey">The API key, or null for a local runtime.</param>
+    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>The model ids the service reports, distinct and sorted.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connector"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the connector needs a key and none was given.</exception>
+    /// <exception cref="NotSupportedException">Thrown for Anthropic, Gemini, subscription and in-process connectors.</exception>
+    /// <exception cref="HttpRequestException">Thrown when the service cannot be reached or refuses.</exception>
+    /// <example>
+    /// <code>var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("ollama"), null, "http://192.168.1.20:11434");</code>
+    /// </example>
+    public static Task<IReadOnlyList<string>> ListModelsAsync(
+        LlmConnectorDescriptor connector,
+        string? apiKey,
+        string? endpoint = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connector);
+        return LlmModelLister.ListAsync(WithEndpoint(connector, endpoint), apiKey, handler: null, cancellationToken);
+    }
+
+    /// <summary>Returns the route with its connector's endpoint replaced, or unchanged for a null endpoint.</summary>
+    /// <param name="route">The route.</param>
+    /// <param name="endpoint">The base URL, or null.</param>
+    /// <returns>The route to create from.</returns>
+    /// <exception cref="ArgumentException">The endpoint is not an absolute http or https URL.</exception>
+    internal static ModelRoute WithEndpoint(ModelRoute route, string? endpoint) =>
+        endpoint is null ? route : route with { Connector = WithEndpoint(route.Connector, endpoint) };
+
+    /// <summary>Returns the connector with its endpoint replaced, or unchanged for a null endpoint.</summary>
+    /// <param name="connector">The connector.</param>
+    /// <param name="endpoint">The base URL, or null.</param>
+    /// <returns>The connector to use.</returns>
+    /// <exception cref="ArgumentException">The endpoint is not an absolute http or https URL.</exception>
+    internal static LlmConnectorDescriptor WithEndpoint(LlmConnectorDescriptor connector, string? endpoint)
+    {
+        if (endpoint is null)
+        {
+            return connector;
+        }
+
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new ArgumentException("The endpoint must be an absolute http or https URL.", nameof(endpoint));
+        }
+
+        return connector with { Endpoint = endpoint };
+    }
 
     /// <summary>
     /// Creates a provider for a <see cref="LlmSource.Subscription"/> route, signing in through the

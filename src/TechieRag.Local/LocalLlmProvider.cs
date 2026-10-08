@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -104,6 +105,13 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
         }
     }
 
+    /// <summary>
+    /// Gets whether this platform has a local inference runtime, without loading or downloading anything:
+    /// false on an Intel Mac or in a browser, where <see cref="LoadAsync"/> throws
+    /// <see cref="PlatformNotSupportedException"/> (REQ-RAG-125, Sevak TR-RAG-047).
+    /// </summary>
+    public static bool IsRuntimeAvailable => LocalRuntimeSelector.IsSupported(RuntimeInformation.ProcessArchitecture);
+
     /// <summary>Gets whether the model is loaded and ready to answer.</summary>
     public bool IsLoaded => loaded is not null;
 
@@ -180,12 +188,20 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
             var (resolvedRuntime, variant, directory) = Resolve();
             if (variant is not null)
             {
+                // REQ-RAG-125 (Sevak TR-RAG-047): a model that cannot fit is refused before its first byte is
+                // requested. The check after the download stays: a Hugging Face model's context cache size is
+                // known only once its genai_config.json is on disk.
+                if (!variant.IsOnDisk(directory))
+                {
+                    memoryGate.Ensure(Model.Id, Model.EstimateMemoryBytes(variant.DownloadBytes, ContextSize));
+                }
+
                 // TECHIERAG_MODEL_BASE_URL is for the built-in catalogue; a Hugging Face name is its own source.
                 var mirror = Model.HuggingFace is null ? LocalModelStore.Mirror : null;
                 await store.EnsureAsync(Model, variant, directory, options, mirror, cancellationToken).ConfigureAwait(false);
             }
 
-            var weightBytes = variant?.DownloadBytes ?? FolderBytes(directory);
+            var weightBytes = variant?.DownloadBytes ?? LocalModel.FolderBytes(directory);
             var required = Model.EstimateMemoryBytes(weightBytes, ContextSize);
             var available = memoryGate.Ensure(Model.Id, required);
             logger.LogInformation(
@@ -501,11 +517,6 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
 
         return tokenizer;
     }
-
-    private static long FolderBytes(string directory) =>
-        Directory.Exists(directory)
-            ? new DirectoryInfo(directory).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
-            : 0;
 
     private static string StripCodeFence(string content)
     {

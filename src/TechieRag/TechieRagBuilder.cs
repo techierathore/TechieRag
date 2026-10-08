@@ -716,42 +716,42 @@ public class TechieRagBuilder
     /// (TrThread, TrMessage, TrWorkspace, TrWorkspaceDocument tables — self-created).
     /// </summary>
     /// <param name="provider">The persistence provider (Sqlite or Postgres).</param>
-    /// <param name="connectionString">The database connection string.</param>
-    /// <param name="defaultUserId">Default user for persistent conversation memory.</param>
-    /// <returns>The builder instance for method chaining.</returns>
-    public TechieRagBuilder WithPersistence(StoreProvider provider, string connectionString, string defaultUserId = "default")
-    {
-        ArgumentException.ThrowIfNullOrEmpty(connectionString);
-        config.Persistence = new PersistenceConfig
-        {
-            Provider = provider,
-            ConnectionString = connectionString,
-            DefaultUserId = defaultUserId
-        };
-        return this;
-    }
-
-    /// <summary>
-    /// Enables SQLite persistence in the per-app default database (REQ-RAG-122 / BRD-182).
-    /// </summary>
-    /// <param name="provider">Must be <see cref="StoreProvider.Sqlite"/>; PostgreSQL needs a connection string.</param>
+    /// <param name="connectionString">
+    /// The database connection string; null uses the per-app default database
+    /// (<see cref="DataRoot.DefaultDatabasePath"/>, the same one <see cref="UseSqliteVec()"/> uses), which only
+    /// SQLite has (REQ-RAG-122 / BRD-182).
+    /// </param>
     /// <param name="defaultUserId">Default user for persistent conversation memory.</param>
     /// <returns>The builder instance for method chaining.</returns>
     /// <remarks>
-    /// The conversation and workspace tables go into <see cref="DataRoot.DefaultDatabasePath"/>, the same
-    /// per-app database <see cref="UseSqliteVec()"/> uses.
+    /// One method takes both the connection string and the user, so a two-argument call
+    /// <c>WithPersistence(provider, "Data Source=…")</c> always means a connection string. To name only a user
+    /// with the default database, name the argument: <c>WithPersistence(StoreProvider.Sqlite, defaultUserId: "alice")</c>
+    /// (Sevak TR-RAG-049: 1.1.2's <c>WithPersistence(provider, defaultUserId)</c> overload captured existing
+    /// two-argument calls and was removed in 1.1.3).
     /// </remarks>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="provider"/> is not <see cref="StoreProvider.Sqlite"/>.</exception>
-    public TechieRagBuilder WithPersistence(StoreProvider provider, string defaultUserId)
+    /// <exception cref="ArgumentException">
+    /// <paramref name="connectionString"/> is empty, or it is null and <paramref name="provider"/> is not
+    /// <see cref="StoreProvider.Sqlite"/>.
+    /// </exception>
+    public TechieRagBuilder WithPersistence(StoreProvider provider, string? connectionString = null, string defaultUserId = "default")
     {
-        if (provider != StoreProvider.Sqlite)
+        if (connectionString is null)
         {
-            throw new ArgumentException("Only SQLite has a default database; pass a connection string for any other provider.", nameof(provider));
+            if (provider != StoreProvider.Sqlite)
+            {
+                throw new ArgumentException("Only SQLite has a default database; pass a connection string for any other provider.", nameof(provider));
+            }
+        }
+        else
+        {
+            ArgumentException.ThrowIfNullOrEmpty(connectionString);
         }
 
         config.Persistence = new PersistenceConfig
         {
             Provider = provider,
+            ConnectionString = connectionString,
             DefaultUserId = defaultUserId
         };
         return this;
@@ -763,7 +763,7 @@ public class TechieRagBuilder
     /// <param name="provider">Must be <see cref="StoreProvider.Sqlite"/>.</param>
     /// <returns>The builder instance for method chaining.</returns>
     /// <exception cref="ArgumentException">Thrown when <paramref name="provider"/> is not <see cref="StoreProvider.Sqlite"/>.</exception>
-    public TechieRagBuilder WithPersistence(StoreProvider provider) => WithPersistence(provider, "default");
+    public TechieRagBuilder WithPersistence(StoreProvider provider) => WithPersistence(provider, connectionString: null);
 
     /// <summary>
     /// Sets or overrides the cost-estimation pricing for a model.

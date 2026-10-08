@@ -22,9 +22,12 @@ Fix the Sevak-reported defects still open on 2026-10-06: workspace pinning and t
 | REQ-RAG-119 | Mail content nested past the parser's depth limit shall be reported in a new optional notes list on the parsed message, never dropped without notice; the list is an addition, so existing callers are unaffected *(Sevak feedback TR-RAG-035)* | Verified | 100% | 2026-10-06 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-119", me` | [view](#d-req-rag-119) |
 | REQ-RAG-120 | Text ingestion shall take an optional caller key and replace the earlier document stored under that key; `IngestConnectorAsync` shall pass the connector's item id as the key *(Sevak feedback TR-RAG-026)* | Verified | 100% | 2026-10-06 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-120", me` | [view](#d-req-rag-120) |
 | REQ-RAG-121 | Registering a tool name a second time shall replace its definition as well as its handler, so the tool list sent to the model holds each name once *(Sevak feedback TR-RAG-039)* | Verified | 100% | 2026-10-06 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-121", me` | [view](#d-req-rag-121) |
-| REQ-RAG-122 | When an app gives no folder for a SQLite database, an existing `techierag.db` in the folder the app runs from shall be used, with a logged warning naming that folder. Otherwise the database shall be created in the per-user TechieRag folder the models use, under `data/<app name>/`. The location follows the models' override order (a folder set in code, then an environment variable, then the per-user default), and a public property returns it. Each app gets its own sub-folder, so two apps never share one database *(Sevak feedback TR-RAG-040; owner decision 2026-10-06: warn and keep existing files, never move them)* | Verified | 100% | 2026-10-06 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-122", me` | [view](#d-req-rag-122) |
+| REQ-RAG-122 | When an app gives no folder for a SQLite database, an existing `techierag.db` in the folder the app runs from shall be used, with a logged warning naming that folder. Otherwise the database shall be created in the per-user TechieRag folder the models use, under `data/<app name>/`. The location follows the models' override order (a folder set in code, then an environment variable, then the per-user default), and a public property returns it. Each app gets its own sub-folder, so two apps never share one database *(Sevak feedback TR-RAG-040; owner decision 2026-10-06: warn and keep existing files, never move them)* | Verified | 100% | 2026-10-07 verify: PASS — test `REQ-RAG-122 PublicOverloadsNeverGiveOneCallTwoMeanings` | [view](#d-req-rag-122) |
 | REQ-RAG-123 | `FlowNodeCatalog.CreateNode` shall take an optional step name, and its documentation shall say a host should set its own, localized name *(Sevak feedback TR-RAG-042)* | Verified | 100% | 2026-10-06 verify: PASS — test `REQ-RAG-123 CreateNodeCarriesHostStepName` | [view](#d-req-rag-123) |
 | REQ-RAG-124 | A flow definition shall say whether any of its steps calls a language model and list those steps *(Sevak feedback TR-RAG-043)* | Verified | 100% | 2026-10-06 verify: PASS — test `REQ-RAG-124 FlowWithoutModelStepsAnswersNo` | [view](#d-req-rag-124) |
+| REQ-RAG-125 | A host shall be able to check, before any download, whether a local model can run and fit on this device, and a load shall refuse a model that cannot fit before downloading it | Verified | 100% | 2026-10-07 verify: PASS — test `REQ-RAG-125 PublicOverloadsNeverGiveOneCallTwoMeanings` | [d](#d-req-rag-125) |
+| REQ-RAG-126 | The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector | Verified | 100% | 2026-10-08 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-126", me` | [d](#d-req-rag-126) |
+| REQ-RAG-127 | Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route | Verified | 100% | 2026-10-08 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-127", me` | [d](#d-req-rag-127) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`.
 
@@ -73,3 +76,18 @@ Fix the Sevak-reported defects still open on 2026-10-06: workspace pinning and t
 <a id="d-req-rag-124"></a>
 - **REQ-RAG-124** — A flow definition shall say whether any of its steps calls a language model and list those steps *(Sevak feedback TR-RAG-043)*. *BRD:* BRD-184
   - *Acceptance:* When a developer asks a flow with one model step whether it uses a model, then it answers yes and lists that step.
+
+
+## Local model fit check
+
+- <a id="d-req-rag-125"></a> **REQ-RAG-125** A host shall be able to check, before any download, whether a local model can run and fit on this device, and a load shall refuse a model that cannot fit before downloading it *(Sevak feedback TR-RAG-047)*. *BRD:* BRD-185
+  - *Acceptance:* When a developer checks a local model that cannot fit before its download, then the check says so without a request, and loading it refuses before the download.
+
+
+## Model routing
+
+- <a id="d-req-rag-126"></a> **REQ-RAG-126** The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector *(Lekhak feedback TR-RAG-004)*. *BRD:* BRD-186
+  - *Acceptance:* When a developer asks for the models of an LM Studio, Ollama or OpenAI-compatible connector on Model routing, then the model ids that service reports are returned
+
+- <a id="d-req-rag-127"></a> **REQ-RAG-127** Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route *(Lekhak feedback TR-RAG-005)*. *BRD:* BRD-187
+  - *Acceptance:* When a developer creates a provider for lmstudio/<model> with an endpoint on Model routing, then its requests go to that endpoint

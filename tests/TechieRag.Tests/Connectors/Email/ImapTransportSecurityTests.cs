@@ -136,6 +136,55 @@ public sealed class ImapTransportSecurityTests
     }
 
     /// <summary>A loopback TCP server that optionally sends one greeting and never speaks TLS.</summary>
+    /// <summary>
+    /// A mail host on a loopback (private-class) address is reached: the TCP connection is made and the
+    /// TLS handshake is attempted, so the only refusal is the TLS one, never the web connectors'
+    /// private-network refusal. Corporate IMAP on <c>10.x</c> or <c>mail.corp.internal</c>, and a local
+    /// Dovecot on <c>localhost:993</c>, depend on this (Sevak TR-RAG-036).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-082 MailHostOnPrivateAddressIsNotRefusedByTheWebGuard")]
+    public async Task MailHostOnPrivateAddressIsNotRefusedByTheWebGuard()
+    {
+        using var server = new LoopbackServer("* OK ready\r\n");
+        using var connection = new SocketImapConnection("127.0.0.1", server.Port, TimeSpan.FromSeconds(10));
+
+        var error = await Assert.ThrowsAsync<ConnectorException>(() => connection.OpenAsync(CancellationToken.None));
+
+        Assert.Contains("TLS", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-network", error.Message, StringComparison.OrdinalIgnoreCase);
+
+        // The server reads on its own task; give it a moment to record the client's first bytes.
+        for (var waited = 0; server.Received.Count == 0 && waited < 40; waited++)
+        {
+            await Task.Delay(50);
+        }
+
+        Assert.NotEmpty(server.Received);
+        Assert.Equal(0x16, server.Received[0]);
+    }
+
+    /// <summary>
+    /// No mail-connector source file uses the HTTP connectors' SSRF guard or its address classifier, so a
+    /// later change cannot put the deny-list on the mail transport without this test failing and pointing
+    /// at the reason (Sevak TR-RAG-036). A guard here would be an operator-set allow-list of mail hosts.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-082 MailTransportNeverUsesTheWebSsrfGuard")]
+    public void MailTransportNeverUsesTheWebSsrfGuard()
+    {
+        var folder = Path.Combine(LibraryRepoFiles.Root(), "src", "TechieRag", "Connectors", "Email");
+        var files = Directory.GetFiles(folder, "*.cs", SearchOption.AllDirectories);
+        Assert.NotEmpty(files);
+
+        string[] guardNames = ["CreateGuardedHandler", "IsPrivateNetworkHost", "IsPrivateNetworkAddress", "HttpConnectorTransport", "blockPrivateTargets"];
+        var uses = files
+            .SelectMany(file => guardNames
+                .Where(name => File.ReadAllText(file).Contains(name, StringComparison.Ordinal))
+                .Select(name => $"{Path.GetFileName(file)} uses {name}"))
+            .ToList();
+
+        Assert.True(uses.Count == 0, string.Join(Environment.NewLine, uses));
+    }
+
     private sealed class LoopbackServer : IDisposable
     {
         private readonly TcpListener listener;

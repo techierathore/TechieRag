@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 3: Consumer feedback from Sevak</h1>
-    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-P3-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-08 &middot; source <code>TechieRag-P3-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -120,6 +120,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#tool-registry">Tool registry</a></li>
         <li class="h3"><a href="#storage-defaults">Storage defaults</a></li>
         <li class="h3"><a href="#flow-step-names-and-model-use">Flow step names and model use</a></li>
+        <li class="h3"><a href="#local-model-fit-check">Local model fit check</a></li>
+        <li class="h3"><a href="#model-routing">Model routing</a></li>
         <li><a href="#development-status">5. Development status</a></li>
         <li><a href="#where-the-rest-lives">6. Where the rest lives</a></li>
       </ol>
@@ -136,7 +138,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-184. Each item names the Sevak feedback entry it answers.</p>
+<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-187 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak). Each item names the Sevak feedback entry it answers.</p>
 <h2 id="screens-and-flow"><a id="2-screens-and-flow"></a>2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -148,6 +150,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Tool registry</td><td><code>ToolRegistry</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>tool name, definition, handler</td></tr>
 <tr><td>Storage defaults</td><td><code>UseSqliteVec()</code>, <code>PersistenceConfig.ConnectionString</code>, the data folder</td><td>App developer</td><td>— (library, no mockup)</td><td>database path, data root, app name</td></tr>
 <tr><td>Flow step names and model use</td><td><code>FlowNodeCatalog</code>, <code>FlowDefinition</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>step name, uses a model</td></tr>
+<tr><td>Local model fit check</td><td><code>LocalLlmProvider</code>, <code>LocalModel</code>, <code>AvailableMemory</code></td><td>App developer</td><td>— (library, no mockup)</td><td>runtime available, memory needed, memory free, download progress</td></tr>
+<tr><td>Model routing</td><td><code>LlmProviderFactory.ListModelsAsync</code>, <code>LlmProviderFactory.CreateForModel</code></td><td>App developer</td><td>— (library, no mockup)</td><td>connector, endpoint, model ids</td></tr>
 </tbody>
 </table>
 <p><strong>Primary journey:</strong></p>
@@ -251,13 +255,41 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 </li>
 </ul>
+<h3 id="local-model-fit-check">Local model fit check<a class="anchor-link" href="#local-model-fit-check">#</a></h3>
+<p>An app can tell whether the local model will run and fit before it offers the download.</p>
+<ul>
+<li><strong>BRD-185</strong> — A host shall be able to check, before any download, whether a local model can run and fit on this device, and a load shall refuse a model that cannot fit before downloading it. Whether the platform has a local runtime, the free memory the model needs and the free memory the library measures shall be public, and a provider's download progress shall reach an option on that provider alone <em>(Sevak feedback TR-RAG-047, added 2026-10-07)</em> <em>Screen:</em> Local model fit check
+<ul>
+<li><em>Acceptance:</em> When a developer checks a local model that cannot fit before its download, then the check says so without a request, and loading it refuses before the download.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="model-routing">Model routing<a class="anchor-link" href="#model-routing">#</a></h3>
+<p>A host can list a service's models and reach a service on another machine by its model name alone.</p>
+<ul>
+<li><strong>BRD-186</strong> — The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector <em>(Lekhak feedback TR-RAG-004, added 2026-10-08)</em> <em>Screen:</em> Model routing
+<ul>
+<li><em>Acceptance:</em> When a developer asks for the models of an LM Studio, Ollama or OpenAI-compatible connector on Model routing, then the model ids that service reports are returned.
+</li>
+</ul>
+</li>
+<li><strong>BRD-187</strong> — Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route <em>(Lekhak feedback TR-RAG-005, added 2026-10-08)</em> <em>Screen:</em> Model routing
+<ul>
+<li><em>Acceptance:</em> When a developer creates a provider for lmstudio/&lt;model&gt; with an endpoint on Model routing, then its requests go to that endpoint.
+</li>
+</ul>
+</li>
+</ul>
 <h2 id="development-status"><a id="5-development-status"></a>5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-06.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-10-08.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
 <tr><td>RAG / AI requirements</td><td>11</td><td>11</td><td>0</td><td>Done</td></tr>
+<tr><td>Local model fit check</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Model routing</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
 <h2 id="where-the-rest-lives"><a id="6-where-the-rest-lives"></a>6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>

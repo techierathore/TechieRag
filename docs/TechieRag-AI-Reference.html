@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-06</div>
+    <div class="sub">Last rendered: 2026-10-08</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -151,6 +151,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#tools-registering-a-name-again-replaces-it">Tools: registering a name again replaces it</a></li>
         <li class="h3"><a href="#per-app-sqlite-database-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite">Per-app SQLite database: DataRoot, UseSqliteVec(), WithPersistence(StoreProvider.Sqlite)</a></li>
         <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
+        <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
+        <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -190,7 +192,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-10-08 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -237,6 +239,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#tools-registering-a-name-again-replaces-it">Tools: registering a name again replaces it</a></li>
         <li class="h3"><a href="#per-app-sqlite-database-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite">Per-app SQLite database: DataRoot, UseSqliteVec(), WithPersistence(StoreProvider.Sqlite)</a></li>
         <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
+        <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
+        <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -583,7 +587,7 @@ var response = await rag.AskAsync("What is quantum computing?");</code></pre>
 <tr><td><code>WithReranker(source, apiKey, model?, endpoint?, topN, candidateCount)</code></td><td>v3: Cohere or Jina rerank stage (Phase-2 Features, 9)</td></tr>
 <tr><td><code>WithReranker(factory, topN, candidateCount)</code></td><td>v3: custom <code>IReranker</code></td></tr>
 <tr><td><code>UseEmbeddedReranker(modelDirectory?, topN, candidateCount)</code></td><td>v3: ONNX cross-encoder rerank, <code>RerankSource.LocalOnnx</code> (<code>TechieRag.Embedded</code>)</td></tr>
-<tr><td><code>WithPersistence(provider, connectionString, defaultUserId)</code></td><td>v3: SQLite/PostgreSQL conversation and workspace stores (Phase-2 Features, 10)</td></tr>
+<tr><td><code>WithPersistence(provider, connectionString = null, defaultUserId)</code></td><td>v3: SQLite/PostgreSQL conversation and workspace stores (Phase-2 Features, 10); a null connection string is the per-app SQLite default (1.1.3, TR-RAG-049)</td></tr>
 <tr><td><code>UseModelRoot(path)</code></td><td>v3: the folder every local model downloads to (<code>TechieRag.Embedded</code>; Phase-2 Features, 3)</td></tr>
 </tbody>
 </table>
@@ -980,7 +984,9 @@ public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId
 
 // TechieRag.Llm.LlmProviderFactory
 public static ILlmProvider Create(ModelRoute route, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
-public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
+public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null, string? endpoint = null);   // endpoint: another host for the route (REQ-RAG-127)
+public static Task&lt;IReadOnlyList&lt;string&gt;&gt; ListModelsAsync(ModelRoute route, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);   // REQ-RAG-126
+public static Task&lt;IReadOnlyList&lt;string&gt;&gt; ListModelsAsync(LlmConnectorDescriptor connector, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);
 
 // TechieRag.Llm.LlmConnectorCatalog
 public static IReadOnlyList&lt;LlmConnectorDescriptor&gt; All { get; }
@@ -1133,6 +1139,7 @@ var documentId = await rag.IngestUrlAsync("https://example.com/handbook", fetche
 var site = await rag.IngestSiteAsync("https://example.com/docs/", fetcher, new WebCrawlOptions { MaxDepth = 2, MaxPages = 50 });</code></pre>
 <h3 id="reranking-withreranker-useembeddedreranker-searchoptions-rerank"><a id="8-reranking-withreranker-useembeddedreranker-searchoptionsrerank"></a>8. Reranking: <code>WithReranker</code>, <code>UseEmbeddedReranker</code>, <code>SearchOptions.Rerank</code><a class="anchor-link" href="#reranking-withreranker-useembeddedreranker-searchoptions-rerank">#</a></h3>
 <p>Package <code>TechieRag</code> (Cohere, Jina, custom) or <code>TechieRag.Embedded</code> (the ONNX cross-encoder bge-reranker-v2-m3, <code>RerankSource.LocalOnnx</code>, downloaded once). The vector search fetches <code>candidateCount</code> chunks, the reranker orders them and returns <code>topN</code>. Configuration alone cannot select <code>LocalOnnx</code>: <code>"Rerank": { "Source": "LocalOnnx" }</code> throws at <code>Build()</code> unless the Embedded package's <code>UseEmbeddedReranker()</code> supplied the reranker.</p>
+<p><strong><code>RerankConfig.Enabled</code> is the default, not the switch (REQ-RAG-047, Sevak TR-RAG-012).</strong> It decides whether a search reranks when the call passes no <code>SearchOptions.Rerank</code> and no workspace decides. A reranker is built whenever <code>Source</code> is usable (Cohere or Jina with a key, a custom factory, <code>UseEmbeddedReranker()</code>), even with <code>Enabled = false</code>, so a call or a workspace can still opt in. To build no reranker, and so avoid the embedded model's download or an API key check, leave <code>Source = RerankSource.None</code>. <code>WithRerankEnabledByDefault(false)</code> after <code>WithReranker(...)</code> keeps the reranker for opt-in use with the default off.</p>
 <pre><code class="language-csharp">// TechieRag.TechieRagBuilder
 public TechieRagBuilder WithReranker(RerankSource source, string apiKey, string? model = null, string? endpoint = null, int topN = 0, int candidateCount = 20);   // Cohere or Jina
 public TechieRagBuilder WithReranker(Func&lt;IReranker&gt; factory, int topN = 0, int candidateCount = 20);                                                       // RerankSource.Custom
@@ -1357,6 +1364,10 @@ var rag = new TechieRagBuilder()
     .WithPersistence(StoreProvider.Sqlite)             // same per-app database
     .Build();
 Console.WriteLine(DataRoot.DefaultDatabasePath);       // ...\TechieRag\data\HelpDesk\techierag.db</code></pre>
+<p><strong>1.1.3 change (Sevak TR-RAG-049).</strong> 1.1.2's <code>WithPersistence(StoreProvider provider, string defaultUserId)</code> is removed: it captured every existing two-argument call <code>WithPersistence(provider, "Data Source=…")</code> and turned the connection string into a user id. There is one method, <code>WithPersistence(StoreProvider provider, string? connectionString = null, string defaultUserId = "default")</code>, so a second positional argument is always a connection string; <code>connectionString: null</code> means the per-app default (SQLite only). To name a user with the default database, name the argument. <code>VectorStoreConfig.IsConnectionStringSet</code> is public, so a host that resolves the unset default into its own data folder can tell "unset" from a value; the getter of an unset <code>ConnectionString</code> returns the absolute per-app path.</p>
+<pre><code class="language-csharp">builder.WithPersistence(StoreProvider.Sqlite, $"Data Source={path}");     // a connection string, as in 1.0.8
+builder.WithPersistence(StoreProvider.Sqlite, defaultUserId: "alice");    // per-app default database, user alice
+var unset = !config.VectorStore.IsConnectionStringSet;                     // true until a value is set</code></pre>
 <h3 id="flows-host-step-names-and-model-use">Flows: host step names and model use<a class="anchor-link" href="#flows-host-step-names-and-model-use">#</a></h3>
 <p>Package <code>TechieRag</code>; namespace <code>TechieRag.Orchestration</code>. <code>FlowNodeCatalog.CreateNode(kind, id, stepName)</code> names the node; a host should pass its own, localized name, because the default is the catalogue's English label. <code>FlowDefinition.UsesLanguageModel()</code> and <code>FlowDefinition.GetLanguageModelSteps()</code> say whether, and which, steps call a model (methods, so they are never persisted).</p>
 <pre><code class="language-csharp">var node = FlowNodeCatalog.CreateNode(FlowNodeKind.Agent, id: null, stepName: localizer["StepTriage"]);
@@ -1364,6 +1375,21 @@ if (flow.UsesLanguageModel())
 {
     var modelSteps = flow.GetLanguageModelSteps().Select(n =&gt; n.DisplayName);
 }</code></pre>
+<h3 id="model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: <code>ListModelsAsync</code>, <code>CreateForModel(…, endpoint)</code><a class="anchor-link" href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). <code>LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)</code> asks the service which models it serves: LM Studio <code>GET /v1/models</code>, Ollama <code>GET /api/tags</code> (names as <code>ollama/&lt;name&gt;</code> takes them), any OpenAI-compatible connector <code>GET {endpoint}/models</code> with the key as a bearer token. The ids come back distinct and sorted. A server that is down or refuses throws <code>HttpRequestException</code>, never an empty list. Anthropic, Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>. <code>CreateForModel(modelName, apiKey, endpoint: url)</code> sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. <code>endpoint</code> must be an absolute http or https URL. Code compiled against the five-argument <code>CreateForModel</code> keeps working.</p>
+<pre><code class="language-csharp">var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "http://192.168.1.20:1234");
+var llm = LlmProviderFactory.CreateForModel($"lmstudio/{ids[0]}", null, endpoint: "http://192.168.1.20:1234");
+var groqIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("groq/llama-3.3-70b-versatile"), groqKey);</code></pre>
+<h3 id="local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download<a class="anchor-link" href="#local-model-will-it-run-and-fit-before-the-download">#</a></h3>
+<p>Package <code>TechieRag.Local</code>; namespace <code>TechieRag.Local</code> (REQ-RAG-125, Sevak TR-RAG-047). Nothing here touches the network. <code>LocalLlmProvider.IsRuntimeAvailable</code> is false where there is no local runtime (an Intel Mac, a browser), where <code>LoadAsync</code> would throw <code>PlatformNotSupportedException</code>. <code>LocalModel.EstimateRequiredMemoryBytes(int? contextSize = null)</code> returns the free memory the load needs (weights + context cache + 256 MB runtime), the same figure the load checks; null when the weight size is not known yet (a Hugging Face model before <code>GetTermsAsync</code>, a missing host folder). For a Hugging Face model the context cache is counted only once its <code>genai_config.json</code> is on disk, so the figure before download is a lower bound. <code>AvailableMemory.Read()</code> returns the free memory the library measures, or null. <code>LoadAsync</code> now refuses a model that cannot fit with <code>LocalModelMemoryException</code> before the terms are asked and before the first byte, and checks again after the download. <code>LocalLlmOptions.DownloadProgress</code> (<code>IProgress&lt;ModelDownloadProgress&gt;?</code>) receives this provider's download alone, each report a copy.</p>
+<pre><code class="language-csharp">using var provider = new LocalLlmProvider(new LocalLlmOptions
+{
+    Model = LocalModel.Phi3Mini4kInstruct,
+    DownloadProgress = new Progress&lt;ModelDownloadProgress&gt;(p =&gt; bar.Value = p.OverallBytesProgressPercent)
+});
+var needed = provider.Model.EstimateRequiredMemoryBytes(provider.ContextSize);
+var free = AvailableMemory.Read();
+var canOffer = LocalLlmProvider.IsRuntimeAvailable &amp;&amp; (needed is null || free is null || free &gt;= needed);</code></pre>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>

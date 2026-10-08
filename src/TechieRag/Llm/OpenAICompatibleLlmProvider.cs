@@ -21,7 +21,8 @@ namespace TechieRag.Llm;
 /// </remarks>
 public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
-    private static readonly string DefaultUserAgent =
+    /// <summary>The User-Agent every request names itself with, the model listing's included.</summary>
+    internal static readonly string DefaultUserAgent =
         $"TechieRag/{typeof(OpenAICompatibleLlmProvider).Assembly.GetName().Version?.ToString(3)}";
 
     private readonly HttpClient httpClient;

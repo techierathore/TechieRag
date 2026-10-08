@@ -1,16 +1,16 @@
 ---
 project: TechieRag
-last_updated: 2026-10-06
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · UAT — handoff done, 11 of 11 verified
+last_updated: 2026-10-08
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · UAT — handoff done, 14 of 14 verified
 last_verified_build: PASS
-last_verified_date: 2026-10-06
+last_verified_date: 2026-10-08
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak). All 11 rows Verified and handed off on 2026-10-06: the UsageGuide has their test plan and limitations, and the new phase-3 DevGuide maps each surface to file and line. The two gaps the handoff found (REQ-RAG-116, REQ-RAG-119) were fixed and re-verified the same day. Phase 2 (90 rows) is also Verified. Both wait for UAT per the UsageGuide, and both ship in the next package with the TR-RAG-048 version fix.
+Phase 3 of 3 (Consumer feedback from Sevak). All 14 rows Verified on 2026-10-08. New today: model listing and an endpoint on `CreateForModel` (Lekhak, BRD-186/187). Sevak's TR-RAG-012 is now documented and TR-RAG-036 is pinned by tests (phase-2 rows re-verified). `RELEASE-NOTES.md` holds the next package's notes. Everything ships in the next package after 1.1.2, waiting for UAT.
 
 ## Next command to run
 
@@ -38,13 +38,13 @@ Why: every row in this phase's scope is terminal and handoff has run; waiting on
 
 ## Known blockers
 
-- 🔶 **Release 1.1.2:** publish the `v1.1.2` release; Sevak waits (TR-RAG-048).
+- 🔶 **ONNX Runtime issue to post:** ORT-001 in `docs/TechieRag-OnnxRuntime-Feedback.md` is ready; fill the macOS version.
+- 🔶 **Next release (after 1.1.2):** paste `RELEASE-NOTES.md` into the GitHub Release.
 - 🔶 **Behaviour changes:** default SQLite folder and repeat tool registration (REQ-RAG-121/122).
 - 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
 - 🔶 **Postgres (REQ-RAG-044):** `TechieRagTestPostgres` is unset; live test skipped.
-- 🔶 **Breaking change:** an appsettings key fails startup; check Sevak.
 - 🔶 **Keys in chat:** OpenCode Go key and Gmail app password; rotate if shared.
-- 🔶 **Owner git:** commit today's work in TechieRag and Sevak.
+- 🔶 **Owner git:** commit TechieRag, Sevak and Lekhak (feedback replies).
 
 ## Verification log
 
@@ -52,11 +52,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-06 | triage-and-fix | 90/90 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
-| 2026-10-06 | amend-docs | 90/90 Verified, 1 N/A | docs/TechieRag-P2-Checklist.md#requirements-status |
 | 2026-10-06 | build-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-06 | handoff-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-06 | fix-issues | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-07 | triage-and-fix | 12/12 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-08 | fix-issues | 14/14 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -78,3 +78,4 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 - OpenCode Go models on `/responses` and `/messages`.
 - Rename TechieDesk to Sevak in about 15 XML doc comments.
 - Update the Android emulator in Visual Studio's SDK.
+- Model listing for Anthropic and Gemini (their own list calls), if a consumer asks.

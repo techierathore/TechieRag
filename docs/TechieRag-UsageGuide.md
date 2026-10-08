@@ -183,9 +183,15 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 
 ### Storage defaults (phase 3)
 - **Sign in as:** user 1, in an empty folder
-- **Steps:** 1) build with `.UseSqliteVec()` and no path 2) read `DataRoot.DefaultDatabasePath` 3) put a `techierag.db` in the running folder and build again 4) `DataRoot.Set("<folder>")` and build again
-- **Expected:** 1–2) the database is under `<LocalApplicationData>/TechieRag/data/<app name>/` 3) the running folder's file is used and a warning names it 4) the database is under the given folder.
+- **Steps:** 1) build with `.UseSqliteVec()` and no path 2) read `DataRoot.DefaultDatabasePath` 3) put a `techierag.db` in the running folder and build again 4) `DataRoot.Set("<folder>")` and build again 5) call `.WithPersistence(StoreProvider.Sqlite, "Data Source=<folder>/app.db")` and read `GetConfig().Persistence` 6) read `new TechieRagConfig().VectorStore.IsConnectionStringSet`
+- **Expected:** 1–2) the database is under `<LocalApplicationData>/TechieRag/data/<app name>/` 3) the running folder's file is used and a warning names it 4) the database is under the given folder 5) the connection string is the one passed and the user is `default` (Sevak TR-RAG-049) 6) false.
 - **Covers:** REQ-RAG-122
+
+### Local model fit check before the download (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) read `LocalLlmProvider.IsRuntimeAvailable`, `LocalModel.Phi3Mini4kInstruct.EstimateRequiredMemoryBytes()` and `AvailableMemory.Read()` with the network off 2) load a model while free memory is below its estimate 3) set `LocalLlmOptions.DownloadProgress` and load a model that is not yet downloaded
+- **Expected:** 1) all three answer with no request sent 2) `LocalModelMemoryException` before the terms are asked and before any byte is requested 3) every report names this model and the last is `Completed`.
+- **Covers:** REQ-RAG-125
 
 ## Automated tests
 

@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-184. Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-187 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak). Each item names the Sevak feedback entry it answers.
 
 ## 2. Screens and flow
 
@@ -25,6 +25,8 @@ Each row is a public surface this phase extends; the Route column names its entr
 | Tool registry | `ToolRegistry` | Agent builder | — (library, no mockup) | tool name, definition, handler |
 | Storage defaults | `UseSqliteVec()`, `PersistenceConfig.ConnectionString`, the data folder | App developer | — (library, no mockup) | database path, data root, app name |
 | Flow step names and model use | `FlowNodeCatalog`, `FlowDefinition` | Agent builder | — (library, no mockup) | step name, uses a model |
+| Local model fit check | `LocalLlmProvider`, `LocalModel`, `AvailableMemory` | App developer | — (library, no mockup) | runtime available, memory needed, memory free, download progress |
+| Model routing | `LlmProviderFactory.ListModelsAsync`, `LlmProviderFactory.CreateForModel` | App developer | — (library, no mockup) | connector, endpoint, model ids |
 
 **Primary journey:**
 1. A developer builds an app on the packages without naming a database folder; the data lands in the per-user TechieRag folder under the app's own name, and the log says where.
@@ -87,15 +89,33 @@ A flow builder can name steps in its own language and ask whether a flow needs a
 - **BRD-184** — A flow definition shall say whether any of its steps calls a language model and list those steps *(Sevak feedback TR-RAG-043)* *Screen:* Flow step names and model use
   - *Acceptance:* When a developer asks a flow with one model step whether it uses a model, then it answers yes and lists that step.
 
+### Local model fit check
+
+An app can tell whether the local model will run and fit before it offers the download.
+
+- **BRD-185** — A host shall be able to check, before any download, whether a local model can run and fit on this device, and a load shall refuse a model that cannot fit before downloading it. Whether the platform has a local runtime, the free memory the model needs and the free memory the library measures shall be public, and a provider's download progress shall reach an option on that provider alone *(Sevak feedback TR-RAG-047, added 2026-10-07)* *Screen:* Local model fit check
+  - *Acceptance:* When a developer checks a local model that cannot fit before its download, then the check says so without a request, and loading it refuses before the download.
+
+### Model routing
+
+A host can list a service's models and reach a service on another machine by its model name alone.
+
+- **BRD-186** — The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector *(Lekhak feedback TR-RAG-004, added 2026-10-08)* *Screen:* Model routing
+  - *Acceptance:* When a developer asks for the models of an LM Studio, Ollama or OpenAI-compatible connector on Model routing, then the model ids that service reports are returned.
+- **BRD-187** — Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route *(Lekhak feedback TR-RAG-005, added 2026-10-08)* *Screen:* Model routing
+  - *Acceptance:* When a developer creates a provider for lmstudio/<model> with an endpoint on Model routing, then its requests go to that endpoint.
+
 ## 5. Development status
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-06.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-10-08.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
 | RAG / AI requirements | 11 | 11 | 0 | Done |
+| Local model fit check | 1 | 1 | 0 | Done |
+| Model routing | 2 | 2 | 0 | Done |
 
 ## 6. Where the rest lives
 

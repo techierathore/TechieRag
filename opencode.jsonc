@@ -833,6 +833,10 @@
       "template": "{file:./.tfcore/tasks/split-brd.md}",
       "description": "Split the BRD into the one docs/{App}-Checklist.md (REQ-UI/FN/RAG/NFR-* in a single Requirements Status table)."
     },
+    "techieflow:tasks:develop-end-to-end": {
+      "template": "{file:./.tfcore/tasks/develop-end-to-end.md}",
+      "description": "A new app from a brief to UAT, unattended: Day 1 both stages, build with inline verify and fixes, handoff; tf-develop.sh commits and pushes after each phase and writes the Build Report with time and tokens per phase. Driven by /flow-master."
+    },
     "techieflow:tasks:build-phase": {
       "template": "{file:./.tfcore/tasks/build-phase.md}",
       "description": "The single unified build: implement every open REQ (UI/FN/RAG/NFR) from the one Checklist by clustering and calling /trblazeui (from mockups) + /techierag as sub-agents; self-smoke (data + visual); chain the verifier. Driven by /flow-master."

@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-08 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -117,8 +117,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#connector-run-results-connectorrunner-connectoritemfailure-mimeparser-techierag">Connector run results: ConnectorRunner, ConnectorItemFailure, MimeParser (TechieRag)</a></li>
         <li class="h3"><a href="#document-replace-on-re-ingest-itechierag-ingesttextasync-text-name-sourcekey-metadata-techierag">Document replace on re-ingest: ITechieRag.IngestTextAsync(text, name, sourceKey, metadata) (TechieRag)</a></li>
         <li class="h3"><a href="#tool-registry-toolregistry-register-techierag">Tool registry: ToolRegistry.Register (TechieRag)</a></li>
-        <li class="h3"><a href="#storage-defaults-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite-userid-techierag">Storage defaults: DataRoot, UseSqliteVec(), WithPersistence(StoreProvider.Sqlite, userId) (TechieRag)</a></li>
+        <li class="h3"><a href="#storage-defaults-dataroot-usesqlitevec-withpersistence-provider-connectionstring-null-defaultuserid-techierag">Storage defaults: DataRoot, UseSqliteVec(), WithPersistence(provider, connectionString = null, defaultUserId) (TechieRag)</a></li>
         <li class="h3"><a href="#flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag">Flow step names and model use: FlowNodeCatalog.CreateNode, FlowDefinition.UsesLanguageModel (TechieRag)</a></li>
+        <li class="h3"><a href="#local-model-fit-check-localllmprovider-isruntimeavailable-localmodel-estimaterequiredmemorybytes-availablememory-read-techierag-local">Local model fit check: LocalLlmProvider.IsRuntimeAvailable, LocalModel.EstimateRequiredMemoryBytes, AvailableMemory.Read (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">Model routing: LlmProviderFactory.ListModelsAsync, CreateForModel(…, endpoint) (TechieRag)</a></li>
         <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
         <li class="h3"><a href="#configuration">Configuration</a></li>
         <li class="h3"><a href="#logging-and-errors">Logging and errors</a></li>
@@ -132,12 +134,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Kind</td><td>library</td></tr>
 <tr><td>Size</td><td>Small</td></tr>
 <tr><td>Phase</td><td>3 of 3</td></tr>
-<tr><td>Verified on</td><td>2026-10-06</td></tr>
-<tr><td>Date</td><td>2026-10-06</td></tr>
+<tr><td>Verified on</td><td>2026-10-08</td></tr>
+<tr><td>Date</td><td>2026-10-08</td></tr>
 </tbody>
 </table>
-<p>This guide maps the six public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, and flow step names and model use (REQ-RAG-114 to REQ-RAG-124, BRD-174 to BRD-184). Phase-1 services are in <code>docs/TechieRag-DevGuide.md</code>, phase-2 services in <code>docs/TechieRag-P2-DevGuide.md</code>.</p>
-<p>No sample calls any phase-3 surface: the probe (<code>samples/TechieRag.Probe</code>) only embeds, stores, searches and generates. So every entry is <code>static-only (unconfirmed)</code> at runtime. What was run on 2026-10-06 is the build (<code>bash .tfcore/utils/tf-build.sh</code>: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (<code>~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-&lt;id&gt;"</code>): 53 tests, 0 failed. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.</p>
+<p>This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187). Phase-1 services are in <code>docs/TechieRag-DevGuide.md</code>, phase-2 services in <code>docs/TechieRag-P2-DevGuide.md</code>.</p>
+<p>No sample calls any phase-3 surface: the probe (<code>samples/TechieRag.Probe</code>) only embeds, stores, searches and generates. So every entry is <code>static-only (unconfirmed)</code> at runtime. What was run on 2026-10-06 is the build (<code>bash .tfcore/utils/tf-build.sh</code>: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (<code>~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-&lt;id&gt;"</code>): 53 tests, 0 failed. On 2026-10-07 the Sevak fixes (TR-RAG-049 in storage defaults, TR-RAG-047 as the new local model entry) were built and verified: build PASS, every test project run on its own, 0 failed. The other entries' file and line references were re-checked against the code that day and still hold. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.</p>
 <h2 id="architecture-cheat-sheet">Architecture cheat-sheet<a class="anchor-link" href="#architecture-cheat-sheet">#</a></h2>
 <div class="diagram">
   <div class="dt">
@@ -160,7 +162,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   Runner --&gt; Mime["MimeParser (EmailConnector)"]
   DI --&gt; Data["DataRoot: data/&lt;app&gt;/techierag.db"]
   Host --&gt; Flow["FlowNodeCatalog / FlowDefinition"]
-  Host --&gt; Tools["ToolRegistry"] --&gt; Loop["AgentLoopRunner"]</pre>
+  Host --&gt; Tools["ToolRegistry"] --&gt; Loop["AgentLoopRunner"]
+  Host --&gt; Fit["LocalLlmProvider.IsRuntimeAvailable, LocalModel.EstimateRequiredMemoryBytes, AvailableMemory.Read"]
+  Fit --&gt; Gate["MemoryGate before the download"] --&gt; Store2["LocalModelStore.EnsureAsync"]
+  Host --&gt; Route["LlmProviderFactory.ListModelsAsync / CreateForModel(endpoint)"] --&gt; Lister["LlmModelLister"]</pre>
 </div>
 <table>
 <thead><tr><th>Layer</th><th>Project or folder</th><th>What lives here</th></tr></thead>
@@ -171,7 +176,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Connectors</td><td><code>src/TechieRag/Connectors/</code>, <code>Connectors/Email/</code></td><td>partial run results, item outcomes, mail parse notes</td></tr>
 <tr><td>Storage defaults</td><td><code>src/TechieRag/Models/DataRoot.cs</code>, <code>Persistence/Sqlite*Store.cs</code></td><td>the per-app database location</td></tr>
 <tr><td>Tools and flows</td><td><code>src/TechieRag/Services/ToolRegistry.cs</code>, <code>Orchestration/</code></td><td>tool replace, step names, model use</td></tr>
-<tr><td>Tests</td><td><code>tests/TechieRag.Tests</code></td><td>seven phase-3 test files, named per entry</td></tr>
+<tr><td>Model routing</td><td><code>src/TechieRag/Llm/LlmProviderFactory.cs</code>, <code>Llm/LlmModelLister.cs</code></td><td>model listing, the per-call endpoint</td></tr>
+<tr><td>Local model fit check</td><td><code>src/TechieRag.Local/</code> (<code>LocalLlmProvider.cs</code>, <code>LocalModel.cs</code>, <code>AvailableMemory.cs</code>, <code>LocalModelStore.cs</code>)</td><td>the pre-download reads, the early memory refusal, per-provider progress</td></tr>
+<tr><td>Tests</td><td><code>tests/TechieRag.Tests</code>, <code>tests/TechieRag.Local.Tests</code>, <code>tests/TechieRag.Agents.Tests</code></td><td>the phase-3 test files named per entry, plus the shared overload check (<code>PublicApi/OverloadShapeCheck.cs</code>, linked into all three)</td></tr>
 </tbody>
 </table>
 <h2 id="screen-by-screen-code-map">Screen-by-screen code map<a class="anchor-link" href="#screen-by-screen-code-map">#</a></h2>
@@ -252,12 +259,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> none.</p>
-<h3 id="storage-defaults-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite-userid-techierag"><a id="storage-defaults-dataroot-usesqlitevec-withpersistencestoreprovidersqlite-userid-techierag"></a>Storage defaults: <code>DataRoot</code>, <code>UseSqliteVec()</code>, <code>WithPersistence(StoreProvider.Sqlite, userId)</code> (<code>TechieRag</code>)<a class="anchor-link" href="#storage-defaults-dataroot-usesqlitevec-withpersistence-storeprovider-sqlite-userid-techierag">#</a></h3>
+<h3 id="storage-defaults-dataroot-usesqlitevec-withpersistence-provider-connectionstring-null-defaultuserid-techierag"><a id="storage-defaults-dataroot-usesqlitevec-withpersistenceprovider-connectionstring--null-defaultuserid-techierag"></a>Storage defaults: <code>DataRoot</code>, <code>UseSqliteVec()</code>, <code>WithPersistence(provider, connectionString = null, defaultUserId)</code> (<code>TechieRag</code>)<a class="anchor-link" href="#storage-defaults-dataroot-usesqlitevec-withpersistence-provider-connectionstring-null-defaultuserid-techierag">#</a></h3>
 <p><img src="screenshots/TechieRag/settings.png" alt="Sevak's settings screen, July 2026: where a host would otherwise name a database folder; it predates phase 3" style="max-width:100%"></p>
-<p>REQ-RAG-122. Covered by <code>Persistence/DefaultDatabaseLocationTests.cs</code>.</p>
-<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-06: REQ-RAG-122 10 passed.</p>
-<p><strong>Call chain:</strong> <code>TechieRagBuilder.UseSqliteVec()</code> → <code>UseVectorStoreAtDefaultLocation</code> → <code>Build</code> → <code>CreateVectorStore</code> → <code>config.VectorStore.IsConnectionStringSet</code> false → <code>DataRoot.ResolveDefaultConnectionString(logger)</code> → <code>ResolveDefaultDatabasePath</code> → <code>ResolveDatabasePath(Environment.CurrentDirectory, logger, createDirectory: true)</code> → <code>AppDirectory</code> → <code>Current</code> → <code>BesideModelRoot(ModelRoot.Current)</code> → <code>new SqliteVecStore</code>. Persistence: <code>WithPersistence(Sqlite, userId)</code> → <code>CreateWorkspaceStore</code> → <code>RequirePersistenceConnectionString</code> → the same resolver. Configuration: <code>TechieRagConfigMapper</code> → <code>UseVectorStoreAtDefaultLocation</code> or <code>WithPersistence(Sqlite, userId)</code> when no connection string is given.</p>
+<p>REQ-RAG-122. Covered by <code>Persistence/DefaultDatabaseLocationTests.cs</code>, <code>Persistence/PersistenceOverloadTests.cs</code> and <code>PublicApi/OverloadShapeTests.cs</code> (Sevak TR-RAG-049, 2026-10-07).</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>; tests run 2026-10-07: REQ-RAG-122 19 passed (18 in <code>TechieRag.Tests</code>, 1 in <code>TechieRag.Agents.Tests</code>).</p>
+<p><strong>Call chain:</strong> <code>TechieRagBuilder.UseSqliteVec()</code> → <code>UseVectorStoreAtDefaultLocation</code> → <code>Build</code> → <code>CreateVectorStore</code> → <code>config.VectorStore.IsConnectionStringSet</code> false → <code>DataRoot.ResolveDefaultConnectionString(logger)</code> → <code>ResolveDefaultDatabasePath</code> → <code>ResolveDatabasePath(Environment.CurrentDirectory, logger, createDirectory: true)</code> → <code>AppDirectory</code> → <code>Current</code> → <code>BesideModelRoot(ModelRoot.Current)</code> → <code>new SqliteVecStore</code>. Persistence: <code>WithPersistence(Sqlite, connectionString: null, defaultUserId)</code> (or the one-argument <code>WithPersistence(Sqlite)</code>) → <code>CreateWorkspaceStore</code> → <code>RequirePersistenceConnectionString</code> → the same resolver. Configuration: <code>TechieRagConfigMapper</code> → <code>UseVectorStoreAtDefaultLocation</code> or <code>WithPersistence(Sqlite, connectionString: null, defaultUserId)</code> when no connection string is given.</p>
 <p>Resolution follows the models' order: a folder set with <code>DataRoot.Set</code>, else <code>data</code> beside <code>ModelRoot.Current</code> (so <code>ModelRoot.Set</code> or <code>TECHIERAG_MODEL_ROOT</code> move data too), else <code>&lt;LocalApplicationData&gt;/TechieRag/data</code> (iOS and Catalyst: <code>&lt;home&gt;/Library/Application Support/TechieRag/data</code>). The database is <code>&lt;root&gt;/&lt;app name&gt;/techierag.db</code>; the app name is <code>SetAppName</code>'s value, else the entry assembly name. An existing <code>techierag.db</code> in the run folder wins, with a warning naming the folder; nothing is moved. An explicit path or connection string, including <code>UseSqliteVec("x.db")</code>, is used as given. <code>DataRoot.DefaultDatabasePath</code> returns the location without creating or logging.</p>
+<p><strong>One persistence method (TR-RAG-049).</strong> 1.1.2's <code>WithPersistence(StoreProvider, string defaultUserId)</code> captured every existing <code>WithPersistence(provider, "Data Source=…")</code>, turning the connection string into a user id, so it is removed. The connection string is now optional: null means the per-app default (SQLite only). <code>IsConnectionStringSet</code> is public. <code>PublicOverloadsNeverGiveOneCallTwoMeanings</code> fails on any overload pair with the same argument types under different names.</p>
 <table>
 <thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
 <tbody>
@@ -267,6 +275,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td><code>src/TechieRag/Models/DataRoot.cs:168</code></td><td><code>ResolveDatabasePath</code></td><td>the return</td><td><code>&lt;data root&gt;/&lt;app name&gt;/techierag.db</code>, folder created</td></tr>
 <tr><td><code>src/TechieRag/TechieRagBuilder.cs:1091</code></td><td><code>CreateVectorStore</code></td><td><code>IsConnectionStringSet</code></td><td>false for <code>UseSqliteVec()</code>; true keeps the caller's string</td></tr>
 <tr><td><code>src/TechieRag/TechieRagBuilder.cs:961</code></td><td><code>RequirePersistenceConnectionString</code></td><td><code>config.Persistence.Provider</code></td><td><code>Sqlite</code> with no string resolves the default; others throw (966)</td></tr>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:739</code></td><td><code>WithPersistence</code></td><td><code>connectionString</code></td><td>the caller's string for a two-argument call; null only when named or omitted, and then <code>provider</code> must be <code>Sqlite</code></td></tr>
+<tr><td><code>src/TechieRag/TechieRagConfig.cs:229</code></td><td><code>IsConnectionStringSet</code></td><td><code>connectionString</code> field</td><td>null until set; the getter (221) then returns the per-app default</td></tr>
+<tr><td><code>tests/TechieRag.Tests/PublicApi/OverloadShapeCheck.cs</code></td><td><code>FindConflictingArity</code></td><td><code>sameTypes</code>, <code>differentNames</code></td><td>never both true for one arity in a shipped assembly</td></tr>
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> <code>BesideModelRoot</code> (<code>DataRoot.cs:182</code>): the model root's parent plus <code>data</code>.</p>
@@ -288,20 +299,64 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> none.</p>
+<h3 id="local-model-fit-check-localllmprovider-isruntimeavailable-localmodel-estimaterequiredmemorybytes-availablememory-read-techierag-local"><a id="local-model-fit-check-localllmproviderisruntimeavailable-localmodelestimaterequiredmemorybytes-availablememoryread-techieraglocal"></a>Local model fit check: <code>LocalLlmProvider.IsRuntimeAvailable</code>, <code>LocalModel.EstimateRequiredMemoryBytes</code>, <code>AvailableMemory.Read</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#local-model-fit-check-localllmprovider-isruntimeavailable-localmodel-estimaterequiredmemorybytes-availablememory-read-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's local-model screen on Mac Catalyst, September 2026: the load and generate path whose memory check now runs before the download; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-125 (Sevak TR-RAG-047, added 2026-10-07). Covered by <code>tests/TechieRag.Local.Tests/PreDownloadFitTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: the probe (<code>LocalProbeRunner.cs</code>) loads and generates but calls none of the new reads. In the tests on Linux x64 the reads ran for real (<code>IsRuntimeAvailable</code> true, <code>AvailableMemory.Read()</code> above zero). Tests run 2026-10-07: REQ-RAG-125 10 passed (6 Local, 4 reference checks).</p>
+<p><strong>Call chain:</strong> <code>IsRuntimeAvailable</code> → <code>LocalRuntimeSelector.IsSupported</code>; <code>EstimateRequiredMemoryBytes</code> → variant <code>DownloadBytes</code> (or <code>FolderBytes</code>) → context size → <code>EstimateMemoryBytes</code>. Load: <code>LoadAsync</code> → <code>Resolve</code> → <code>IsOnDisk</code> false → <code>MemoryGate.Ensure</code> → <code>LocalModelStore.EnsureAsync</code> → <code>RequireTermsAsync</code> → <code>DownloadReportingAsync</code> → <code>ModelDownloadService.DownloadAsync</code> → <code>VerifyAsync</code> → <code>ApplyGenAiConfig</code> (Hugging Face) → <code>MemoryGate.Ensure</code> again → <code>runtime.Load</code>.</p>
+<p>The reads are the ones the load uses, so a host's answer and the load agree. With files missing, the memory check runs before the terms and the first request. The later check stays: a Hugging Face model's cache size arrives in its <code>genai_config.json</code>, so its early estimate is a lower bound. A model on disk is checked once, as before.</p>
+<p><code>DownloadProgress</code> subscribes to the shared <code>ProgressChanged</code> only during this download, forwards events carrying this model's id, and reports copies (the service mutates one object). Downloads run one at a time, so the id separates them.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:113</code></td><td><code>IsRuntimeAvailable</code></td><td>the return</td><td>false on an Intel Mac or in a browser; true on Windows and Linux x64/Arm64, Apple-silicon macOS, Android, iOS, Mac Catalyst</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModel.cs:377</code></td><td><code>EstimateRequiredMemoryBytes</code></td><td><code>weightBytes</code></td><td>the catalogue variant's bytes; null for an unresolved Hugging Face model or a missing host folder</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModel.cs:391</code></td><td><code>EstimateRequiredMemoryBytes</code></td><td>the return</td><td>weights + <code>KvBytesPerToken</code> × context + 256 MB (<code>RuntimeOverheadBytes</code>, line 29)</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:196</code></td><td><code>LoadAsync</code></td><td><code>Model.EstimateMemoryBytes(...)</code></td><td>reached only when <code>IsOnDisk</code> (194) is false; throws <code>LocalModelMemoryException</code> before line 201 when short</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:206</code></td><td><code>LoadAsync</code></td><td><code>available</code></td><td>the second check, with the full estimate after the download</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModelStore.cs:173</code></td><td><code>DownloadReportingAsync</code> (<code>Forward</code>)</td><td><code>changed.ModelName</code></td><td>this model's id; any other name is not reported</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModelStore.cs:186</code></td><td><code>DownloadReportingAsync</code></td><td>the handler</td><td>removed in <code>finally</code>, so a later download of another model never reaches this provider's option</td></tr>
+<tr><td><code>src/TechieRag.Local/AvailableMemory.cs:28</code></td><td><code>Read</code></td><td>the return</td><td>Linux and Android <code>MemAvailable</code>; Windows available physical memory; iOS <code>os_proc_available_memory()</code>; null when unreadable</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> required bytes = weight bytes + <code>KvBytesPerToken</code> × context size + 256 MB (<code>LocalModel.cs:348</code>); context size = the asked size, else 2,048 on a phone and 4,096 elsewhere, never above <code>ContextLength</code> (<code>LocalModel.cs:385</code>).</p>
+<h3 id="model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag"><a id="model-routing-llmproviderfactorylistmodelsasync-createformodel-endpoint-techierag"></a>Model routing: <code>LlmProviderFactory.ListModelsAsync</code>, <code>CreateForModel(…, endpoint)</code> (<code>TechieRag</code>)<a class="anchor-link" href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host lists a service's models and names its address; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-126, REQ-RAG-127 (Lekhak TR-RAG-004 and TR-RAG-005, added 2026-10-08). Covered by <code>tests/TechieRag.Tests/Llm/ModelListingAndEndpointTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample lists models or passes an endpoint. The tests run both calls end to end against a loopback HTTP server. Tests run 2026-10-08: REQ-RAG-126 6 passed, REQ-RAG-127 3 passed.</p>
+<p><strong>Call chain:</strong> listing: <code>ListModelsAsync(route)</code> → <code>ListModelsAsync(connector)</code> → <code>WithEndpoint(connector, endpoint)</code> → <code>LlmModelLister.ListAsync</code> → key check → path by <code>Source</code> → <code>GET</code> → <code>LlmHttpGuard.EnsureSuccess</code> → <code>ReadOpenAIModels</code> or <code>ReadOllamaModels</code> → distinct, sorted. Provider: <code>CreateForModel(…, endpoint)</code> → <code>ModelRouter.Require</code> → <code>WithEndpoint(route, endpoint)</code> → <code>Create</code>.</p>
+<p>LM Studio answers <code>v1/models</code>, an OpenAI-compatible connector <code>models</code> under its own base path (so Groq's <code>/openai/v1</code> stays), and Ollama <code>api/tags</code>. A refusing or unreachable server throws; an empty list only ever means the server listed nothing. Anthropic, Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>.</p>
+<p><code>CreateForModel</code> has two overloads. The new one ends with an optional <code>endpoint</code>. The 1.1.2 five-argument shape is kept with no defaults and hidden from IntelliSense, so code compiled against it still binds and every shorter call reaches the new one. <code>PublicOverloadsNeverGiveOneCallTwoMeanings</code> passes because both use the same names for the same positions.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/LlmProviderFactory.cs:119</code></td><td><code>CreateForModel</code></td><td><code>endpoint</code></td><td>null keeps the catalog endpoint; a URL replaces it</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmProviderFactory.cs:213</code></td><td><code>WithEndpoint</code></td><td><code>uri.Scheme</code></td><td><code>http</code> or <code>https</code>; anything else throws <code>ArgumentException</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:43</code></td><td><code>ListAsync</code></td><td><code>path</code></td><td><code>v1/models</code> (LM Studio), <code>models</code> (OpenAI-compatible), <code>api/tags</code> (Ollama)</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:54</code></td><td><code>ListAsync</code></td><td><code>request.RequestUri</code></td><td>the endpoint plus the path, base path kept</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:62</code></td><td><code>ListAsync</code></td><td><code>response.StatusCode</code></td><td>2xx; 429 raises <code>LlmRateLimitException</code>, others <code>HttpRequestException</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:65</code></td><td><code>ListAsync</code></td><td>the return</td><td>the ids, distinct and sorted ordinally</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none.</p>
 <h2 id="cross-cutting-flows">Cross-cutting flows<a class="anchor-link" href="#cross-cutting-flows">#</a></h2>
-<p>Phase 1's flows are in <code>docs/TechieRag-DevGuide.md</code> and phase 2's changes in <code>docs/TechieRag-P2-DevGuide.md</code>. Phase 3 changed two.</p>
+<p>Phase 1's flows are in <code>docs/TechieRag-DevGuide.md</code> and phase 2's changes in <code>docs/TechieRag-P2-DevGuide.md</code>. Phase 3 changed two; the local model's load order changed in its own entry above.</p>
 <h3 id="configuration">Configuration<a class="anchor-link" href="#configuration">#</a></h3>
-<p><strong>Call chain:</strong> <code>ServiceCollectionExtensions.AddTechieRag(IConfiguration)</code> → <code>TechieRagConfigMapper.Apply</code> → <code>UseVectorStoreAtDefaultLocation</code> when the vector store section names no connection string (<code>TechieRagConfigMapper.cs:55</code>), <code>WithPersistence(StoreProvider.Sqlite, userId)</code> when SQLite persistence names none (<code>:173</code>) → <code>TechieRagBuilder.Build()</code>. <code>AddTechieRag</code> also registers <code>IWorkspaceManager</code> with <code>TryAdd</code> (<code>ServiceCollectionExtensions.cs:87</code>). <code>VectorStoreConfig.ConnectionString</code> reads <code>DataRoot.DefaultConnectionString</code> when never set (<code>TechieRagConfig.cs:221</code>). No new environment variable: <code>TECHIERAG_MODEL_ROOT</code> moves data and models together.</p>
+<p><strong>Call chain:</strong> <code>ServiceCollectionExtensions.AddTechieRag(IConfiguration)</code> → <code>TechieRagConfigMapper.Apply</code> → <code>UseVectorStoreAtDefaultLocation</code> when the vector store section names no connection string (<code>TechieRagConfigMapper.cs:55</code>), <code>WithPersistence(StoreProvider.Sqlite, connectionString: null, defaultUserId)</code> when SQLite persistence names none (<code>:173</code>) → <code>TechieRagBuilder.Build()</code>. <code>AddTechieRag</code> also registers <code>IWorkspaceManager</code> with <code>TryAdd</code> (<code>ServiceCollectionExtensions.cs:87</code>). <code>VectorStoreConfig.ConnectionString</code> reads <code>DataRoot.DefaultConnectionString</code> when never set (<code>TechieRagConfig.cs:221</code>); <code>IsConnectionStringSet</code> (<code>:229</code>, public since 2026-10-07) says whether it was set. No new environment variable: <code>TECHIERAG_MODEL_ROOT</code> moves data and models together.</p>
 <h3 id="logging-and-errors">Logging and errors<a class="anchor-link" href="#logging-and-errors">#</a></h3>
 <p><code>DataRoot.ResolveDatabasePath</code> logs one warning when it keeps a run-folder <code>techierag.db</code> (<code>DataRoot.cs:156</code>), under the logger category <code>TechieRag.Models.DataRoot</code>. <code>ConnectorRunner</code> logs the cancel at Information (<code>ConnectorRunner.cs:292</code>). Errors: <code>ConnectorRunCanceledException</code> and <code>ConnectorException</code> now carry <code>PartialResult</code> and <code>PartialIngestion</code>; mail parse losses are codes (<code>MailParseCodes</code>) on <code>ParsedMailMessage.Notes</code>, not exceptions. The rest is unchanged from phase 1.</p>
 <h2 id="known-issues">Known issues<a class="anchor-link" href="#known-issues">#</a></h2>
-<p>Found while reading the code for this guide on 2026-10-06; none contradicts a requirement's acceptance.</p>
+<p>Found while reading the code for this guide on 2026-10-06 and 2026-10-07; none contradicts a requirement's acceptance.</p>
 <ul>
 <li>Fixed 2026-10-06 (fix-issues): REQ-RAG-119, <code>EmailConnector</code> now copies <code>ParsedMailMessage.Notes</code> onto the item's metadata under <code>ParseNotesMetadataKey</code> (<code>src/TechieRag/Connectors/Email/EmailConnector.cs:43</code>, written at <code>:263</code>), so a connector sync sees them too. REQ-RAG-116, the <code>IWorkspaceManager</code> registration (<code>ServiceCollectionExtensions.cs:88</code>) throws <code>InvalidOperationException</code> naming <code>WithPersistence</code> when no persistence is configured, instead of returning null.
 </li>
 <li>REQ-RAG-120: connector ingestion keys documents by <code>connector:&lt;type&gt;:&lt;name&gt;:&lt;item id&gt;</code> rather than the bare item id the BRD names; deliberate and documented at <code>ConnectorIngestionExtensions.cs:121-124</code>.
 </li>
 <li>REQ-RAG-118: the byte-budget stop is still logged with <code>{Bytes:N0}</code> (<code>ConnectorRunner.cs:272</code>), culture-formatted; it is a log line, not an item reason, so the requirement holds.
+</li>
+<li>REQ-RAG-125: for a Hugging Face model, <code>EstimateRequiredMemoryBytes</code> before the download leaves out the context cache (<code>KvBytesPerToken</code> is 0 until <code>ApplyGenAiConfig</code>, <code>LocalModel.cs:447</code>), so the early check can pass a model the check after the download refuses. This is documented on the method and in the AI reference.
+</li>
+<li>REQ-RAG-122: removing 1.1.2's <code>WithPersistence(StoreProvider, string defaultUserId)</code> breaks binary compatibility with an assembly compiled against 1.1.2 that called it (<code>MissingMethodException</code>). The next release notes must say so.
 </li>
 </ul>
   </main>

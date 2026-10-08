@@ -222,8 +222,11 @@ public class VectorStoreConfig
         set => connectionString = value;
     }
 
-    /// <summary>Gets whether <see cref="ConnectionString"/> was set rather than left to the per-app default.</summary>
-    internal bool IsConnectionStringSet => connectionString is not null;
+    /// <summary>
+    /// Gets whether <see cref="ConnectionString"/> was set rather than left to the per-app default, so a host that
+    /// resolves an unset value into its own data folder can tell "unset" from a value (Sevak TR-RAG-049).
+    /// </summary>
+    public bool IsConnectionStringSet => connectionString is not null;
 
     private string? connectionString;
 
@@ -642,7 +645,22 @@ public enum RerankSource
 /// <summary>Configuration for the optional second-stage rerank of vector search results.</summary>
 public class RerankConfig
 {
-    /// <summary>Gets or sets whether the rerank stage is applied after vector search.</summary>
+    /// <summary>
+    /// Gets or sets whether a search reranks <b>by default</b>, when the call passes no
+    /// <see cref="Models.SearchOptions.Rerank"/> and no workspace decides.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Changed meaning (REQ-RAG-047, Sevak TR-RAG-012).</b> This once meant "build and use a
+    /// reranker". It now only sets the default. A reranker is built whenever <see cref="Source"/> is usable
+    /// (Cohere or Jina with an API key, a custom factory, or <c>UseEmbeddedReranker()</c>), whatever this
+    /// says, because a workspace with <c>RerankEnabled = true</c> or a call with
+    /// <c>SearchOptions.Rerank = true</c> must be able to rerank while the default is off.</para>
+    /// <para><b>To build no reranker at all</b>, for example to avoid the embedded model's download or an
+    /// API key check, leave <see cref="Source"/> at <see cref="RerankSource.None"/>. Setting this to false
+    /// does not prevent it.</para>
+    /// <para>With this false and a source configured without the key it needs, no reranker is built and
+    /// no error is raised. With this true the same setup throws at <c>Build()</c>.</para>
+    /// </remarks>
     public bool Enabled { get; set; }
 
     /// <summary>Gets or sets the reranker source type.</summary>

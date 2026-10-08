@@ -17,8 +17,11 @@ namespace TechieRag.Local;
 /// to the process minus what the process already uses; an estimate.</description></item>
 /// </list>
 /// Returns null when nothing could be read, and the gate then lets the load proceed.
+/// <para>Public since REQ-RAG-125 (Sevak TR-RAG-047), so a host can compare it with
+/// <see cref="LocalModel.EstimateRequiredMemoryBytes"/> before offering a download; it is the reading the
+/// load itself checks.</para>
 /// </remarks>
-internal static class AvailableMemory
+public static class AvailableMemory
 {
     /// <summary>Reads the available memory in bytes, or null when it cannot be read.</summary>
     /// <returns>Bytes, or null.</returns>
