@@ -28,4 +28,9 @@
     <ProjectReference Include="..\..\src\TechieRag.Local\TechieRag.Local.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Sevak TR-RAG-049: the shared public-overload release check, run against this package's assembly. -->
+    <Compile Include="..\TechieRag.Tests\PublicApi\OverloadShapeCheck.cs" Link="PublicApi\OverloadShapeCheck.cs" />
+  </ItemGroup>
+
 </Project>

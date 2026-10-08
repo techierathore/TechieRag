@@ -34,9 +34,17 @@ public sealed class PhaseThreeReferenceTests
         { "REQ-RAG-122", "DataRoot.Set" },
         { "REQ-RAG-122", "UseSqliteVec()" },
         { "REQ-RAG-122", "WithPersistence(StoreProvider.Sqlite)" },
+        { "REQ-RAG-122", "IsConnectionStringSet" },
+        { "REQ-RAG-122", "defaultUserId: \"alice\"" },
         { "REQ-RAG-123", "stepName" },
         { "REQ-RAG-124", "UsesLanguageModel()" },
         { "REQ-RAG-124", "GetLanguageModelSteps()" },
+        { "REQ-RAG-125", "LocalLlmProvider.IsRuntimeAvailable" },
+        { "REQ-RAG-125", "EstimateRequiredMemoryBytes" },
+        { "REQ-RAG-125", "AvailableMemory.Read()" },
+        { "REQ-RAG-125", "DownloadProgress" },
+        { "REQ-RAG-126", "ListModelsAsync" },
+        { "REQ-RAG-127", "endpoint: \"http://192.168.1.20:1234\"" },
     };
 
     /// <summary>
@@ -60,7 +68,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(7, sections.Count);
+        Assert.Equal(9, sections.Count);   // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 

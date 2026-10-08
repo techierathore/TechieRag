@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 22 logged: 1 open, 21 fixed, 0 will not fix |
+| Count | 28 logged: 1 open, 27 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
-| Updated | 2026-10-06 |
+| Updated | 2026-10-08 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
@@ -15,10 +15,16 @@
 |---|---|---|---|
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 
-## Fixed (21)
+## Fixed (27)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20261008-04 (REQ-RAG-082) | 2026-10-08 by production | 2026-10-08 by fix-issues | the check was too weak | Sevak TR-RAG-036: no test keeps the HTTP connectors' SSRF guard off the mail transport; the row says connector transports reuse the guard, so a future change could apply it to IMAP and refuse every private-address mail host |
+| MISS-TechieRag-20261008-03 (REQ-RAG-098) | 2026-10-08 by production | 2026-10-08 by fix-issues | the check was too weak | Sevak TR-RAG-012: RerankConfig.Enabled still documented as 'whether the rerank stage is applied', but since REQ-RAG-047 it only sets the default for calls that pass no SearchOptions.Rerank and the reranker is built whenever a usable source exists; no release note says so |
+| MISS-TechieRag-20261008-02 (REQ-RAG-127) | 2026-10-08 by production | 2026-10-08 by fix-issues | the app's spec | Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route |
+| MISS-TechieRag-20261008-01 (REQ-RAG-126) | 2026-10-08 by production | 2026-10-08 by fix-issues | the app's spec | The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector |
+| MISS-TechieRag-20261007-02 (REQ-RAG-125) | 2026-10-07 by production | 2026-10-07 by fix-issues | the app's spec | A host shall be able to check, before any download, whether a local model can run and fit on this device, and a load shall refuse a model that cannot fit before downloading it |
+| MISS-TechieRag-20261007-01 (REQ-RAG-122) | 2026-10-07 by production | 2026-10-07 by fix-issues | the check was too weak | Sevak TR-RAG-049: 1.1.2 silently moves a host's stores to the per-user default — the new WithPersistence(provider, defaultUserId) overload captures existing two-argument calls WithPersistence(Sqlite, "Data Source=…") so the connection string becomes the user id, and an unset VectorStore.ConnectionSt |
 | MISS-TechieRag-20261006-04 (REQ-RAG-116) | 2026-10-06 by owner | 2026-10-06 by fix-issues | the check was too weak | resolving IWorkspaceManager from DI with no persistence configured returns null instead of a clear error |
 | MISS-TechieRag-20261006-03 (REQ-RAG-119) | 2026-10-06 by owner | 2026-10-06 by fix-issues | the check was too weak | EmailConnector.FetchAsync drops ParsedMailMessage.Notes, so mail synced through a connector run never shows content skipped past the nesting limit |
 | MISS-TechieRag-20261006-02 (REQ-FN-006) | 2026-10-06 by owner | 2026-10-06 by fix-issues | the check was too weak | SevakConsumesReleasedPackages hard-codes Sevak's pin as 1.0.7; Sevak moved to 1.0.8 on 2026-10-05, so the row fails although Sevak still consumes released packages only |

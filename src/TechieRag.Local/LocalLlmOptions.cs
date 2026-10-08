@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using TechieRag.Embedded;
 
 namespace TechieRag.Local;
 
@@ -43,4 +44,12 @@ public sealed class LocalLlmOptions
     /// needed and returns whether they accepted. Called at most once per download, before any request.
     /// </summary>
     public Func<LocalModelTerms, CancellationToken, Task<bool>>? ConfirmTermsAsync { get; set; }
+
+    /// <summary>
+    /// Gets or sets where this provider's model download reports its progress; null reports nothing here.
+    /// Only this provider's download is reported, never the embedder's or another provider's, which the
+    /// process-wide <see cref="ModelDownloadService.ProgressChanged"/> also carries. Each report is a copy
+    /// taken when the progress changed (REQ-RAG-125, Sevak TR-RAG-047).
+    /// </summary>
+    public IProgress<ModelDownloadProgress>? DownloadProgress { get; set; }
 }

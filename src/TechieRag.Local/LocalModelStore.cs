@@ -133,7 +133,7 @@ internal sealed class LocalModelStore
             var files = variant.GetDownloadFiles(mirror);
             var terms = model.GetTerms() with { DownloadBytes = ModelDownloadService.GetPendingBytes(directory, files) };
             await RequireTermsAsync(terms, options, cancellationToken).ConfigureAwait(false);
-            await downloads.DownloadAsync(model.Id, directory, files, cancellationToken).ConfigureAwait(false);
+            await DownloadReportingAsync(model.Id, directory, files, options.DownloadProgress, cancellationToken).ConfigureAwait(false);
         }
 
         await VerifyAsync(directory, variant, cancellationToken).ConfigureAwait(false);
@@ -142,6 +142,68 @@ internal sealed class LocalModelStore
             model.ApplyGenAiConfig(ReadConfig(directory, variant, model.Id));
         }
     }
+
+    /// <summary>
+    /// Downloads a model's files and forwards the progress of this download alone to the provider's
+    /// <see cref="LocalLlmOptions.DownloadProgress"/> (REQ-RAG-125).
+    /// </summary>
+    /// <param name="modelId">The model, the name every progress event of this download carries.</param>
+    /// <param name="directory">The folder.</param>
+    /// <param name="files">The files.</param>
+    /// <param name="progress">Where progress goes; null downloads without forwarding.</param>
+    /// <param name="cancellationToken">Cancels the download.</param>
+    /// <returns>A task that completes when every file is on disk.</returns>
+    private async Task DownloadReportingAsync(
+        string modelId,
+        string directory,
+        IReadOnlyList<ModelDownloadFile> files,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (progress is null)
+        {
+            await downloads.DownloadAsync(modelId, directory, files, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        // The service downloads one model at a time and stamps every event with the model's name, so the
+        // name tells this download's events from the embedder's and other providers'.
+        void Forward(object? sender, ModelDownloadProgress changed)
+        {
+            if (string.Equals(changed.ModelName, modelId, StringComparison.Ordinal))
+            {
+                progress.Report(Copy(changed));
+            }
+        }
+
+        downloads.ProgressChanged += Forward;
+        try
+        {
+            await downloads.DownloadAsync(modelId, directory, files, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            downloads.ProgressChanged -= Forward;
+        }
+    }
+
+    /// <summary>Copies a progress reading, because the service updates one shared instance in place.</summary>
+    /// <param name="source">The shared reading.</param>
+    /// <returns>A copy.</returns>
+    private static ModelDownloadProgress Copy(ModelDownloadProgress source) => new()
+    {
+        Status = source.Status,
+        ModelName = source.ModelName,
+        CurrentFile = source.CurrentFile,
+        CurrentFileSize = source.CurrentFileSize,
+        TotalFiles = source.TotalFiles,
+        CompletedFiles = source.CompletedFiles,
+        CurrentFileBytesDownloaded = source.CurrentFileBytesDownloaded,
+        CurrentFileTotalBytes = source.CurrentFileTotalBytes,
+        TotalBytes = source.TotalBytes,
+        BytesDownloaded = source.BytesDownloaded,
+        ErrorMessage = source.ErrorMessage
+    };
 
     /// <summary>
     /// Reads a downloaded model's configuration and checks that every file it names was downloaded.

@@ -170,7 +170,7 @@ internal static class TechieRagConfigMapper
         // REQ-RAG-122: SQLite named with no connection string uses the per-app default database.
         if (source.Provider == StoreProvider.Sqlite)
         {
-            builder.WithPersistence(StoreProvider.Sqlite, source.DefaultUserId);
+            builder.WithPersistence(StoreProvider.Sqlite, connectionString: null, defaultUserId: source.DefaultUserId);
             return;
         }
 

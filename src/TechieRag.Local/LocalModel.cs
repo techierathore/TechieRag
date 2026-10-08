@@ -349,6 +349,57 @@ public sealed class LocalModel
         weightBytes + (KvBytesPerToken * contextSize) + RuntimeOverheadBytes;
 
     /// <summary>
+    /// Estimates the free memory loading this model needs, before anything is downloaded, so a host can
+    /// compare it with <see cref="AvailableMemory.Read"/> before offering the download (REQ-RAG-125, Sevak TR-RAG-047).
+    /// </summary>
+    /// <param name="contextSize">
+    /// The context size in tokens the model will be loaded with; null uses the default a provider picks on
+    /// this platform (2,048 on a phone, 4,096 elsewhere), never more than the model supports. Pass
+    /// <see cref="LocalLlmProvider.ContextSize"/> to match a configured provider.
+    /// </param>
+    /// <returns>
+    /// Bytes: the weights, the context cache and the runtime's working memory, the same figure the load checks.
+    /// Null when the weight size is not known yet: a Hugging Face model before
+    /// <see cref="LocalLlmProvider.GetTermsAsync"/> has read its file list, or a host folder that does not exist.
+    /// </returns>
+    /// <remarks>
+    /// For a Hugging Face model the context cache size is read from its <c>genai_config.json</c>, which arrives
+    /// with the download; before then the figure counts the weights and the runtime only, a lower bound.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="contextSize"/> is zero or negative.</exception>
+    public long? EstimateRequiredMemoryBytes(int? contextSize = null)
+    {
+        if (contextSize is { } requested)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(requested, nameof(contextSize));
+        }
+
+        long? weightBytes = Folder is not null
+            ? Directory.Exists(Folder) ? FolderBytes(Folder) : null
+            : FindVariant(LocalModelFormat.OnnxGenAi)?.DownloadBytes;
+        if (weightBytes is not { } weights)
+        {
+            return null;
+        }
+
+        var size = contextSize ?? DefaultContextSize(IsPhonePlatform);
+        if (ContextLength > 0)
+        {
+            size = Math.Min(ContextLength, size);
+        }
+
+        return EstimateMemoryBytes(weights, size);
+    }
+
+    /// <summary>Sums the size of every file under a folder.</summary>
+    /// <param name="directory">The folder.</param>
+    /// <returns>Bytes; 0 when the folder does not exist.</returns>
+    internal static long FolderBytes(string directory) =>
+        Directory.Exists(directory)
+            ? new DirectoryInfo(directory).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length)
+            : 0;
+
+    /// <summary>
     /// Refuses a model a platform cannot carry.
     /// </summary>
     /// <param name="isPhone">Whether the platform is Android or iOS.</param>

@@ -336,7 +336,7 @@ var response = await rag.AskAsync("What is quantum computing?");
 | `WithReranker(source, apiKey, model?, endpoint?, topN, candidateCount)` | v3: Cohere or Jina rerank stage (Phase-2 Features, 9) |
 | `WithReranker(factory, topN, candidateCount)` | v3: custom `IReranker` |
 | `UseEmbeddedReranker(modelDirectory?, topN, candidateCount)` | v3: ONNX cross-encoder rerank, `RerankSource.LocalOnnx` (`TechieRag.Embedded`) |
-| `WithPersistence(provider, connectionString, defaultUserId)` | v3: SQLite/PostgreSQL conversation and workspace stores (Phase-2 Features, 10) |
+| `WithPersistence(provider, connectionString = null, defaultUserId)` | v3: SQLite/PostgreSQL conversation and workspace stores (Phase-2 Features, 10); a null connection string is the per-app SQLite default (1.1.3, TR-RAG-049) |
 | `UseModelRoot(path)` | v3: the folder every local model downloads to (`TechieRag.Embedded`; Phase-2 Features, 3) |
 
 ---
@@ -784,7 +784,9 @@ public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId
 
 // TechieRag.Llm.LlmProviderFactory
 public static ILlmProvider Create(ModelRoute route, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
-public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
+public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null, string? endpoint = null);   // endpoint: another host for the route (REQ-RAG-127)
+public static Task<IReadOnlyList<string>> ListModelsAsync(ModelRoute route, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);   // REQ-RAG-126
+public static Task<IReadOnlyList<string>> ListModelsAsync(LlmConnectorDescriptor connector, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);
 
 // TechieRag.Llm.LlmConnectorCatalog
 public static IReadOnlyList<LlmConnectorDescriptor> All { get; }
@@ -959,6 +961,8 @@ var site = await rag.IngestSiteAsync("https://example.com/docs/", fetcher, new W
 ### 8. Reranking: `WithReranker`, `UseEmbeddedReranker`, `SearchOptions.Rerank`
 
 Package `TechieRag` (Cohere, Jina, custom) or `TechieRag.Embedded` (the ONNX cross-encoder bge-reranker-v2-m3, `RerankSource.LocalOnnx`, downloaded once). The vector search fetches `candidateCount` chunks, the reranker orders them and returns `topN`. Configuration alone cannot select `LocalOnnx`: `"Rerank": { "Source": "LocalOnnx" }` throws at `Build()` unless the Embedded package's `UseEmbeddedReranker()` supplied the reranker.
+
+**`RerankConfig.Enabled` is the default, not the switch (REQ-RAG-047, Sevak TR-RAG-012).** It decides whether a search reranks when the call passes no `SearchOptions.Rerank` and no workspace decides. A reranker is built whenever `Source` is usable (Cohere or Jina with a key, a custom factory, `UseEmbeddedReranker()`), even with `Enabled = false`, so a call or a workspace can still opt in. To build no reranker, and so avoid the embedded model's download or an API key check, leave `Source = RerankSource.None`. `WithRerankEnabledByDefault(false)` after `WithReranker(...)` keeps the reranker for opt-in use with the default off.
 
 ```csharp
 // TechieRag.TechieRagBuilder
@@ -1257,6 +1261,14 @@ var rag = new TechieRagBuilder()
 Console.WriteLine(DataRoot.DefaultDatabasePath);       // ...\TechieRag\data\HelpDesk\techierag.db
 ```
 
+**1.1.3 change (Sevak TR-RAG-049).** 1.1.2's `WithPersistence(StoreProvider provider, string defaultUserId)` is removed: it captured every existing two-argument call `WithPersistence(provider, "Data Source=…")` and turned the connection string into a user id. There is one method, `WithPersistence(StoreProvider provider, string? connectionString = null, string defaultUserId = "default")`, so a second positional argument is always a connection string; `connectionString: null` means the per-app default (SQLite only). To name a user with the default database, name the argument. `VectorStoreConfig.IsConnectionStringSet` is public, so a host that resolves the unset default into its own data folder can tell "unset" from a value; the getter of an unset `ConnectionString` returns the absolute per-app path.
+
+```csharp
+builder.WithPersistence(StoreProvider.Sqlite, $"Data Source={path}");     // a connection string, as in 1.0.8
+builder.WithPersistence(StoreProvider.Sqlite, defaultUserId: "alice");    // per-app default database, user alice
+var unset = !config.VectorStore.IsConnectionStringSet;                     // true until a value is set
+```
+
 ### Flows: host step names and model use
 
 Package `TechieRag`; namespace `TechieRag.Orchestration`. `FlowNodeCatalog.CreateNode(kind, id, stepName)` names the node; a host should pass its own, localized name, because the default is the catalogue's English label. `FlowDefinition.UsesLanguageModel()` and `FlowDefinition.GetLanguageModelSteps()` say whether, and which, steps call a model (methods, so they are never persisted).
@@ -1267,6 +1279,31 @@ if (flow.UsesLanguageModel())
 {
     var modelSteps = flow.GetLanguageModelSteps().Select(n => n.DisplayName);
 }
+```
+
+### Model listing and endpoints: `ListModelsAsync`, `CreateForModel(…, endpoint)`
+
+Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). `LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)` asks the service which models it serves: LM Studio `GET /v1/models`, Ollama `GET /api/tags` (names as `ollama/<name>` takes them), any OpenAI-compatible connector `GET {endpoint}/models` with the key as a bearer token. The ids come back distinct and sorted. A server that is down or refuses throws `HttpRequestException`, never an empty list. Anthropic, Gemini, subscription and in-process connectors throw `NotSupportedException`. `CreateForModel(modelName, apiKey, endpoint: url)` sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. `endpoint` must be an absolute http or https URL. Code compiled against the five-argument `CreateForModel` keeps working.
+
+```csharp
+var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "http://192.168.1.20:1234");
+var llm = LlmProviderFactory.CreateForModel($"lmstudio/{ids[0]}", null, endpoint: "http://192.168.1.20:1234");
+var groqIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("groq/llama-3.3-70b-versatile"), groqKey);
+```
+
+### Local model: will it run and fit, before the download
+
+Package `TechieRag.Local`; namespace `TechieRag.Local` (REQ-RAG-125, Sevak TR-RAG-047). Nothing here touches the network. `LocalLlmProvider.IsRuntimeAvailable` is false where there is no local runtime (an Intel Mac, a browser), where `LoadAsync` would throw `PlatformNotSupportedException`. `LocalModel.EstimateRequiredMemoryBytes(int? contextSize = null)` returns the free memory the load needs (weights + context cache + 256 MB runtime), the same figure the load checks; null when the weight size is not known yet (a Hugging Face model before `GetTermsAsync`, a missing host folder). For a Hugging Face model the context cache is counted only once its `genai_config.json` is on disk, so the figure before download is a lower bound. `AvailableMemory.Read()` returns the free memory the library measures, or null. `LoadAsync` now refuses a model that cannot fit with `LocalModelMemoryException` before the terms are asked and before the first byte, and checks again after the download. `LocalLlmOptions.DownloadProgress` (`IProgress<ModelDownloadProgress>?`) receives this provider's download alone, each report a copy.
+
+```csharp
+using var provider = new LocalLlmProvider(new LocalLlmOptions
+{
+    Model = LocalModel.Phi3Mini4kInstruct,
+    DownloadProgress = new Progress<ModelDownloadProgress>(p => bar.Value = p.OverallBytesProgressPercent)
+});
+var needed = provider.Model.EstimateRequiredMemoryBytes(provider.ContextSize);
+var free = AvailableMemory.Read();
+var canOffer = LocalLlmProvider.IsRuntimeAvailable && (needed is null || free is null || free >= needed);
 ```
 
 ---

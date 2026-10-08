@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Architecture</h1>
-    <div class="sub">Last rendered: 2026-10-06</div>
+    <div class="sub">Last rendered: 2026-10-07</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#stack-decisions">1. Stack decisions</a></li>
@@ -123,7 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Architecture</h1>
-    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-Architecture.md</code></div>
+    <div class="subtitle">Rendered 2026-10-07 &middot; source <code>TechieRag-Architecture.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -335,7 +335,7 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 {
     IAsyncEnumerable&lt;string&gt; GenerateAsync(string templatedPrompt, LocalGenerationSettings settings, CancellationToken ct);
 }</code></pre>
-<p><strong>Load path (lazy; <code>LoadAsync</code> pre-loads).</strong> Pick the runtime (<code>LocalRuntimeSelector.ForCurrentPlatform()</code>: <code>OnnxGenAiRuntime</code> on Windows and Linux x64/Arm64, Apple-silicon macOS, Android, iOS and Mac Catalyst; null on an Intel Mac, where the package ships no native library, so a load throws <code>PlatformNotSupportedException</code>) → pick the model's file set for that format (one per model; a variant with no default address needs <code>TECHIERAG_MODEL_BASE_URL</code> when files are missing) → <code>LocalModelStore.EnsureAsync</code>: terms (<code>LocalLlmOptions.TermsAccepted</code> or <code>ConfirmTermsAsync</code>; otherwise <code>LocalModelTermsNotAcceptedException</code> carrying the terms URL, no request sent) → <code>ModelDownloadService.DownloadAsync</code> (size before the first byte, <code>.part</code> resume, progress events; <code>TECHIERAG_MODEL_BASE_URL</code> as <code>&lt;mirror&gt;/&lt;folder&gt;/&lt;file&gt;</code>) → SHA-256 of every file against the catalog (mismatch deletes the file; a <code>.techierag-verified</code> mark avoids re-hashing) → <code>MemoryGate</code> (weights + context cache per token × context + 256 MB against <code>MemAvailable</code> / <code>GlobalMemoryStatusEx</code> / <code>os_proc_available_memory</code> (iOS); <code>LocalModelMemoryException</code> names the shortfall) → <code>runtime.Load</code>.</p>
+<p><strong>Load path (lazy; <code>LoadAsync</code> pre-loads).</strong> Pick the runtime (<code>LocalRuntimeSelector.ForCurrentPlatform()</code>: <code>OnnxGenAiRuntime</code> on Windows and Linux x64/Arm64, Apple-silicon macOS, Android, iOS and Mac Catalyst; null on an Intel Mac (no native library), so a load throws <code>PlatformNotSupportedException</code>) → pick the model's file set for that format (one per model; without a default address, missing files need <code>TECHIERAG_MODEL_BASE_URL</code>) → if files are missing, <code>MemoryGate</code> first (BRD-185) → <code>LocalModelStore.EnsureAsync</code>: terms (<code>LocalLlmOptions.TermsAccepted</code> or <code>ConfirmTermsAsync</code>; otherwise <code>LocalModelTermsNotAcceptedException</code> carrying the terms URL, no request sent) → <code>ModelDownloadService.DownloadAsync</code> (size before the first byte, <code>.part</code> resume, progress events, and <code>LocalLlmOptions.DownloadProgress</code>; <code>TECHIERAG_MODEL_BASE_URL</code> as <code>&lt;mirror&gt;/&lt;folder&gt;/&lt;file&gt;</code>) → SHA-256 of every file against the catalog (mismatch deletes the file; a <code>.techierag-verified</code> mark avoids re-hashing) → <code>MemoryGate</code> (weights + per-token cache × context + 256 MB against the platform's free-memory reading; <code>LocalModelMemoryException</code> names the shortfall) → <code>runtime.Load</code>. Pre-download reads (BRD-185): <code>IsRuntimeAvailable</code>, <code>EstimateRequiredMemoryBytes</code>, <code>AvailableMemory.Read()</code>.</p>
 <p><strong>Core side (additive).</strong> <code>LlmSource.Local</code>; <code>LlmConnectorCatalog</code> row <code>local</code> (no endpoint, no key, no prefixes, so only <code>local/&lt;model&gt;</code> routes there); <code>LlmProviderFactory</code> and <code>TechieRagBuilder.CreateLlmProviderFromConfig</code> arms call <code>LocalLlmProviderRegistry.Create</code>, which <code>LocalLlm.Register()</code> fills (every <code>UseLocalLlm()</code> overload calls it).</p>
 <h2 id="data-model"><a id="4-data-model"></a>4. Data model<a class="anchor-link" href="#data-model">#</a></h2>
 <p>The library owns no schema of its own beyond the tables its stores create on first use. Every store uses <code>IF NOT EXISTS</code> DDL; none records a schema version (Open question 6).</p>
