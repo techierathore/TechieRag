@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 28 logged: 1 open, 27 fixed, 0 will not fix |
+| Count | 29 logged: 1 open, 28 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
-| Updated | 2026-10-08 |
+| Updated | 2026-10-09 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
@@ -15,10 +15,11 @@
 |---|---|---|---|
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 
-## Fixed (27)
+## Fixed (28)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20261009-01 (REQ-FN-001) | 2026-10-09 by owner | 2026-10-09 by fix-issues | the app's spec | The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice (Chatur feedback TR-RAG-006) |
 | MISS-TechieRag-20261008-04 (REQ-RAG-082) | 2026-10-08 by production | 2026-10-08 by fix-issues | the check was too weak | Sevak TR-RAG-036: no test keeps the HTTP connectors' SSRF guard off the mail transport; the row says connector transports reuse the guard, so a future change could apply it to IMAP and refuse every private-address mail host |
 | MISS-TechieRag-20261008-03 (REQ-RAG-098) | 2026-10-08 by production | 2026-10-08 by fix-issues | the check was too weak | Sevak TR-RAG-012: RerankConfig.Enabled still documented as 'whether the rerank stage is applied', but since REQ-RAG-047 it only sets the default for calls that pass no SearchOptions.Rerank and the reranker is built whenever a usable source exists; no release note says so |
 | MISS-TechieRag-20261008-02 (REQ-RAG-127) | 2026-10-08 by production | 2026-10-08 by fix-issues | the app's spec | Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route |

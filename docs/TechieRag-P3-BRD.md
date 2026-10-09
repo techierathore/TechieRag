@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-187 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak). Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-188 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak; BRD-188 on 2026-10-09, a small-model chooser, from Chatur). Each item names the Sevak feedback entry it answers.
 
 ## 2. Screens and flow
 
@@ -98,24 +98,26 @@ An app can tell whether the local model will run and fit before it offers the do
 
 ### Model routing
 
-A host can list a service's models and reach a service on another machine by its model name alone.
+A host can list a service's models, reach a service on another machine by its model name alone, and let a small model choose which model does a piece of work.
 
 - **BRD-186** — The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector *(Lekhak feedback TR-RAG-004, added 2026-10-08)* *Screen:* Model routing
   - *Acceptance:* When a developer asks for the models of an LM Studio, Ollama or OpenAI-compatible connector on Model routing, then the model ids that service reports are returned.
 - **BRD-187** — Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route *(Lekhak feedback TR-RAG-005, added 2026-10-08)* *Screen:* Model routing
   - *Acceptance:* When a developer creates a provider for lmstudio/<model> with an endpoint on Model routing, then its requests go to that endpoint.
+- **BRD-188** — The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice *(Chatur feedback TR-RAG-006, added 2026-10-09)* *Screen:* Model routing
+  - *Acceptance:* When a developer asks the chooser to pick between candidate models for a request on Model routing, then one candidate's id and the small model's reason are returned.
 
 ## 5. Development status
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-08.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-10-09.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
 | RAG / AI requirements | 11 | 11 | 0 | Done |
 | Local model fit check | 1 | 1 | 0 | Done |
-| Model routing | 2 | 2 | 0 | Done |
+| Model routing | 3 | 3 | 0 | Done |
 
 ## 6. Where the rest lives
 

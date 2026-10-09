@@ -254,6 +254,28 @@ LM Studio answers `v1/models`, an OpenAI-compatible connector `models` under its
 
 **Calculations on this service:** none.
 
+### Model choice: `ModelChooser`, `IModelChooser` (`TechieRag`)
+
+![Sevak's LLM settings screen, July 2026: where a host would name the small model and the candidates; it predates this change](screenshots/TechieRag/llm-settings.png)
+
+REQ-RAG-128 (Chatur TR-RAG-006, added 2026-10-09). Covered by `tests/TechieRag.Tests/Llm/ModelChooserTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: no sample calls the chooser. The tests use a fake small model. A scratch console run on 2026-10-09 used `qwen2.5-0.5b-instruct` through `TechieRag.Local` and chose right for both requests: a greeting went to the fast model, a code review to the deep one. Tests run 2026-10-09: REQ-RAG-128 6 passed.
+
+**Call chain:** `ChooseAsync` → `ValidateCandidates` → one candidate: return `OnlyCandidate` → else `BuildPrompt` → `ILlmProvider.ChatAsync` (temperature 0, JSON mode) → `ReadChoice` → `ParseReply` (the first `{` to the last `}`) → `MatchCandidate` (exact id ignoring case, else the one id ending `/<reply>`) → `SmallModel`, or the fallback candidate.
+
+The small model's failure is not caught: an exception from `ChatAsync` reaches the host. Only a reply that names no candidate becomes `Fallback`. The live run found the suffix match was needed, because the 0.5B model answered `llama3.2` for `ollama/llama3.2`.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/ModelChooser.cs:85` | `ChooseAsync` | `candidates.Count` | 1 returns without a model call |
+| `src/TechieRag/Llm/ModelChooser.cs:102` | `ChooseAsync` | `response.Content` | JSON `{"model": …, "reason": …}`, possibly wrapped in prose or a fence |
+| `src/TechieRag/Llm/ModelChooser.cs:114` | `ReadChoice` | `chosen` | the named candidate; null when the reply named none or an unknown id |
+| `src/TechieRag/Llm/ModelChooser.cs:122` | `ReadChoice` | `fallback` | `FallbackModelId`'s candidate, else the first |
+| `src/TechieRag/Llm/ModelChooser.cs:137` | `MatchCandidate` | the return | null when two candidates end with the same model name |
+
+**Calculations on this service:** the request is cut to `MaxRequestCharacters` (default 4000), with a note giving how many characters were cut.
+
 ## Cross-cutting flows
 
 Phase 1's flows are in `docs/TechieRag-DevGuide.md` and phase 2's changes in `docs/TechieRag-P2-DevGuide.md`. Phase 3 changed two; the local model's load order changed in its own entry above.

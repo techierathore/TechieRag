@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Usage Guide</h1>
-    <div class="sub">Last rendered: 2026-10-07</div>
+    <div class="sub">Last rendered: 2026-10-09</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#test-users">Test users</a></li>
@@ -138,6 +138,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#mail-parse-notes-tool-registry-flows-phase-3">Mail parse notes, tool registry, flows (phase 3)</a></li>
         <li class="h3"><a href="#storage-defaults-phase-3">Storage defaults (phase 3)</a></li>
         <li class="h3"><a href="#local-model-fit-check-before-the-download-phase-3">Local model fit check before the download (phase 3)</a></li>
+        <li class="h3"><a href="#model-routing-listing-endpoint-and-model-choice-phase-3">Model routing: listing, endpoint and model choice (phase 3)</a></li>
         <li><a href="#automated-tests">Automated tests</a></li>
         <li><a href="#known-limitations">Known limitations</a></li>
         <li><a href="#platform-notes">Platform notes</a></li>
@@ -152,7 +153,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Usage Guide</h1>
-    <div class="subtitle">Rendered 2026-10-07 &middot; source <code>TechieRag-UsageGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-UsageGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -186,6 +187,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#mail-parse-notes-tool-registry-flows-phase-3">Mail parse notes, tool registry, flows (phase 3)</a></li>
         <li class="h3"><a href="#storage-defaults-phase-3">Storage defaults (phase 3)</a></li>
         <li class="h3"><a href="#local-model-fit-check-before-the-download-phase-3">Local model fit check before the download (phase 3)</a></li>
+        <li class="h3"><a href="#model-routing-listing-endpoint-and-model-choice-phase-3">Model routing: listing, endpoint and model choice (phase 3)</a></li>
         <li><a href="#automated-tests">Automated tests</a></li>
         <li><a href="#known-limitations">Known limitations</a></li>
         <li><a href="#platform-notes">Platform notes</a></li>
@@ -514,6 +516,17 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Expected:</strong> 1) all three answer with no request sent 2) <code>LocalModelMemoryException</code> before the terms are asked and before any byte is requested 3) every report names this model and the last is <code>Completed</code>.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-125
+</li>
+</ul>
+<h3 id="model-routing-listing-endpoint-and-model-choice-phase-3">Model routing: listing, endpoint and model choice (phase 3)<a class="anchor-link" href="#model-routing-listing-endpoint-and-model-choice-phase-3">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) <code>LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "&lt;LM Studio URL&gt;")</code> 2) <code>CreateForModel("lmstudio/&lt;id&gt;", null, endpoint: "&lt;LM Studio URL&gt;")</code> and chat 3) <code>new ModelChooser(&lt;small model&gt;).ChooseAsync("hi", [fast, deep])</code> with a "fast" and a "deep" <code>ModelCandidate</code> 4) the same with "Review this C# class for thread-safety bugs." 5) stop the small model's server and choose again
+</li>
+<li><strong>Expected:</strong> 1) the ids LM Studio serves 2) the reply comes from that host 3) the fast model, <code>Source = SmallModel</code>, a reason 4) the deep model 5) the exception is thrown, no choice is returned.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-126, REQ-RAG-127, REQ-RAG-128
 </li>
 </ul>
 <h2 id="automated-tests">Automated tests<a class="anchor-link" href="#automated-tests">#</a></h2>

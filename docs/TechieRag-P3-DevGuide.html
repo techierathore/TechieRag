@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-10-08 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -121,6 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag">Flow step names and model use: FlowNodeCatalog.CreateNode, FlowDefinition.UsesLanguageModel (TechieRag)</a></li>
         <li class="h3"><a href="#local-model-fit-check-localllmprovider-isruntimeavailable-localmodel-estimaterequiredmemorybytes-availablememory-read-techierag-local">Local model fit check: LocalLlmProvider.IsRuntimeAvailable, LocalModel.EstimateRequiredMemoryBytes, AvailableMemory.Read (TechieRag.Local)</a></li>
         <li class="h3"><a href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">Model routing: LlmProviderFactory.ListModelsAsync, CreateForModel(…, endpoint) (TechieRag)</a></li>
+        <li class="h3"><a href="#model-choice-modelchooser-imodelchooser-techierag">Model choice: ModelChooser, IModelChooser (TechieRag)</a></li>
         <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
         <li class="h3"><a href="#configuration">Configuration</a></li>
         <li class="h3"><a href="#logging-and-errors">Logging and errors</a></li>
@@ -339,6 +340,23 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> none.</p>
+<h3 id="model-choice-modelchooser-imodelchooser-techierag">Model choice: <code>ModelChooser</code>, <code>IModelChooser</code> (<code>TechieRag</code>)<a class="anchor-link" href="#model-choice-modelchooser-imodelchooser-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host would name the small model and the candidates; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-128 (Chatur TR-RAG-006, added 2026-10-09). Covered by <code>tests/TechieRag.Tests/Llm/ModelChooserTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample calls the chooser. The tests use a fake small model. A scratch console run on 2026-10-09 used <code>qwen2.5-0.5b-instruct</code> through <code>TechieRag.Local</code> and chose right for both requests: a greeting went to the fast model, a code review to the deep one. Tests run 2026-10-09: REQ-RAG-128 6 passed.</p>
+<p><strong>Call chain:</strong> <code>ChooseAsync</code> → <code>ValidateCandidates</code> → one candidate: return <code>OnlyCandidate</code> → else <code>BuildPrompt</code> → <code>ILlmProvider.ChatAsync</code> (temperature 0, JSON mode) → <code>ReadChoice</code> → <code>ParseReply</code> (the first <code>{</code> to the last <code>}</code>) → <code>MatchCandidate</code> (exact id ignoring case, else the one id ending <code>/&lt;reply&gt;</code>) → <code>SmallModel</code>, or the fallback candidate.</p>
+<p>The small model's failure is not caught: an exception from <code>ChatAsync</code> reaches the host. Only a reply that names no candidate becomes <code>Fallback</code>. The live run found the suffix match was needed, because the 0.5B model answered <code>llama3.2</code> for <code>ollama/llama3.2</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/ModelChooser.cs:85</code></td><td><code>ChooseAsync</code></td><td><code>candidates.Count</code></td><td>1 returns without a model call</td></tr>
+<tr><td><code>src/TechieRag/Llm/ModelChooser.cs:102</code></td><td><code>ChooseAsync</code></td><td><code>response.Content</code></td><td>JSON <code>{"model": …, "reason": …}</code>, possibly wrapped in prose or a fence</td></tr>
+<tr><td><code>src/TechieRag/Llm/ModelChooser.cs:114</code></td><td><code>ReadChoice</code></td><td><code>chosen</code></td><td>the named candidate; null when the reply named none or an unknown id</td></tr>
+<tr><td><code>src/TechieRag/Llm/ModelChooser.cs:122</code></td><td><code>ReadChoice</code></td><td><code>fallback</code></td><td><code>FallbackModelId</code>'s candidate, else the first</td></tr>
+<tr><td><code>src/TechieRag/Llm/ModelChooser.cs:137</code></td><td><code>MatchCandidate</code></td><td>the return</td><td>null when two candidates end with the same model name</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> the request is cut to <code>MaxRequestCharacters</code> (default 4000), with a note giving how many characters were cut.</p>
 <h2 id="cross-cutting-flows">Cross-cutting flows<a class="anchor-link" href="#cross-cutting-flows">#</a></h2>
 <p>Phase 1's flows are in <code>docs/TechieRag-DevGuide.md</code> and phase 2's changes in <code>docs/TechieRag-P2-DevGuide.md</code>. Phase 3 changed two; the local model's load order changed in its own entry above.</p>
 <h3 id="configuration">Configuration<a class="anchor-link" href="#configuration">#</a></h3>
