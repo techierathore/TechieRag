@@ -19,6 +19,7 @@ Paste the section for a release into its GitHub Release when you publish it. All
 
 ### New
 
+- `ModelChooser` lets a small model choose which of several models does a piece of work. `ChooseAsync(request, candidates)` returns one candidate's id, a reason to show and log, and whether the small model chose or the fallback was used. A failure of the small model throws (Chatur TR-RAG-006).
 - `LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)` lists the models an LM Studio, Ollama or OpenAI-compatible service reports (Lekhak TR-RAG-004).
 - `LlmProviderFactory.CreateForModel(…, endpoint: url)` creates a provider for another host without rebuilding the route (Lekhak TR-RAG-005).
 - `LocalLlmProvider.IsRuntimeAvailable`, `LocalModel.EstimateRequiredMemoryBytes(contextSize?)`, `AvailableMemory.Read()` and `LocalLlmOptions.DownloadProgress` tell a host before any download whether the local model will run and fit (Sevak TR-RAG-047).

@@ -1,28 +1,28 @@
 ---
 project: TechieRag
-last_updated: 2026-10-08
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · UAT — handoff done, 14 of 14 verified
+last_updated: 2026-10-09
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 15 of 15 verified
 last_verified_build: PASS
-last_verified_date: 2026-10-08
+last_verified_date: 2026-10-09
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak). All 14 rows Verified on 2026-10-08. New today: model listing and an endpoint on `CreateForModel` (Lekhak, BRD-186/187). Sevak's TR-RAG-012 is now documented and TR-RAG-036 is pinned by tests (phase-2 rows re-verified). `RELEASE-NOTES.md` holds the next package's notes. Everything ships in the next package after 1.1.2, waiting for UAT.
+Phase 3 of 3 (Consumer feedback from Sevak). All 15 rows Verified on 2026-10-09. New today: `ModelChooser`, where a small model picks the model for a request (Chatur TR-RAG-006, REQ-RAG-128). It has 6 tests and a live run on qwen2.5-0.5b. The AI reference, DevGuide, UsageGuide, release notes and the reply in Chatur's feedback file are current. Everything ships in the next package after 1.1.2.
 
 ## Next command to run
 
 Claude Code:
 ```
-(owner) set current_phase to Released after UAT — no agent command
+(owner) commit, then build and publish the package — its shipped documents are current; no agent command
 ```
 OpenCode:
 ```
-(owner) set current_phase to Released after UAT — no agent command
+(owner) commit, then build and publish the package — its shipped documents are current; no agent command
 ```
-Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-P3-Checklist.md.
+Why: every row in this phase's scope is terminal and the shipped documents were brought up to date; working docs/TechieRag-P3-Checklist.md.
 
 ## Open requirements
 
@@ -38,13 +38,14 @@ Why: every row in this phase's scope is terminal and handoff has run; waiting on
 
 ## Known blockers
 
+- 🔶 **Release (after 1.1.2):** create GitHub Release `v1.1.3` with the `RELEASE-NOTES.md` section, then run *Publish to NuGet.org* on that tag.
+- 🔶 **Owner git:** commit TechieRag and Chatur (TR-RAG-006 reply in `Chatur/docs/Chatur-TechieRag-Feedback.md`).
 - 🔶 **ONNX Runtime issue to post:** ORT-001 in `docs/TechieRag-OnnxRuntime-Feedback.md` is ready; fill the macOS version.
-- 🔶 **Next release (after 1.1.2):** paste `RELEASE-NOTES.md` into the GitHub Release.
 - 🔶 **Behaviour changes:** default SQLite folder and repeat tool registration (REQ-RAG-121/122).
 - 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
 - 🔶 **Postgres (REQ-RAG-044):** `TechieRagTestPostgres` is unset; live test skipped.
+- 🔶 **Windows probe head not driven:** the verify boot waits for a web view the native probe never opens (TechieFlow TF-006); rows were graded by their tests.
 - 🔶 **Keys in chat:** OpenCode Go key and Gmail app password; rotate if shared.
-- 🔶 **Owner git:** commit TechieRag, Sevak and Lekhak (feedback replies).
 
 ## Verification log
 
@@ -52,17 +53,17 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-06 | build-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-06 | handoff-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-06 | fix-issues | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-07 | triage-and-fix | 12/12 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-08 | fix-issues | 14/14 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-09 | triage-and-fix + handoff | 15/15 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
 - OnnxRuntime: 1 open · 0 closed — docs/TechieRag-OnnxRuntime-Feedback.md
 - OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
-- TechieFlow: 0 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
+- TechieFlow: 2 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 
 ## Standards compliance
 

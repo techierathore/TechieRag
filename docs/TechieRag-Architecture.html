@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Architecture</h1>
-    <div class="sub">Last rendered: 2026-10-07</div>
+    <div class="sub">Last rendered: 2026-10-09</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#stack-decisions">1. Stack decisions</a></li>
@@ -123,7 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Architecture</h1>
-    <div class="subtitle">Rendered 2026-10-07 &middot; source <code>TechieRag-Architecture.md</code></div>
+    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-Architecture.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -259,7 +259,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
     Emb["Embedding — Ollama, LmStudio, OpenAICompatible, AzureOpenAI, Cohere, Gemini, Http, Onnx"]
     Vec["VectorStores — SqliteVec, PgVector, Qdrant"]
     Proc["Processors — Pdf, Docx, Xlsx, Pptx, Csv, Html, Markdown, Json, Toml, Code, Text, Generic, AudioTranscription + 4 chunkers"]
-    Llm["Llm — Ollama, LmStudio, OpenAICompatible, AzureAIFoundry, Gemini, Anthropic + LlmProviderFactory, ModelRouter, LlmConnectorCatalog"]
+    Llm["Llm — Ollama, LmStudio, OpenAICompatible, AzureAIFoundry, Gemini, Anthropic + LlmProviderFactory, ModelRouter, ModelChooser, LlmConnectorCatalog"]
     Svc["Services — AgentLoopRunner, ToolRegistry, CompositeToolHandler, RetryHandler, FallbackLlmHandler, TokenUsageTracker, PromptTemplateEngine, InMemory/DbConversationMemory, WorkspaceManager"]
     Orch["Orchestration — FlowRunner, FlowRuntime, FlowValidator, guardrails, AgentToolHandler"]
     Mcp["Mcp — McpClient, Stdio/Http transports, McpToolHandler, trust policy"]
@@ -504,7 +504,7 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 <tr><td><code>Embedding</code></td><td>Eight embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX)</td><td>Abstractions, <code>HttpClient</code></td></tr>
 <tr><td><code>VectorStores</code></td><td><code>SqliteVecStore</code>, <code>PgVectorStore</code>, <code>QdrantStore</code>: upsert, search, delete, list, stats, clear</td><td>Dapper, Npgsql, Pgvector, Qdrant.Client, Microsoft.Data.Sqlite</td></tr>
 <tr><td><code>Processors</code> (+ <code>Chunking</code>)</td><td>13 format processors and 4 chunkers (recursive, token, markdown, sentence)</td><td>PdfPig, OpenXml, HtmlAgilityPack, Markdig, Tomlyn</td></tr>
-<tr><td><code>Llm</code></td><td>Six LLM providers, <code>LlmProviderFactory</code>, <code>ModelRouter</code> (longest-prefix model-name routing), <code>LlmConnectorCatalog</code>, <code>LlmHttpGuard</code></td><td>Abstractions, Models, <code>HttpClient</code></td></tr>
+<tr><td><code>Llm</code></td><td>Six LLM providers, <code>LlmProviderFactory</code>, <code>ModelRouter</code> (longest-prefix model-name routing), <code>ModelChooser</code>, <code>LlmConnectorCatalog</code>, <code>LlmHttpGuard</code></td><td>Abstractions, Models, <code>HttpClient</code></td></tr>
 <tr><td><code>Services</code></td><td><code>AgentLoopRunner</code>, <code>ToolRegistry</code>, <code>CompositeToolHandler</code>, <code>RetryHandler</code>, <code>FallbackLlmHandler</code>, <code>TokenUsageTracker</code>, <code>PromptTemplateEngine</code>, <code>InMemoryConversationMemory</code>, <code>DbConversationMemory</code>, <code>WorkspaceManager</code></td><td>Abstractions, Models</td></tr>
 <tr><td><code>Orchestration</code></td><td>Flow graphs (Agent, Tool, Condition, Handoff, Terminal nodes), <code>FlowRunner</code>, <code>FlowRuntime</code>, <code>FlowValidator</code>, <code>FlowSerializer</code>, guardrail chain, <code>GuardedToolHandler</code>, <code>AgentToolHandler</code>, <code>FlowMessage</code> codes</td><td>Services, Abstractions</td></tr>
 <tr><td><code>Mcp</code></td><td><code>McpClient</code>, stdio and HTTP transports, <code>McpToolHandler</code>, <code>McpTrustPolicy</code>, server registry</td><td>Abstractions, <code>HttpClient</code>, <code>System.Diagnostics.Process</code></td></tr>

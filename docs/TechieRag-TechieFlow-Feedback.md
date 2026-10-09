@@ -4,13 +4,13 @@
 |---|---|
 | App | TechieRag |
 | Upstream | TechieFlow |
-| Updated | 2026-10-06 |
+| Updated | 2026-10-09 (TF-005, TF-006 added) |
 
 ## Summary
 
-4 entries: 0 blocking now, 0 open, 0 fixed upstream, 4 closed (TF-001 to TF-004).
+6 entries: 0 blocking now, 2 open (TF-005, TF-006, both minor), 0 fixed upstream, 4 closed (TF-001 to TF-004).
 
-Nothing is blocked. All four entries were re-checked here on 2026-10-06 and closed.
+Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and closed.
 
 ## Entries
 
@@ -85,6 +85,37 @@ Nothing is blocked. All four entries were re-checked here on 2026-10-06 and clos
 - **Encountered in:** the status gate of `*build-phase` and `*fix-issues TechieRag`, 2026-10-06.
 - **Workaround:** the failing test was re-run alone, and the report says the failure was memory, not code.
 - **Suggested fix:** in `tf-doc-tests.sh` (and `tf-build.sh test` when the target is a solution), run each test project in turn and merge the results.
+
+### TF-005 — a new triage row takes an id that another phase's checklist already uses
+
+- **Severity:** minor
+- **Blocks:** no — the row was renumbered by hand to REQ-RAG-128 and the run carried on.
+- **Repro:** in TechieRag (phase 3, whose checklist has no REQ-FN rows; phase 1's checklist has REQ-FN-001):
+  ```text
+  bash .tfcore/utils/tf-triage.sh TechieRag new "<title>" "<acceptance>" --section "Model routing"
+  REQ-FN-001: new Not Started row — …
+  ```
+- **Expected:** the next free id across every phase's checklist (and the telemetry streams), so an id names one row.
+- **Actual:** `add_row` counts only the current checklist, so it gives REQ-FN-001 again. The miss `MISS-TechieRag-20261009-01` and its escaped gate record carry REQ-FN-001. `req_id` cannot be amended (SCHEMA §5.5.7), so those two records will always name the wrong row. (Leaving out `--prefix RAG`, the default `FN`, was this run's mistake, not the script's.)
+- **Encountered in:** `*triage-and-fix TechieRag` for Chatur TR-RAG-006, 2026-10-09.
+- **Workaround:** the checklist row and BRD were renamed to REQ-RAG-128. The miss is closed by its `miss_id`.
+- **Suggested fix:** take the highest id with that prefix across `docs/{App}-Checklist.md` and every `docs/{App}-P*-Checklist.md`. On a project whose rows all use one prefix (here `RAG`), default to that prefix or refuse without `--prefix`.
+
+### TF-006 — the verify boot picks a native MAUI sample as the Windows head and waits 300 s for a DevTools port it can never open
+
+- **Severity:** minor
+- **Blocks:** no — every row here has no screen, so the verdict graded them by their tests. All 15 passed.
+- **Repro:** in TechieRag, `samples/TechieRag.Probe` is a plain MAUI app (no `AddMauiBlazorWebView`, no `BlazorWebView`):
+  ```text
+  bash .tfcore/utils/tf-verify-boot.sh start
+  NONE head=windows kind=host reason=the app's DevTools port never answered on localhost 172.18.144.1:9223 within 300 s
+  ```
+  The probe started and showed its window ("TechieRag Probe", responding), and no `msedgewebview2` process belonged to it. Ran three times, about 15 minutes in all.
+- **Expected:** the `windows` head is chosen only for a Blazor Hybrid project. A plain MAUI head is skipped or reported at once with "no web view, not drivable over CDP". On a library whose rows have no screen, the boot is skipped.
+- **Actual:** any project with `UseMaui` and a `net*-windows` target is chosen. The script waits the full 300 s, and the second try also hits "Only one usage of each socket address" from the relay left by the first.
+- **Encountered in:** `*triage-and-fix TechieRag`, the verify step, 2026-10-09. The 2026-10-08 ledger says the same head booted, which this run could not reproduce.
+- **Workaround:** none needed. The verdict graded the rows by their tests, and the report says the app was not booted.
+- **Suggested fix:** check for `AddMauiBlazorWebView` or a `BlazorWebView` in the project before choosing `windows`. Stop the relay on a failed start.
 
 ## Replies from TechieFlow
 

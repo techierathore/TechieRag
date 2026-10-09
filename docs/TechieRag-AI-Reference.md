@@ -788,6 +788,14 @@ public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILog
 public static Task<IReadOnlyList<string>> ListModelsAsync(ModelRoute route, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);   // REQ-RAG-126
 public static Task<IReadOnlyList<string>> ListModelsAsync(LlmConnectorDescriptor connector, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);
 
+// TechieRag.Llm.ModelChooser : IModelChooser - a small model chooses the model for a request (REQ-RAG-128)
+public ModelChooser(ILlmProvider smallModel, ModelChooserOptions? options = null);
+public Task<ModelChoice> ChooseAsync(string request, IReadOnlyList<ModelCandidate> candidates, CancellationToken cancellationToken = default);
+public sealed record ModelCandidate { required string ModelId; string? Tier; string? Notes; string? Cost; }
+public sealed record ModelChoice(ModelCandidate Candidate, string Reason, ModelChoiceSource Source, TokenUsage? Usage) { string ModelId; }
+public enum ModelChoiceSource { SmallModel, OnlyCandidate, Fallback }
+public sealed class ModelChooserOptions { int MaxRequestCharacters = 4000; string? FallbackModelId; string? Guidance; int MaxTokens = 200; }
+
 // TechieRag.Llm.LlmConnectorCatalog
 public static IReadOnlyList<LlmConnectorDescriptor> All { get; }
 public static LlmConnectorDescriptor? Find(string? name);
@@ -1304,6 +1312,23 @@ using var provider = new LocalLlmProvider(new LocalLlmOptions
 var needed = provider.Model.EstimateRequiredMemoryBytes(provider.ContextSize);
 var free = AvailableMemory.Read();
 var canOffer = LocalLlmProvider.IsRuntimeAvailable && (needed is null || free is null || free >= needed);
+```
+
+### Choosing a model for a piece of work: `ModelChooser`
+
+Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-128, Chatur TR-RAG-006). `ModelRouter` turns a model name into a service; `ModelChooser` decides which name. `new ModelChooser(smallModel, options?)` takes any `ILlmProvider`; a cheap or local one is enough. `ChooseAsync(request, candidates)` takes the request text and `ModelCandidate { ModelId, Tier?, Notes?, Cost? }` items, the free-text fields written in the host's own words. It returns a `ModelChoice` with `Candidate`, `ModelId`, `Reason` (one sentence to show and log), `Source` (`ModelChoiceSource.SmallModel`, `OnlyCandidate` or `Fallback`) and the small model's `Usage`. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to `ModelChooserOptions.MaxRequestCharacters` (default 4000). The reply's id is matched ignoring case. An id without its `connector/` prefix matches when exactly one candidate ends with it. **The answer is always a candidate:** a reply that is not JSON, or names a model that was not offered, gives `ModelChooserOptions.FallbackModelId` (else the first candidate) with `Source = Fallback`. **A failure of the small model is thrown** (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. `ModelChooserOptions.Guidance` adds the host's rule to the instructions. The interface `IModelChooser` lets a unit test pass a fixed choice.
+
+```csharp
+var chooser = new ModelChooser(
+    LlmProviderFactory.CreateForModel("ollama/llama3.2", null),
+    new ModelChooserOptions { Guidance = "Prefer free models unless the work needs deep reasoning." });
+var choice = await chooser.ChooseAsync(userText,
+[
+    new ModelCandidate { ModelId = "ollama/llama3.2", Tier = "fast", Cost = "free, local", Notes = "short answers" },
+    new ModelCandidate { ModelId = "anthropic/claude-sonnet-5-5", Tier = "deep", Cost = "paid", Notes = "code, long reasoning" },
+]);
+log.LogInformation("Routed to {Model} ({Source}): {Reason}", choice.ModelId, choice.Source, choice.Reason);
+var llm = LlmProviderFactory.CreateForModel(choice.ModelId, keyFor(choice.ModelId));
 ```
 
 ---

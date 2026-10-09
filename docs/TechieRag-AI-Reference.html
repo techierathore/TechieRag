@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-08</div>
+    <div class="sub">Last rendered: 2026-10-09</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -153,6 +153,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
         <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
+        <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -192,7 +193,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-08 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -241,6 +242,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
         <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
+        <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -988,6 +990,14 @@ public static ILlmProvider CreateForModel(string modelName, string? apiKey, ILog
 public static Task&lt;IReadOnlyList&lt;string&gt;&gt; ListModelsAsync(ModelRoute route, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);   // REQ-RAG-126
 public static Task&lt;IReadOnlyList&lt;string&gt;&gt; ListModelsAsync(LlmConnectorDescriptor connector, string? apiKey, string? endpoint = null, CancellationToken cancellationToken = default);
 
+// TechieRag.Llm.ModelChooser : IModelChooser - a small model chooses the model for a request (REQ-RAG-128)
+public ModelChooser(ILlmProvider smallModel, ModelChooserOptions? options = null);
+public Task&lt;ModelChoice&gt; ChooseAsync(string request, IReadOnlyList&lt;ModelCandidate&gt; candidates, CancellationToken cancellationToken = default);
+public sealed record ModelCandidate { required string ModelId; string? Tier; string? Notes; string? Cost; }
+public sealed record ModelChoice(ModelCandidate Candidate, string Reason, ModelChoiceSource Source, TokenUsage? Usage) { string ModelId; }
+public enum ModelChoiceSource { SmallModel, OnlyCandidate, Fallback }
+public sealed class ModelChooserOptions { int MaxRequestCharacters = 4000; string? FallbackModelId; string? Guidance; int MaxTokens = 200; }
+
 // TechieRag.Llm.LlmConnectorCatalog
 public static IReadOnlyList&lt;LlmConnectorDescriptor&gt; All { get; }
 public static LlmConnectorDescriptor? Find(string? name);
@@ -1390,6 +1400,18 @@ var groqIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("groq
 var needed = provider.Model.EstimateRequiredMemoryBytes(provider.ContextSize);
 var free = AvailableMemory.Read();
 var canOffer = LocalLlmProvider.IsRuntimeAvailable &amp;&amp; (needed is null || free is null || free &gt;= needed);</code></pre>
+<h3 id="choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: <code>ModelChooser</code><a class="anchor-link" href="#choosing-a-model-for-a-piece-of-work-modelchooser">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-128, Chatur TR-RAG-006). <code>ModelRouter</code> turns a model name into a service; <code>ModelChooser</code> decides which name. <code>new ModelChooser(smallModel, options?)</code> takes any <code>ILlmProvider</code>; a cheap or local one is enough. <code>ChooseAsync(request, candidates)</code> takes the request text and <code>ModelCandidate { ModelId, Tier?, Notes?, Cost? }</code> items, the free-text fields written in the host's own words. It returns a <code>ModelChoice</code> with <code>Candidate</code>, <code>ModelId</code>, <code>Reason</code> (one sentence to show and log), <code>Source</code> (<code>ModelChoiceSource.SmallModel</code>, <code>OnlyCandidate</code> or <code>Fallback</code>) and the small model's <code>Usage</code>. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to <code>ModelChooserOptions.MaxRequestCharacters</code> (default 4000). The reply's id is matched ignoring case. An id without its <code>connector/</code> prefix matches when exactly one candidate ends with it. <strong>The answer is always a candidate:</strong> a reply that is not JSON, or names a model that was not offered, gives <code>ModelChooserOptions.FallbackModelId</code> (else the first candidate) with <code>Source = Fallback</code>. <strong>A failure of the small model is thrown</strong> (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. <code>ModelChooserOptions.Guidance</code> adds the host's rule to the instructions. The interface <code>IModelChooser</code> lets a unit test pass a fixed choice.</p>
+<pre><code class="language-csharp">var chooser = new ModelChooser(
+    LlmProviderFactory.CreateForModel("ollama/llama3.2", null),
+    new ModelChooserOptions { Guidance = "Prefer free models unless the work needs deep reasoning." });
+var choice = await chooser.ChooseAsync(userText,
+[
+    new ModelCandidate { ModelId = "ollama/llama3.2", Tier = "fast", Cost = "free, local", Notes = "short answers" },
+    new ModelCandidate { ModelId = "anthropic/claude-sonnet-5-5", Tier = "deep", Cost = "paid", Notes = "code, long reasoning" },
+]);
+log.LogInformation("Routed to {Model} ({Source}): {Reason}", choice.ModelId, choice.Source, choice.Reason);
+var llm = LlmProviderFactory.CreateForModel(choice.ModelId, keyFor(choice.ModelId));</code></pre>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>

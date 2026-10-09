@@ -104,7 +104,7 @@ flowchart TB
     Emb["Embedding — Ollama, LmStudio, OpenAICompatible, AzureOpenAI, Cohere, Gemini, Http, Onnx"]
     Vec["VectorStores — SqliteVec, PgVector, Qdrant"]
     Proc["Processors — Pdf, Docx, Xlsx, Pptx, Csv, Html, Markdown, Json, Toml, Code, Text, Generic, AudioTranscription + 4 chunkers"]
-    Llm["Llm — Ollama, LmStudio, OpenAICompatible, AzureAIFoundry, Gemini, Anthropic + LlmProviderFactory, ModelRouter, LlmConnectorCatalog"]
+    Llm["Llm — Ollama, LmStudio, OpenAICompatible, AzureAIFoundry, Gemini, Anthropic + LlmProviderFactory, ModelRouter, ModelChooser, LlmConnectorCatalog"]
     Svc["Services — AgentLoopRunner, ToolRegistry, CompositeToolHandler, RetryHandler, FallbackLlmHandler, TokenUsageTracker, PromptTemplateEngine, InMemory/DbConversationMemory, WorkspaceManager"]
     Orch["Orchestration — FlowRunner, FlowRuntime, FlowValidator, guardrails, AgentToolHandler"]
     Mcp["Mcp — McpClient, Stdio/Http transports, McpToolHandler, trust policy"]
@@ -335,7 +335,7 @@ One row per decision. Every package added to the project has a row saying why.
 | `Embedding` | Eight embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) | Abstractions, `HttpClient` |
 | `VectorStores` | `SqliteVecStore`, `PgVectorStore`, `QdrantStore`: upsert, search, delete, list, stats, clear | Dapper, Npgsql, Pgvector, Qdrant.Client, Microsoft.Data.Sqlite |
 | `Processors` (+ `Chunking`) | 13 format processors and 4 chunkers (recursive, token, markdown, sentence) | PdfPig, OpenXml, HtmlAgilityPack, Markdig, Tomlyn |
-| `Llm` | Six LLM providers, `LlmProviderFactory`, `ModelRouter` (longest-prefix model-name routing), `LlmConnectorCatalog`, `LlmHttpGuard` | Abstractions, Models, `HttpClient` |
+| `Llm` | Six LLM providers, `LlmProviderFactory`, `ModelRouter` (longest-prefix model-name routing), `ModelChooser`, `LlmConnectorCatalog`, `LlmHttpGuard` | Abstractions, Models, `HttpClient` |
 | `Services` | `AgentLoopRunner`, `ToolRegistry`, `CompositeToolHandler`, `RetryHandler`, `FallbackLlmHandler`, `TokenUsageTracker`, `PromptTemplateEngine`, `InMemoryConversationMemory`, `DbConversationMemory`, `WorkspaceManager` | Abstractions, Models |
 | `Orchestration` | Flow graphs (Agent, Tool, Condition, Handoff, Terminal nodes), `FlowRunner`, `FlowRuntime`, `FlowValidator`, `FlowSerializer`, guardrail chain, `GuardedToolHandler`, `AgentToolHandler`, `FlowMessage` codes | Services, Abstractions |
 | `Mcp` | `McpClient`, stdio and HTTP transports, `McpToolHandler`, `McpTrustPolicy`, server registry | Abstractions, `HttpClient`, `System.Diagnostics.Process` |
