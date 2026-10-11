@@ -35,11 +35,14 @@ public class OpenAiEndpointCompositionTests
         Assert.Equal(expected, provider.EffectiveCompletionsUri.ToString());
     }
 
-    /// <summary>Every OpenAI-compatible connector in the catalog composes a usable completions URI.</summary>
+    /// <summary>
+    /// Every OpenAI-compatible connector in the catalog composes a usable completions URI; the generic
+    /// <c>openai-compatible</c> connector has no endpoint of its own and is covered by REQ-RAG-130's tests.
+    /// </summary>
     [Fact]
     public void EveryCatalogEndpointComposesACompletionsUri()
     {
-        foreach (var connector in LlmConnectorCatalog.All.Where(c => c.Source == LlmSource.OpenAICompatible))
+        foreach (var connector in LlmConnectorCatalog.All.Where(c => c.Source == LlmSource.OpenAICompatible && !c.RequiresEndpoint))
         {
             var provider = new OpenAICompatibleLlmProvider(connector.Endpoint!, "key", "model");
 

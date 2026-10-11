@@ -4,7 +4,7 @@ namespace TechieRag.Tests.Documentation;
 
 /// <summary>
 /// The shipped AI reference describes every public member added for phase-3 cluster A
-/// (REQ-RAG-114 to REQ-RAG-124), each section with a C# call example.
+/// (REQ-RAG-114 to REQ-RAG-124) and the later phase-3 rows, each section with a C# call example.
 /// </summary>
 public sealed class PhaseThreeReferenceTests
 {
@@ -51,6 +51,13 @@ public sealed class PhaseThreeReferenceTests
         { "REQ-RAG-128", "FallbackModelId" },
         { "REQ-RAG-129", "DisposeAsync()" },
         { "REQ-RAG-129", "ObjectDisposedException" },
+        { "REQ-RAG-130", "openai-compatible/glm-4.6@https://" },
+        { "REQ-RAG-130", "anthropic-compatible/glm-4.6" },
+        { "REQ-RAG-131", "include_venice_system_prompt" },
+        { "REQ-RAG-131", "venice/zai-org-glm-5-1" },
+        { "REQ-RAG-132", "LlmConnectorCatalog.Describe()" },
+        { "REQ-RAG-132", "LlmConnectorInfo" },
+        { "REQ-RAG-133", "{endpoint}/v1/messages" },
     };
 
     /// <summary>
@@ -74,7 +81,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(11, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053)
+        Assert.Equal(13, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 

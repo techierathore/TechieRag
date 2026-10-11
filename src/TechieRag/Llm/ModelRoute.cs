@@ -17,4 +17,10 @@ public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId
 
     /// <summary>Gets the provider implementation that will serve this route.</summary>
     public LlmSource Source => Connector.Source;
+
+    /// <summary>
+    /// Gets whether the endpoint was written on the route (<c>connector/model@https://host</c>), in which case it
+    /// wins over an endpoint the app passes separately (REQ-RAG-130).
+    /// </summary>
+    public bool EndpointFromRoute { get; init; }
 }

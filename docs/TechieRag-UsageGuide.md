@@ -205,6 +205,12 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** 1) the ids LM Studio serves 2) the reply comes from that host 3) the fast model, `Source = SmallModel`, a reason 4) the deep model 5) the exception is thrown, no choice is returned.
 - **Covers:** REQ-RAG-126, REQ-RAG-127, REQ-RAG-128
 
+### Any service by route, Venice and the connector list (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) `CreateForModel("anthropic-compatible/glm-4.6", "<Z.ai key>", endpoint: "https://api.z.ai/api/anthropic")` and chat 2) `CreateForModel("openai-compatible/glm-4.6", "<key>")` with no endpoint 3) `CreateForModel("venice/zai-org-glm-5-1", "<Venice key>")` and chat with your own system prompt 4) `LlmConnectorCatalog.Describe()`
+- **Expected:** 1) GLM answers 2) `InvalidOperationException` naming the Base URL and the `@https://` suffix 3) Venice answers in your system prompt's voice, with no Venice persona 4) rows for venice, openrouter, openai-compatible and anthropic-compatible, each with an example route.
+- **Covers:** REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133
+
 ## Automated tests
 
 ```

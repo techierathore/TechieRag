@@ -140,6 +140,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-fit-check-before-the-download-phase-3">Local model fit check before the download (phase 3)</a></li>
         <li class="h3"><a href="#local-model-unload-while-answering-phase-3">Local model unload while answering (phase 3)</a></li>
         <li class="h3"><a href="#model-routing-listing-endpoint-and-model-choice-phase-3">Model routing: listing, endpoint and model choice (phase 3)</a></li>
+        <li class="h3"><a href="#any-service-by-route-venice-and-the-connector-list-phase-3">Any service by route, Venice and the connector list (phase 3)</a></li>
         <li><a href="#automated-tests">Automated tests</a></li>
         <li><a href="#known-limitations">Known limitations</a></li>
         <li><a href="#platform-notes">Platform notes</a></li>
@@ -190,6 +191,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-fit-check-before-the-download-phase-3">Local model fit check before the download (phase 3)</a></li>
         <li class="h3"><a href="#local-model-unload-while-answering-phase-3">Local model unload while answering (phase 3)</a></li>
         <li class="h3"><a href="#model-routing-listing-endpoint-and-model-choice-phase-3">Model routing: listing, endpoint and model choice (phase 3)</a></li>
+        <li class="h3"><a href="#any-service-by-route-venice-and-the-connector-list-phase-3">Any service by route, Venice and the connector list (phase 3)</a></li>
         <li><a href="#automated-tests">Automated tests</a></li>
         <li><a href="#known-limitations">Known limitations</a></li>
         <li><a href="#platform-notes">Platform notes</a></li>
@@ -540,6 +542,17 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Expected:</strong> 1) the ids LM Studio serves 2) the reply comes from that host 3) the fast model, <code>Source = SmallModel</code>, a reason 4) the deep model 5) the exception is thrown, no choice is returned.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-126, REQ-RAG-127, REQ-RAG-128
+</li>
+</ul>
+<h3 id="any-service-by-route-venice-and-the-connector-list-phase-3">Any service by route, Venice and the connector list (phase 3)<a class="anchor-link" href="#any-service-by-route-venice-and-the-connector-list-phase-3">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) <code>CreateForModel("anthropic-compatible/glm-4.6", "&lt;Z.ai key&gt;", endpoint: "https://api.z.ai/api/anthropic")</code> and chat 2) <code>CreateForModel("openai-compatible/glm-4.6", "&lt;key&gt;")</code> with no endpoint 3) <code>CreateForModel("venice/zai-org-glm-5-1", "&lt;Venice key&gt;")</code> and chat with your own system prompt 4) <code>LlmConnectorCatalog.Describe()</code>
+</li>
+<li><strong>Expected:</strong> 1) GLM answers 2) <code>InvalidOperationException</code> naming the Base URL and the <code>@https://</code> suffix 3) Venice answers in your system prompt's voice, with no Venice persona 4) rows for venice, openrouter, openai-compatible and anthropic-compatible, each with an example route.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133
 </li>
 </ul>
 <h2 id="automated-tests">Automated tests<a class="anchor-link" href="#automated-tests">#</a></h2>

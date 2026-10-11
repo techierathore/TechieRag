@@ -155,6 +155,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
+        <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
+        <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -245,6 +247,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
+        <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
+        <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -980,11 +984,12 @@ foreach (var connector in LlmConnectorCatalog.All.Where(c =&gt; c.Source == LlmS
 <p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code>. An application persists one string, the model name, and the catalog picks the service: <code>claude-sonnet-4-5</code> routes to Anthropic, <code>gemini-2.0-flash</code> to Google, <code>gpt-4o</code> to OpenAI. Open-weight names are served by several services, so they must be qualified with the connector (<code>groq/llama-3.3-70b-versatile</code>, <code>local/qwen2.5-0.5b-instruct</code>); an unqualified one throws <code>InvalidOperationException</code>.</p>
 <pre><code class="language-csharp">// TechieRag.TechieRagBuilder
 public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey = null);
+public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey, string? endpoint);   // the app's Base URL (REQ-RAG-130)
 
 // TechieRag.Llm.ModelRouter
 public static ModelRoute? Resolve(string? modelName);
 public static ModelRoute Require(string modelName);
-public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId) { string? Endpoint; LlmSource Source; }
+public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId) { string? Endpoint; LlmSource Source; bool EndpointFromRoute; }   // "connector/model@https://host" sets the endpoint, which wins
 
 // TechieRag.Llm.LlmProviderFactory
 public static ILlmProvider Create(ModelRoute route, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
@@ -1004,8 +1009,13 @@ public sealed class ModelChooserOptions { int MaxRequestCharacters = 4000; strin
 public static IReadOnlyList&lt;LlmConnectorDescriptor&gt; All { get; }
 public static LlmConnectorDescriptor? Find(string? name);
 public static LlmConnectorDescriptor Require(string name);
-public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList&lt;string&gt; ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; string? SessionHeader; SubscriptionTerms? Subscription; }
+public static IReadOnlyList&lt;LlmConnectorInfo&gt; Describe();   // one row per usable connector, for a settings page (REQ-RAG-132)
+public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList&lt;string&gt; ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; bool RequiresEndpoint; bool IsLocal; string? ExampleModel; string? ExampleEndpoint; IReadOnlyDictionary&lt;string, object&gt;? RequestBodyFields; string? SessionHeader; SubscriptionTerms? Subscription; }
+public sealed record LlmConnectorInfo { string Name; string DisplayName; bool RequiresApiKey; bool RequiresEndpoint; bool RequiresSignIn; bool IsLocal; string? DefaultEndpoint; string ExampleRoute; }
 public const string OpenCodeGoName = "opencode-go";   // OpenCode Go: https://opencode.ai/zen/go/v1, session header x-opencode-session
+public const string VeniceName = "venice";   // https://api.venice.ai/api/v1, Venice's own system prompt switched off (REQ-RAG-131)
+public const string OpenAICompatibleName = "openai-compatible";   // any chat/completions service; needs an endpoint (REQ-RAG-130)
+public const string AnthropicCompatibleName = "anthropic-compatible";   // any Anthropic Messages service; needs an endpoint
 
 // TechieRag.LlmConfig - configuration can name the connector instead of pasting its URL
 public string? Connector { get; set; }   // e.g. "groq"; an explicit Endpoint still wins
@@ -1388,7 +1398,7 @@ if (flow.UsesLanguageModel())
     var modelSteps = flow.GetLanguageModelSteps().Select(n =&gt; n.DisplayName);
 }</code></pre>
 <h3 id="model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: <code>ListModelsAsync</code>, <code>CreateForModel(…, endpoint)</code><a class="anchor-link" href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">#</a></h3>
-<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). <code>LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)</code> asks the service which models it serves: LM Studio <code>GET /v1/models</code>, Ollama <code>GET /api/tags</code> (names as <code>ollama/&lt;name&gt;</code> takes them), any OpenAI-compatible connector <code>GET {endpoint}/models</code> with the key as a bearer token. The ids come back distinct and sorted. A server that is down or refuses throws <code>HttpRequestException</code>, never an empty list. Anthropic, Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>. <code>CreateForModel(modelName, apiKey, endpoint: url)</code> sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. <code>endpoint</code> must be an absolute http or https URL. Code compiled against the five-argument <code>CreateForModel</code> keeps working.</p>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). <code>LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)</code> asks the service which models it serves: LM Studio <code>GET /v1/models</code>, Ollama <code>GET /api/tags</code> (names as <code>ollama/&lt;name&gt;</code> takes them), any OpenAI-compatible connector <code>GET {endpoint}/models</code> with the key as a bearer token, Anthropic and any Anthropic-compatible connector <code>GET {endpoint}/v1/models</code> with <code>x-api-key</code> (REQ-RAG-130). The ids come back distinct and sorted. A server that is down or refuses throws <code>HttpRequestException</code>, never an empty list; so does a service without a model list (404). Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>. <code>CreateForModel(modelName, apiKey, endpoint: url)</code> sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. <code>endpoint</code> must be an absolute http or https URL. Code compiled against the five-argument <code>CreateForModel</code> keeps working.</p>
 <pre><code class="language-csharp">var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "http://192.168.1.20:1234");
 var llm = LlmProviderFactory.CreateForModel($"lmstudio/{ids[0]}", null, endpoint: "http://192.168.1.20:1234");
 var groqIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("groq/llama-3.3-70b-versatile"), groqKey);</code></pre>
@@ -1420,6 +1430,32 @@ var choice = await chooser.ChooseAsync(userText,
 ]);
 log.LogInformation("Routed to {Model} ({Source}): {Reason}", choice.ModelId, choice.Source, choice.Reason);
 var llm = LlmProviderFactory.CreateForModel(choice.ModelId, keyFor(choice.ModelId));</code></pre>
+<h3 id="any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: <code>openai-compatible/</code>, <code>anthropic-compatible/</code>, <code>venice/</code><a class="anchor-link" href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-130, REQ-RAG-131, REQ-RAG-133; owner report of 2026-10-11 from Lekhak's provider page). Two generic connectors reach a service the catalog does not list, without a release. <code>openai-compatible/&lt;model&gt;</code> uses the OpenAI chat/completions format. <code>anthropic-compatible/&lt;model&gt;</code> uses the Anthropic Messages format through <code>AnthropicLlmProvider</code>. Both need the service's endpoint. Give it as the app's Base URL (<code>CreateForModel(…, endpoint: url)</code>, <code>UseLlmForModel(route, key, endpoint)</code>, <code>LlmConfig.Endpoint</code>) or on the route itself as <code>openai-compatible/glm-4.6@https://api.z.ai/api/paas/v4</code>. An endpoint written on the route wins over the app's. Only <code>@http://</code> or <code>@https://</code> starts an endpoint, so <code>claude-3@20240229</code> stays one model id. Without an endpoint, creating the provider (or building, or listing models) throws <code>InvalidOperationException</code>, and the message names both ways to give one. Both require an API key, and a call without one is refused before any request with <code>InvalidOperationException</code> (hosted services such as OpenRouter, Azure AI Foundry and the Gemini API all need one). A self-hosted server that ignores keys takes any placeholder, e.g. <code>"none"</code>. <code>AnthropicLlmProvider</code> now keeps the endpoint's path: it posts to <code>{endpoint}/v1/messages</code>, and to <code>{endpoint}/messages</code> when the endpoint already ends in <code>/v1</code>. Before this, <code>https://api.z.ai/api/anthropic</code> was sent to <code>https://api.z.ai/v1/messages</code>.</p>
+<p><code>venice/&lt;model&gt;</code> reaches <code>https://api.venice.ai/api/v1</code>. It has no default model, so <code>venice/</code> alone is refused. What Venice adds on its own (docs checked 2026-10-11):</p>
+<ul>
+<li><strong>System prompt (handled):</strong> Venice adds its own system prompt next to yours unless <code>venice_parameters.include_venice_system_prompt</code> is false; its default is true. The <code>venice</code> connector sends false on every plain and streamed request (<code>LlmConnectorDescriptor.RequestBodyFields</code>). To keep Venice's prompt, use <code>openai-compatible/&lt;model&gt;@https://api.venice.ai/api/v1</code>, which sends no Venice field.
+</li>
+<li><strong>Tool calls (work):</strong> function tools, <code>tool_choice</code> and parallel calls follow the OpenAI shape. Support is per model: Venice's <code>/models</code> gives <code>model_spec.capabilities.supportsFunctionCalling</code>. On 2026-10-11, 125 of the 130 text models had it, <code>zai-org-glm-5-1</code> among them. The five without it were <code>grok-4-20-multi-agent</code>, <code>hermes-3-llama-3.1-405b</code> and three <code>e2ee-…</code> models, so check <code>/models</code> before offering tools.
+</li>
+<li><strong>Streaming (works):</strong> <code>stream</code> and <code>stream_options.include_usage</code> are honoured, so streamed token usage arrives as usual.
+</li>
+<li><strong>Not exposed as options:</strong> web search, web citations, scraping, characters, <code>strip_thinking_response</code> and <code>disable_thinking</code>. Venice reads them from <code>venice_parameters</code> or from a suffix on the model id (<code>venice/zai-org-glm-5-1:enable_web_search=on</code>). The model id is sent unchanged, so the suffix form works. Whether a suffix can switch the system prompt back on, against the body field, is not documented and was not tested; use the <code>openai-compatible</code> route for that.
+</li>
+<li><strong>Model list:</strong> <code>ListModelsAsync(ModelRouter.Require("venice/x"), key)</code> asks <code>GET /models</code>, which returns Venice's text models.
+</li>
+</ul>
+<pre><code class="language-csharp">var glm = LlmProviderFactory.CreateForModel("anthropic-compatible/glm-4.6", zaiKey, endpoint: "https://api.z.ai/api/anthropic");
+var vllm = LlmProviderFactory.CreateForModel("openai-compatible/qwen3-32b@http://gpu-box:8000/v1", null);
+var venice = LlmProviderFactory.CreateForModel("venice/zai-org-glm-5-1", veniceKey);   // Venice's own system prompt off
+var veniceIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("venice/x"), veniceKey);
+builder.UseLlmForModel("anthropic-compatible/glm-4.6", zaiKey, "https://api.z.ai/api/anthropic");</code></pre>
+<h3 id="connector-list-for-app-screens-llmconnectorcatalog-describe"><a id="connector-list-for-app-screens-llmconnectorcatalogdescribe"></a>Connector list for app screens: <code>LlmConnectorCatalog.Describe()</code><a class="anchor-link" href="#connector-list-for-app-screens-llmconnectorcatalog-describe">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-132). <code>LlmConnectorCatalog.Describe()</code> returns one <code>LlmConnectorInfo</code> per connector an app can offer, in catalog order. Each row has <code>Name</code>, <code>DisplayName</code>, <code>RequiresApiKey</code>, <code>RequiresEndpoint</code> (show a Base URL field), <code>RequiresSignIn</code> (a subscription, no key), <code>IsLocal</code> (Ollama, LM Studio, the in-process model), <code>DefaultEndpoint</code> (null for the generic routes and the in-process model) and <code>ExampleRoute</code>. Every example route resolves through <code>ModelRouter</code> to its own connector, e.g. <code>venice/zai-org-glm-5-1</code>, <code>openrouter/anthropic/claude-sonnet-4.5</code> or <code>openai-compatible/glm-4.6@https://api.z.ai/api/paas/v4</code>. Subscription vendors that forbid sign-in are left out. A provider page builds its hint from this list instead of a hard-coded one.</p>
+<pre><code class="language-csharp">foreach (var c in LlmConnectorCatalog.Describe())
+{
+    hints.Add($"{c.DisplayName}: {c.ExampleRoute}{(c.RequiresApiKey ? " (key)" : "")}{(c.RequiresEndpoint ? " (Base URL)" : "")}");
+}</code></pre>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>

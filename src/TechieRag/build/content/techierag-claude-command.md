@@ -59,7 +59,7 @@ persona:
       - ITechieRag interface (IngestAsync, SearchAsync, AskAsync, ChatWithRagAsync, streaming, AskStreamWithSourcesAsync)
       - ILlmProvider interface (CompleteAsync, ChatAsync, streaming, structured output, typed ChatStreamEventsAsync)
       - All 6 API LLM providers (Ollama, LM Studio, OpenAI-Compatible, Azure AI Foundry, Gemini, Anthropic), plus the local model (TechieRag.Local, UseLocalLlm) and the ChatGPT subscription (UseChatGptSubscriptionLlm)
-      - Provider routing by model name (UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel, LlmConnectorCatalog)
+      - Provider routing by model name (UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel, LlmConnectorCatalog); generic routes openai-compatible/<model> and anthropic-compatible/<model> with the endpoint as Base URL or an @https:// suffix, both needing a key; the venice connector (Venice's own system prompt off); LlmConnectorCatalog.Describe() for a settings page's route hint
       - OpenAI-compatible request headers and a per-conversation session id (LlmConfig.Headers, WithLlmHeaders, UseOpenAICompatibleLlm(endpoint, key, model, headers, sessionHeader), LlmCompletionOptions.SessionId); the OpenCode Go connector (UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, model), sends x-opencode-session; chat/completions models only)
       - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models (UseEmbedded: bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS; UseModelRoot; ModelDownloadService)
       - All 3 vector stores (SqliteVec, PgVector, Qdrant)
@@ -106,6 +106,7 @@ persona:
     - PascalCase for public members, camelCase for private fields, no underscores
     - XML documentation on public classes and methods
     - Async suffix on all async methods
+    - Route by one string: a route is `connector/model`, optionally `@https://host` (that endpoint wins over the app's Base URL). For a service the catalog does not list use `openai-compatible/<model>` or `anthropic-compatible/<model>`; both need an endpoint and an API key, else they are refused. `venice/<model>` switches Venice's own system prompt off. Build a settings page's route hint from `LlmConnectorCatalog.Describe()`, never a hard-coded list
   integration:
     description: >
       TechieRag packages are published on nuget.org, the default NuGet feed every .NET SDK already
@@ -359,6 +360,9 @@ Shows all available providers:
 | ChatGPT subscription | UseChatGptSubscriptionLlm(signInCallback) | chatgpt.com | Device-code sign-in | Yes | Yes |
 | OpenCode Go | UseConnectorLlm("opencode-go", key, "kimi-k2.7-code") | opencode.ai/zen/go/v1 | Bearer + x-opencode-session | Yes | Yes |
 | By model name | UseLlmForModel("claude-sonnet-4-5", apiKey) | From the catalog | Per service | Per service | Per service |
+| Any OpenAI-compatible service | UseLlmForModel("openai-compatible/<model>", key, baseUrl) or `…@https://host/v1` | You give it | Bearer (required) | Per model | Yes |
+| Any Anthropic-compatible service (e.g. GLM) | UseLlmForModel("anthropic-compatible/glm-4.6", key, "https://api.z.ai/api/anthropic") | You give it | x-api-key (required) | Yes | Yes |
+| Venice AI | UseLlmForModel("venice/zai-org-glm-5-1", key) | api.venice.ai/api/v1 | Bearer | Per model (check /models) | Yes |
 
 **Vector Stores:**
 | Store | Builder Method | Requires |

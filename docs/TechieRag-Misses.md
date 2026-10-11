@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 30 logged: 1 open, 29 fixed, 0 will not fix |
+| Count | 36 logged: 1 open, 35 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
 | Updated | 2026-10-11 |
 
@@ -15,10 +15,16 @@
 |---|---|---|---|
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 
-## Fixed (29)
+## Fixed (35)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20261011-07 (REQ-RAG-132) | 2026-10-11 by owner | 2026-10-11 by log-miss | the framework never said it | Have you updated the documents and agent guides about the new routes? (the shipped /techierag agent files for Claude Code and OpenCode, and the ProductGuide, were not updated for REQ-RAG-130 to 132) |
+| MISS-TechieRag-20261011-06 (REQ-RAG-130) | 2026-10-11 by owner | 2026-10-11 by fix-issues | the app's spec | openai-compatible/<model> was accepted without an API key; hosted OpenAI-compatible vendors (OpenRouter, Bedrock, Azure AI Foundry, Gemini API) all need one, so a missing key must be refused up front like anthropic-compatible |
+| MISS-TechieRag-20261011-05 (REQ-RAG-133) | 2026-10-11 by owner | 2026-10-11 by fix-issues | the check was too weak | The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached |
+| MISS-TechieRag-20261011-04 (REQ-RAG-132) | 2026-10-11 by owner | 2026-10-11 by fix-issues | the app's spec | The connector catalog shall describe itself for app screens through one public method: per connector its display name, whether it needs a key, whether it needs an endpoint, local or hosted, default endpoint and one example route |
+| MISS-TechieRag-20261011-03 (REQ-RAG-131) | 2026-10-11 by owner | 2026-10-11 by fix-issues | the app's spec | The library shall have a venice connector, so venice/<model> reaches https://api.venice.ai/api/v1 with Venice's own system prompt switched off |
+| MISS-TechieRag-20261011-02 (REQ-RAG-130) | 2026-10-11 by owner | 2026-10-11 by fix-issues | the app's spec | The library shall take two generic routes, openai-compatible/<model> and anthropic-compatible/<model>, that reach any service at an endpoint the app gives (its Base URL or an @https:// suffix on the route), refuse with a clear message when no endpoint is given, and list models where the service offe |
 | MISS-TechieRag-20261011-01 (REQ-RAG-129) | 2026-10-11 by production | 2026-10-11 by fix-issues | the app's spec | Disposing a local model provider shall cancel or wait for the calls already inside it, free the native model only once none is left, and make every call that resumes afterwards throw ObjectDisposedException before it touches the model |
 | MISS-TechieRag-20261009-01 (REQ-FN-001) | 2026-10-09 by owner | 2026-10-09 by fix-issues | the app's spec | The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice (Chatur feedback TR-RAG-006) |
 | MISS-TechieRag-20261008-04 (REQ-RAG-082) | 2026-10-08 by production | 2026-10-08 by fix-issues | the check was too weak | Sevak TR-RAG-036: no test keeps the HTTP connectors' SSRF guard off the mail transport; the row says connector transports reuse the guard, so a future change could apply it to IMAP and refuse every private-address mail host |

@@ -130,7 +130,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
 <tr><th>last_updated</th><td>2026-10-11</td></tr>
-<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 16 of 16 verified</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 20 of 20 verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
 <tr><th>last_verified_date</th><td>2026-10-11</td></tr>
 </tbody>
@@ -149,7 +149,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3 (Consumer feedback from Sevak). All 16 rows Verified on 2026-10-11. New today: disposing a local model while calls are inside no longer crashes the app (Sevak TR-RAG-053, REQ-RAG-129). Each call ends with <code>ObjectDisposedException</code>, and <code>DisposeAsync</code> was added. There are 4 tests and a live race on Linux and Windows. 2026-10-09 added <code>ModelChooser</code> (Chatur TR-RAG-006). Both ship in the next package after 1.1.2.</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak). All 20 rows Verified on 2026-10-11. New today, from Lekhak's provider page: the <code>openai-compatible/</code> and <code>anthropic-compatible/</code> routes (endpoint from the Base URL or an <code>@https://</code> suffix), a <code>venice</code> connector that switches off Venice's own system prompt, <code>LlmConnectorCatalog.Describe()</code> for settings pages, and an Anthropic endpoint-path fix (REQ-RAG-130 to 133). Both generic routes now require an API key (owner decision). Earlier today: REQ-RAG-129. All ship in the next package after 1.1.2.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
 <pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
@@ -173,19 +173,23 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>🔶 <strong>Release (after 1.1.2):</strong> create GitHub Release <code>v1.1.3</code> with the <code>RELEASE-NOTES.md</code> section, then run <em>Publish to NuGet.org</em> on that tag.
+<li>🔶 <strong>Release:</strong> GitHub Release <code>v1.1.3</code> with its <code>RELEASE-NOTES.md</code> section, then <em>Publish to NuGet.org</em> on that tag.
 </li>
-<li>🔶 <strong>Owner git:</strong> commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply in <code>Sevak/docs/Sevak-TechieRag-Feedback.md</code>).
+<li>🔶 <strong>Owner git:</strong> commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply).
 </li>
-<li>🔶 <strong>ONNX Runtime issue to post:</strong> ORT-001 in <code>docs/TechieRag-OnnxRuntime-Feedback.md</code> is ready; fill the macOS version.
+<li>🔶 <strong>No live Venice or GLM call:</strong> no key here; wire format tested on a loopback server, Venice <code>/models</code> checked live.
 </li>
-<li>🔶 <strong>Behaviour changes:</strong> default SQLite folder and repeat tool registration (REQ-RAG-121/122).
+<li>🔶 <strong>Gmail live test flaky:</strong> REQ-RAG-110 failed twice on Gmail IMAP search, then passed.
 </li>
-<li>🔶 <strong>Local model re-check:</strong> REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
+<li>🔶 <strong>ONNX Runtime issue:</strong> ORT-001 ready to post; fill the macOS version.
 </li>
-<li>🔶 <strong>Postgres (REQ-RAG-044):</strong> <code>TechieRagTestPostgres</code> is unset; live test skipped.
+<li>🔶 <strong>Behaviour changes:</strong> SQLite folder, tool re-registration (REQ-RAG-121/122), Anthropic endpoint path (REQ-RAG-133).
 </li>
-<li>🔶 <strong>Windows probe head not driven:</strong> the verify boot waits for a web view the native probe never opens (TechieFlow TF-006); rows were graded by their tests.
+<li>🔶 <strong>Local model re-check:</strong> REQ-RAG-057/059/063/065 skip below 4.6 GB free.
+</li>
+<li>🔶 <strong>Postgres (REQ-RAG-044):</strong> <code>TechieRagTestPostgres</code> unset; live test skipped.
+</li>
+<li>🔶 <strong>Windows probe head not driven</strong> (TechieFlow TF-006); rows graded by their tests.
 </li>
 <li>🔶 <strong>Keys in chat:</strong> OpenCode Go key and Gmail app password; rotate if shared.
 </li>
@@ -195,11 +199,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-06</td><td>fix-issues</td><td>11/11 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-07</td><td>triage-and-fix</td><td>12/12 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-08</td><td>fix-issues</td><td>14/14 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-09</td><td>triage-and-fix + handoff</td><td>15/15 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>16/16 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-11</td><td>triage-and-fix + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -208,7 +212,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
 </li>
-<li>TechieFlow: 2 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
+<li>TechieFlow: 3 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 </li>
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
@@ -234,7 +238,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>Update the Android emulator in Visual Studio's SDK.
 </li>
-<li>Model listing for Anthropic and Gemini (their own list calls), if a consumer asks.
+<li>Gemini model listing, if a consumer asks.
+</li>
+<li>Typed Venice switches (web search, thinking); the model-id suffix works today.
 </li>
 </ul>
   </main>

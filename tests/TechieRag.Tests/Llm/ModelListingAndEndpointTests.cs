@@ -76,7 +76,7 @@ public sealed class ModelListingAndEndpointTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => LlmModelLister.ListAsync(LlmConnectorCatalog.Require("openai"), null, handler, CancellationToken.None));
         await Assert.ThrowsAsync<NotSupportedException>(
-            () => LlmModelLister.ListAsync(LlmConnectorCatalog.Require("anthropic"), "test-key", handler, CancellationToken.None));
+            () => LlmModelLister.ListAsync(LlmConnectorCatalog.Require("gemini"), "test-key", handler, CancellationToken.None));
         Assert.Empty(handler.Requests);
 
         var failing = new RecordingHandler("""{"error":"down"}""", HttpStatusCode.InternalServerError);

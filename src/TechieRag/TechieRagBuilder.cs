@@ -428,6 +428,22 @@ public class TechieRagBuilder
     public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey = null)
         => ApplyRoute(ModelRouter.Require(modelName), apiKey);
 
+    /// <summary>
+    /// Configures the LLM by model name at the given endpoint, e.g. the app's Base URL for an
+    /// <c>openai-compatible/&lt;model&gt;</c> or <c>anthropic-compatible/&lt;model&gt;</c> route (REQ-RAG-130).
+    /// </summary>
+    /// <param name="modelName">A model name or route; an endpoint written on it (<c>…@https://host</c>) wins.</param>
+    /// <param name="apiKey">The API key for the service, or null for one that needs none.</param>
+    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the model name does not identify one service.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
+    /// <example>
+    /// <code>builder.UseLlmForModel("anthropic-compatible/glm-4.6", zaiKey, "https://api.z.ai/api/anthropic");</code>
+    /// </example>
+    public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey, string? endpoint)
+        => ApplyRoute(LlmProviderFactory.WithEndpoint(ModelRouter.Require(modelName), endpoint), apiKey);
+
     private TechieRagBuilder ApplyRoute(ModelRoute route, string? apiKey)
     {
         config.Llm = new LlmConfig
@@ -986,6 +1002,14 @@ public class TechieRagBuilder
         // configuration did not spell them out. An explicit endpoint always wins, so a proxied or
         // self-hosted deployment of the same service still overrides the catalog.
         var connector = LlmConnectorCatalog.Find(llmConfig.Connector);
+
+        // REQ-RAG-130: a generic connector stands for any service of its wire format, so it has no endpoint of
+        // its own; without one from configuration the Anthropic provider would fall back to api.anthropic.com.
+        if (connector is { RequiresEndpoint: true } && string.IsNullOrEmpty(llmConfig.Endpoint))
+        {
+            throw LlmProviderFactory.EndpointRequired(connector, llmConfig.Model);
+        }
+
         if (connector is not null && string.IsNullOrEmpty(llmConfig.Endpoint))
         {
             llmConfig = new LlmConfig
@@ -1008,7 +1032,10 @@ public class TechieRagBuilder
         // REQ-RAG-109: a service that reads a per-conversation session id names its header in the catalog.
         var sessionHeader = llmConfig.SessionHeader ?? connector?.SessionHeader;
 
-        return llmConfig.Source switch
+        // A connector named with an explicit endpoint and no source still takes the connector's wire format.
+        var source = llmConfig.Source == LlmSource.None && connector is not null ? connector.Source : llmConfig.Source;
+
+        return source switch
         {
             // REQ-RAG-064: the in-process model of TechieRag.Local; no endpoint, no key.
             LlmSource.Local => LocalLlmProviderRegistry.Create(llmConfig.Model, config.LoggerFactory),
@@ -1030,7 +1057,11 @@ public class TechieRagBuilder
                 llmConfig.Model,
                 llmConfig.Headers,
                 sessionHeader,
-                config.LoggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>()),
+                config.LoggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>())
+            {
+                // REQ-RAG-131: e.g. Venice's switch for its own system prompt.
+                BodyFields = connector?.RequestBodyFields
+            },
 
             LlmSource.AzureAIFoundry => new AzureAIFoundryLlmProvider(
                 llmConfig.Endpoint ?? throw new InvalidOperationException("Endpoint is required for Azure AI Foundry LLM provider."),
@@ -1056,7 +1087,7 @@ public class TechieRagBuilder
             // sign-in callback. Same exception as LlmProviderFactory.Create gives for the connector.
             LlmSource.Subscription => throw LlmProviderFactory.SubscriptionNeedsSignIn(SubscriptionConnectorFor(connector)),
 
-            _ => throw new InvalidOperationException($"Unsupported LLM source: {llmConfig.Source}")
+            _ => throw new InvalidOperationException($"Unsupported LLM source: {source}")
         };
     }
 

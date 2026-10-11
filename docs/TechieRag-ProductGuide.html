@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Product Guide</h1>
-    <div class="subtitle">Rendered 2026-09-25 &middot; source <code>TechieRag-ProductGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-ProductGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -220,7 +220,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <ol>
 <li>Pick one of six providers at build time: <code>UseOllamaLlm(endpoint, model)</code> or <code>UseLmStudioLlm(endpoint, model)</code> for a server on your own machine; <code>UseOpenAICompatibleLlm(endpoint, key, model)</code> for OpenAI, vLLM, Groq, Together or LocalAI; <code>UseAzureAIFoundryLlm</code> for an Azure deployment; <code>UseGeminiLlm(key)</code> for Google; <code>UseAnthropicLlm(key)</code> for Claude. <code>UseCustomLlmProvider</code> accepts your own.
 </li>
-<li>Or pick by model name alone: <code>UseLlmForModel("claude-sonnet-4-5")</code> or <code>UseLlmForModel("gpt-4o")</code> looks the name up in the built-in catalogue and builds the right provider; hand it the key as the second argument or through an environment variable.
+<li>Or pick by model name alone: <code>UseLlmForModel("claude-sonnet-4-5")</code> or <code>UseLlmForModel("gpt-4o")</code> looks the name up in the built-in catalogue and builds the right provider; hand it the key as the second argument or through an environment variable. For a service with no name in the catalogue, use <code>openai-compatible/&lt;model&gt;</code> or <code>anthropic-compatible/&lt;model&gt;</code> and give its address, either as the Base URL or after an <code>@</code> (<code>openai-compatible/glm-4.6@https://api.z.ai/api/paas/v4</code>); both need a key. <code>venice/&lt;model&gt;</code> reaches Venice AI. <code>LlmConnectorCatalog.Describe()</code> lists every route your settings page can offer.
 </li>
 <li>Run a model inside your app with <code>UseLocalLlm()</code> from the Local package. Give it <code>ConfirmTermsAsync</code> so your app can show the model's licence before anything downloads; the download states its size first, resumes if the app is closed halfway, and is checked file by file. No endpoint, no key, and it works offline. Names such as <code>local/qwen2.5-0.5b-instruct</code> route to it once <code>LocalLlm.Register()</code> has run.
 </li>

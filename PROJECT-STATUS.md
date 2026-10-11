@@ -1,7 +1,7 @@
 ---
 project: TechieRag
 last_updated: 2026-10-11
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 16 of 16 verified
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 20 of 20 verified
 last_verified_build: PASS
 last_verified_date: 2026-10-11
 ---
@@ -10,7 +10,7 @@ last_verified_date: 2026-10-11
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak). All 16 rows Verified on 2026-10-11. New today: disposing a local model while calls are inside no longer crashes the app (Sevak TR-RAG-053, REQ-RAG-129). Each call ends with `ObjectDisposedException`, and `DisposeAsync` was added. There are 4 tests and a live race on Linux and Windows. 2026-10-09 added `ModelChooser` (Chatur TR-RAG-006). Both ship in the next package after 1.1.2.
+Phase 3 of 3 (Consumer feedback from Sevak). All 20 rows Verified on 2026-10-11. New today, from Lekhak's provider page: the `openai-compatible/` and `anthropic-compatible/` routes (endpoint from the Base URL or an `@https://` suffix), a `venice` connector that switches off Venice's own system prompt, `LlmConnectorCatalog.Describe()` for settings pages, and an Anthropic endpoint-path fix (REQ-RAG-130 to 133). Both generic routes now require an API key (owner decision). Earlier today: REQ-RAG-129. All ship in the next package after 1.1.2.
 
 ## Next command to run
 
@@ -38,13 +38,15 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 
 ## Known blockers
 
-- 🔶 **Release (after 1.1.2):** create GitHub Release `v1.1.3` with the `RELEASE-NOTES.md` section, then run *Publish to NuGet.org* on that tag.
-- 🔶 **Owner git:** commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply in `Sevak/docs/Sevak-TechieRag-Feedback.md`).
-- 🔶 **ONNX Runtime issue to post:** ORT-001 in `docs/TechieRag-OnnxRuntime-Feedback.md` is ready; fill the macOS version.
-- 🔶 **Behaviour changes:** default SQLite folder and repeat tool registration (REQ-RAG-121/122).
-- 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
-- 🔶 **Postgres (REQ-RAG-044):** `TechieRagTestPostgres` is unset; live test skipped.
-- 🔶 **Windows probe head not driven:** the verify boot waits for a web view the native probe never opens (TechieFlow TF-006); rows were graded by their tests.
+- 🔶 **Release:** GitHub Release `v1.1.3` with its `RELEASE-NOTES.md` section, then *Publish to NuGet.org* on that tag.
+- 🔶 **Owner git:** commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply).
+- 🔶 **No live Venice or GLM call:** no key here; wire format tested on a loopback server, Venice `/models` checked live.
+- 🔶 **Gmail live test flaky:** REQ-RAG-110 failed twice on Gmail IMAP search, then passed.
+- 🔶 **ONNX Runtime issue:** ORT-001 ready to post; fill the macOS version.
+- 🔶 **Behaviour changes:** SQLite folder, tool re-registration (REQ-RAG-121/122), Anthropic endpoint path (REQ-RAG-133).
+- 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free.
+- 🔶 **Postgres (REQ-RAG-044):** `TechieRagTestPostgres` unset; live test skipped.
+- 🔶 **Windows probe head not driven** (TechieFlow TF-006); rows graded by their tests.
 - 🔶 **Keys in chat:** OpenCode Go key and Gmail app password; rotate if shared.
 
 ## Verification log
@@ -53,17 +55,17 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-06 | fix-issues | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-10-07 | triage-and-fix | 12/12 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-08 | fix-issues | 14/14 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-09 | triage-and-fix + handoff | 15/15 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | fix-issues + handoff | 16/16 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-11 | triage-and-fix + handoff | 20/20 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-11 | fix-issues + handoff | 20/20 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
 - OnnxRuntime: 1 open · 0 closed — docs/TechieRag-OnnxRuntime-Feedback.md
 - OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
-- TechieFlow: 2 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
+- TechieFlow: 3 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 
 ## Standards compliance
 
@@ -79,4 +81,5 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 - OpenCode Go models on `/responses` and `/messages`.
 - Rename TechieDesk to Sevak in about 15 XML doc comments.
 - Update the Android emulator in Visual Studio's SDK.
-- Model listing for Anthropic and Gemini (their own list calls), if a consumer asks.
+- Gemini model listing, if a consumer asks.
+- Typed Venice switches (web search, thinking); the model-id suffix works today.

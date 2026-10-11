@@ -147,6 +147,12 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <remarks>Test seam for REQ-RAG-034: lets endpoint composition be asserted without a network call.</remarks>
     internal Uri EffectiveCompletionsUri => new(httpClient.BaseAddress!, completionsPath);
 
+    /// <summary>
+    /// Gets the top-level fields added to every request body, from the connector's
+    /// <see cref="LlmConnectorDescriptor.RequestBodyFields"/> (REQ-RAG-131); a field the provider sets itself wins.
+    /// </summary>
+    internal IReadOnlyDictionary<string, object>? BodyFields { get; init; }
+
     /// <summary>The header the session id travels in, or null for none.</summary>
     /// <remarks>Test seam for REQ-RAG-109: lets connector wiring be asserted without a network call.</remarks>
     internal string? SessionHeaderName => sessionHeader;
@@ -371,6 +377,14 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
             if (options.ToolChoice is not null)
                 request["tool_choice"] = options.ToolChoice;
+        }
+
+        if (BodyFields is not null)
+        {
+            foreach (var field in BodyFields)
+            {
+                request.TryAdd(field.Key, field.Value);
+            }
         }
 
         return request;
