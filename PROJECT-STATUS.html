@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-10-09</div>
+    <div class="sub">Last rendered: 2026-10-11</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,7 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
       <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, then build and publish the package — its shipped documents are current; no agent command</div>
@@ -129,10 +129,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-10-09</td></tr>
-<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 15 of 15 verified</td></tr>
+<tr><th>last_updated</th><td>2026-10-11</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 16 of 16 verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-10-09</td></tr>
+<tr><th>last_verified_date</th><td>2026-10-11</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,7 +149,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3 (Consumer feedback from Sevak). All 15 rows Verified on 2026-10-09. New today: <code>ModelChooser</code>, where a small model picks the model for a request (Chatur TR-RAG-006, REQ-RAG-128). It has 6 tests and a live run on qwen2.5-0.5b. The AI reference, DevGuide, UsageGuide, release notes and the reply in Chatur's feedback file are current. Everything ships in the next package after 1.1.2.</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak). All 16 rows Verified on 2026-10-11. New today: disposing a local model while calls are inside no longer crashes the app (Sevak TR-RAG-053, REQ-RAG-129). Each call ends with <code>ObjectDisposedException</code>, and <code>DisposeAsync</code> was added. There are 4 tests and a live race on Linux and Windows. 2026-10-09 added <code>ModelChooser</code> (Chatur TR-RAG-006). Both ship in the next package after 1.1.2.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
 <pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
@@ -175,7 +175,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <ul>
 <li>🔶 <strong>Release (after 1.1.2):</strong> create GitHub Release <code>v1.1.3</code> with the <code>RELEASE-NOTES.md</code> section, then run <em>Publish to NuGet.org</em> on that tag.
 </li>
-<li>🔶 <strong>Owner git:</strong> commit TechieRag and Chatur (TR-RAG-006 reply in <code>Chatur/docs/Chatur-TechieRag-Feedback.md</code>).
+<li>🔶 <strong>Owner git:</strong> commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply in <code>Sevak/docs/Sevak-TechieRag-Feedback.md</code>).
 </li>
 <li>🔶 <strong>ONNX Runtime issue to post:</strong> ORT-001 in <code>docs/TechieRag-OnnxRuntime-Feedback.md</code> is ready; fill the macOS version.
 </li>
@@ -195,11 +195,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-06</td><td>handoff-phase</td><td>11/11 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-06</td><td>fix-issues</td><td>11/11 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-07</td><td>triage-and-fix</td><td>12/12 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-08</td><td>fix-issues</td><td>14/14 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-09</td><td>triage-and-fix + handoff</td><td>15/15 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>16/16 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>

@@ -26,10 +26,16 @@ namespace TechieRag.Local;
 /// call (or <see cref="LoadAsync"/>) accepts the terms, downloads once into the model root, verifies
 /// SHA-256, checks free memory, then loads.</para>
 /// <para><b>One answer at a time.</b> A loaded model holds one context; concurrent calls queue.</para>
+/// <para><b>Dispose while calls are inside</b> (REQ-RAG-129, Sevak TR-RAG-053). <see cref="Dispose"/>
+/// refuses new calls, cancels the load, the queue and the generation of every call already inside, and
+/// returns without blocking. Each of those calls ends with <see cref="ObjectDisposedException"/> at its
+/// next step, before it touches the model again. The model's native memory is freed when the last call
+/// has left, never under a running token. <see cref="DisposeAsync"/> does the same and completes once the
+/// memory is freed, so a host can load the next model after it.</para>
 /// <para><b>Not supported:</b> tool calling (<see cref="SupportsToolCalling"/> is false until a test
 /// proves otherwise, REQ-RAG-063), images, and a per-call model other than the loaded one.</para>
 /// </remarks>
-public sealed class LocalLlmProvider : ILlmProvider, IDisposable
+public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable
 {
     private const string JsonSystemPrompt = "You are a helpful assistant that responds only with valid JSON.";
 
@@ -43,9 +49,13 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     private readonly SemaphoreSlim loadGate = new(1, 1);
     private readonly SemaphoreSlim generateGate = new(1, 1);
     private readonly bool isPhone;
+    private readonly object lifetimeLock = new();
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly TaskCompletionSource released = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ILocalLlmModel? loaded;
     private ILocalTokenizer? tokenizer;
-    private bool disposed;
+    private int activeCalls;
+    private volatile bool disposed;
 
     /// <summary>
     /// Creates a provider for this platform; nothing is downloaded or loaded until first use.
@@ -115,6 +125,18 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     /// <summary>Gets whether the model is loaded and ready to answer.</summary>
     public bool IsLoaded => loaded is not null;
 
+    /// <summary>Gets how many calls are inside the provider now (loading, queued or generating).</summary>
+    internal int ActiveCalls
+    {
+        get
+        {
+            lock (lifetimeLock)
+            {
+                return activeCalls;
+            }
+        }
+    }
+
     /// <inheritdoc/>
     public string Name => "Local";
 
@@ -168,9 +190,27 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     /// <exception cref="LocalModelIntegrityException">A downloaded file failed its hash check.</exception>
     /// <exception cref="LocalModelMemoryException">The device has too little free memory.</exception>
     /// <exception cref="HttpRequestException">A Hugging Face model's metadata could not be fetched.</exception>
+    /// <exception cref="ObjectDisposedException">The provider was disposed before or during the load.</exception>
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(disposed, this);
+        Enter();
+        try
+        {
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
+            await WhileAliveAsync(LoadCoreAsync(linked.Token), cancellationToken).ConfigureAwait(false);
+            ThrowIfDisposed();
+        }
+        finally
+        {
+            Exit();
+        }
+    }
+
+    /// <summary>Loads the model; the caller has entered (<see cref="Enter"/>) and passes a token the dispose cancels.</summary>
+    /// <param name="cancellationToken">The caller's token linked to this provider's lifetime.</param>
+    /// <returns>A task that completes when the model is loaded.</returns>
+    private async Task LoadCoreAsync(CancellationToken cancellationToken)
+    {
         if (loaded is not null)
         {
             return;
@@ -329,23 +369,124 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
             return 0;
         }
 
-        var counter = (ILocalTokenizer?)loaded ?? TryLoadTokenizer();
-        return counter?.CountTokens(text) ?? (int)Math.Ceiling(text.Length / 4.0);
+        Enter();
+        try
+        {
+            var counter = (ILocalTokenizer?)loaded ?? TryLoadTokenizer();
+            return counter?.CountTokens(text) ?? (int)Math.Ceiling(text.Length / 4.0);
+        }
+        finally
+        {
+            Exit();
+        }
     }
 
-    /// <summary>Unloads the model and frees its memory.</summary>
+    /// <summary>
+    /// Unloads the model: refuses new calls, cancels every call inside (each ends with
+    /// <see cref="ObjectDisposedException"/>), and frees the native memory once the last has left.
+    /// Returns without waiting for them.
+    /// </summary>
     public void Dispose()
     {
-        if (disposed)
+        bool releaseNow;
+        lock (lifetimeLock)
         {
-            return;
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            releaseNow = activeCalls == 0;
         }
 
-        disposed = true;
+        // Cancel after the flag is set, so a call woken by the cancellation sees it.
+        lifetime.Cancel();
+        if (releaseNow)
+        {
+            ReleaseNative();
+        }
+    }
+
+    /// <summary>
+    /// Unloads the model as <see cref="Dispose"/> does and completes once every call has left and the
+    /// native memory is freed.
+    /// </summary>
+    /// <returns>A task that completes when the model's memory is freed.</returns>
+    public async ValueTask DisposeAsync()
+    {
+        Dispose();
+        await released.Task.ConfigureAwait(false);
+    }
+
+    /// <summary>Registers a call inside the provider, refusing it once disposed.</summary>
+    /// <exception cref="ObjectDisposedException">The provider was disposed.</exception>
+    private void Enter()
+    {
+        lock (lifetimeLock)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            activeCalls++;
+        }
+    }
+
+    /// <summary>Ends a call; the last call to leave a disposed provider frees the native model.</summary>
+    private void Exit()
+    {
+        bool releaseNow;
+        lock (lifetimeLock)
+        {
+            activeCalls--;
+            releaseNow = disposed && activeCalls == 0;
+        }
+
+        if (releaseNow)
+        {
+            ReleaseNative();
+        }
+    }
+
+    /// <summary>Frees the model, the tokenizer and the gates; runs once, when no call is inside.</summary>
+    private void ReleaseNative()
+    {
         loaded?.Dispose();
+        loaded = null;
         tokenizer?.Dispose();
+        tokenizer = null;
         loadGate.Dispose();
         generateGate.Dispose();
+        released.TrySetResult();
+    }
+
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(disposed, this);
+
+    /// <summary>Awaits a step, turning a cancellation caused by <see cref="Dispose"/> into <see cref="ObjectDisposedException"/>.</summary>
+    /// <param name="step">The step.</param>
+    /// <param name="callerToken">The caller's own token; its cancellation stays an <see cref="OperationCanceledException"/>.</param>
+    /// <returns>A task that completes with the step.</returns>
+    private async Task WhileAliveAsync(Task step, CancellationToken callerToken)
+    {
+        try
+        {
+            await step.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (disposed && !callerToken.IsCancellationRequested)
+        {
+            throw new ObjectDisposedException(nameof(LocalLlmProvider), exception);
+        }
+    }
+
+    /// <inheritdoc cref="WhileAliveAsync(Task, CancellationToken)"/>
+    private async Task<bool> WhileAliveAsync(ValueTask<bool> step, CancellationToken callerToken)
+    {
+        try
+        {
+            return await step.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (disposed && !callerToken.IsCancellationRequested)
+        {
+            throw new ObjectDisposedException(nameof(LocalLlmProvider), exception);
+        }
     }
 
     private async IAsyncEnumerable<LlmStreamEvent> StreamCoreAsync(
@@ -356,56 +497,81 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable
     {
         ArgumentNullException.ThrowIfNull(messages);
         RefuseUnsupported(callOptions);
-        await LoadAsync(cancellationToken).ConfigureAwait(false);
-        var model = loaded!;
 
-        var conversation = PrepareConversation(messages, callOptions);
-        var prompt = Model.ChatTemplate == LocalChatTemplate.ModelDefined
-            ? model.ApplyChatTemplate(ChatTemplateFormatter.ToMessagesJson(conversation))
-            : ChatTemplateFormatter.Format(Model.ChatTemplate, conversation);
-        var promptTokens = model.CountTokens(prompt);
-        if (promptTokens >= ContextSize)
-        {
-            throw new LocalPromptTooLongException(Model.Id, promptTokens, ContextSize);
-        }
-
-        var settings = BuildSettings(callOptions, ContextSize - promptTokens);
-        var filter = new StopSequenceFilter(settings.StopSequences);
-        await generateGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // REQ-RAG-129 (Sevak TR-RAG-053): the call is counted from here to its last step, so the native
+        // model is never freed under it, and the flag is checked after every await before the model is used.
+        Enter();
         try
         {
-            var watch = Stopwatch.StartNew();
-            var produced = 0;
-            await foreach (var piece in model.GenerateAsync(prompt, settings, cancellationToken)
-                               .WithCancellation(cancellationToken).ConfigureAwait(false))
-            {
-                produced++;
-                var text = filter.Push(piece);
-                if (text.Length > 0)
-                {
-                    yield return LlmStreamEvent.FromText(text);
-                }
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
+            var token = linked.Token;
+            await WhileAliveAsync(LoadCoreAsync(token), cancellationToken).ConfigureAwait(false);
+            ThrowIfDisposed();
+            var model = loaded!;
 
-                if (filter.Stopped || produced >= settings.MaxTokens)
-                {
-                    break;
-                }
+            var conversation = PrepareConversation(messages, callOptions);
+            var prompt = Model.ChatTemplate == LocalChatTemplate.ModelDefined
+                ? model.ApplyChatTemplate(ChatTemplateFormatter.ToMessagesJson(conversation))
+                : ChatTemplateFormatter.Format(Model.ChatTemplate, conversation);
+            var promptTokens = model.CountTokens(prompt);
+            if (promptTokens >= ContextSize)
+            {
+                throw new LocalPromptTooLongException(Model.Id, promptTokens, ContextSize);
             }
 
-            var rest = filter.Flush();
-            if (rest.Length > 0)
+            var settings = BuildSettings(callOptions, ContextSize - promptTokens);
+            var filter = new StopSequenceFilter(settings.StopSequences);
+            await WhileAliveAsync(generateGate.WaitAsync(token), cancellationToken).ConfigureAwait(false);
+            try
             {
-                yield return LlmStreamEvent.FromText(rest);
-            }
+                ThrowIfDisposed();
+                var watch = Stopwatch.StartNew();
+                var produced = 0;
+                var pieces = model.GenerateAsync(prompt, settings, token).GetAsyncEnumerator(token);
+                try
+                {
+                    while (await WhileAliveAsync(pieces.MoveNextAsync(), cancellationToken).ConfigureAwait(false))
+                    {
+                        ThrowIfDisposed();
+                        produced++;
+                        var text = filter.Push(pieces.Current);
+                        if (text.Length > 0)
+                        {
+                            yield return LlmStreamEvent.FromText(text);
+                            ThrowIfDisposed();
+                        }
 
-            var finishReason = !filter.Stopped && produced >= settings.MaxTokens ? "length" : "stop";
-            var usage = new TokenUsage { InputTokens = promptTokens, OutputTokens = produced, ModelName = Model.Id, ProviderName = Name };
-            RaiseCompleted(usage, watch.Elapsed, isStreaming);
-            yield return LlmStreamEvent.FromCompleted(usage, finishReason, Model.Id);
+                        if (filter.Stopped || produced >= settings.MaxTokens)
+                        {
+                            break;
+                        }
+                    }
+                }
+                finally
+                {
+                    await pieces.DisposeAsync().ConfigureAwait(false);
+                }
+
+                var rest = filter.Flush();
+                if (rest.Length > 0)
+                {
+                    yield return LlmStreamEvent.FromText(rest);
+                    ThrowIfDisposed();
+                }
+
+                var finishReason = !filter.Stopped && produced >= settings.MaxTokens ? "length" : "stop";
+                var usage = new TokenUsage { InputTokens = promptTokens, OutputTokens = produced, ModelName = Model.Id, ProviderName = Name };
+                RaiseCompleted(usage, watch.Elapsed, isStreaming);
+                yield return LlmStreamEvent.FromCompleted(usage, finishReason, Model.Id);
+            }
+            finally
+            {
+                generateGate.Release();
+            }
         }
         finally
         {
-            generateGate.Release();
+            Exit();
         }
     }
 

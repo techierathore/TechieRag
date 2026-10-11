@@ -229,6 +229,28 @@ The reads are the ones the load uses, so a host's answer and the load agree. Wit
 
 **Calculations on this service:** required bytes = weight bytes + `KvBytesPerToken` × context size + 256 MB (`LocalModel.cs:348`); context size = the asked size, else 2,048 on a phone and 4,096 elsewhere, never above `ContextLength` (`LocalModel.cs:385`).
 
+### Local model lifetime: `LocalLlmProvider.Dispose`, `DisposeAsync` (`TechieRag.Local`)
+
+![The probe's local-model screen on Mac Catalyst, September 2026: the generate path a dispose now cancels safely; it predates this change](screenshots/TechieRag/probe-maccatalyst-generate.png)
+
+REQ-RAG-129 (Sevak TR-RAG-053, added 2026-10-11). Covered by `tests/TechieRag.Local.Tests/LocalProviderDisposeTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: no sample disposes during a call. A scratch console app ran Sevak's case on 2026-10-11 with qwen2.5-0.5b on the real engine: one call generating, two queued, then `DisposeAsync`, five rounds each on Linux and Windows. Every call ended with `ObjectDisposedException` (one Windows call had finished first), the memory was freed 0.15 to 0.43 s later, and the process stayed alive. Phi-3, the model in Sevak's crash, did not fit the Windows laptop's free memory that day. Tests run 2026-10-11: REQ-RAG-129 4 passed, 20 repeat runs clean.
+
+**Call chain:** a call: `StreamCoreAsync` → `Enter` (counts the call; refused once disposed) → `LoadCoreAsync` → `generateGate.WaitAsync` → `GenerateAsync` pieces, the flag checked after every await and every yield → `Exit`. Dispose: `Dispose` → flag set under `lifetimeLock` → `lifetime.Cancel()` → `ReleaseNative` now if no call is inside, else from the last `Exit`.
+
+The token a call passes down links the caller's token with `lifetime`. A cancellation that comes from the dispose becomes `ObjectDisposedException` in `WhileAliveAsync`; one from the caller stays `OperationCanceledException`. A native token step cannot be interrupted, so the model waits for it rather than being freed under it. `OnnxGenAiModel` also refuses every member after its own dispose, as a second guard.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag.Local/LocalLlmProvider.cs:503` | `StreamCoreAsync` | `activeCalls` | one more for each call inside |
+| `src/TechieRag.Local/LocalLlmProvider.cs:404` | `Dispose` | `lifetime.IsCancellationRequested` | true; queued calls wake with `ObjectDisposedException` |
+| `src/TechieRag.Local/LocalLlmProvider.cs:434` | `Exit` | `releaseNow` | true only for the last call leaving a disposed provider |
+| `src/TechieRag.Local/LocalLlmProvider.cs:450` | `ReleaseNative` | `loaded` | disposed once, then null |
+| `src/TechieRag.Local/LocalLlmProvider.cs:535` | `StreamCoreAsync` | `disposed` | checked after each token, before the model is used again |
+
+**Calculations on this service:** none.
+
 ### Model routing: `LlmProviderFactory.ListModelsAsync`, `CreateForModel(…, endpoint)` (`TechieRag`)
 
 ![Sevak's LLM settings screen, July 2026: where a host lists a service's models and names its address; it predates this change](screenshots/TechieRag/llm-settings.png)

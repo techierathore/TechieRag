@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 3: Consumer feedback from Sevak</h1>
-    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-P3-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-P3-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -122,6 +122,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flow-step-names-and-model-use">Flow step names and model use</a></li>
         <li class="h3"><a href="#local-model-fit-check">Local model fit check</a></li>
         <li class="h3"><a href="#model-routing">Model routing</a></li>
+        <li class="h3"><a href="#local-model-lifetime">Local model lifetime</a></li>
         <li><a href="#development-status">5. Development status</a></li>
         <li><a href="#where-the-rest-lives">6. Where the rest lives</a></li>
       </ol>
@@ -138,7 +139,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-188 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak; BRD-188 on 2026-10-09, a small-model chooser, from Chatur). Each item names the Sevak feedback entry it answers.</p>
+<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-189 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak; BRD-188 on 2026-10-09, a small-model chooser, from Chatur; BRD-189 on 2026-10-11, a safe dispose for local models, from Sevak). Each item names the Sevak feedback entry it answers.</p>
 <h2 id="screens-and-flow"><a id="2-screens-and-flow"></a>2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -151,7 +152,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Storage defaults</td><td><code>UseSqliteVec()</code>, <code>PersistenceConfig.ConnectionString</code>, the data folder</td><td>App developer</td><td>— (library, no mockup)</td><td>database path, data root, app name</td></tr>
 <tr><td>Flow step names and model use</td><td><code>FlowNodeCatalog</code>, <code>FlowDefinition</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>step name, uses a model</td></tr>
 <tr><td>Local model fit check</td><td><code>LocalLlmProvider</code>, <code>LocalModel</code>, <code>AvailableMemory</code></td><td>App developer</td><td>— (library, no mockup)</td><td>runtime available, memory needed, memory free, download progress</td></tr>
-<tr><td>Model routing</td><td><code>LlmProviderFactory.ListModelsAsync</code>, <code>LlmProviderFactory.CreateForModel</code></td><td>App developer</td><td>— (library, no mockup)</td><td>connector, endpoint, model ids</td></tr>
+<tr><td>Model routing</td><td><code>LlmProviderFactory.ListModelsAsync</code>, <code>LlmProviderFactory.CreateForModel</code>, <code>ModelChooser</code></td><td>App developer</td><td>— (library, no mockup)</td><td>connector, endpoint, model ids, candidates, chosen model, reason</td></tr>
+<tr><td>Local model lifetime</td><td><code>LocalLlmProvider.Dispose</code>, <code>LocalLlmProvider.DisposeAsync</code></td><td>App developer</td><td>— (library, no mockup)</td><td>calls inside, memory freed</td></tr>
 </tbody>
 </table>
 <p><strong>Primary journey:</strong></p>
@@ -287,15 +289,26 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 </li>
 </ul>
+<h3 id="local-model-lifetime">Local model lifetime<a class="anchor-link" href="#local-model-lifetime">#</a></h3>
+<p>A host can unload or swap a local model while calls are still using it, and the process never crashes.</p>
+<ul>
+<li><strong>BRD-189</strong> — Disposing a local model provider shall cancel or wait for the calls already inside it, free the native model only once none is left, and make every call that resumes afterwards throw ObjectDisposedException before it touches the model <em>(Sevak feedback TR-RAG-053, added 2026-10-11)</em> <em>Screen:</em> Local model lifetime
+<ul>
+<li><em>Acceptance:</em> When a developer disposes a local provider on Local model lifetime while three calls are inside, then each ends with ObjectDisposedException and the model is freed once.
+</li>
+</ul>
+</li>
+</ul>
 <h2 id="development-status"><a id="5-development-status"></a>5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-09.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-10-11.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
 <tr><td>RAG / AI requirements</td><td>11</td><td>11</td><td>0</td><td>Done</td></tr>
 <tr><td>Local model fit check</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Model routing</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
+<tr><td>Local model lifetime</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>
 <h2 id="where-the-rest-lives"><a id="6-where-the-rest-lives"></a>6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>

@@ -193,6 +193,12 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** 1) all three answer with no request sent 2) `LocalModelMemoryException` before the terms are asked and before any byte is requested 3) every report names this model and the last is `Completed`.
 - **Covers:** REQ-RAG-125
 
+### Local model unload while answering (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) load a local model and start three `ChatAsync` calls at once 2) while the first answers, `await provider.DisposeAsync()` 3) call `ChatAsync` again
+- **Expected:** 1–2) all three calls end with `ObjectDisposedException`, `DisposeAsync` completes within a second, the app keeps running 3) `ObjectDisposedException` at once.
+- **Covers:** REQ-RAG-129
+
 ### Model routing: listing, endpoint and model choice (phase 3)
 - **Sign in as:** user 1
 - **Steps:** 1) `LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "<LM Studio URL>")` 2) `CreateForModel("lmstudio/<id>", null, endpoint: "<LM Studio URL>")` and chat 3) `new ModelChooser(<small model>).ChooseAsync("hi", [fast, deep])` with a "fast" and a "deep" `ModelCandidate` 4) the same with "Review this C# class for thread-safety bugs." 5) stop the small model's server and choose again

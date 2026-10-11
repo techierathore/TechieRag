@@ -422,7 +422,7 @@ A custom `ILlmProvider` that implements `ChatStreamAsync` on top of the typed me
 
 ### 2. Local model: `TechieRag.Local`
 
-Package `TechieRag.Local` (depends on `TechieRag.Embedded`); namespace `TechieRag.Local`. One provider, `LocalLlmProvider : ILlmProvider`, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws `PlatformNotSupportedException` on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. `SupportsToolCalling` is false; a request with tools is refused. A MAUI app writes no native wiring: the package's `buildTransitive` targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.
+Package `TechieRag.Local` (depends on `TechieRag.Embedded`); namespace `TechieRag.Local`. One provider, `LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable`, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws `PlatformNotSupportedException` on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. `SupportsToolCalling` is false; a request with tools is refused. A MAUI app writes no native wiring: the package's `buildTransitive` targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.
 
 | Model | Id | Where it is the default | Download | Licence |
 |-------|----|-------------------------|----------|---------|
@@ -1312,6 +1312,17 @@ using var provider = new LocalLlmProvider(new LocalLlmOptions
 var needed = provider.Model.EstimateRequiredMemoryBytes(provider.ContextSize);
 var free = AvailableMemory.Read();
 var canOffer = LocalLlmProvider.IsRuntimeAvailable && (needed is null || free is null || free >= needed);
+```
+
+### Local model lifetime: dispose while calls are inside
+
+Package `TechieRag.Local`; namespace `TechieRag.Local` (REQ-RAG-129, Sevak TR-RAG-053). `LocalLlmProvider.Dispose()` may be called while calls are loading, queued or generating. It refuses new calls, cancels the ones inside, and returns without blocking. Each of those calls ends with `ObjectDisposedException` at its next step, before it touches the model again; a caller's own cancellation stays `OperationCanceledException`. The native model is freed when the last call has left, never under a running token (one token step, about 0.3 s on a CPU). `await provider.DisposeAsync()` does the same and completes once the memory is freed, so await it before loading the next model. Every call made after the dispose, `EstimateTokenCount` included, throws `ObjectDisposedException`. A stream a host stops reading is freed when its `await foreach` ends.
+
+```csharp
+await oldProvider.DisposeAsync();            // calls still inside end with ObjectDisposedException
+var next = LocalLlm.Create("phi-3-mini-4k-instruct");
+try { reply = await oldProvider.ChatAsync(messages); }
+catch (ObjectDisposedException) { /* the model was unloaded or swapped: retry on `next` */ }
 ```
 
 ### Choosing a model for a piece of work: `ModelChooser`
