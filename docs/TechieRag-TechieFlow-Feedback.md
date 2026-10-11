@@ -117,6 +117,21 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Workaround:** none needed. The verdict graded the rows by their tests, and the report says the app was not booted.
 - **Suggested fix:** check for `AddMauiBlazorWebView` or a `BlazorWebView` in the project before choosing `windows`. Stop the relay on a failed start.
 
+### TF-007 — the Stop hook tells you to run a BRD-status command that does nothing for another phase
+
+- **Severity:** minor
+- **Blocks:** no — `tf-brd-status.sh TechieRag --phase 2` worked, and the gate passed.
+- **Repro:** in a Large project, change a phase-2 checklist while `appPhase` is 3 (here a `tf-triage.sh note` on REQ-RAG-110), then end the turn. `guard-status-html.sh` says:
+  ```text
+  docs/TechieRag-P2-BRD.md is older than docs/TechieRag-P2-Checklist.md. Run: bash .tfcore/utils/tf-brd-status.sh TechieRag-P2
+  ```
+  Running that prints `docs/TechieRag-P2-P3-Checklist.md does not exist yet; nothing to do`.
+- **Expected:** the hook prints `bash .tfcore/utils/tf-brd-status.sh TechieRag --phase 2`.
+- **Actual:** it passes the file stem `TechieRag-P2` as the app name. The script then adds `-P3-` from `appPhase` and finds no file.
+- **Encountered in:** the follow-up `*fix-issues` run after `*triage-and-fix TechieRag`, 2026-10-11.
+- **Workaround:** run `tf-brd-status.sh <App> --phase N` by hand.
+- **Suggested fix:** in `guard-status-html.sh`, split `<App>-P<n>` into the app name and `--phase <n>` when it builds the command.
+
 ## Replies from TechieFlow
 
 <!-- The upstream team's answers, newest block first. Left in full: this is the record. -->

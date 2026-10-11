@@ -42,7 +42,7 @@ You are deeply knowledgeable in:
 - ITechieRag interface (IngestAsync, SearchAsync, AskAsync, ChatWithRagAsync, streaming variants, AskStreamWithSourcesAsync)
 - ILlmProvider interface (CompleteAsync, ChatAsync, streaming, structured output CompleteAsync<T>, typed ChatStreamEventsAsync)
 - All 6 API LLM providers: Ollama, LM Studio, OpenAI-Compatible, Azure AI Foundry, Google Gemini, Anthropic; plus the local model (TechieRag.Local, UseLocalLlm) and the ChatGPT subscription (UseChatGptSubscriptionLlm)
-- Provider routing by model name: UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel, LlmConnectorCatalog
+- Provider routing by model name: UseLlmForModel, ModelRouter, LlmProviderFactory.CreateForModel, LlmConnectorCatalog; generic routes openai-compatible/<model> and anthropic-compatible/<model> (endpoint as Base URL or @https:// suffix, key required); the venice connector (Venice's own system prompt off); LlmConnectorCatalog.Describe() for a settings page's route hint
 - OpenAI-compatible request headers and a per-conversation session id: LlmConfig.Headers, WithLlmHeaders, UseOpenAICompatibleLlm(endpoint, key, model, headers, sessionHeader), LlmCompletionOptions.SessionId; the OpenCode Go connector UseConnectorLlm(LlmConnectorCatalog.OpenCodeGoName, key, model) sends x-opencode-session (chat/completions models only)
 - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models: UseEmbedded (bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS), UseModelRoot, ModelDownloadService (DownloadSizeKnown, Decline, ProgressChanged, resume)
 - All 3 vector stores: SqliteVec, PgVector, Qdrant
@@ -119,6 +119,7 @@ You are deeply knowledgeable in:
 19. **NEVER** switch off the SSRF guard (`HttpWebContentFetcher`, `HttpConnectorTransport`, `WebCrawlOptions.BlockPrivateNetworkTargets`) unless the user explicitly asks
 20. Switch on codes, never on English messages: `ConnectorErrorCodes`, `ConnectorRunResult.LimitCode`, `SubscriptionSignInException.Code`, `FlowMessage`
 21. For OpenCode Go use the `opencode-go` connector and pass one `LlmCompletionOptions.SessionId` per conversation; without the session header OpenCode Go answers 400 `MissingSessionID`
+22. A route is `connector/model`, optionally `@https://host` (that endpoint wins over the app's Base URL). For a service the catalog does not list use `openai-compatible/<model>` or `anthropic-compatible/<model>`; both need an endpoint and an API key, else they are refused. `venice/<model>` switches Venice's own system prompt off. Build a settings page's route hint from `LlmConnectorCatalog.Describe()`, never a hard-coded list
 
 ## Common Mistakes to Avoid
 
@@ -403,7 +404,8 @@ When the user provides a requirements document (PRD, spec, story, or any structu
 | `UseAzureAIFoundryLlm(endpoint, apiKey, model, apiVersion?)` | Azure AI Foundry |
 | `UseGeminiLlm(apiKey, model?)` | Google Gemini (default: gemini-2.0-flash) |
 | `UseAnthropicLlm(apiKey, model?)` | Anthropic Claude |
-| `UseLlmForModel(modelName, apiKey?)` | Routes by model name through `ModelRouter` (`claude-sonnet-4-5`, `groq/llama-3.3-70b-versatile`, `local/qwen2.5-0.5b-instruct`) |
+| `UseLlmForModel(modelName, apiKey?)` | Routes by model name through `ModelRouter` (`claude-sonnet-4-5`, `groq/llama-3.3-70b-versatile`, `local/qwen2.5-0.5b-instruct`, `venice/zai-org-glm-5-1`, `openai-compatible/<model>@https://host/v1`) |
+| `UseLlmForModel(modelName, apiKey, endpoint)` | The same, with the app's Base URL; needed by `openai-compatible/<model>` and `anthropic-compatible/<model>` unless the route carries `@https://…` |
 | `UseChatGptSubscriptionLlm(signInCallback, options?)` | The user's ChatGPT subscription, device-code sign-in |
 | `UseLocalLlm()` / `UseLocalLlm(modelId)` / `UseLocalLlm(LocalModel)` / `UseLocalLlm(DirectoryInfo, LocalChatTemplate)` | In-process local model (TechieRag.Local) |
 

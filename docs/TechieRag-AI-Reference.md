@@ -776,11 +776,12 @@ Package `TechieRag`; namespace `TechieRag.Llm`. An application persists one stri
 ```csharp
 // TechieRag.TechieRagBuilder
 public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey = null);
+public TechieRagBuilder UseLlmForModel(string modelName, string? apiKey, string? endpoint);   // the app's Base URL (REQ-RAG-130)
 
 // TechieRag.Llm.ModelRouter
 public static ModelRoute? Resolve(string? modelName);
 public static ModelRoute Require(string modelName);
-public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId) { string? Endpoint; LlmSource Source; }
+public sealed record ModelRoute(LlmConnectorDescriptor Connector, string ModelId) { string? Endpoint; LlmSource Source; bool EndpointFromRoute; }   // "connector/model@https://host" sets the endpoint, which wins
 
 // TechieRag.Llm.LlmProviderFactory
 public static ILlmProvider Create(ModelRoute route, string? apiKey, ILoggerFactory? loggerFactory = null, int maxTokens = 2048, int? contextTokens = null);
@@ -800,8 +801,13 @@ public sealed class ModelChooserOptions { int MaxRequestCharacters = 4000; strin
 public static IReadOnlyList<LlmConnectorDescriptor> All { get; }
 public static LlmConnectorDescriptor? Find(string? name);
 public static LlmConnectorDescriptor Require(string name);
-public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList<string> ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; string? SessionHeader; SubscriptionTerms? Subscription; }
+public static IReadOnlyList<LlmConnectorInfo> Describe();   // one row per usable connector, for a settings page (REQ-RAG-132)
+public sealed record LlmConnectorDescriptor { string Name; string DisplayName; LlmSource Source; string? Endpoint; IReadOnlyList<string> ModelPrefixes; string? DefaultModel; bool RequiresApiKey = true; bool RequiresEndpoint; bool IsLocal; string? ExampleModel; string? ExampleEndpoint; IReadOnlyDictionary<string, object>? RequestBodyFields; string? SessionHeader; SubscriptionTerms? Subscription; }
+public sealed record LlmConnectorInfo { string Name; string DisplayName; bool RequiresApiKey; bool RequiresEndpoint; bool RequiresSignIn; bool IsLocal; string? DefaultEndpoint; string ExampleRoute; }
 public const string OpenCodeGoName = "opencode-go";   // OpenCode Go: https://opencode.ai/zen/go/v1, session header x-opencode-session
+public const string VeniceName = "venice";   // https://api.venice.ai/api/v1, Venice's own system prompt switched off (REQ-RAG-131)
+public const string OpenAICompatibleName = "openai-compatible";   // any chat/completions service; needs an endpoint (REQ-RAG-130)
+public const string AnthropicCompatibleName = "anthropic-compatible";   // any Anthropic Messages service; needs an endpoint
 
 // TechieRag.LlmConfig - configuration can name the connector instead of pasting its URL
 public string? Connector { get; set; }   // e.g. "groq"; an explicit Endpoint still wins
@@ -1291,7 +1297,7 @@ if (flow.UsesLanguageModel())
 
 ### Model listing and endpoints: `ListModelsAsync`, `CreateForModel(…, endpoint)`
 
-Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). `LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)` asks the service which models it serves: LM Studio `GET /v1/models`, Ollama `GET /api/tags` (names as `ollama/<name>` takes them), any OpenAI-compatible connector `GET {endpoint}/models` with the key as a bearer token. The ids come back distinct and sorted. A server that is down or refuses throws `HttpRequestException`, never an empty list. Anthropic, Gemini, subscription and in-process connectors throw `NotSupportedException`. `CreateForModel(modelName, apiKey, endpoint: url)` sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. `endpoint` must be an absolute http or https URL. Code compiled against the five-argument `CreateForModel` keeps working.
+Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). `LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)` asks the service which models it serves: LM Studio `GET /v1/models`, Ollama `GET /api/tags` (names as `ollama/<name>` takes them), any OpenAI-compatible connector `GET {endpoint}/models` with the key as a bearer token, Anthropic and any Anthropic-compatible connector `GET {endpoint}/v1/models` with `x-api-key` (REQ-RAG-130). The ids come back distinct and sorted. A server that is down or refuses throws `HttpRequestException`, never an empty list; so does a service without a model list (404). Gemini, subscription and in-process connectors throw `NotSupportedException`. `CreateForModel(modelName, apiKey, endpoint: url)` sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. `endpoint` must be an absolute http or https URL. Code compiled against the five-argument `CreateForModel` keeps working.
 
 ```csharp
 var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "http://192.168.1.20:1234");
@@ -1340,6 +1346,36 @@ var choice = await chooser.ChooseAsync(userText,
 ]);
 log.LogInformation("Routed to {Model} ({Source}): {Reason}", choice.ModelId, choice.Source, choice.Reason);
 var llm = LlmProviderFactory.CreateForModel(choice.ModelId, keyFor(choice.ModelId));
+```
+
+### Any service by route, and Venice: `openai-compatible/`, `anthropic-compatible/`, `venice/`
+
+Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-130, REQ-RAG-131, REQ-RAG-133; owner report of 2026-10-11 from Lekhak's provider page). Two generic connectors reach a service the catalog does not list, without a release. `openai-compatible/<model>` uses the OpenAI chat/completions format. `anthropic-compatible/<model>` uses the Anthropic Messages format through `AnthropicLlmProvider`. Both need the service's endpoint. Give it as the app's Base URL (`CreateForModel(…, endpoint: url)`, `UseLlmForModel(route, key, endpoint)`, `LlmConfig.Endpoint`) or on the route itself as `openai-compatible/glm-4.6@https://api.z.ai/api/paas/v4`. An endpoint written on the route wins over the app's. Only `@http://` or `@https://` starts an endpoint, so `claude-3@20240229` stays one model id. Without an endpoint, creating the provider (or building, or listing models) throws `InvalidOperationException`, and the message names both ways to give one. Both require an API key, and a call without one is refused before any request with `InvalidOperationException` (hosted services such as OpenRouter, Azure AI Foundry and the Gemini API all need one). A self-hosted server that ignores keys takes any placeholder, e.g. `"none"`. `AnthropicLlmProvider` now keeps the endpoint's path: it posts to `{endpoint}/v1/messages`, and to `{endpoint}/messages` when the endpoint already ends in `/v1`. Before this, `https://api.z.ai/api/anthropic` was sent to `https://api.z.ai/v1/messages`.
+
+`venice/<model>` reaches `https://api.venice.ai/api/v1`. It has no default model, so `venice/` alone is refused. What Venice adds on its own (docs checked 2026-10-11):
+- **System prompt (handled):** Venice adds its own system prompt next to yours unless `venice_parameters.include_venice_system_prompt` is false; its default is true. The `venice` connector sends false on every plain and streamed request (`LlmConnectorDescriptor.RequestBodyFields`). To keep Venice's prompt, use `openai-compatible/<model>@https://api.venice.ai/api/v1`, which sends no Venice field.
+- **Tool calls (work):** function tools, `tool_choice` and parallel calls follow the OpenAI shape. Support is per model: Venice's `/models` gives `model_spec.capabilities.supportsFunctionCalling`. On 2026-10-11, 125 of the 130 text models had it, `zai-org-glm-5-1` among them. The five without it were `grok-4-20-multi-agent`, `hermes-3-llama-3.1-405b` and three `e2ee-…` models, so check `/models` before offering tools.
+- **Streaming (works):** `stream` and `stream_options.include_usage` are honoured, so streamed token usage arrives as usual.
+- **Not exposed as options:** web search, web citations, scraping, characters, `strip_thinking_response` and `disable_thinking`. Venice reads them from `venice_parameters` or from a suffix on the model id (`venice/zai-org-glm-5-1:enable_web_search=on`). The model id is sent unchanged, so the suffix form works. Whether a suffix can switch the system prompt back on, against the body field, is not documented and was not tested; use the `openai-compatible` route for that.
+- **Model list:** `ListModelsAsync(ModelRouter.Require("venice/x"), key)` asks `GET /models`, which returns Venice's text models.
+
+```csharp
+var glm = LlmProviderFactory.CreateForModel("anthropic-compatible/glm-4.6", zaiKey, endpoint: "https://api.z.ai/api/anthropic");
+var vllm = LlmProviderFactory.CreateForModel("openai-compatible/qwen3-32b@http://gpu-box:8000/v1", null);
+var venice = LlmProviderFactory.CreateForModel("venice/zai-org-glm-5-1", veniceKey);   // Venice's own system prompt off
+var veniceIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("venice/x"), veniceKey);
+builder.UseLlmForModel("anthropic-compatible/glm-4.6", zaiKey, "https://api.z.ai/api/anthropic");
+```
+
+### Connector list for app screens: `LlmConnectorCatalog.Describe()`
+
+Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-132). `LlmConnectorCatalog.Describe()` returns one `LlmConnectorInfo` per connector an app can offer, in catalog order. Each row has `Name`, `DisplayName`, `RequiresApiKey`, `RequiresEndpoint` (show a Base URL field), `RequiresSignIn` (a subscription, no key), `IsLocal` (Ollama, LM Studio, the in-process model), `DefaultEndpoint` (null for the generic routes and the in-process model) and `ExampleRoute`. Every example route resolves through `ModelRouter` to its own connector, e.g. `venice/zai-org-glm-5-1`, `openrouter/anthropic/claude-sonnet-4.5` or `openai-compatible/glm-4.6@https://api.z.ai/api/paas/v4`. Subscription vendors that forbid sign-in are left out. A provider page builds its hint from this list instead of a hard-coded one.
+
+```csharp
+foreach (var c in LlmConnectorCatalog.Describe())
+{
+    hints.Add($"{c.DisplayName}: {c.ExampleRoute}{(c.RequiresApiKey ? " (key)" : "")}{(c.RequiresEndpoint ? " (Base URL)" : "")}");
+}
 ```
 
 ---

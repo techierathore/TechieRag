@@ -30,6 +30,10 @@ Fix the Sevak-reported defects still open on 2026-10-06: workspace pinning and t
 | REQ-RAG-127 | Creating a provider from a model name shall take an optional endpoint, so a local runtime on another machine needs no rebuilt route | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-127 EndpointOverrideIsValidatedAndOldCallStillWorks` | [d](#d-req-rag-127) |
 | REQ-RAG-128 | The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-128 BadInputAndModelFailureThrow` | [d](#d-req-rag-128) |
 | REQ-RAG-129 | Disposing a local model provider shall cancel or wait for the calls already inside it, free the native model only once none is left, and make every call that resumes afterwards throw ObjectDisposedException before it touches the model | Verified | 100% | 2026-10-11 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-129", me` | [d](#d-req-rag-129) |
+| REQ-RAG-130 | The library shall take two generic routes, openai-compatible/<model> and anthropic-compatible/<model>, that reach any service at an endpoint the app gives (its Base URL or an @https:// suffix on the route), refuse with a clear message when no endpoint is given, and list models where the service offers /models | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-130 GenericRoutesListModels` | [d](#d-req-rag-130) |
+| REQ-RAG-131 | The library shall have a venice connector, so venice/<model> reaches https://api.venice.ai/api/v1 with Venice's own system prompt switched off | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-131 VeniceStreamCarriesSwitchAndGenericRouteDoesNot` | [d](#d-req-rag-131) |
+| REQ-RAG-132 | The connector catalog shall describe itself for app screens through one public method: per connector its display name, whether it needs a key, whether it needs an endpoint, local or hosted, default endpoint and one example route | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-132 DescribeListsUsableConnectorsWithResolvableExamp` | [d](#d-req-rag-132) |
+| REQ-RAG-133 | The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-133 AnthropicProviderKeepsEndpointPath` | [d](#d-req-rag-133) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`.
 
@@ -96,6 +100,18 @@ Fix the Sevak-reported defects still open on 2026-10-06: workspace pinning and t
 
 - <a id="d-req-rag-128"></a> **REQ-RAG-128** The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice *(Chatur feedback TR-RAG-006)*. *BRD:* BRD-188
   - *Acceptance:* When a developer asks the chooser to pick between candidate models for a request on Model routing, then one candidate's id and the small model's reason are returned
+
+- <a id="d-req-rag-130"></a> **REQ-RAG-130** The library shall take two generic routes, openai-compatible/<model> and anthropic-compatible/<model>, that reach any service at an endpoint the app gives (its Base URL or an @https:// suffix on the route), refuse with a clear message when no endpoint is given, and list models where the service offers /models *(owner report from Lekhak's provider page)*. *BRD:* BRD-190
+  - *Acceptance:* When a developer creates a provider for openai-compatible/<model> or anthropic-compatible/<model> with an endpoint and key on Model routing, then requests reach that endpoint; missing either, it is refused
+
+- <a id="d-req-rag-131"></a> **REQ-RAG-131** The library shall have a venice connector, so venice/<model> reaches https://api.venice.ai/api/v1 with Venice's own system prompt switched off *(owner report from Lekhak's provider page)*. *BRD:* BRD-191
+  - *Acceptance:* When a developer creates a provider for venice/zai-org-glm-5-1 on Model routing, then requests reach Venice with Venice's own system prompt switched off
+
+- <a id="d-req-rag-132"></a> **REQ-RAG-132** The connector catalog shall describe itself for app screens through one public method: per connector its display name, whether it needs a key, whether it needs an endpoint, local or hosted, default endpoint and one example route *(owner report from Lekhak's provider page)*. *BRD:* BRD-192
+  - *Acceptance:* When an app calls LlmConnectorCatalog.Describe() on Model routing, then every connector, venice and both generic routes included, has an example route that resolves to it
+
+- <a id="d-req-rag-133"></a> **REQ-RAG-133** The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached *(owner report from Lekhak's provider page)*. *BRD:* BRD-193
+  - *Acceptance:* When a developer points the Anthropic provider at https://api.z.ai/api/anthropic on Model routing, then messages go to https://api.z.ai/api/anthropic/v1/messages
 
 
 ## Local model lifetime

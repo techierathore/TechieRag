@@ -8,8 +8,10 @@ namespace TechieRag.Llm;
 /// </summary>
 /// <remarks>
 /// <para><b>One call per service family:</b> LM Studio answers <c>GET /v1/models</c>, Ollama
-/// <c>GET /api/tags</c>, and every OpenAI-compatible connector <c>GET {endpoint}/models</c> with the
-/// key as a bearer token. All three map onto the same list of ids.</para>
+/// <c>GET /api/tags</c>, every OpenAI-compatible connector <c>GET {endpoint}/models</c> with the
+/// key as a bearer token, and an Anthropic-compatible one <c>GET {endpoint}/v1/models</c> with
+/// <c>x-api-key</c> (REQ-RAG-130; a service without that call answers 404, which throws). All map onto
+/// the same list of ids.</para>
 /// <para><b>A failure throws:</b> an unreachable or refusing service raises
 /// <see cref="HttpRequestException"/> rather than returning an empty list, so a host never shows "no
 /// models" for a server that is down. The API key never appears in a message.</para>
@@ -43,17 +45,32 @@ internal static class LlmModelLister
             LlmSource.LmStudio => ("v1/models", (Func<JsonElement, IEnumerable<string>>)ReadOpenAIModels),
             LlmSource.OpenAICompatible => ("models", ReadOpenAIModels),
             LlmSource.Ollama => ("api/tags", ReadOllamaModels),
+            // REQ-RAG-130: Anthropic's GET /v1/models answers in the same {"data":[{"id":…}]} shape.
+            LlmSource.Anthropic => ("models", ReadOpenAIModels),
             _ => throw new NotSupportedException(
-                $"Listing models is not supported for the '{connector.Name}' connector; it covers LM Studio, Ollama and OpenAI-compatible connectors.")
+                $"Listing models is not supported for the '{connector.Name}' connector; it covers LM Studio, Ollama, OpenAI-compatible and Anthropic-compatible connectors.")
         };
+
+        if (connector.RequiresEndpoint && string.IsNullOrWhiteSpace(connector.Endpoint))
+        {
+            throw LlmProviderFactory.EndpointRequired(connector, modelId: null);
+        }
 
         var endpoint = connector.Endpoint
             ?? throw new InvalidOperationException($"Connector '{connector.Name}' has no endpoint.");
+        var baseUri = connector.Source == LlmSource.Anthropic
+            ? AnthropicLlmProvider.VersionedBase(endpoint)
+            : new Uri(endpoint.TrimEnd('/') + "/");
         using var httpClient = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
         httpClient.Timeout = Timeout;
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(new Uri(endpoint.TrimEnd('/') + "/"), path));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(baseUri, path));
         request.Headers.TryAddWithoutValidation("User-Agent", OpenAICompatibleLlmProvider.DefaultUserAgent);
-        if (!string.IsNullOrEmpty(apiKey))
+        if (connector.Source == LlmSource.Anthropic)
+        {
+            request.Headers.TryAddWithoutValidation("x-api-key", apiKey);
+            request.Headers.TryAddWithoutValidation("anthropic-version", AnthropicLlmProvider.ApiVersion);
+        }
+        else if (!string.IsNullOrEmpty(apiKey))
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }

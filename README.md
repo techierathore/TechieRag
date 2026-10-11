@@ -214,6 +214,30 @@ await rag.InitializeAsync();
 | PostgreSQL/pgvector | `.UsePgVector(connectionString)` | `Host=localhost;Database=mydb;...` |
 | Qdrant | `.UseQdrant(endpoint, apiKey)` | `http://localhost:6334` |
 
+### LLM routes
+
+An app stores one string, the route, and `UseLlmForModel(route, apiKey)` or `LlmProviderFactory.CreateForModel(route, apiKey, endpoint: …)` picks the service. A route is `connector/model`. Unique names such as `gpt-4o-mini`, `claude-…` or `gemini-…` work without the connector part. Any route can end in `@https://host/…` to name the endpoint, and that endpoint wins over the one the app passes. `LlmConnectorCatalog.Describe()` returns this table at run time, so a settings page can build its hint from it.
+
+| Route | Service | Key | Endpoint |
+|-------|---------|-----|----------|
+| `openai/gpt-4o` or `gpt-4o` | OpenAI | yes | `https://api.openai.com/v1` |
+| `anthropic/claude-sonnet-4-5-20250929` | Anthropic | yes | `https://api.anthropic.com` |
+| `gemini/gemini-2.0-flash` | Google Gemini | yes | `https://generativelanguage.googleapis.com` |
+| `mistral/…`, `deepseek/…`, `xai/…`, `cohere/…`, `perplexity/…` | named service | yes | built in |
+| `groq/llama-3.3-70b-versatile` | Groq | yes | built in |
+| `together/…`, `fireworks/…`, `cerebras/…` | named host | yes | built in |
+| `openrouter/anthropic/claude-sonnet-4.5` | OpenRouter | yes | `https://openrouter.ai/api/v1` |
+| `venice/zai-org-glm-5-1` | Venice AI (Venice's own system prompt switched off) | yes | `https://api.venice.ai/api/v1` |
+| `opencode-go/kimi-k2.7-code` | OpenCode Go | yes | built in |
+| `openai-compatible/<model>@https://host/v1` | any service with the OpenAI chat/completions format | yes | **you give it** (Base URL or `@` suffix) |
+| `anthropic-compatible/<model>@https://host` | any service with the Anthropic Messages format, e.g. GLM at `https://api.z.ai/api/anthropic` | yes | **you give it** (Base URL or `@` suffix) |
+| `ollama/llama3.2` | Ollama (local) | no | `http://localhost:11434` |
+| `lmstudio/qwen3-8b` | LM Studio (local) | no | `http://localhost:1234` |
+| `local/qwen2.5-0.5b-instruct` | in-process model (`TechieRag.Local`) | no | none |
+| `chatgpt-subscription/gpt-6-luna` | ChatGPT subscription | sign-in | built in |
+
+Without an endpoint, the two generic routes are refused, and the error message shows both ways to give one. `LlmProviderFactory.ListModelsAsync` lists models for every route above except Gemini, the in-process model and subscriptions. For a generic route it lists them only when the service offers `/models`.
+
 ### Processing Options
 
 ```csharp

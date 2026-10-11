@@ -9,7 +9,7 @@
 | Verified on | 2026-10-08 |
 | Date | 2026-10-08 |
 
-This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187). Phase-1 services are in `docs/TechieRag-DevGuide.md`, phase-2 services in `docs/TechieRag-P2-DevGuide.md`.
+This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Phase-1 services are in `docs/TechieRag-DevGuide.md`, phase-2 services in `docs/TechieRag-P2-DevGuide.md`.
 
 No sample calls any phase-3 surface: the probe (`samples/TechieRag.Probe`) only embeds, stores, searches and generates. So every entry is `static-only (unconfirmed)` at runtime. What was run on 2026-10-06 is the build (`bash .tfcore/utils/tf-build.sh`: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (`~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-<id>"`): 53 tests, 0 failed. On 2026-10-07 the Sevak fixes (TR-RAG-049 in storage defaults, TR-RAG-047 as the new local model entry) were built and verified: build PASS, every test project run on its own, 0 failed. The other entries' file and line references were re-checked against the code that day and still hold. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.
 
@@ -261,7 +261,7 @@ REQ-RAG-126, REQ-RAG-127 (Lekhak TR-RAG-004 and TR-RAG-005, added 2026-10-08). C
 
 **Call chain:** listing: `ListModelsAsync(route)` → `ListModelsAsync(connector)` → `WithEndpoint(connector, endpoint)` → `LlmModelLister.ListAsync` → key check → path by `Source` → `GET` → `LlmHttpGuard.EnsureSuccess` → `ReadOpenAIModels` or `ReadOllamaModels` → distinct, sorted. Provider: `CreateForModel(…, endpoint)` → `ModelRouter.Require` → `WithEndpoint(route, endpoint)` → `Create`.
 
-LM Studio answers `v1/models`, an OpenAI-compatible connector `models` under its own base path (so Groq's `/openai/v1` stays), and Ollama `api/tags`. A refusing or unreachable server throws; an empty list only ever means the server listed nothing. Anthropic, Gemini, subscription and in-process connectors throw `NotSupportedException`.
+LM Studio answers `v1/models`, an OpenAI-compatible connector `models` under its own base path (so Groq's `/openai/v1` stays), Ollama `api/tags`, and an Anthropic or Anthropic-compatible connector `v1/models` with `x-api-key` (since 2026-10-11, REQ-RAG-130). A refusing or unreachable server throws; an empty list only ever means the server listed nothing. Gemini, subscription and in-process connectors throw `NotSupportedException`.
 
 `CreateForModel` has two overloads. The new one ends with an optional `endpoint`. The 1.1.2 five-argument shape is kept with no defaults and hidden from IntelliSense, so code compiled against it still binds and every shorter call reaches the new one. `PublicOverloadsNeverGiveOneCallTwoMeanings` passes because both use the same names for the same positions.
 
@@ -273,6 +273,32 @@ LM Studio answers `v1/models`, an OpenAI-compatible connector `models` under its
 | `src/TechieRag/Llm/LlmModelLister.cs:54` | `ListAsync` | `request.RequestUri` | the endpoint plus the path, base path kept |
 | `src/TechieRag/Llm/LlmModelLister.cs:62` | `ListAsync` | `response.StatusCode` | 2xx; 429 raises `LlmRateLimitException`, others `HttpRequestException` |
 | `src/TechieRag/Llm/LlmModelLister.cs:65` | `ListAsync` | the return | the ids, distinct and sorted ordinally |
+
+**Calculations on this service:** none.
+
+### Generic routes, Venice and the connector list: `openai-compatible/`, `anthropic-compatible/`, `venice/`, `LlmConnectorCatalog.Describe()` (`TechieRag`)
+
+![Sevak's LLM settings screen, July 2026: where a host shows the route hint and the Base URL field; it predates this change](screenshots/TechieRag/llm-settings.png)
+
+REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133 (owner report from Lekhak's provider page, added 2026-10-11). Covered by `tests/TechieRag.Tests/Llm/GenericRoutesAndVeniceTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: no sample uses these routes, and no Venice or GLM key was on this machine, so no live chat ran. The tests send real HTTP to a loopback server under a base path. Venice's public `GET /api/v1/models` was called live on 2026-10-11: 130 text models, 125 with function calling, `zai-org-glm-5-1` among them. Tests run 2026-10-11: REQ-RAG-130 5 passed, REQ-RAG-131 2 passed, REQ-RAG-132 1 passed, REQ-RAG-133 1 passed.
+
+**Call chain:** `CreateForModel(route, key, endpoint)` → `ModelRouter.Require` → `Resolve` → `LlmConnectorCatalog.Find` → `SplitEndpoint` (the first `@http://` or `@https://`) → `WithEndpoint(connector, suffix)` with `EndpointFromRoute` set → `WithEndpoint(route, endpoint)` (skipped when the route carried one) → `Create` → `RequiresEndpoint` with no endpoint → `EndpointRequired`; else the provider by `Source`. The OpenAI-compatible provider gets `BodyFields` from the connector's `RequestBodyFields`; `BuildRequest` adds them last with `TryAdd`, so a field the provider sets wins. The builder path is `UseLlmForModel` → `ApplyRoute` → `CreateLlmProviderFromConfig`, which refuses a generic connector with no endpoint and takes the connector's `Source` when configuration gave none.
+
+`AnthropicLlmProvider` builds `messagesUri` once from `VersionedBase(endpoint)`: the endpoint plus `/v1/`, or plus `/` when it already ends in `/v1`. The earlier absolute `/v1/messages` replaced the endpoint's path. `Describe()` maps each descriptor to an `LlmConnectorInfo`, skipping subscription rows whose vendor forbids sign-in; the example route is `name/` + `DefaultModel ?? ExampleModel`, plus `@ExampleEndpoint` for a generic connector.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/ModelRouter.cs:47` | `Resolve` | `endpoint` | the URL after `@`, or null; `claude-3@20240229` gives null |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:210` | `WithEndpoint` | `route.EndpointFromRoute` | true keeps the route's endpoint over the app's |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:52` | `Create` | `connector.Endpoint` | non-empty for `openai-compatible` and `anthropic-compatible`, else `InvalidOperationException` |
+| `src/TechieRag/Llm/LlmProviderFactory.cs:89` | `Create` | `connector.RequestBodyFields` | `venice_parameters` for `venice`; null for every other connector |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:386` | `BuildRequest` | `request` | carries `venice_parameters.include_venice_system_prompt: false` for Venice |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:74` | constructor | `messagesUri` | `{endpoint}/v1/messages`, path kept |
+| `src/TechieRag/Llm/LlmModelLister.cs:49` | `ListAsync` | `path` | `models` under the `v1/` base for Anthropic-compatible |
+| `src/TechieRag/TechieRagBuilder.cs:1010` | `CreateLlmProviderFromConfig` | `llmConfig.Endpoint` | non-empty for a generic connector, else the same refusal |
+| `src/TechieRag/Llm/LlmConnectorCatalog.cs:268` | `Describe` | the return | every row's `ExampleRoute` resolves to its own `Name` |
 
 **Calculations on this service:** none.
 

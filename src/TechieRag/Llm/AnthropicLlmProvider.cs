@@ -23,7 +23,11 @@ namespace TechieRag.Llm;
 /// </remarks>
 public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 {
+    /// <summary>The <c>anthropic-version</c> header every request sends.</summary>
+    internal const string ApiVersion = "2023-06-01";
+
     private readonly HttpClient httpClient;
+    private readonly Uri messagesUri;
     private readonly int defaultMaxTokens;
     private readonly ILogger<AnthropicLlmProvider> logger;
 
@@ -52,7 +56,9 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// </summary>
     /// <param name="apiKey">Anthropic API key.</param>
     /// <param name="model">Model name (e.g., "claude-sonnet-4-5-20250929").</param>
-    /// <param name="endpoint">API endpoint (defaults to https://api.anthropic.com).</param>
+    /// <param name="endpoint">API endpoint (defaults to https://api.anthropic.com). Its path is kept, so an
+    /// Anthropic-compatible service such as <c>https://api.z.ai/api/anthropic</c> is reached at
+    /// <c>{endpoint}/v1/messages</c>; an endpoint that already ends in <c>/v1</c> is not given a second one (REQ-RAG-133).</param>
     /// <param name="maxTokens">Default max output tokens.</param>
     /// <param name="logger">Logger instance.</param>
     public AnthropicLlmProvider(string apiKey, string model = "claude-sonnet-4-5-20250929", string? endpoint = null, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null)
@@ -64,13 +70,15 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         defaultMaxTokens = maxTokens;
         this.logger = logger ?? NullLogger<AnthropicLlmProvider>.Instance;
 
+        var versionedBase = VersionedBase(endpoint ?? "https://api.anthropic.com");
+        messagesUri = new Uri(versionedBase, "messages");
         httpClient = new HttpClient
         {
-            BaseAddress = new Uri((endpoint ?? "https://api.anthropic.com").TrimEnd('/')),
+            BaseAddress = versionedBase,
             Timeout = TimeSpan.FromSeconds(120)
         };
         httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
-        httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+        httpClient.DefaultRequestHeaders.Add("anthropic-version", ApiVersion);
     }
 
     /// <summary>
@@ -85,9 +93,29 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
+        messagesUri = httpClient.BaseAddress is null
+            ? new Uri("/v1/messages", UriKind.Relative)
+            : new Uri(VersionedBase(httpClient.BaseAddress.ToString()), "messages");
         ModelName = model;
         defaultMaxTokens = maxTokens;
         this.logger = logger ?? NullLogger<AnthropicLlmProvider>.Instance;
+    }
+
+    /// <summary>The absolute URI messages are posted to.</summary>
+    /// <remarks>Test seam for REQ-RAG-133: lets endpoint composition be asserted without a network call.</remarks>
+    internal Uri EffectiveMessagesUri => messagesUri;
+
+    /// <summary>
+    /// The endpoint's <c>v1/</c> base, keeping any path the endpoint has (REQ-RAG-133). The request paths are
+    /// relative to it; the earlier absolute <c>/v1/messages</c> replaced the endpoint's path, so
+    /// <c>https://api.z.ai/api/anthropic</c> was sent to <c>https://api.z.ai/v1/messages</c>.
+    /// </summary>
+    /// <param name="endpoint">The service's base URL, with or without a trailing <c>/v1</c>.</param>
+    /// <returns>The base URI ending in <c>/v1/</c>.</returns>
+    internal static Uri VersionedBase(string endpoint)
+    {
+        var trimmed = endpoint.TrimEnd('/');
+        return new Uri(trimmed.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? trimmed + "/" : trimmed + "/v1/");
     }
 
     /// <inheritdoc/>
@@ -123,7 +151,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync("/v1/messages", content, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.PostAsync(messagesUri, content, cancellationToken).ConfigureAwait(false);
         LlmHttpGuard.EnsureSuccess(response);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -176,7 +204,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/v1/messages") { Content = content };
+        var requestMessage = new HttpRequestMessage(HttpMethod.Post, messagesUri) { Content = content };
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         LlmHttpGuard.EnsureSuccess(response);
 

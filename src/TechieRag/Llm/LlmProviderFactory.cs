@@ -30,7 +30,8 @@ public static class LlmProviderFactory
     /// <c>num_ctx</c>); null leaves the runtime's own default (TR-RAG-003).</param>
     /// <returns>A provider configured for the route.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="route"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the connector needs an API key and none was supplied.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the connector needs an API key and none was supplied,
+    /// or needs an endpoint (<c>openai-compatible</c>, <c>anthropic-compatible</c>) and the route has none.</exception>
     public static ILlmProvider Create(
         ModelRoute route,
         string? apiKey,
@@ -44,6 +45,11 @@ public static class LlmProviderFactory
         if (connector.RequiresApiKey && string.IsNullOrEmpty(apiKey))
         {
             throw new InvalidOperationException($"An API key is required for the '{connector.Name}' connector.");
+        }
+
+        if (connector.RequiresEndpoint && string.IsNullOrWhiteSpace(connector.Endpoint))
+        {
+            throw EndpointRequired(connector, route.ModelId);
         }
 
         return connector.Source switch
@@ -78,7 +84,10 @@ public static class LlmProviderFactory
                 route.ModelId,
                 headers: null,
                 connector.SessionHeader,
-                loggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>()),
+                loggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>())
+            {
+                BodyFields = connector.RequestBodyFields
+            },
 
             // REQ-RAG-070: a subscription has no API key; it needs the host's sign-in callback.
             LlmSource.Subscription => throw SubscriptionNeedsSignIn(connector),
@@ -140,18 +149,19 @@ public static class LlmProviderFactory
         Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens, contextTokens);
 
     /// <summary>
-    /// Lists the models a route's service reports, for LM Studio, Ollama and every OpenAI-compatible
-    /// connector (REQ-RAG-126, Lekhak TR-RAG-004).
+    /// Lists the models a route's service reports, for LM Studio, Ollama, every OpenAI-compatible connector and
+    /// every Anthropic-compatible one that offers <c>/v1/models</c> (REQ-RAG-126, REQ-RAG-130).
     /// </summary>
     /// <param name="route">The route; only its connector is used.</param>
     /// <param name="apiKey">The API key, or null for a local runtime.</param>
-    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it.</param>
+    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it. An endpoint written
+    /// on the route wins.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns>The model ids the service reports, distinct and sorted; Ollama's are the names <c>ollama/&lt;name&gt;</c> takes.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="route"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the connector needs a key and none was given.</exception>
-    /// <exception cref="NotSupportedException">Thrown for Anthropic, Gemini, subscription and in-process connectors.</exception>
+    /// <exception cref="NotSupportedException">Thrown for Gemini, subscription and in-process connectors.</exception>
     /// <exception cref="HttpRequestException">Thrown when the service cannot be reached or refuses; never an empty list for a down server.</exception>
     public static Task<IReadOnlyList<string>> ListModelsAsync(
         ModelRoute route,
@@ -160,12 +170,12 @@ public static class LlmProviderFactory
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(route);
-        return ListModelsAsync(route.Connector, apiKey, endpoint, cancellationToken);
+        return ListModelsAsync(WithEndpoint(route, endpoint).Connector, apiKey, endpoint: null, cancellationToken);
     }
 
     /// <summary>
-    /// Lists the models a connector's service reports, for LM Studio, Ollama and every OpenAI-compatible
-    /// connector (REQ-RAG-126, Lekhak TR-RAG-004).
+    /// Lists the models a connector's service reports, for LM Studio, Ollama, every OpenAI-compatible connector
+    /// and every Anthropic-compatible one that offers <c>/v1/models</c> (REQ-RAG-126, REQ-RAG-130).
     /// </summary>
     /// <param name="connector">The connector, for example <c>LlmConnectorCatalog.Require("lmstudio")</c>.</param>
     /// <param name="apiKey">The API key, or null for a local runtime.</param>
@@ -175,7 +185,7 @@ public static class LlmProviderFactory
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="connector"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the connector needs a key and none was given.</exception>
-    /// <exception cref="NotSupportedException">Thrown for Anthropic, Gemini, subscription and in-process connectors.</exception>
+    /// <exception cref="NotSupportedException">Thrown for Gemini, subscription and in-process connectors.</exception>
     /// <exception cref="HttpRequestException">Thrown when the service cannot be reached or refuses.</exception>
     /// <example>
     /// <code>var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("ollama"), null, "http://192.168.1.20:11434");</code>
@@ -195,8 +205,21 @@ public static class LlmProviderFactory
     /// <param name="endpoint">The base URL, or null.</param>
     /// <returns>The route to create from.</returns>
     /// <exception cref="ArgumentException">The endpoint is not an absolute http or https URL.</exception>
+    /// <remarks>An endpoint written on the route itself (<see cref="ModelRoute.EndpointFromRoute"/>) wins (REQ-RAG-130).</remarks>
     internal static ModelRoute WithEndpoint(ModelRoute route, string? endpoint) =>
-        endpoint is null ? route : route with { Connector = WithEndpoint(route.Connector, endpoint) };
+        endpoint is null || route.EndpointFromRoute ? route : route with { Connector = WithEndpoint(route.Connector, endpoint) };
+
+    /// <summary>
+    /// The exception for a generic connector reached without an endpoint, naming both ways to give one
+    /// (REQ-RAG-130). Shared with <c>TechieRagBuilder</c> so configuration and the factory say the same.
+    /// </summary>
+    /// <param name="connector">The connector that needs an endpoint.</param>
+    /// <param name="modelId">The model id, for the example in the message.</param>
+    /// <returns>The exception to throw.</returns>
+    internal static InvalidOperationException EndpointRequired(LlmConnectorDescriptor connector, string? modelId) =>
+        new($"The '{connector.Name}' connector needs the service's endpoint. Give it as the app's Base URL "
+            + $"(the endpoint argument), or on the route as '{connector.Name}/{(string.IsNullOrWhiteSpace(modelId) ? "<model>" : modelId)}"
+            + $"@{(connector.Source == LlmSource.Anthropic ? "https://host" : "https://host/v1")}'.");
 
     /// <summary>Returns the connector with its endpoint replaced, or unchanged for a null endpoint.</summary>
     /// <param name="connector">The connector.</param>

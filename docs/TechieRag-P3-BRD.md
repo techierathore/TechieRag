@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-189 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak; BRD-188 on 2026-10-09, a small-model chooser, from Chatur; BRD-189 on 2026-10-11, a safe dispose for local models, from Sevak). Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page). Each item names the Sevak feedback entry it answers.
 
 ## 2. Screens and flow
 
@@ -99,7 +99,7 @@ An app can tell whether the local model will run and fit before it offers the do
 
 ### Model routing
 
-A host can list a service's models, reach a service on another machine by its model name alone, and let a small model choose which model does a piece of work.
+A host can list a service's models, reach a service on another machine by its model name alone, reach any OpenAI- or Anthropic-compatible service and Venice by route, show the routes it can offer, and let a small model choose which model does a piece of work.
 
 - **BRD-186** — The library shall list the models a connector or route serves, for LM Studio, Ollama and every OpenAI-compatible connector *(Lekhak feedback TR-RAG-004, added 2026-10-08)* *Screen:* Model routing
   - *Acceptance:* When a developer asks for the models of an LM Studio, Ollama or OpenAI-compatible connector on Model routing, then the model ids that service reports are returned.
@@ -107,6 +107,14 @@ A host can list a service's models, reach a service on another machine by its mo
   - *Acceptance:* When a developer creates a provider for lmstudio/<model> with an endpoint on Model routing, then its requests go to that endpoint.
 - **BRD-188** — The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice *(Chatur feedback TR-RAG-006, added 2026-10-09)* *Screen:* Model routing
   - *Acceptance:* When a developer asks the chooser to pick between candidate models for a request on Model routing, then one candidate's id and the small model's reason are returned.
+- **BRD-190** — The library shall take two generic routes, openai-compatible/<model> and anthropic-compatible/<model>, that reach any service at an endpoint the app gives (its Base URL or an @https:// suffix on the route), refuse with a clear message when no endpoint is given, and list models where the service offers /models *(owner report from Lekhak's provider page, added 2026-10-11)* *Screen:* Model routing
+  - *Acceptance:* When a developer creates a provider for openai-compatible/<model> or anthropic-compatible/<model> with an endpoint and key on Model routing, then requests reach that endpoint; missing either, it is refused.
+- **BRD-191** — The library shall have a venice connector, so venice/<model> reaches https://api.venice.ai/api/v1 with Venice's own system prompt switched off *(owner report from Lekhak's provider page, added 2026-10-11)* *Screen:* Model routing
+  - *Acceptance:* When a developer creates a provider for venice/zai-org-glm-5-1 on Model routing, then requests reach Venice with Venice's own system prompt switched off.
+- **BRD-192** — The connector catalog shall describe itself for app screens through one public method: per connector its display name, whether it needs a key, whether it needs an endpoint, local or hosted, default endpoint and one example route *(owner report from Lekhak's provider page, added 2026-10-11)* *Screen:* Model routing
+  - *Acceptance:* When an app calls LlmConnectorCatalog.Describe() on Model routing, then every connector, venice and both generic routes included, has an example route that resolves to it.
+- **BRD-193** — The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached *(owner report from Lekhak's provider page, added 2026-10-11)* *Screen:* Model routing
+  - *Acceptance:* When a developer points the Anthropic provider at https://api.z.ai/api/anthropic on Model routing, then messages go to https://api.z.ai/api/anthropic/v1/messages.
 
 ### Local model lifetime
 
@@ -125,7 +133,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 |---|---|---|---|---|
 | RAG / AI requirements | 11 | 11 | 0 | Done |
 | Local model fit check | 1 | 1 | 0 | Done |
-| Model routing | 3 | 3 | 0 | Done |
+| Model routing | 7 | 7 | 0 | Done |
 | Local model lifetime | 1 | 1 | 0 | Done |
 
 ## 6. Where the rest lives
