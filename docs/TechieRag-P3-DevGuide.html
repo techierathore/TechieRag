@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -120,6 +120,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#storage-defaults-dataroot-usesqlitevec-withpersistence-provider-connectionstring-null-defaultuserid-techierag">Storage defaults: DataRoot, UseSqliteVec(), WithPersistence(provider, connectionString = null, defaultUserId) (TechieRag)</a></li>
         <li class="h3"><a href="#flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag">Flow step names and model use: FlowNodeCatalog.CreateNode, FlowDefinition.UsesLanguageModel (TechieRag)</a></li>
         <li class="h3"><a href="#local-model-fit-check-localllmprovider-isruntimeavailable-localmodel-estimaterequiredmemorybytes-availablememory-read-techierag-local">Local model fit check: LocalLlmProvider.IsRuntimeAvailable, LocalModel.EstimateRequiredMemoryBytes, AvailableMemory.Read (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local">Local model lifetime: LocalLlmProvider.Dispose, DisposeAsync (TechieRag.Local)</a></li>
         <li class="h3"><a href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">Model routing: LlmProviderFactory.ListModelsAsync, CreateForModel(…, endpoint) (TechieRag)</a></li>
         <li class="h3"><a href="#model-choice-modelchooser-imodelchooser-techierag">Model choice: ModelChooser, IModelChooser (TechieRag)</a></li>
         <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
@@ -321,6 +322,23 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> required bytes = weight bytes + <code>KvBytesPerToken</code> × context size + 256 MB (<code>LocalModel.cs:348</code>); context size = the asked size, else 2,048 on a phone and 4,096 elsewhere, never above <code>ContextLength</code> (<code>LocalModel.cs:385</code>).</p>
+<h3 id="local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local"><a id="local-model-lifetime-localllmproviderdispose-disposeasync-techieraglocal"></a>Local model lifetime: <code>LocalLlmProvider.Dispose</code>, <code>DisposeAsync</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's local-model screen on Mac Catalyst, September 2026: the generate path a dispose now cancels safely; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-129 (Sevak TR-RAG-053, added 2026-10-11). Covered by <code>tests/TechieRag.Local.Tests/LocalProviderDisposeTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample disposes during a call. A scratch console app ran Sevak's case on 2026-10-11 with qwen2.5-0.5b on the real engine: one call generating, two queued, then <code>DisposeAsync</code>, five rounds each on Linux and Windows. Every call ended with <code>ObjectDisposedException</code> (one Windows call had finished first), the memory was freed 0.15 to 0.43 s later, and the process stayed alive. Phi-3, the model in Sevak's crash, did not fit the Windows laptop's free memory that day. Tests run 2026-10-11: REQ-RAG-129 4 passed, 20 repeat runs clean.</p>
+<p><strong>Call chain:</strong> a call: <code>StreamCoreAsync</code> → <code>Enter</code> (counts the call; refused once disposed) → <code>LoadCoreAsync</code> → <code>generateGate.WaitAsync</code> → <code>GenerateAsync</code> pieces, the flag checked after every await and every yield → <code>Exit</code>. Dispose: <code>Dispose</code> → flag set under <code>lifetimeLock</code> → <code>lifetime.Cancel()</code> → <code>ReleaseNative</code> now if no call is inside, else from the last <code>Exit</code>.</p>
+<p>The token a call passes down links the caller's token with <code>lifetime</code>. A cancellation that comes from the dispose becomes <code>ObjectDisposedException</code> in <code>WhileAliveAsync</code>; one from the caller stays <code>OperationCanceledException</code>. A native token step cannot be interrupted, so the model waits for it rather than being freed under it. <code>OnnxGenAiModel</code> also refuses every member after its own dispose, as a second guard.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:503</code></td><td><code>StreamCoreAsync</code></td><td><code>activeCalls</code></td><td>one more for each call inside</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:404</code></td><td><code>Dispose</code></td><td><code>lifetime.IsCancellationRequested</code></td><td>true; queued calls wake with <code>ObjectDisposedException</code></td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:434</code></td><td><code>Exit</code></td><td><code>releaseNow</code></td><td>true only for the last call leaving a disposed provider</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:450</code></td><td><code>ReleaseNative</code></td><td><code>loaded</code></td><td>disposed once, then null</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:535</code></td><td><code>StreamCoreAsync</code></td><td><code>disposed</code></td><td>checked after each token, before the model is used again</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none.</p>
 <h3 id="model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag"><a id="model-routing-llmproviderfactorylistmodelsasync-createformodel-endpoint-techierag"></a>Model routing: <code>LlmProviderFactory.ListModelsAsync</code>, <code>CreateForModel(…, endpoint)</code> (<code>TechieRag</code>)<a class="anchor-link" href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">#</a></h3>
 <p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host lists a service's models and names its address; it predates this change" style="max-width:100%"></p>
 <p>REQ-RAG-126, REQ-RAG-127 (Lekhak TR-RAG-004 and TR-RAG-005, added 2026-10-08). Covered by <code>tests/TechieRag.Tests/Llm/ModelListingAndEndpointTests.cs</code>.</p>

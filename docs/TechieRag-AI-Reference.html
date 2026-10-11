@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-09</div>
+    <div class="sub">Last rendered: 2026-10-11</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -153,6 +153,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
         <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
+        <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
@@ -193,7 +194,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -242,6 +243,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flows-host-step-names-and-model-use">Flows: host step names and model use</a></li>
         <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
+        <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
@@ -663,7 +665,7 @@ await foreach (var step in runner.RunStreamAsync(messages))
 }</code></pre>
 <p>A custom <code>ILlmProvider</code> that implements <code>ChatStreamAsync</code> on top of the typed method must override <code>ChatStreamEventsAsync</code> too, or the two defaults call each other.</p>
 <h3 id="local-model-techierag-local"><a id="2-local-model-techieraglocal"></a>2. Local model: <code>TechieRag.Local</code><a class="anchor-link" href="#local-model-techierag-local">#</a></h3>
-<p>Package <code>TechieRag.Local</code> (depends on <code>TechieRag.Embedded</code>); namespace <code>TechieRag.Local</code>. One provider, <code>LocalLlmProvider : ILlmProvider</code>, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws <code>PlatformNotSupportedException</code> on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. <code>SupportsToolCalling</code> is false; a request with tools is refused. A MAUI app writes no native wiring: the package's <code>buildTransitive</code> targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.</p>
+<p>Package <code>TechieRag.Local</code> (depends on <code>TechieRag.Embedded</code>); namespace <code>TechieRag.Local</code>. One provider, <code>LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable</code>, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws <code>PlatformNotSupportedException</code> on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. <code>SupportsToolCalling</code> is false; a request with tools is refused. A MAUI app writes no native wiring: the package's <code>buildTransitive</code> targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.</p>
 <table>
 <thead><tr><th>Model</th><th>Id</th><th>Where it is the default</th><th>Download</th><th>Licence</th></tr></thead>
 <tbody>
@@ -1400,6 +1402,12 @@ var groqIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("groq
 var needed = provider.Model.EstimateRequiredMemoryBytes(provider.ContextSize);
 var free = AvailableMemory.Read();
 var canOffer = LocalLlmProvider.IsRuntimeAvailable &amp;&amp; (needed is null || free is null || free &gt;= needed);</code></pre>
+<h3 id="local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside<a class="anchor-link" href="#local-model-lifetime-dispose-while-calls-are-inside">#</a></h3>
+<p>Package <code>TechieRag.Local</code>; namespace <code>TechieRag.Local</code> (REQ-RAG-129, Sevak TR-RAG-053). <code>LocalLlmProvider.Dispose()</code> may be called while calls are loading, queued or generating. It refuses new calls, cancels the ones inside, and returns without blocking. Each of those calls ends with <code>ObjectDisposedException</code> at its next step, before it touches the model again; a caller's own cancellation stays <code>OperationCanceledException</code>. The native model is freed when the last call has left, never under a running token (one token step, about 0.3 s on a CPU). <code>await provider.DisposeAsync()</code> does the same and completes once the memory is freed, so await it before loading the next model. Every call made after the dispose, <code>EstimateTokenCount</code> included, throws <code>ObjectDisposedException</code>. A stream a host stops reading is freed when its <code>await foreach</code> ends.</p>
+<pre><code class="language-csharp">await oldProvider.DisposeAsync();            // calls still inside end with ObjectDisposedException
+var next = LocalLlm.Create("phi-3-mini-4k-instruct");
+try { reply = await oldProvider.ChatAsync(messages); }
+catch (ObjectDisposedException) { /* the model was unloaded or swapped: retry on `next` */ }</code></pre>
 <h3 id="choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: <code>ModelChooser</code><a class="anchor-link" href="#choosing-a-model-for-a-piece-of-work-modelchooser">#</a></h3>
 <p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-128, Chatur TR-RAG-006). <code>ModelRouter</code> turns a model name into a service; <code>ModelChooser</code> decides which name. <code>new ModelChooser(smallModel, options?)</code> takes any <code>ILlmProvider</code>; a cheap or local one is enough. <code>ChooseAsync(request, candidates)</code> takes the request text and <code>ModelCandidate { ModelId, Tier?, Notes?, Cost? }</code> items, the free-text fields written in the host's own words. It returns a <code>ModelChoice</code> with <code>Candidate</code>, <code>ModelId</code>, <code>Reason</code> (one sentence to show and log), <code>Source</code> (<code>ModelChoiceSource.SmallModel</code>, <code>OnlyCandidate</code> or <code>Fallback</code>) and the small model's <code>Usage</code>. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to <code>ModelChooserOptions.MaxRequestCharacters</code> (default 4000). The reply's id is matched ignoring case. An id without its <code>connector/</code> prefix matches when exactly one candidate ends with it. <strong>The answer is always a candidate:</strong> a reply that is not JSON, or names a model that was not offered, gives <code>ModelChooserOptions.FallbackModelId</code> (else the first candidate) with <code>Source = Fallback</code>. <strong>A failure of the small model is thrown</strong> (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. <code>ModelChooserOptions.Guidance</code> adds the host's rule to the instructions. The interface <code>IModelChooser</code> lets a unit test pass a fixed choice.</p>
 <pre><code class="language-csharp">var chooser = new ModelChooser(

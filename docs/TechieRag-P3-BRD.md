@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-188 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak; BRD-188 on 2026-10-09, a small-model chooser, from Chatur). Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-189 (added later: BRD-185 on 2026-10-07, a pre-download fit check for local models; BRD-186 and BRD-187 on 2026-10-08, model listing and a per-call endpoint, from Lekhak; BRD-188 on 2026-10-09, a small-model chooser, from Chatur; BRD-189 on 2026-10-11, a safe dispose for local models, from Sevak). Each item names the Sevak feedback entry it answers.
 
 ## 2. Screens and flow
 
@@ -26,7 +26,8 @@ Each row is a public surface this phase extends; the Route column names its entr
 | Storage defaults | `UseSqliteVec()`, `PersistenceConfig.ConnectionString`, the data folder | App developer | — (library, no mockup) | database path, data root, app name |
 | Flow step names and model use | `FlowNodeCatalog`, `FlowDefinition` | Agent builder | — (library, no mockup) | step name, uses a model |
 | Local model fit check | `LocalLlmProvider`, `LocalModel`, `AvailableMemory` | App developer | — (library, no mockup) | runtime available, memory needed, memory free, download progress |
-| Model routing | `LlmProviderFactory.ListModelsAsync`, `LlmProviderFactory.CreateForModel` | App developer | — (library, no mockup) | connector, endpoint, model ids |
+| Model routing | `LlmProviderFactory.ListModelsAsync`, `LlmProviderFactory.CreateForModel`, `ModelChooser` | App developer | — (library, no mockup) | connector, endpoint, model ids, candidates, chosen model, reason |
+| Local model lifetime | `LocalLlmProvider.Dispose`, `LocalLlmProvider.DisposeAsync` | App developer | — (library, no mockup) | calls inside, memory freed |
 
 **Primary journey:**
 1. A developer builds an app on the packages without naming a database folder; the data lands in the per-user TechieRag folder under the app's own name, and the log says where.
@@ -107,17 +108,25 @@ A host can list a service's models, reach a service on another machine by its mo
 - **BRD-188** — The library shall choose a model for a piece of work: a small model reads the request and a list of candidate models (each with a tier, notes and cost) and returns one candidate's id and the reason, so a host can show and log the choice *(Chatur feedback TR-RAG-006, added 2026-10-09)* *Screen:* Model routing
   - *Acceptance:* When a developer asks the chooser to pick between candidate models for a request on Model routing, then one candidate's id and the small model's reason are returned.
 
+### Local model lifetime
+
+A host can unload or swap a local model while calls are still using it, and the process never crashes.
+
+- **BRD-189** — Disposing a local model provider shall cancel or wait for the calls already inside it, free the native model only once none is left, and make every call that resumes afterwards throw ObjectDisposedException before it touches the model *(Sevak feedback TR-RAG-053, added 2026-10-11)* *Screen:* Local model lifetime
+  - *Acceptance:* When a developer disposes a local provider on Local model lifetime while three calls are inside, then each ends with ObjectDisposedException and the model is freed once.
+
 ## 5. Development status
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-09.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-10-11.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
 | RAG / AI requirements | 11 | 11 | 0 | Done |
 | Local model fit check | 1 | 1 | 0 | Done |
 | Model routing | 3 | 3 | 0 | Done |
+| Local model lifetime | 1 | 1 | 0 | Done |
 
 ## 6. Where the rest lives
 

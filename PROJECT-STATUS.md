@@ -1,16 +1,16 @@
 ---
 project: TechieRag
-last_updated: 2026-10-09
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 15 of 15 verified
+last_updated: 2026-10-11
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 16 of 16 verified
 last_verified_build: PASS
-last_verified_date: 2026-10-09
+last_verified_date: 2026-10-11
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak). All 15 rows Verified on 2026-10-09. New today: `ModelChooser`, where a small model picks the model for a request (Chatur TR-RAG-006, REQ-RAG-128). It has 6 tests and a live run on qwen2.5-0.5b. The AI reference, DevGuide, UsageGuide, release notes and the reply in Chatur's feedback file are current. Everything ships in the next package after 1.1.2.
+Phase 3 of 3 (Consumer feedback from Sevak). All 16 rows Verified on 2026-10-11. New today: disposing a local model while calls are inside no longer crashes the app (Sevak TR-RAG-053, REQ-RAG-129). Each call ends with `ObjectDisposedException`, and `DisposeAsync` was added. There are 4 tests and a live race on Linux and Windows. 2026-10-09 added `ModelChooser` (Chatur TR-RAG-006). Both ship in the next package after 1.1.2.
 
 ## Next command to run
 
@@ -39,7 +39,7 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 ## Known blockers
 
 - 🔶 **Release (after 1.1.2):** create GitHub Release `v1.1.3` with the `RELEASE-NOTES.md` section, then run *Publish to NuGet.org* on that tag.
-- 🔶 **Owner git:** commit TechieRag and Chatur (TR-RAG-006 reply in `Chatur/docs/Chatur-TechieRag-Feedback.md`).
+- 🔶 **Owner git:** commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply in `Sevak/docs/Sevak-TechieRag-Feedback.md`).
 - 🔶 **ONNX Runtime issue to post:** ORT-001 in `docs/TechieRag-OnnxRuntime-Feedback.md` is ready; fill the macOS version.
 - 🔶 **Behaviour changes:** default SQLite folder and repeat tool registration (REQ-RAG-121/122).
 - 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free; WSL has 7.8 GB total.
@@ -53,11 +53,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-06 | handoff-phase | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-06 | fix-issues | 11/11 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-07 | triage-and-fix | 12/12 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-08 | fix-issues | 14/14 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-09 | triage-and-fix + handoff | 15/15 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-11 | fix-issues + handoff | 16/16 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 

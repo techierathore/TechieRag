@@ -13,6 +13,9 @@ namespace TechieRag.Local.Runtime;
 /// thread pool, so an awaiting UI thread never blocks on inference.</para>
 /// <para><b>Cancellation</b> is checked before each token; the generator, its parameters, the token
 /// sequence and the decoding stream are disposed however the enumeration ends.</para>
+/// <para><b>After <see cref="Dispose"/></b> every member and every resumed step of a generation throws
+/// <see cref="ObjectDisposedException"/> before it touches a native handle (REQ-RAG-129, Sevak TR-RAG-053).
+/// The provider frees the model only once no call is inside, so this is the second line of defence.</para>
 /// <para><b>Decoded text</b> is cleaned of SentencePiece space markers (<see cref="DecodedText"/>).</para>
 /// <para><b>JSON.</b> A schema is enforced by GenAI's <c>json_schema</c> guidance. A native build
 /// without guidance support throws on it once; from then on the answer is unconstrained and relies on
@@ -26,6 +29,7 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
     private readonly Model model;
     private readonly Tokenizer tokenizer;
     private readonly int contextSize;
+    private volatile bool disposed;
 
     /// <summary>Loads a model folder on the CPU.</summary>
     /// <param name="modelDirectory">The folder with <c>genai_config.json</c>.</param>
@@ -56,7 +60,11 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
     internal static bool GuidanceUnavailable => guidanceUnavailable;
 
     /// <inheritdoc/>
-    public int CountTokens(string text) => OnnxGenAiTokenizer.Count(tokenizer, text);
+    public int CountTokens(string text)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+        return OnnxGenAiTokenizer.Count(tokenizer, text);
+    }
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<string> GenerateAsync(
@@ -67,18 +75,22 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
         ArgumentNullException.ThrowIfNull(prompt);
         ArgumentNullException.ThrowIfNull(settings);
         cancellationToken.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(disposed, this);
 
         using var sequences = tokenizer.Encode(prompt);
         var search = OnnxGenAiSearchOptions.From(settings, sequences[0].Length, contextSize);
         using var parameters = CreateParameters(search);
         using var generator = new Generator(model, parameters);
         await Task.Run(() => generator.AppendTokenSequences(sequences), cancellationToken).ConfigureAwait(false);
+        ObjectDisposedException.ThrowIf(disposed, this);
         using var stream = tokenizer.CreateStream();
         while (!generator.IsDone())
         {
             cancellationToken.ThrowIfCancellationRequested();
             var token = await Task.Run(() => NextToken(generator), cancellationToken).ConfigureAwait(false);
+            ObjectDisposedException.ThrowIf(disposed, this);
             yield return DecodedText.Clean(stream.Decode(token));
+            ObjectDisposedException.ThrowIf(disposed, this);
         }
     }
 
@@ -92,12 +104,19 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
     public string ApplyChatTemplate(string messagesJson)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(messagesJson);
+        ObjectDisposedException.ThrowIf(disposed, this);
         return tokenizer.ApplyChatTemplate(null!, messagesJson, null!, true);
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
         tokenizer.Dispose();
         model.Dispose();
         config.Dispose();

@@ -15,6 +15,7 @@ Paste the section for a release into its GitHub Release when you publish it. All
 
 - **`RerankConfig.Enabled` is the default for searches, not the switch that builds a reranker** (since REQ-RAG-047; Sevak TR-RAG-012). It decides whether a search reranks when the call passes no `SearchOptions.Rerank` and no workspace decides. A reranker is built whenever `Rerank.Source` is usable, even with `Enabled = false`. To build no reranker, which avoids the embedded model's download and any API key check, leave `Rerank.Source = None`. The XML documentation on `Enabled` now says this.
 - **An unset `VectorStore.ConnectionString` reads the absolute per-app path** (from 1.1.2, REQ-RAG-122). `VectorStoreConfig.IsConnectionStringSet` is now public, so a host can tell "unset" from a value.
+- **Disposing a local model while it answers no longer crashes the app** (REQ-RAG-129, Sevak TR-RAG-053). `LocalLlmProvider.Dispose` cancels the calls inside; each ends with `ObjectDisposedException`, and the native model is freed after the last has left. The new `DisposeAsync` completes once the memory is freed. `EstimateTokenCount` after a dispose now throws `ObjectDisposedException` instead of using the freed tokenizer.
 - **A local model that cannot fit is refused before its download** (REQ-RAG-125). `LocalLlmProvider.LoadAsync` throws `LocalModelMemoryException` before the terms are asked and before the first byte, then checks again after the download.
 
 ### New

@@ -49,6 +49,8 @@ public sealed class PhaseThreeReferenceTests
         { "REQ-RAG-128", "ModelChoiceSource.SmallModel" },
         { "REQ-RAG-128", "IModelChooser" },
         { "REQ-RAG-128", "FallbackModelId" },
+        { "REQ-RAG-129", "DisposeAsync()" },
+        { "REQ-RAG-129", "ObjectDisposedException" },
     };
 
     /// <summary>
@@ -72,7 +74,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(10, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006)
+        Assert.Equal(11, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 
