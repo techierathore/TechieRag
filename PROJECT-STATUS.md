@@ -41,7 +41,8 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 - 🔶 **Release:** NuGet is at 1.1.5; publish the next release with the "Next release after 1.1.5" section of `RELEASE-NOTES.md`.
 - 🔶 **Owner git:** commit TechieRag and Lekhak (TR-RAG-007 reply in `docs/Lekhak-TechieRag-Feedback.md`).
 - 🔶 **Behaviour change:** failed LLM calls throw `LlmHttpException`; exact-type checks must accept it; rerankers, embedders not covered (REQ-RAG-134).
-- 🔶 **No live Venice or GLM call:** no key here; wire format and error text tested on a loopback server.
+- 🔶 **No live Venice or GLM call:** no key here; loopback-tested.
+- 🔶 **CI #53:** GitHub-side failure; re-run it.
 - 🔶 **Gmail live test flaky:** REQ-RAG-110 failed twice on Gmail IMAP search, then passed.
 - 🔶 **ONNX Runtime issue:** ORT-001 ready to post; fill the macOS version.
 - 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free.
@@ -55,11 +56,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-09 | triage-and-fix + handoff | 15/15 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | fix-issues + handoff | 16/16 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | triage-and-fix + handoff | 20/20 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | fix-issues + handoff | 20/20 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-15 | triage-and-fix + handoff | 21/21 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-15 | fix-issues | 21/21 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
