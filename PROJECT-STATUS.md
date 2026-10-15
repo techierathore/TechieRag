@@ -1,16 +1,16 @@
 ---
 project: TechieRag
-last_updated: 2026-10-11
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 20 of 20 verified
+last_updated: 2026-10-15
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 21 of 21 verified
 last_verified_build: PASS
-last_verified_date: 2026-10-11
+last_verified_date: 2026-10-15
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak). All 20 rows Verified on 2026-10-11. New today, from Lekhak's provider page: the `openai-compatible/` and `anthropic-compatible/` routes (endpoint from the Base URL or an `@https://` suffix), a `venice` connector that switches off Venice's own system prompt, `LlmConnectorCatalog.Describe()` for settings pages, and an Anthropic endpoint-path fix (REQ-RAG-130 to 133). Both generic routes now require an API key (owner decision). Earlier today: REQ-RAG-129. All ship in the next package after 1.1.2.
+Phase 3 of 3 (Consumer feedback from Sevak). All 21 rows Verified on 2026-10-15. New today, from Lekhak TR-RAG-007: a failed LLM call throws `LlmHttpException` carrying the status code, the response body and the provider's own message (REQ-RAG-134, BRD-194). The AI reference, agent guides, release notes, UsageGuide and P3 DevGuide describe it, and Lekhak's feedback file has the reply. It ships in the next package after 1.1.5.
 
 ## Next command to run
 
@@ -38,12 +38,12 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 
 ## Known blockers
 
-- 🔶 **Release:** GitHub Release `v1.1.3` with its `RELEASE-NOTES.md` section, then *Publish to NuGet.org* on that tag.
-- 🔶 **Owner git:** commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply).
-- 🔶 **No live Venice or GLM call:** no key here; wire format tested on a loopback server, Venice `/models` checked live.
+- 🔶 **Release:** NuGet is at 1.1.5; publish the next release with the "Next release after 1.1.5" section of `RELEASE-NOTES.md`.
+- 🔶 **Owner git:** commit TechieRag and Lekhak (TR-RAG-007 reply in `docs/Lekhak-TechieRag-Feedback.md`).
+- 🔶 **Behaviour change:** failed LLM calls throw `LlmHttpException`; exact-type checks must accept it; rerankers, embedders not covered (REQ-RAG-134).
+- 🔶 **No live Venice or GLM call:** no key here; wire format and error text tested on a loopback server.
 - 🔶 **Gmail live test flaky:** REQ-RAG-110 failed twice on Gmail IMAP search, then passed.
 - 🔶 **ONNX Runtime issue:** ORT-001 ready to post; fill the macOS version.
-- 🔶 **Behaviour changes:** SQLite folder, tool re-registration (REQ-RAG-121/122), Anthropic endpoint path (REQ-RAG-133).
 - 🔶 **Local model re-check:** REQ-RAG-057/059/063/065 skip below 4.6 GB free.
 - 🔶 **Postgres (REQ-RAG-044):** `TechieRagTestPostgres` unset; live test skipped.
 - 🔶 **Windows probe head not driven** (TechieFlow TF-006); rows graded by their tests.
@@ -55,11 +55,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-10-08 | fix-issues | 14/14 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-09 | triage-and-fix + handoff | 15/15 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | fix-issues + handoff | 16/16 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | triage-and-fix + handoff | 20/20 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-10-11 | fix-issues + handoff | 20/20 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-10-15 | triage-and-fix + handoff | 21/21 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -69,7 +69,7 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 ## Standards compliance
 
-- Last check 2026-10-03: 0 findings, see the checklist Remarks.
+- Last check 2026-10-15: 0 findings, see the checklist Remarks.
 
 ## Deferred / future
 

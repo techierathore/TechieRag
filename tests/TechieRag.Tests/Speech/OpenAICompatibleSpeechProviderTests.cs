@@ -152,15 +152,20 @@ public class OpenAICompatibleSpeechProviderTests
         Assert.Equal("af_bella", voices[0].Id);
     }
 
-    /// <summary>Verifies a failing endpoint surfaces as an HTTP error rather than an empty transcript.</summary>
+    /// <summary>
+    /// Verifies a failing endpoint surfaces as an HTTP error rather than an empty transcript, and that the error
+    /// is the <see cref="LlmHttpException"/> quoting the endpoint's plain-text body (REQ-RAG-134).
+    /// </summary>
     [Fact]
     public async Task TranscribeThrowsOnEndpointFailure()
     {
         var handler = new SpeechStubHandler("nope", "text/plain", HttpStatusCode.InternalServerError);
         var provider = BuildSpeechToText(handler);
 
-        await Assert.ThrowsAsync<HttpRequestException>(
+        var error = await Assert.ThrowsAsync<LlmHttpException>(
             () => provider.TranscribeAsync(AudioStream(), "standup.mp3"));
+        Assert.IsAssignableFrom<HttpRequestException>(error);
+        Assert.EndsWith("Response body: nope", error.Message, StringComparison.Ordinal);
     }
 
     /// <summary>Builds a speech-to-text provider over the stub handler.</summary>

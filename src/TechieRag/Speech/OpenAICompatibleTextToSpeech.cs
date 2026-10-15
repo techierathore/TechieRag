@@ -142,7 +142,7 @@ public class OpenAICompatibleTextToSpeech : ITextToSpeech
             .PostAsync(speechPath, content, cancellationToken)
             .ConfigureAwait(false);
 
-        LlmHttpGuard.EnsureSuccess(response);
+        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
 
         var data = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
 

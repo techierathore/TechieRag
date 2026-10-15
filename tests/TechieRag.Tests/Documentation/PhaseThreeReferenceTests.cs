@@ -58,6 +58,9 @@ public sealed class PhaseThreeReferenceTests
         { "REQ-RAG-132", "LlmConnectorCatalog.Describe()" },
         { "REQ-RAG-132", "LlmConnectorInfo" },
         { "REQ-RAG-133", "{endpoint}/v1/messages" },
+        { "REQ-RAG-134", "LlmHttpException" },
+        { "REQ-RAG-134", "ProviderMessage" },
+        { "REQ-RAG-134", "ResponseBody" },
     };
 
     /// <summary>
@@ -81,7 +84,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(13, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11)
+        Assert.Equal(14, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 

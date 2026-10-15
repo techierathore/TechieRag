@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 3: Consumer feedback from Sevak</h1>
-    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-P3-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>TechieRag-P3-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -139,7 +139,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page). Each item names the Sevak feedback entry it answers.</p>
+<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text). Each item names the Sevak feedback entry it answers.</p>
 <h2 id="screens-and-flow"><a id="2-screens-and-flow"></a>2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -312,6 +312,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-194</strong> — A failed LLM call shall carry the provider's error text: the status code, the response body (cut to a safe length) and the provider's own error message, in a typed exception that is still an HttpRequestException, so an app can say why a call failed <em>(Lekhak feedback TR-RAG-007, added 2026-10-15)</em> <em>Screen:</em> Model routing
+<ul>
+<li><em>Acceptance:</em> When a service on Model routing answers a chat with 404 and an error message, then the thrown LlmHttpException carries that message, the body and the status.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="local-model-lifetime">Local model lifetime<a class="anchor-link" href="#local-model-lifetime">#</a></h3>
 <p>A host can unload or swap a local model while calls are still using it, and the process never crashes.</p>
@@ -325,13 +331,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="development-status"><a id="5-development-status"></a>5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-11.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-10-15.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
 <tr><td>RAG / AI requirements</td><td>11</td><td>11</td><td>0</td><td>Done</td></tr>
 <tr><td>Local model fit check</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Model routing</td><td>7</td><td>7</td><td>0</td><td>Done</td></tr>
+<tr><td>Model routing</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
 <tr><td>Local model lifetime</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 </tbody>
 </table>

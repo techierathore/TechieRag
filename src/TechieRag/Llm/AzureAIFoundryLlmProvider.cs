@@ -122,7 +122,7 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var response = await httpClient.PostAsync(completionsPath, content, cancellationToken).ConfigureAwait(false);
-        LlmHttpGuard.EnsureSuccess(response);
+        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<OpenAIChatResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -171,7 +171,7 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, completionsPath) { Content = content };
         var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        LlmHttpGuard.EnsureSuccess(response);
+        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
 
         var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);

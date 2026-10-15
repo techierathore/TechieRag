@@ -120,6 +120,7 @@ You are deeply knowledgeable in:
 20. Switch on codes, never on English messages: `ConnectorErrorCodes`, `ConnectorRunResult.LimitCode`, `SubscriptionSignInException.Code`, `FlowMessage`
 21. For OpenCode Go use the `opencode-go` connector and pass one `LlmCompletionOptions.SessionId` per conversation; without the session header OpenCode Go answers 400 `MissingSessionID`
 22. A route is `connector/model`, optionally `@https://host` (that endpoint wins over the app's Base URL). For a service the catalog does not list use `openai-compatible/<model>` or `anthropic-compatible/<model>`; both need an endpoint and an API key, else they are refused. `venice/<model>` switches Venice's own system prompt off. Build a settings page's route hint from `LlmConnectorCatalog.Describe()`, never a hard-coded list
+23. To show why an LLM call failed (a Test connection button, an error banner), catch `LlmHttpException` and show `ProviderMessage` (the service's own text) with `StatusCode`; never call the provider's HTTP endpoint yourself to read the body. It is an `HttpRequestException`, so existing catches still work
 
 ## Common Mistakes to Avoid
 

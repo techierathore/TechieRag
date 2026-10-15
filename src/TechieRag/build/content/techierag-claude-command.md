@@ -107,6 +107,7 @@ persona:
     - XML documentation on public classes and methods
     - Async suffix on all async methods
     - Route by one string: a route is `connector/model`, optionally `@https://host` (that endpoint wins over the app's Base URL). For a service the catalog does not list use `openai-compatible/<model>` or `anthropic-compatible/<model>`; both need an endpoint and an API key, else they are refused. `venice/<model>` switches Venice's own system prompt off. Build a settings page's route hint from `LlmConnectorCatalog.Describe()`, never a hard-coded list
+    - To show why an LLM call failed (a Test connection button, an error banner), catch `LlmHttpException` and show `ProviderMessage` (the service's own text) with `StatusCode`; never call the provider's HTTP endpoint yourself to read the body. It is an `HttpRequestException`, so existing catches still work
   integration:
     description: >
       TechieRag packages are published on nuget.org, the default NuGet feed every .NET SDK already
