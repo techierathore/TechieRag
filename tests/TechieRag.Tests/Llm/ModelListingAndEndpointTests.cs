@@ -80,8 +80,11 @@ public sealed class ModelListingAndEndpointTests
         Assert.Empty(handler.Requests);
 
         var failing = new RecordingHandler("""{"error":"down"}""", HttpStatusCode.InternalServerError);
-        var error = await Assert.ThrowsAsync<HttpRequestException>(
+        // An HttpRequestException still, now the LlmHttpException that carries the provider's text (REQ-RAG-134).
+        var error = await Assert.ThrowsAsync<LlmHttpException>(
             () => LlmModelLister.ListAsync(LlmConnectorCatalog.Require("openai"), "secret-key-123", failing, CancellationToken.None));
+        Assert.IsAssignableFrom<HttpRequestException>(error);
+        Assert.Equal("down", error.ProviderMessage);
         Assert.DoesNotContain("secret-key-123", error.Message, StringComparison.Ordinal);
     }
 

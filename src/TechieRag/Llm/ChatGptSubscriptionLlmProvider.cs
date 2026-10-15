@@ -191,7 +191,7 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
         var response = await SendAsync(body, session, cancellationToken).ConfigureAwait(false);
         if (response.StatusCode != HttpStatusCode.Unauthorized)
         {
-            LlmHttpGuard.EnsureSuccess(response);
+            await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
             return response;
         }
 
@@ -207,7 +207,7 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
             throw new SubscriptionSignInException(SubscriptionSignInException.CodeSessionRejected, "The ChatGPT subscription session was refused after renewal.");
         }
 
-        LlmHttpGuard.EnsureSuccess(response);
+        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         return response;
     }
 

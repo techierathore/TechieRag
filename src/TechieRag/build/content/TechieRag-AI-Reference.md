@@ -1297,7 +1297,7 @@ if (flow.UsesLanguageModel())
 
 ### Model listing and endpoints: `ListModelsAsync`, `CreateForModel(…, endpoint)`
 
-Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). `LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)` asks the service which models it serves: LM Studio `GET /v1/models`, Ollama `GET /api/tags` (names as `ollama/<name>` takes them), any OpenAI-compatible connector `GET {endpoint}/models` with the key as a bearer token, Anthropic and any Anthropic-compatible connector `GET {endpoint}/v1/models` with `x-api-key` (REQ-RAG-130). The ids come back distinct and sorted. A server that is down or refuses throws `HttpRequestException`, never an empty list; so does a service without a model list (404). Gemini, subscription and in-process connectors throw `NotSupportedException`. `CreateForModel(modelName, apiKey, endpoint: url)` sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. `endpoint` must be an absolute http or https URL. Code compiled against the five-argument `CreateForModel` keeps working.
+Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). `LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)` asks the service which models it serves: LM Studio `GET /v1/models`, Ollama `GET /api/tags` (names as `ollama/<name>` takes them), any OpenAI-compatible connector `GET {endpoint}/models` with the key as a bearer token, Anthropic and any Anthropic-compatible connector `GET {endpoint}/v1/models` with `x-api-key` (REQ-RAG-130). The ids come back distinct and sorted. A server that is down throws `HttpRequestException`, and one that refuses throws its `LlmHttpException` subtype with the service's message (REQ-RAG-134), never an empty list; so does a service without a model list (404). Gemini, subscription and in-process connectors throw `NotSupportedException`. `CreateForModel(modelName, apiKey, endpoint: url)` sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. `endpoint` must be an absolute http or https URL. Code compiled against the five-argument `CreateForModel` keeps working.
 
 ```csharp
 var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "http://192.168.1.20:1234");
@@ -1375,6 +1375,28 @@ Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-132). `LlmConnectorCatal
 foreach (var c in LlmConnectorCatalog.Describe())
 {
     hints.Add($"{c.DisplayName}: {c.ExampleRoute}{(c.RequiresApiKey ? " (key)" : "")}{(c.RequiresEndpoint ? " (Base URL)" : "")}");
+}
+```
+
+### Why a call failed: `LlmHttpException`
+
+Package `TechieRag`; namespace `TechieRag.Models` (REQ-RAG-134, Lekhak TR-RAG-007). When a service answers a chat, a stream, `ListModelsAsync` or an OpenAI-compatible speech call with a non-success status, the library throws `LlmHttpException`. It is an `HttpRequestException`, so existing `catch (HttpRequestException)` blocks still work. It has three things:
+- `StatusCode`: the HTTP status.
+- `ResponseBody`: what the service sent, cut to `LlmHttpException.MaxBodyLength` (4000) characters, or null.
+- `ProviderMessage`: the service's own explanation, read from `error.message`, `error` as text (Ollama, LM Studio), `message` or `detail`, or null.
+
+`Message` starts with the same status line as before (`Response status code does not indicate success: 404 (Not Found).`) and then adds ` Provider message: …`. A plain-text body is added as ` Response body: …` instead. An HTML error page adds nothing. The added text is cut to 500 characters. A stream throws before its first event. `LlmRateLimitException` (429, or 503 with `Retry-After`) now derives from `LlmHttpException`, so it carries the same three things as well as `RetryAfter`. Reranker and embedding calls are not covered yet; they still throw the plain `HttpRequestException`.
+
+```csharp
+try
+{
+    await llm.ChatAsync([ChatMessage.User("Say OK.")], new LlmCompletionOptions { MaxTokens = 5 });
+    status.Text = "Connected.";
+}
+catch (LlmHttpException ex)
+{
+    // ex.StatusCode == HttpStatusCode.NotFound, ex.ProviderMessage == "Specified model not found: wrong-model"
+    status.Text = $"{(int?)ex.StatusCode}: {ex.ProviderMessage ?? ex.Message}";
 }
 ```
 

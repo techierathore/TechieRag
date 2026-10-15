@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page). Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text). Each item names the Sevak feedback entry it answers.
 
 ## 2. Screens and flow
 
@@ -115,6 +115,8 @@ A host can list a service's models, reach a service on another machine by its mo
   - *Acceptance:* When an app calls LlmConnectorCatalog.Describe() on Model routing, then every connector, venice and both generic routes included, has an example route that resolves to it.
 - **BRD-193** — The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached *(owner report from Lekhak's provider page, added 2026-10-11)* *Screen:* Model routing
   - *Acceptance:* When a developer points the Anthropic provider at https://api.z.ai/api/anthropic on Model routing, then messages go to https://api.z.ai/api/anthropic/v1/messages.
+- **BRD-194** — A failed LLM call shall carry the provider's error text: the status code, the response body (cut to a safe length) and the provider's own error message, in a typed exception that is still an HttpRequestException, so an app can say why a call failed *(Lekhak feedback TR-RAG-007, added 2026-10-15)* *Screen:* Model routing
+  - *Acceptance:* When a service on Model routing answers a chat with 404 and an error message, then the thrown LlmHttpException carries that message, the body and the status.
 
 ### Local model lifetime
 
@@ -127,13 +129,13 @@ A host can unload or swap a local model while calls are still using it, and the 
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-11.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-10-15.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
 | RAG / AI requirements | 11 | 11 | 0 | Done |
 | Local model fit check | 1 | 1 | 0 | Done |
-| Model routing | 7 | 7 | 0 | Done |
+| Model routing | 8 | 8 | 0 | Done |
 | Local model lifetime | 1 | 1 | 0 | Done |
 
 ## 6. Where the rest lives

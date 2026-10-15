@@ -211,6 +211,12 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** 1) GLM answers 2) `InvalidOperationException` naming the Base URL and the `@https://` suffix 3) Venice answers in your system prompt's voice, with no Venice persona 4) rows for venice, openrouter, openai-compatible and anthropic-compatible, each with an example route.
 - **Covers:** REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133
 
+### Provider error text (phase 3)
+- **Sign in as:** user 1
+- **Steps:** 1) `CreateForModel("venice/wrong-model", "<Venice key>")` and `ChatAsync` 2) the same with a wrong key and a real model 3) `CreateForModel("ollama/no-such-model", null)` and stream a chat
+- **Expected:** 1) `LlmHttpException`, `StatusCode` 404, `ProviderMessage` naming the unknown model 2) `StatusCode` 401, `ProviderMessage` about the key 3) `LlmHttpException` before the first token, `ProviderMessage` "model 'no-such-model' not found".
+- **Covers:** REQ-RAG-134
+
 ## Automated tests
 
 ```

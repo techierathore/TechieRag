@@ -76,7 +76,7 @@ internal static class LlmModelLister
         }
 
         using var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-        LlmHttpGuard.EnsureSuccess(response);
+        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(body, cancellationToken: cancellationToken).ConfigureAwait(false);
         return read(document.RootElement)

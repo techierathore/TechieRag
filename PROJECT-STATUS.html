@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-10-11</div>
+    <div class="sub">Last rendered: 2026-10-15</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,7 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
       <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, then build and publish the package — its shipped documents are current; no agent command</div>
@@ -129,10 +129,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-10-11</td></tr>
-<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 20 of 20 verified</td></tr>
+<tr><th>last_updated</th><td>2026-10-15</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 21 of 21 verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-10-11</td></tr>
+<tr><th>last_verified_date</th><td>2026-10-15</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,7 +149,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3 (Consumer feedback from Sevak). All 20 rows Verified on 2026-10-11. New today, from Lekhak's provider page: the <code>openai-compatible/</code> and <code>anthropic-compatible/</code> routes (endpoint from the Base URL or an <code>@https://</code> suffix), a <code>venice</code> connector that switches off Venice's own system prompt, <code>LlmConnectorCatalog.Describe()</code> for settings pages, and an Anthropic endpoint-path fix (REQ-RAG-130 to 133). Both generic routes now require an API key (owner decision). Earlier today: REQ-RAG-129. All ship in the next package after 1.1.2.</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak). All 21 rows Verified on 2026-10-15. New today, from Lekhak TR-RAG-007: a failed LLM call throws <code>LlmHttpException</code> carrying the status code, the response body and the provider's own message (REQ-RAG-134, BRD-194). The AI reference, agent guides, release notes, UsageGuide and P3 DevGuide describe it, and Lekhak's feedback file has the reply. It ships in the next package after 1.1.5.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
 <pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
@@ -173,17 +173,19 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>🔶 <strong>Release:</strong> GitHub Release <code>v1.1.3</code> with its <code>RELEASE-NOTES.md</code> section, then <em>Publish to NuGet.org</em> on that tag.
+<li>🔶 <strong>Release:</strong> NuGet is at 1.1.5; publish the next release with the "Next release after 1.1.5" section of <code>RELEASE-NOTES.md</code>.
 </li>
-<li>🔶 <strong>Owner git:</strong> commit TechieRag, Chatur (TR-RAG-006 reply) and Sevak (TR-RAG-053 reply).
+<li>🔶 <strong>Owner git:</strong> commit TechieRag and Lekhak (TR-RAG-007 reply in <code>docs/Lekhak-TechieRag-Feedback.md</code>).
 </li>
-<li>🔶 <strong>No live Venice or GLM call:</strong> no key here; wire format tested on a loopback server, Venice <code>/models</code> checked live.
+<li>🔶 <strong>Behaviour change:</strong> failed LLM calls throw <code>LlmHttpException</code>; exact-type checks must accept it; rerankers, embedders not covered (REQ-RAG-134).
+</li>
+<li>🔶 <strong>No live Venice or GLM call:</strong> no key here; loopback-tested.
+</li>
+<li>🔶 <strong>CI #53:</strong> GitHub-side failure; re-run it.
 </li>
 <li>🔶 <strong>Gmail live test flaky:</strong> REQ-RAG-110 failed twice on Gmail IMAP search, then passed.
 </li>
 <li>🔶 <strong>ONNX Runtime issue:</strong> ORT-001 ready to post; fill the macOS version.
-</li>
-<li>🔶 <strong>Behaviour changes:</strong> SQLite folder, tool re-registration (REQ-RAG-121/122), Anthropic endpoint path (REQ-RAG-133).
 </li>
 <li>🔶 <strong>Local model re-check:</strong> REQ-RAG-057/059/063/065 skip below 4.6 GB free.
 </li>
@@ -199,11 +201,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-08</td><td>fix-issues</td><td>14/14 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-09</td><td>triage-and-fix + handoff</td><td>15/15 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>16/16 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-11</td><td>triage-and-fix + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-15</td><td>triage-and-fix + handoff</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-15</td><td>fix-issues</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -217,7 +219,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
 <ul>
-<li>Last check 2026-10-03: 0 findings, see the checklist Remarks.
+<li>Last check 2026-10-15: 0 findings, see the checklist Remarks.
 </li>
 </ul>
 <h2 id="deferred-future"><a id="deferred--future"></a>Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>

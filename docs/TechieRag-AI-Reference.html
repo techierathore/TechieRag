@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-11</div>
+    <div class="sub">Last rendered: 2026-10-15</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -157,6 +157,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
+        <li class="h3"><a href="#why-a-call-failed-llmhttpexception">Why a call failed: LlmHttpException</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -196,7 +197,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -249,6 +250,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
+        <li class="h3"><a href="#why-a-call-failed-llmhttpexception">Why a call failed: LlmHttpException</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -1398,7 +1400,7 @@ if (flow.UsesLanguageModel())
     var modelSteps = flow.GetLanguageModelSteps().Select(n =&gt; n.DisplayName);
 }</code></pre>
 <h3 id="model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: <code>ListModelsAsync</code>, <code>CreateForModel(…, endpoint)</code><a class="anchor-link" href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">#</a></h3>
-<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). <code>LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)</code> asks the service which models it serves: LM Studio <code>GET /v1/models</code>, Ollama <code>GET /api/tags</code> (names as <code>ollama/&lt;name&gt;</code> takes them), any OpenAI-compatible connector <code>GET {endpoint}/models</code> with the key as a bearer token, Anthropic and any Anthropic-compatible connector <code>GET {endpoint}/v1/models</code> with <code>x-api-key</code> (REQ-RAG-130). The ids come back distinct and sorted. A server that is down or refuses throws <code>HttpRequestException</code>, never an empty list; so does a service without a model list (404). Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>. <code>CreateForModel(modelName, apiKey, endpoint: url)</code> sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. <code>endpoint</code> must be an absolute http or https URL. Code compiled against the five-argument <code>CreateForModel</code> keeps working.</p>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-126 and REQ-RAG-127, Lekhak TR-RAG-004 and TR-RAG-005). <code>LlmProviderFactory.ListModelsAsync(route or connector, apiKey, endpoint?)</code> asks the service which models it serves: LM Studio <code>GET /v1/models</code>, Ollama <code>GET /api/tags</code> (names as <code>ollama/&lt;name&gt;</code> takes them), any OpenAI-compatible connector <code>GET {endpoint}/models</code> with the key as a bearer token, Anthropic and any Anthropic-compatible connector <code>GET {endpoint}/v1/models</code> with <code>x-api-key</code> (REQ-RAG-130). The ids come back distinct and sorted. A server that is down throws <code>HttpRequestException</code>, and one that refuses throws its <code>LlmHttpException</code> subtype with the service's message (REQ-RAG-134), never an empty list; so does a service without a model list (404). Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>. <code>CreateForModel(modelName, apiKey, endpoint: url)</code> sends to another host, so a LAN LM Studio or Ollama needs no rebuilt route. <code>endpoint</code> must be an absolute http or https URL. Code compiled against the five-argument <code>CreateForModel</code> keeps working.</p>
 <pre><code class="language-csharp">var ids = await LlmProviderFactory.ListModelsAsync(LlmConnectorCatalog.Require("lmstudio"), null, "http://192.168.1.20:1234");
 var llm = LlmProviderFactory.CreateForModel($"lmstudio/{ids[0]}", null, endpoint: "http://192.168.1.20:1234");
 var groqIds = await LlmProviderFactory.ListModelsAsync(ModelRouter.Require("groq/llama-3.3-70b-versatile"), groqKey);</code></pre>
@@ -1455,6 +1457,27 @@ builder.UseLlmForModel("anthropic-compatible/glm-4.6", zaiKey, "https://api.z.ai
 <pre><code class="language-csharp">foreach (var c in LlmConnectorCatalog.Describe())
 {
     hints.Add($"{c.DisplayName}: {c.ExampleRoute}{(c.RequiresApiKey ? " (key)" : "")}{(c.RequiresEndpoint ? " (Base URL)" : "")}");
+}</code></pre>
+<h3 id="why-a-call-failed-llmhttpexception">Why a call failed: <code>LlmHttpException</code><a class="anchor-link" href="#why-a-call-failed-llmhttpexception">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Models</code> (REQ-RAG-134, Lekhak TR-RAG-007). When a service answers a chat, a stream, <code>ListModelsAsync</code> or an OpenAI-compatible speech call with a non-success status, the library throws <code>LlmHttpException</code>. It is an <code>HttpRequestException</code>, so existing <code>catch (HttpRequestException)</code> blocks still work. It has three things:</p>
+<ul>
+<li><code>StatusCode</code>: the HTTP status.
+</li>
+<li><code>ResponseBody</code>: what the service sent, cut to <code>LlmHttpException.MaxBodyLength</code> (4000) characters, or null.
+</li>
+<li><code>ProviderMessage</code>: the service's own explanation, read from <code>error.message</code>, <code>error</code> as text (Ollama, LM Studio), <code>message</code> or <code>detail</code>, or null.
+</li>
+</ul>
+<p><code>Message</code> starts with the same status line as before (<code>Response status code does not indicate success: 404 (Not Found).</code>) and then adds <code> Provider message: …</code>. A plain-text body is added as <code> Response body: …</code> instead. An HTML error page adds nothing. The added text is cut to 500 characters. A stream throws before its first event. <code>LlmRateLimitException</code> (429, or 503 with <code>Retry-After</code>) now derives from <code>LlmHttpException</code>, so it carries the same three things as well as <code>RetryAfter</code>. Reranker and embedding calls are not covered yet; they still throw the plain <code>HttpRequestException</code>.</p>
+<pre><code class="language-csharp">try
+{
+    await llm.ChatAsync([ChatMessage.User("Say OK.")], new LlmCompletionOptions { MaxTokens = 5 });
+    status.Text = "Connected.";
+}
+catch (LlmHttpException ex)
+{
+    // ex.StatusCode == HttpStatusCode.NotFound, ex.ProviderMessage == "Specified model not found: wrong-model"
+    status.Text = $"{(int?)ex.StatusCode}: {ex.ProviderMessage ?? ex.Message}";
 }</code></pre>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>

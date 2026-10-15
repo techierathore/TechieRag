@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -123,6 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local">Local model lifetime: LocalLlmProvider.Dispose, DisposeAsync (TechieRag.Local)</a></li>
         <li class="h3"><a href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">Model routing: LlmProviderFactory.ListModelsAsync, CreateForModel(…, endpoint) (TechieRag)</a></li>
         <li class="h3"><a href="#generic-routes-venice-and-the-connector-list-openai-compatible-anthropic-compatible-venice-llmconnectorcatalog-describe-techierag">Generic routes, Venice and the connector list: openai-compatible/, anthropic-compatible/, venice/, LlmConnectorCatalog.Describe() (TechieRag)</a></li>
+        <li class="h3"><a href="#provider-error-text-llmhttpexception-techierag">Provider error text: LlmHttpException (TechieRag)</a></li>
         <li class="h3"><a href="#model-choice-modelchooser-imodelchooser-techierag">Model choice: ModelChooser, IModelChooser (TechieRag)</a></li>
         <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
         <li class="h3"><a href="#configuration">Configuration</a></li>
@@ -344,7 +345,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host lists a service's models and names its address; it predates this change" style="max-width:100%"></p>
 <p>REQ-RAG-126, REQ-RAG-127 (Lekhak TR-RAG-004 and TR-RAG-005, added 2026-10-08). Covered by <code>tests/TechieRag.Tests/Llm/ModelListingAndEndpointTests.cs</code>.</p>
 <p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample lists models or passes an endpoint. The tests run both calls end to end against a loopback HTTP server. Tests run 2026-10-08: REQ-RAG-126 6 passed, REQ-RAG-127 3 passed.</p>
-<p><strong>Call chain:</strong> listing: <code>ListModelsAsync(route)</code> → <code>ListModelsAsync(connector)</code> → <code>WithEndpoint(connector, endpoint)</code> → <code>LlmModelLister.ListAsync</code> → key check → path by <code>Source</code> → <code>GET</code> → <code>LlmHttpGuard.EnsureSuccess</code> → <code>ReadOpenAIModels</code> or <code>ReadOllamaModels</code> → distinct, sorted. Provider: <code>CreateForModel(…, endpoint)</code> → <code>ModelRouter.Require</code> → <code>WithEndpoint(route, endpoint)</code> → <code>Create</code>.</p>
+<p><strong>Call chain:</strong> listing: <code>ListModelsAsync(route)</code> → <code>ListModelsAsync(connector)</code> → <code>WithEndpoint(connector, endpoint)</code> → <code>LlmModelLister.ListAsync</code> → key check → path by <code>Source</code> → <code>GET</code> → <code>LlmHttpGuard.EnsureSuccessAsync</code> → <code>ReadOpenAIModels</code> or <code>ReadOllamaModels</code> → distinct, sorted. Provider: <code>CreateForModel(…, endpoint)</code> → <code>ModelRouter.Require</code> → <code>WithEndpoint(route, endpoint)</code> → <code>Create</code>.</p>
 <p>LM Studio answers <code>v1/models</code>, an OpenAI-compatible connector <code>models</code> under its own base path (so Groq's <code>/openai/v1</code> stays), Ollama <code>api/tags</code>, and an Anthropic or Anthropic-compatible connector <code>v1/models</code> with <code>x-api-key</code> (since 2026-10-11, REQ-RAG-130). A refusing or unreachable server throws; an empty list only ever means the server listed nothing. Gemini, subscription and in-process connectors throw <code>NotSupportedException</code>.</p>
 <p><code>CreateForModel</code> has two overloads. The new one ends with an optional <code>endpoint</code>. The 1.1.2 five-argument shape is kept with no defaults and hidden from IntelliSense, so code compiled against it still binds and every shorter call reaches the new one. <code>PublicOverloadsNeverGiveOneCallTwoMeanings</code> passes because both use the same names for the same positions.</p>
 <table>
@@ -354,7 +355,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td><code>src/TechieRag/Llm/LlmProviderFactory.cs:213</code></td><td><code>WithEndpoint</code></td><td><code>uri.Scheme</code></td><td><code>http</code> or <code>https</code>; anything else throws <code>ArgumentException</code></td></tr>
 <tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:43</code></td><td><code>ListAsync</code></td><td><code>path</code></td><td><code>v1/models</code> (LM Studio), <code>models</code> (OpenAI-compatible), <code>api/tags</code> (Ollama)</td></tr>
 <tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:54</code></td><td><code>ListAsync</code></td><td><code>request.RequestUri</code></td><td>the endpoint plus the path, base path kept</td></tr>
-<tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:62</code></td><td><code>ListAsync</code></td><td><code>response.StatusCode</code></td><td>2xx; 429 raises <code>LlmRateLimitException</code>, others <code>HttpRequestException</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:79</code></td><td><code>ListAsync</code></td><td><code>response.StatusCode</code></td><td>2xx; 429 raises <code>LlmRateLimitException</code>, others <code>LlmHttpException</code> with the service's message (REQ-RAG-134)</td></tr>
 <tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:65</code></td><td><code>ListAsync</code></td><td>the return</td><td>the ids, distinct and sorted ordinally</td></tr>
 </tbody>
 </table>
@@ -377,6 +378,22 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td><code>src/TechieRag/Llm/LlmModelLister.cs:49</code></td><td><code>ListAsync</code></td><td><code>path</code></td><td><code>models</code> under the <code>v1/</code> base for Anthropic-compatible</td></tr>
 <tr><td><code>src/TechieRag/TechieRagBuilder.cs:1010</code></td><td><code>CreateLlmProviderFromConfig</code></td><td><code>llmConfig.Endpoint</code></td><td>non-empty for a generic connector, else the same refusal</td></tr>
 <tr><td><code>src/TechieRag/Llm/LlmConnectorCatalog.cs:268</code></td><td><code>Describe</code></td><td>the return</td><td>every row's <code>ExampleRoute</code> resolves to its own <code>Name</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none.</p>
+<h3 id="provider-error-text-llmhttpexception-techierag">Provider error text: <code>LlmHttpException</code> (<code>TechieRag</code>)<a class="anchor-link" href="#provider-error-text-llmhttpexception-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host's Test connection shows why a call failed; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-134 (Lekhak TR-RAG-007, added 2026-10-15). Covered by <code>tests/TechieRag.Tests/Llm/ProviderErrorTextTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample makes a failing call. The tests send real HTTP to a loopback server that answers with an error status. Tests run 2026-10-15: REQ-RAG-134 4 passed, core suite 1057 passed.</p>
+<p><strong>Call chain:</strong> any provider's <code>ChatAsync</code> or <code>ChatStreamEventsAsync</code>, <code>LlmModelLister.ListAsync</code>, or the speech clients → <code>SendAsync</code> → <code>LlmHttpGuard.EnsureSuccessAsync</code> → on failure <code>ReadBodyAsync</code> (at most 4000 characters) → <code>ExtractProviderMessage</code> (<code>error.message</code>, <code>error</code> as text, <code>message</code>, <code>detail</code>, first array item) → <code>DescribeDetail</code> → <code>LlmRateLimitException</code> for 429 or 503 with <code>Retry-After</code>, else <code>LlmHttpException</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/LlmHttpGuard.cs:38</code></td><td><code>EnsureSuccessAsync</code></td><td><code>response.IsSuccessStatusCode</code></td><td>true returns without reading the body</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmHttpGuard.cs:96</code></td><td><code>ExtractProviderMessage</code></td><td>the return</td><td><code>Specified model not found: wrong-model</code> for Lekhak's 404 body; null for non-JSON</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmHttpGuard.cs:120</code></td><td><code>DescribeDetail</code></td><td>the return</td><td><code> Provider message: …</code>, <code> Response body: …</code> for plain text, empty for HTML</td></tr>
+<tr><td><code>src/TechieRag/Llm/LlmHttpGuard.cs:63</code></td><td><code>EnsureSuccessAsync</code></td><td>the thrown exception</td><td><code>LlmHttpException</code> with <code>StatusCode</code>, <code>ResponseBody</code>, <code>ProviderMessage</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:195</code></td><td><code>ChatAsync</code></td><td>the awaited guard</td><td>throws before the body is parsed as a reply</td></tr>
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> none.</p>

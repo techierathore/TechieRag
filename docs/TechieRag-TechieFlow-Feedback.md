@@ -131,6 +131,7 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Encountered in:** the follow-up `*fix-issues` run after `*triage-and-fix TechieRag`, 2026-10-11.
 - **Workaround:** run `tf-brd-status.sh <App> --phase N` by hand.
 - **Suggested fix:** in `guard-status-html.sh`, split `<App>-P<n>` into the app name and `--phase <n>` when it builds the command.
+- **Seen again 2026-10-15:** same message after a `tf-triage.sh note` on REQ-FN-057 (P2 checklist) in `*fix-issues TechieRag`; same workaround worked.
 
 ## Replies from TechieFlow
 

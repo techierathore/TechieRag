@@ -259,7 +259,7 @@ REQ-RAG-126, REQ-RAG-127 (Lekhak TR-RAG-004 and TR-RAG-005, added 2026-10-08). C
 
 **Runtime:** `static-only (unconfirmed)`: no sample lists models or passes an endpoint. The tests run both calls end to end against a loopback HTTP server. Tests run 2026-10-08: REQ-RAG-126 6 passed, REQ-RAG-127 3 passed.
 
-**Call chain:** listing: `ListModelsAsync(route)` → `ListModelsAsync(connector)` → `WithEndpoint(connector, endpoint)` → `LlmModelLister.ListAsync` → key check → path by `Source` → `GET` → `LlmHttpGuard.EnsureSuccess` → `ReadOpenAIModels` or `ReadOllamaModels` → distinct, sorted. Provider: `CreateForModel(…, endpoint)` → `ModelRouter.Require` → `WithEndpoint(route, endpoint)` → `Create`.
+**Call chain:** listing: `ListModelsAsync(route)` → `ListModelsAsync(connector)` → `WithEndpoint(connector, endpoint)` → `LlmModelLister.ListAsync` → key check → path by `Source` → `GET` → `LlmHttpGuard.EnsureSuccessAsync` → `ReadOpenAIModels` or `ReadOllamaModels` → distinct, sorted. Provider: `CreateForModel(…, endpoint)` → `ModelRouter.Require` → `WithEndpoint(route, endpoint)` → `Create`.
 
 LM Studio answers `v1/models`, an OpenAI-compatible connector `models` under its own base path (so Groq's `/openai/v1` stays), Ollama `api/tags`, and an Anthropic or Anthropic-compatible connector `v1/models` with `x-api-key` (since 2026-10-11, REQ-RAG-130). A refusing or unreachable server throws; an empty list only ever means the server listed nothing. Gemini, subscription and in-process connectors throw `NotSupportedException`.
 
@@ -271,7 +271,7 @@ LM Studio answers `v1/models`, an OpenAI-compatible connector `models` under its
 | `src/TechieRag/Llm/LlmProviderFactory.cs:213` | `WithEndpoint` | `uri.Scheme` | `http` or `https`; anything else throws `ArgumentException` |
 | `src/TechieRag/Llm/LlmModelLister.cs:43` | `ListAsync` | `path` | `v1/models` (LM Studio), `models` (OpenAI-compatible), `api/tags` (Ollama) |
 | `src/TechieRag/Llm/LlmModelLister.cs:54` | `ListAsync` | `request.RequestUri` | the endpoint plus the path, base path kept |
-| `src/TechieRag/Llm/LlmModelLister.cs:62` | `ListAsync` | `response.StatusCode` | 2xx; 429 raises `LlmRateLimitException`, others `HttpRequestException` |
+| `src/TechieRag/Llm/LlmModelLister.cs:79` | `ListAsync` | `response.StatusCode` | 2xx; 429 raises `LlmRateLimitException`, others `LlmHttpException` with the service's message (REQ-RAG-134) |
 | `src/TechieRag/Llm/LlmModelLister.cs:65` | `ListAsync` | the return | the ids, distinct and sorted ordinally |
 
 **Calculations on this service:** none.
@@ -299,6 +299,26 @@ REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133 (owner report from Lekhak's p
 | `src/TechieRag/Llm/LlmModelLister.cs:49` | `ListAsync` | `path` | `models` under the `v1/` base for Anthropic-compatible |
 | `src/TechieRag/TechieRagBuilder.cs:1010` | `CreateLlmProviderFromConfig` | `llmConfig.Endpoint` | non-empty for a generic connector, else the same refusal |
 | `src/TechieRag/Llm/LlmConnectorCatalog.cs:268` | `Describe` | the return | every row's `ExampleRoute` resolves to its own `Name` |
+
+**Calculations on this service:** none.
+
+### Provider error text: `LlmHttpException` (`TechieRag`)
+
+![Sevak's LLM settings screen, July 2026: where a host's Test connection shows why a call failed; it predates this change](screenshots/TechieRag/llm-settings.png)
+
+REQ-RAG-134 (Lekhak TR-RAG-007, added 2026-10-15). Covered by `tests/TechieRag.Tests/Llm/ProviderErrorTextTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: no sample makes a failing call. The tests send real HTTP to a loopback server that answers with an error status. Tests run 2026-10-15: REQ-RAG-134 4 passed, core suite 1057 passed.
+
+**Call chain:** any provider's `ChatAsync` or `ChatStreamEventsAsync`, `LlmModelLister.ListAsync`, or the speech clients → `SendAsync` → `LlmHttpGuard.EnsureSuccessAsync` → on failure `ReadBodyAsync` (at most 4000 characters) → `ExtractProviderMessage` (`error.message`, `error` as text, `message`, `detail`, first array item) → `DescribeDetail` → `LlmRateLimitException` for 429 or 503 with `Retry-After`, else `LlmHttpException`.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/LlmHttpGuard.cs:38` | `EnsureSuccessAsync` | `response.IsSuccessStatusCode` | true returns without reading the body |
+| `src/TechieRag/Llm/LlmHttpGuard.cs:96` | `ExtractProviderMessage` | the return | `Specified model not found: wrong-model` for Lekhak's 404 body; null for non-JSON |
+| `src/TechieRag/Llm/LlmHttpGuard.cs:120` | `DescribeDetail` | the return | ` Provider message: …`, ` Response body: …` for plain text, empty for HTML |
+| `src/TechieRag/Llm/LlmHttpGuard.cs:63` | `EnsureSuccessAsync` | the thrown exception | `LlmHttpException` with `StatusCode`, `ResponseBody`, `ProviderMessage` |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:195` | `ChatAsync` | the awaited guard | throws before the body is parsed as a reply |
 
 **Calculations on this service:** none.
 

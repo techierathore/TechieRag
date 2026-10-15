@@ -128,7 +128,7 @@ public class OpenAICompatibleSpeechToText : ISpeechToText
             .PostAsync(transcriptionsPath, form, cancellationToken)
             .ConfigureAwait(false);
 
-        LlmHttpGuard.EnsureSuccess(response);
+        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
         var transcript = ParseTranscript(json, options.IncludeSegments);

@@ -2,6 +2,14 @@
 
 Paste the section for a release into its GitHub Release when you publish it. All five packages (TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Local, TechieRag.Agents) ship together at one version. The newest release is first.
 
+## Next release after 1.1.5
+
+### Behaviour, stated plainly
+
+- **A failed LLM call now says why** (REQ-RAG-134, Lekhak TR-RAG-007). Chats, streams, `ListModelsAsync` and the OpenAI-compatible speech calls throw the new `LlmHttpException` on a non-success status. It is still an `HttpRequestException`. It carries `StatusCode`, `ResponseBody` (cut to 4000 characters) and `ProviderMessage` (the service's own `error.message`, `error`, `message` or `detail`). Its `Message` keeps the old status line and adds ` Provider message: …`, for example `Response status code does not indicate success: 404 (Not Found). Provider message: Specified model not found: wrong-model`. `LlmRateLimitException` now derives from it. Code that checks for the exact type `HttpRequestException` (`ex.GetType() == typeof(HttpRequestException)`, or xUnit's `Assert.ThrowsAsync<HttpRequestException>`) needs to accept the subtype; `catch (HttpRequestException)` is unaffected.
+
+The call example is in the AI reference the package installs (`.techierag/TechieRag-AI-Reference.md`, section "Why a call failed: `LlmHttpException`").
+
 ## Next release after 1.1.2
 
 ### Breaking changes

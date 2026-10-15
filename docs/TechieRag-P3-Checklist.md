@@ -34,6 +34,7 @@ Fix the Sevak-reported defects still open on 2026-10-06: workspace pinning and t
 | REQ-RAG-131 | The library shall have a venice connector, so venice/<model> reaches https://api.venice.ai/api/v1 with Venice's own system prompt switched off | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-131 VeniceStreamCarriesSwitchAndGenericRouteDoesNot` | [d](#d-req-rag-131) |
 | REQ-RAG-132 | The connector catalog shall describe itself for app screens through one public method: per connector its display name, whether it needs a key, whether it needs an endpoint, local or hosted, default endpoint and one example route | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-132 DescribeListsUsableConnectorsWithResolvableExamp` | [d](#d-req-rag-132) |
 | REQ-RAG-133 | The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached | Verified | 100% | 2026-10-11 verify: PASS — test `REQ-RAG-133 AnthropicProviderKeepsEndpointPath` | [d](#d-req-rag-133) |
+| REQ-RAG-134 | A failed LLM call shall carry the provider's error text: status code, trimmed response body and the provider's own error message, in a typed exception that is still an HttpRequestException (Lekhak feedback TR-RAG-007) | Verified | 100% | 2026-10-15 verify: PASS — test `REQ-RAG-134 FailedStreamCarriesProviderMessage` | [d](#d-req-rag-134) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`.
 
@@ -113,8 +114,12 @@ Fix the Sevak-reported defects still open on 2026-10-06: workspace pinning and t
 - <a id="d-req-rag-133"></a> **REQ-RAG-133** The Anthropic provider shall keep the path of its endpoint, so an Anthropic-compatible service under a path is reached *(owner report from Lekhak's provider page)*. *BRD:* BRD-193
   - *Acceptance:* When a developer points the Anthropic provider at https://api.z.ai/api/anthropic on Model routing, then messages go to https://api.z.ai/api/anthropic/v1/messages
 
+- <a id="d-req-rag-134"></a> **REQ-RAG-134** A failed LLM call shall carry the provider's error text: status code, trimmed response body and the provider's own error message, in a typed exception that is still an HttpRequestException *(Lekhak feedback TR-RAG-007)*. *BRD:* BRD-194
+  - *Acceptance:* When a service on Model routing answers a chat with 404 and an error message, then the thrown LlmHttpException carries that message, the body and the status
+
 
 ## Local model lifetime
 
 - <a id="d-req-rag-129"></a> **REQ-RAG-129** Disposing a local model provider shall cancel or wait for the calls already inside it, free the native model only once none is left, and make every call that resumes afterwards throw ObjectDisposedException before it touches the model *(Sevak feedback TR-RAG-053)*. *BRD:* BRD-189
   - *Acceptance:* When a developer disposes a local provider on Local model lifetime while three calls are inside, then each ends with ObjectDisposedException and the model is freed once
+
