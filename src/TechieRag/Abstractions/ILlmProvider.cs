@@ -23,6 +23,10 @@ public interface ILlmProvider
     /// <summary>Gets the name of the LLM model being used.</summary>
     string ModelName { get; }
 
+    /// <summary>Gets the route the provider was created for, for example <c>venice/qwen-3-6-plus</c>.</summary>
+    /// <remarks>Null when the provider was created directly and no route is known.</remarks>
+    string? Route => null;
+
     /// <summary>Gets whether this provider supports tool/function calling.</summary>
     bool SupportsToolCalling { get; }
 
@@ -97,10 +101,18 @@ public class LlmCompletionEventArgs : EventArgs
     public required int InputTokens { get; init; }
 
     /// <summary>Gets the number of output/completion tokens.</summary>
+    /// <remarks>This includes reasoning tokens; see <see cref="ReasoningTokens"/>.</remarks>
     public required int OutputTokens { get; init; }
 
     /// <summary>Gets the total tokens (input + output).</summary>
     public int TotalTokens => InputTokens + OutputTokens;
+
+    /// <summary>Gets the number of reasoning tokens reported by the provider.</summary>
+    /// <remarks>Included in <see cref="OutputTokens"/>, not additional to it.</remarks>
+    public int ReasoningTokens { get; init; }
+
+    /// <summary>Gets whether any token count was estimated because the provider sent none.</summary>
+    public bool IsEstimated { get; init; }
 
     /// <summary>Gets the duration of the LLM operation.</summary>
     public required TimeSpan Duration { get; init; }
@@ -110,6 +122,12 @@ public class LlmCompletionEventArgs : EventArgs
 
     /// <summary>Gets the provider name used.</summary>
     public required string ProviderName { get; init; }
+
+    /// <summary>Gets the route the call was made on, when the provider exposes one.</summary>
+    public string? Route { get; init; }
+
+    /// <summary>Gets the caller-supplied tag from <see cref="LlmCompletionOptions.CallerTag"/>.</summary>
+    public string? CallerTag { get; init; }
 
     /// <summary>Gets whether this was a streaming request.</summary>
     public bool IsStreaming { get; init; }

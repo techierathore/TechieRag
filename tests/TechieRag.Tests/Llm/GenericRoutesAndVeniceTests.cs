@@ -3,8 +3,10 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using TechieRag.Abstractions;
 using TechieRag.Llm;
 using TechieRag.Models;
+using TechieRag.Services;
 using Xunit;
 
 namespace TechieRag.Tests.Llm;
@@ -256,6 +258,249 @@ public sealed class GenericRoutesAndVeniceTests
             new AnthropicLlmProvider("k").EffectiveMessagesUri);
     }
 
+    /// <summary>
+    /// A Venice non-streamed reply that carries <c>completion_tokens_details.reasoning_tokens</c> is parsed
+    /// into <see cref="TokenUsage.ReasoningTokens"/>, reported on the response and raised in the completion
+    /// event (Lekhak TR-RAG-009).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 VeniceNonStreamedReplyReportsReasoningTokens")]
+    public async Task VeniceNonStreamedReplyReportsReasoningTokens()
+    {
+        const string reply =
+            """{"id":"x","object":"chat.completion","model":"qwen-3-6-plus","choices":[{"index":0,"message":{"role":"assistant","content":"5"},"finish_reason":"stop"}],"usage":{"prompt_tokens":22,"completion_tokens":191,"total_tokens":213,"completion_tokens_details":{"reasoning_tokens":173}}}""";
+
+        using var server = new LoopbackServer(reply);
+        var llm = LlmProviderFactory.CreateForModel("venice/qwen-3-6-plus", "k", endpoint: server.BaseUrl + "/api/v1");
+
+        LlmCompletionEventArgs? captured = null;
+        llm.OnCompletionCompleted += (_, args) => captured = args;
+
+        var response = await llm.ChatAsync([ChatMessage.User("Count from 1 to 5")], new LlmCompletionOptions { CallerTag = "test-agent" });
+
+        Assert.Equal(22, response.Usage.InputTokens);
+        Assert.Equal(191, response.Usage.OutputTokens);
+        Assert.Equal(173, response.Usage.ReasoningTokens);
+        Assert.False(response.Usage.IsEstimated);
+        Assert.Equal("venice/qwen-3-6-plus", response.Usage.Route);
+        Assert.Equal("test-agent", response.Usage.CallerTag);
+
+        Assert.NotNull(captured);
+        Assert.Equal(173, captured!.ReasoningTokens);
+        Assert.Equal("venice/qwen-3-6-plus", captured.Route);
+        Assert.Equal("test-agent", captured.CallerTag);
+    }
+
+    /// <summary>
+    /// A Venice streamed reply that carries a final usage chunk with reasoning tokens reports them on the
+    /// completed event and in the aggregated stream usage (Lekhak TR-RAG-008 / TR-RAG-009).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 VeniceStreamedReplyReportsReasoningTokens")]
+    public async Task VeniceStreamedReplyReportsReasoningTokens()
+    {
+        const string stream =
+            "data: {\"choices\":[{\"delta\":{\"content\":\"\"}}]}\n\n" +
+            "data: {\"choices\":[{\"delta\":{\"content\":\"5\"}}]}\n\n" +
+            "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":22,\"completion_tokens\":191,\"total_tokens\":213,\"completion_tokens_details\":{\"reasoning_tokens\":173}}}\n\n" +
+            "data: [DONE]\n\n";
+
+        using var server = new LoopbackServer(stream, "text/event-stream");
+        var llm = LlmProviderFactory.CreateForModel("venice/qwen-3-6-plus", "k", endpoint: server.BaseUrl + "/api/v1");
+
+        LlmCompletionEventArgs? captured = null;
+        llm.OnCompletionCompleted += (_, args) => captured = args;
+
+        var events = new List<LlmStreamEvent>();
+        await foreach (var ev in llm.ChatStreamEventsAsync([ChatMessage.User("Count from 1 to 5")], new LlmCompletionOptions { CallerTag = "stream-agent" }))
+        {
+            events.Add(ev);
+        }
+
+        var completed = events.Last();
+        Assert.Equal(LlmStreamEventKind.Completed, completed.Kind);
+        Assert.NotNull(completed.Usage);
+        Assert.Equal(22, completed.Usage!.InputTokens);
+        Assert.Equal(191, completed.Usage.OutputTokens);
+        Assert.Equal(173, completed.Usage.ReasoningTokens);
+        Assert.Equal("venice/qwen-3-6-plus", completed.Usage.Route);
+        Assert.Equal("stream-agent", completed.Usage.CallerTag);
+
+        Assert.NotNull(captured);
+        Assert.Equal(173, captured!.ReasoningTokens);
+    }
+
+    /// <summary>
+    /// <see cref="LlmCompletionOptions.DisableReasoning"/> maps to Venice's own
+    /// <c>venice_parameters.disable_thinking</c> and <c>strip_thinking_response</c>; <c>MaxReasoningTokens</c>
+    /// maps to <c>max_thinking_tokens</c> (Lekhak TR-RAG-009).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 VeniceReasoningControlsAreMapped")]
+    public async Task VeniceReasoningControlsAreMapped()
+    {
+        const string reply =
+            """{"id":"x","object":"chat.completion","model":"qwen-3-6-plus","choices":[{"index":0,"message":{"role":"assistant","content":"5"},"finish_reason":"stop"}],"usage":{"prompt_tokens":22,"completion_tokens":20,"total_tokens":42}}""";
+
+        using var server = new LoopbackServer(reply);
+        var llm = LlmProviderFactory.CreateForModel("venice/qwen-3-6-plus", "k", endpoint: server.BaseUrl + "/api/v1");
+        await llm.ChatAsync(
+            [ChatMessage.User("Count from 1 to 5")],
+            new LlmCompletionOptions { DisableReasoning = true, MaxReasoningTokens = 50 });
+
+        var request = Assert.Single(server.Requests);
+        using var body = JsonDocument.Parse(request.Body);
+        var veniceParams = body.RootElement.GetProperty("venice_parameters");
+        Assert.True(veniceParams.GetProperty("disable_thinking").GetBoolean());
+        Assert.True(veniceParams.GetProperty("strip_thinking_response").GetBoolean());
+        Assert.Equal(50, veniceParams.GetProperty("max_thinking_tokens").GetInt32());
+        Assert.False(veniceParams.GetProperty("include_venice_system_prompt").GetBoolean());
+    }
+
+    /// <summary>
+    /// A host can cap the request timeout on <see cref="LlmCompletionOptions.RequestTimeout"/> so a call is
+    /// not cut off at the provider's old 120-second default (Lekhak TR-RAG-010).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-136 VeniceRequestTimeoutIsHonoured")]
+    public async Task VeniceRequestTimeoutIsHonoured()
+    {
+        using var server = new LoopbackServer(
+            """{"id":"x","object":"chat.completion","model":"qwen-3-6-plus","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}""",
+            delay: TimeSpan.FromMilliseconds(300));
+
+        var llm = LlmProviderFactory.CreateForModel("venice/qwen-3-6-plus", "k", endpoint: server.BaseUrl + "/api/v1");
+
+        // A short per-call timeout cancels before the slow reply arrives.
+        var shortCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => llm.ChatAsync([ChatMessage.User("hi")], new LlmCompletionOptions { RequestTimeout = TimeSpan.FromMilliseconds(100) }, shortCts.Token));
+
+        // A long per-call timeout lets the slow reply finish even though the old default was 120 s.
+        var response = await llm.ChatAsync(
+            [ChatMessage.User("hi")],
+            new LlmCompletionOptions { RequestTimeout = TimeSpan.FromSeconds(2) });
+        Assert.Equal("ok", response.Content);
+    }
+
+    /// <summary>
+    /// An LM Studio non-streamed reply carries the route and caller tag on the response usage and in the
+    /// completion event, using the same OpenAI-compatible shape as Venice.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 LmStudioRouteAndCallerTagAreReported")]
+    public async Task LmStudioRouteAndCallerTagAreReported()
+    {
+        using var server = new LoopbackServer(ChatCompletionReply);
+        var llm = LlmProviderFactory.CreateForModel("lmstudio/qwen2.5", null, endpoint: server.BaseUrl + "/v1");
+
+        LlmCompletionEventArgs? captured = null;
+        llm.OnCompletionCompleted += (_, args) => captured = args;
+
+        var response = await llm.ChatAsync(
+            [ChatMessage.User("hi")],
+            new LlmCompletionOptions { CallerTag = "lmstudio-agent" });
+
+        Assert.Equal("lmstudio/qwen2.5", response.Usage.Route);
+        Assert.Equal("lmstudio-agent", response.Usage.CallerTag);
+        Assert.NotNull(captured);
+        Assert.Equal("lmstudio/qwen2.5", captured!.Route);
+        Assert.Equal("lmstudio-agent", captured.CallerTag);
+    }
+
+    /// <summary>
+    /// An Ollama non-streamed reply carries the route and caller tag on the response usage and in the
+    /// completion event.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 OllamaRouteAndCallerTagAreReported")]
+    public async Task OllamaRouteAndCallerTagAreReported()
+    {
+        const string reply =
+            """{"message":{"role":"assistant","content":"Hello"},"done":true,"done_reason":"stop","prompt_eval_count":3,"eval_count":2}""";
+
+        using var server = new LoopbackServer(reply);
+        var llm = LlmProviderFactory.CreateForModel("ollama/llama3.2", null, endpoint: server.BaseUrl);
+
+        LlmCompletionEventArgs? captured = null;
+        llm.OnCompletionCompleted += (_, args) => captured = args;
+
+        var response = await llm.ChatAsync(
+            [ChatMessage.User("hi")],
+            new LlmCompletionOptions { CallerTag = "ollama-agent" });
+
+        Assert.Equal("Hello", response.Content);
+        Assert.Equal("ollama/llama3.2", response.Usage.Route);
+        Assert.Equal("ollama-agent", response.Usage.CallerTag);
+        Assert.NotNull(captured);
+        Assert.Equal("ollama/llama3.2", captured!.Route);
+        Assert.Equal("ollama-agent", captured.CallerTag);
+    }
+
+    /// <summary>
+    /// An Anthropic non-streamed reply carries the route and caller tag on the response usage and in the
+    /// completion event.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 AnthropicRouteAndCallerTagAreReported")]
+    public async Task AnthropicRouteAndCallerTagAreReported()
+    {
+        const string reply =
+            """{"id":"msg_1","type":"message","role":"assistant","model":"claude-3","content":[{"type":"text","text":"Hello"}],"stop_reason":"end_turn","usage":{"input_tokens":3,"output_tokens":1}}""";
+
+        using var server = new LoopbackServer(reply);
+        var llm = LlmProviderFactory.CreateForModel("anthropic/claude-3", "k", endpoint: server.BaseUrl + "/api/anthropic");
+
+        LlmCompletionEventArgs? captured = null;
+        llm.OnCompletionCompleted += (_, args) => captured = args;
+
+        var response = await llm.ChatAsync(
+            [ChatMessage.User("hi")],
+            new LlmCompletionOptions { CallerTag = "anthropic-agent" });
+
+        Assert.Equal("Hello", response.Content);
+        Assert.Equal("anthropic/claude-3", response.Usage.Route);
+        Assert.Equal("anthropic-agent", response.Usage.CallerTag);
+        Assert.NotNull(captured);
+        Assert.Equal("anthropic/claude-3", captured!.Route);
+        Assert.Equal("anthropic-agent", captured.CallerTag);
+    }
+
+    /// <summary>
+    /// A per-call request timeout cancels a slow LM Studio provider before the old 120-second default.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-136 RequestTimeoutCancelsSlowProvider")]
+    public async Task RequestTimeoutCancelsSlowProvider()
+    {
+        using var server = new LoopbackServer(
+            """{"id":"x","object":"chat.completion","model":"qwen2.5","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}""",
+            delay: TimeSpan.FromMilliseconds(300));
+
+        var llm = LlmProviderFactory.CreateForModel("lmstudio/qwen2.5", null, endpoint: server.BaseUrl + "/v1");
+        var hostCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+        var ex = await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => llm.ChatAsync(
+                [ChatMessage.User("hi")],
+                new LlmCompletionOptions { RequestTimeout = TimeSpan.FromMilliseconds(100) },
+                hostCts.Token));
+
+        Assert.True(hostCts.Token.IsCancellationRequested || ex.Message.Contains("canceled", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// <see cref="BudgetEnforcingLlmProvider"/> refuses further calls once the session budget is spent, raising
+    /// <see cref="TechieRagBudgetExceededException"/> before the underlying provider is asked.
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-135 BudgetEnforcingProviderRefusesCallsOnceSpent")]
+    public void BudgetEnforcingProviderRefusesCallsOnceSpent()
+    {
+        var tracker = new TokenUsageTracker();
+        tracker.SetBudget(new UsageBudget { MaxTotalTokens = 10, BlockOnExceeded = true });
+        tracker.RecordUsage(new TokenUsage { InputTokens = 5, OutputTokens = 6, ModelName = "m", ProviderName = "p" });
+
+        var fake = new TestDoubles.FakeLlmProvider { ModelName = "m" };
+        var guarded = new BudgetEnforcingLlmProvider(fake, tracker);
+
+        var ex = Assert.Throws<TechieRagBudgetExceededException>(
+            () => guarded.ChatAsync([ChatMessage.User("hi")], new LlmCompletionOptions { CallerTag = "agent-1" }).GetAwaiter().GetResult());
+        Assert.Contains("agent-1", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("agent-1", ex.CallerTag);
+    }
+
     /// <summary>One request seen by the loopback server.</summary>
     /// <param name="Line">"METHOD /path".</param>
     /// <param name="Authorization">The Authorization header, or null.</param>
@@ -269,14 +514,17 @@ public sealed class GenericRoutesAndVeniceTests
         private readonly HttpListener listener = new();
         private readonly string body;
         private readonly string contentType;
+        private readonly TimeSpan delay;
 
         /// <summary>Starts the server on a free loopback port.</summary>
         /// <param name="body">The body every request gets.</param>
         /// <param name="contentType">The reply's content type.</param>
-        public LoopbackServer(string body, string contentType = "application/json")
+        /// <param name="delay">Artificial delay before the response body is written.</param>
+        public LoopbackServer(string body, string contentType = "application/json", TimeSpan? delay = null)
         {
             this.body = body;
             this.contentType = contentType;
+            this.delay = delay ?? TimeSpan.Zero;
             var probe = new TcpListener(IPAddress.Loopback, 0);
             probe.Start();
             var port = ((IPEndPoint)probe.LocalEndpoint).Port;
@@ -317,6 +565,11 @@ public sealed class GenericRoutesAndVeniceTests
                         context.Request.Headers["Authorization"],
                         context.Request.Headers["x-api-key"],
                         await reader.ReadToEndAsync()));
+                }
+
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay);
                 }
 
                 var bytes = Encoding.UTF8.GetBytes(body);

@@ -39,26 +39,32 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
     private readonly ChatGptDeviceSignIn signIn;
     private readonly SemaphoreSlim sessionGate = new(1, 1);
     private readonly ILogger<ChatGptSubscriptionLlmProvider> logger;
+    private readonly TimeSpan? configuredTimeout;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="signInCallback">Called with the page and code when the user must sign in; the host opens the browser.</param>
     /// <param name="options">Model, session store and endpoints; null uses the defaults.</param>
     /// <param name="logger">Logger; never receives a token.</param>
+    /// <param name="requestTimeout">Optional default timeout for model calls from this provider; null uses 120 seconds.</param>
     /// <exception cref="ArgumentNullException"><paramref name="signInCallback"/> is null.</exception>
     public ChatGptSubscriptionLlmProvider(
         Func<SubscriptionSignInPrompt, CancellationToken, Task> signInCallback,
         ChatGptSubscriptionOptions? options = null,
-        ILogger<ChatGptSubscriptionLlmProvider>? logger = null)
+        ILogger<ChatGptSubscriptionLlmProvider>? logger = null,
+        TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(signInCallback);
 
         this.signInCallback = signInCallback;
         this.options = options ?? new ChatGptSubscriptionOptions();
         this.logger = logger ?? NullLogger<ChatGptSubscriptionLlmProvider>.Instance;
+        configuredTimeout = requestTimeout;
         sessionStore = this.options.SessionStore ?? new InMemorySubscriptionSessionStore();
         httpClient = new HttpClient(this.options.Handler ?? HttpWebContentFetcher.CreateGuardedHandler(), disposeHandler: this.options.Handler is null)
         {
-            Timeout = TimeSpan.FromSeconds(120)
+            // The effective timeout for model calls is enforced per-call through a linked cancellation token,
+            // so the HttpClient timeout must never truncate a host token that allows more time (TR-RAG-010).
+            Timeout = Timeout.InfiniteTimeSpan
         };
         signIn = new ChatGptDeviceSignIn(httpClient, this.options);
         ModelName = this.options.Model;
@@ -69,6 +75,9 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
 
     /// <inheritdoc/>
     public string ModelName { get; }
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
 
     /// <inheritdoc/>
     public bool SupportsToolCalling => true;
@@ -170,16 +179,19 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
         bool isStreaming,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var stopwatch = Stopwatch.StartNew();
         var body = JsonSerializer.Serialize(OpenAIResponsesRequest.Build(messages, options, ModelName, this.options.DefaultInstructions));
-        using var response = await SendWithSessionAsync(body, cancellationToken).ConfigureAwait(false);
+        using var response = await SendWithSessionAsync(body, callToken).ConfigureAwait(false);
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
         var context = new StreamReadContext(Name, options?.Model ?? ModelName, messages, EstimateTokenCount, (usage, involvedToolCalls) =>
-            RaiseCompletionEvent(usage, stopwatch.Elapsed, isStreaming, involvedToolCalls));
+            RaiseCompletionEvent(usage, stopwatch.Elapsed, isStreaming, involvedToolCalls), Route, options?.CallerTag);
 
-        await foreach (var streamEvent in OpenAIResponsesStreamReader.ReadAsync(reader, context, cancellationToken).ConfigureAwait(false))
+        await foreach (var streamEvent in OpenAIResponsesStreamReader.ReadAsync(reader, context, callToken).ConfigureAwait(false))
         {
             yield return streamEvent;
         }
@@ -292,9 +304,13 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
         {
             InputTokens = usage.InputTokens,
             OutputTokens = usage.OutputTokens,
+            ReasoningTokens = usage.ReasoningTokens,
+            IsEstimated = usage.IsEstimated,
             Duration = duration,
             ModelName = usage.ModelName,
             ProviderName = Name,
+            Route = Route,
+            CallerTag = usage.CallerTag,
             IsStreaming = isStreaming,
             InvolvedToolCalls = involvedToolCalls
         });

@@ -10,6 +10,7 @@
     - TechieRag-AI-Reference.md → .techierag/TechieRag-AI-Reference.md
     - techierag-claude-command.md → .claude/commands/techierag.md
     - techierag-opencode-command.md → .opencode/command/techierag.md
+    - techierag-codex-agent.toml → .codex/agents/techierag.toml
 
     SkipUnchangedFiles=true ensures files are only written when content has actually changed,
     so builds remain fast when files are already up to date.
@@ -56,6 +57,14 @@
     <MakeDir Directories="$(TechieRagRepoRoot).opencode\command" />
     <Copy SourceFiles="$(TechieRagContentDir)techierag-opencode-command.md"
           DestinationFiles="$(TechieRagRepoRoot).opencode\command\techierag.md"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Deploy Codex agent file to repo root on every build -->
+  <Target Name="TechieRagDeployCodexAgent" AfterTargets="Build">
+    <MakeDir Directories="$(TechieRagRepoRoot).codex\agents" />
+    <Copy SourceFiles="$(TechieRagContentDir)techierag-codex-agent.toml"
+          DestinationFiles="$(TechieRagRepoRoot).codex\agents\techierag.toml"
           SkipUnchangedFiles="true" />
   </Target>
 

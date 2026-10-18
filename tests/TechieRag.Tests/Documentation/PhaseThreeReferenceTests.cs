@@ -84,7 +84,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(14, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007)
+        Assert.Equal(19, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007) + TR-RAG-052 (Sevak local tool calling) + consumption monitoring / reasoning controls / timeout / codex agent (feedback sweep 2026-10-16)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 

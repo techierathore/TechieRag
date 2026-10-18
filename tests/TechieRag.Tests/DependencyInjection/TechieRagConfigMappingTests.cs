@@ -31,7 +31,7 @@ public class TechieRagConfigMappingTests
     private static readonly HashSet<Type> LeafTypes =
     [
         typeof(string), typeof(int), typeof(long), typeof(float), typeof(decimal), typeof(bool),
-        typeof(Dictionary<string, ModelPricing>), typeof(Dictionary<string, string>)
+        typeof(TimeSpan), typeof(Dictionary<string, ModelPricing>), typeof(Dictionary<string, string>)
     ];
 
     /// <summary>
@@ -336,6 +336,7 @@ public class TechieRagConfigMappingTests
             _ when type == typeof(float) => 0.25f + (index / 100f),
             _ when type == typeof(decimal) => 12.5m + index,
             _ when type == typeof(bool) => !(bool)current!,
+            _ when type == typeof(TimeSpan) => TimeSpan.FromSeconds(100 + index),
             _ when type == typeof(Dictionary<string, ModelPricing>) => new Dictionary<string, ModelPricing>(StringComparer.OrdinalIgnoreCase)
             {
                 ["sentinel-model"] = new ModelPricing { InputPerMillionUsd = 1.5m, OutputPerMillionUsd = 2.5m }

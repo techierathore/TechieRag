@@ -183,7 +183,7 @@ public class ModelDownloadService
     private static readonly Lazy<ModelDownloadService> Shared = new(() => new ModelDownloadService(null));
 
     /// <summary>A file on disk at this fraction of its expected size counts as downloaded.</summary>
-    private const double CompleteFraction = 0.95;
+
 
     /// <summary>Minimum gap between two byte-progress events.</summary>
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromMilliseconds(250);
@@ -452,10 +452,15 @@ public class ModelDownloadService
     /// <param name="directory">The model folder.</param>
     /// <param name="file">The file.</param>
     /// <returns><see langword="true"/> when it need not be fetched.</returns>
+    /// <remarks>
+    /// The size must match the pin exactly. A file that is larger (for example from an earlier
+    /// conversion or version) is treated as incomplete so the whole pinned file is downloaded and
+    /// the stale copy is overwritten (TR-RAG-051).
+    /// </remarks>
     private static bool IsFileComplete(string directory, ModelDownloadFile file)
     {
         var path = Path.Combine(directory, file.FileName);
-        return File.Exists(path) && new FileInfo(path).Length >= file.ExpectedBytes * CompleteFraction;
+        return File.Exists(path) && new FileInfo(path).Length == file.ExpectedBytes;
     }
 
     /// <summary>The length of a partial file left by an interrupted download.</summary>

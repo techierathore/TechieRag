@@ -1,6 +1,7 @@
 using TechieRag.Local.Tests.Conformance;
 using TechieRag.Local.Tests.TestDoubles;
 using TechieRag.Models;
+using TechieRag.Services;
 using Xunit;
 
 namespace TechieRag.Local.Tests;
@@ -254,5 +255,203 @@ public sealed class LocalLlmProviderTests
         var required = LocalModel.Qwen25Instruct05B.EstimateMemoryBytes(491_400_032, 2_048);
 
         Assert.Equal(491_400_032 + (12_288L * 2_048) + LocalModel.RuntimeOverheadBytes, required);
+    }
+
+    /// <summary>The shipped catalogue models advertise tool calling; a plain folder model does not.</summary>
+    [Fact]
+    public void CatalogueModelsSupportToolCalling()
+    {
+        Assert.True(LocalModel.Qwen25Instruct05B.SupportsToolCalling);
+        Assert.True(LocalModel.Phi3Mini4kInstruct.SupportsToolCalling);
+
+        using var unsupported = FakeProviderFactory.Create(runtime);
+        Assert.False(unsupported.SupportsToolCalling);
+    }
+
+    /// <summary>A model that does not support tool calling still refuses a request that carries tools.</summary>
+    [Fact]
+    public async Task UnsupportedModelRefusesTools()
+    {
+        using var provider = FakeProviderFactory.Create(runtime);
+        var options = new LlmCompletionOptions
+        {
+            Tools = [new ToolDefinition { Name = "lookup", Description = "Looks things up.", ParametersSchema = """{"type":"object"}""" }]
+        };
+
+        var error = await Assert.ThrowsAsync<NotSupportedException>(() => provider.ChatAsync([ChatMessage.User("Hi")], options));
+
+        Assert.Contains("SupportsToolCalling is false", error.Message);
+    }
+
+    /// <summary>When tools are supplied, the prompt contains the tool definitions and the tool-call instruction.</summary>
+    [Fact]
+    public async Task ToolDefinitionsReachThePrompt()
+    {
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+        var options = new LlmCompletionOptions
+        {
+            SystemPrompt = "Be helpful.",
+            Tools = [new ToolDefinition
+            {
+                Name = "get_weather",
+                Description = "Gets the weather for a city.",
+                ParametersSchema = """{"type":"object","properties":{"city":{"type":"string"}}}"""
+            }]
+        };
+
+        await provider.ChatAsync([ChatMessage.User("What's the weather?")], options);
+
+        var prompt = runtime.Prompts.Single();
+        Assert.Contains("<tools>", prompt);
+        Assert.Contains("get_weather", prompt);
+        Assert.Contains("Be helpful.", prompt);
+        Assert.Contains("<tool_call>", prompt);
+    }
+
+    /// <summary>A Qwen-style tool-call block is parsed into response tool calls with generated ids.</summary>
+    [Fact]
+    public async Task QwenToolCallBlockIsParsed()
+    {
+        runtime.Script = (_, _) =>
+        [
+            "<tool_call>\n",
+            """{"name":"get_weather","arguments":{"city":"Paris"}}""",
+            "\n</tool_call>"
+        ];
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+        var options = new LlmCompletionOptions
+        {
+            Tools = [new ToolDefinition
+            {
+                Name = "get_weather",
+                Description = "Gets the weather for a city.",
+                ParametersSchema = """{"type":"object","properties":{"city":{"type":"string"}}}"""
+            }]
+        };
+
+        var response = await provider.ChatAsync([ChatMessage.User("Weather in Paris?")], options);
+
+        Assert.True(response.HasToolCalls);
+        Assert.Equal("tool_calls", response.FinishReason);
+        Assert.Null(response.Content);
+        var call = Assert.Single(response.ToolCalls);
+        Assert.Equal("get_weather", call.Name);
+        Assert.Contains("Paris", call.ArgumentsJson);
+        Assert.False(string.IsNullOrEmpty(call.Id));
+    }
+
+    /// <summary>Multiple Qwen-style tool-call blocks in one answer become multiple tool calls.</summary>
+    [Fact]
+    public async Task MultipleQwenToolCallsAreParsed()
+    {
+        runtime.Script = (_, _) =>
+        [
+            "<tool_call>{\"name\":\"a\",\"arguments\":{}}</tool_call><tool_call>{\"name\":\"b\",\"arguments\":{}}</tool_call>"
+        ];
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+        var options = new LlmCompletionOptions
+        {
+            Tools =
+            [
+                new ToolDefinition { Name = "a", Description = "A.", ParametersSchema = "{}" },
+                new ToolDefinition { Name = "b", Description = "B.", ParametersSchema = "{}" }
+            ]
+        };
+
+        var response = await provider.ChatAsync([ChatMessage.User("Call both.")], options);
+
+        Assert.Equal(2, response.ToolCalls!.Count);
+        Assert.Equal("a", response.ToolCalls[0].Name);
+        Assert.Equal("b", response.ToolCalls[1].Name);
+    }
+
+    /// <summary>A plain text answer when tools are present is not misidentified as a tool call.</summary>
+    [Fact]
+    public async Task PlainTextAnswerWithToolsIsNotParsedAsToolCall()
+    {
+        runtime.Script = (_, _) => ["I don't need a tool."];
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+        var options = new LlmCompletionOptions
+        {
+            Tools = [new ToolDefinition { Name = "lookup", Description = "Looks things up.", ParametersSchema = "{}" }]
+        };
+
+        var response = await provider.ChatAsync([ChatMessage.User("Hi")], options);
+
+        Assert.False(response.HasToolCalls);
+        Assert.Equal("I don't need a tool.", response.Content);
+        Assert.Equal("stop", response.FinishReason);
+    }
+
+    /// <summary>A tool result message is wrapped in the model's tool-response format for the next turn.</summary>
+    [Fact]
+    public async Task ToolResultIsFormattedForNextTurn()
+    {
+        runtime.Script = (_, _) => ["Done."];
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+
+        await provider.ChatAsync(
+        [
+            ChatMessage.User("Call a tool."),
+            new ChatMessage { Role = "tool", ToolCallId = "c1", Name = "get_weather", Content = "Sunny, 22 C." }
+        ]);
+
+        var prompt = runtime.Prompts.Single();
+        Assert.Contains("<tool_response>", prompt);
+        Assert.Contains("get_weather", prompt);
+        Assert.Contains("Sunny, 22 C.", prompt);
+    }
+
+    /// <summary>A tool-call turn streamed from a supported model yields tool-call events, not text deltas.</summary>
+    [Fact]
+    public async Task StreamedToolCallYieldsToolCallEvents()
+    {
+        runtime.Script = (_, _) =>
+        [
+            "<tool_call>{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}</tool_call>"
+        ];
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+        var options = new LlmCompletionOptions
+        {
+            Tools = [new ToolDefinition
+            {
+                Name = "get_weather",
+                Description = "Gets the weather for a city.",
+                ParametersSchema = """{"type":"object","properties":{"city":{"type":"string"}}}"""
+            }]
+        };
+
+        var events = new List<LlmStreamEvent>();
+        await foreach (var streamEvent in provider.ChatStreamEventsAsync([ChatMessage.User("Weather?")], options))
+        {
+            events.Add(streamEvent);
+        }
+
+        Assert.Contains(events, e => e.Kind == LlmStreamEventKind.ToolCall);
+        Assert.DoesNotContain(events, e => e.Kind == LlmStreamEventKind.TextDelta);
+        Assert.Equal("tool_calls", events[^1].FinishReason);
+    }
+
+    /// <summary>The agent loop runs a tool through the local provider and receives the final answer.</summary>
+    [Fact]
+    public async Task AgentLoopRunsToolCallAndReturnsFinalAnswer()
+    {
+        var registry = new ToolRegistry();
+        registry.Register("get_weather", "Gets the weather for a city.",
+            """{"type":"object","properties":{"city":{"type":"string"}}}""",
+            arguments => "Sunny, 22 C in Paris.");
+
+        runtime.Script = (prompt, _) =>
+            prompt.Contains("<tool_response>", StringComparison.Ordinal)
+                ? ["The weather in Paris is sunny and 22 C."]
+                : ["<tool_call>{\"name\":\"get_weather\",\"arguments\":{\"city\":\"Paris\"}}</tool_call>"];
+
+        using var provider = FakeProviderFactory.Create(runtime, supportsToolCalling: true);
+        var runner = new AgentLoopRunner(provider, registry);
+
+        var response = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);
+
+        Assert.False(response.HasToolCalls);
+        Assert.Contains("22 C", response.Content);
     }
 }

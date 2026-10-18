@@ -30,12 +30,16 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     private readonly Uri messagesUri;
     private readonly int defaultMaxTokens;
     private readonly ILogger<AnthropicLlmProvider> logger;
+    private readonly TimeSpan? configuredTimeout;
 
     /// <inheritdoc/>
     public string Name => "Anthropic";
 
     /// <inheritdoc/>
     public string ModelName { get; }
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
 
     /// <inheritdoc/>
     public bool SupportsToolCalling => true;
@@ -61,7 +65,8 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <c>{endpoint}/v1/messages</c>; an endpoint that already ends in <c>/v1</c> is not given a second one (REQ-RAG-133).</param>
     /// <param name="maxTokens">Default max output tokens.</param>
     /// <param name="logger">Logger instance.</param>
-    public AnthropicLlmProvider(string apiKey, string model = "claude-sonnet-4-5-20250929", string? endpoint = null, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    public AnthropicLlmProvider(string apiKey, string model = "claude-sonnet-4-5-20250929", string? endpoint = null, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null, TimeSpan? requestTimeout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(apiKey);
         ArgumentException.ThrowIfNullOrEmpty(model);
@@ -69,13 +74,16 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         ModelName = model;
         defaultMaxTokens = maxTokens;
         this.logger = logger ?? NullLogger<AnthropicLlmProvider>.Instance;
+        configuredTimeout = requestTimeout;
 
         var versionedBase = VersionedBase(endpoint ?? "https://api.anthropic.com");
         messagesUri = new Uri(versionedBase, "messages");
         httpClient = new HttpClient
         {
             BaseAddress = versionedBase,
-            Timeout = TimeSpan.FromSeconds(120)
+            // The effective timeout is enforced per-call through a linked cancellation token, so the
+            // HttpClient timeout must never truncate a host token that allows more time (TR-RAG-010).
+            Timeout = Timeout.InfiniteTimeSpan
         };
         httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
         httpClient.DefaultRequestHeaders.Add("anthropic-version", ApiVersion);
@@ -89,7 +97,8 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="model">Model name.</param>
     /// <param name="maxTokens">Default max output tokens.</param>
     /// <param name="logger">Logger instance.</param>
-    internal AnthropicLlmProvider(HttpClient httpClient, string model, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    internal AnthropicLlmProvider(HttpClient httpClient, string model, int maxTokens = 2048, ILogger<AnthropicLlmProvider>? logger = null, TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
@@ -99,6 +108,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         ModelName = model;
         defaultMaxTokens = maxTokens;
         this.logger = logger ?? NullLogger<AnthropicLlmProvider>.Instance;
+        configuredTimeout = requestTimeout;
     }
 
     /// <summary>The absolute URI messages are posted to.</summary>
@@ -146,15 +156,18 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildAnthropicRequest(messages, options);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync(messagesUri, content, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.PostAsync(messagesUri, content, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var responseJson = await response.Content.ReadAsStringAsync(callToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("Failed to parse Anthropic response");
 
@@ -177,6 +190,9 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
                 OutputTokens = outputTokens,
                 CacheReadTokens = cacheReadTokens,
                 CacheWriteTokens = cacheWriteTokens,
+                IsEstimated = result.Usage is null,
+                Route = Route,
+                CallerTag = options?.CallerTag,
                 ModelName = ModelName,
                 ProviderName = Name
             },
@@ -184,7 +200,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
             ModelName = result.Model ?? ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens, cacheWriteTokens);
+        RaiseCompletionEvent(llmResponse.Usage, sw.Elapsed, false, llmResponse.HasToolCalls);
         return llmResponse;
     }
 
@@ -198,6 +214,9 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// they are assembled and the call is emitted when its block stops (REQ-RAG-067 / BRD-110).</remarks>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildAnthropicRequest(messages, options);
         ((Dictionary<string, object>)request)["stream"] = true;
@@ -205,16 +224,16 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, messagesUri) { Content = content };
-        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
         var state = new AnthropicStreamState();
 
         // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        while (await reader.ReadLineAsync(callToken).ConfigureAwait(false) is { } line)
         {
             if (string.IsNullOrEmpty(line)) continue;
 
@@ -233,10 +252,10 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
             }
         }
 
-        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { });
+        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { }, Route, options?.CallerTag);
         var usage = context.BuildUsage(state.InputTokens, state.OutputTokens, state.CacheReadTokens, state.OutputText.ToString(), state.CacheWriteTokens);
         sw.Stop();
-        RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, state.ToolCallCount > 0, usage.CacheReadTokens, usage.CacheWriteTokens);
+        RaiseCompletionEvent(usage, sw.Elapsed, true, state.ToolCallCount > 0);
 
         var finishReason = state.StopReason == "tool_use" ? "tool_calls" : state.StopReason ?? (state.ToolCallCount > 0 ? "tool_calls" : "stop");
         yield return LlmStreamEvent.FromCompleted(usage, finishReason, ModelName);
@@ -507,18 +526,23 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return toolUses.Count > 0 ? toolUses : null;
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0, int cacheWriteTokens = 0)
+    private void RaiseCompletionEvent(TokenUsage usage, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
     {
         TechieRagTelemetry.RecordLlmCompletion(
-            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens, cacheWriteTokens);
+            Name, ModelName, usage.InputTokens, usage.OutputTokens, duration, isStreaming,
+            usage.CacheReadTokens, usage.CacheWriteTokens);
 
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens,
+            InputTokens = usage.InputTokens,
+            OutputTokens = usage.OutputTokens,
+            ReasoningTokens = usage.ReasoningTokens,
+            IsEstimated = usage.IsEstimated,
             Duration = duration,
             ModelName = ModelName,
             ProviderName = Name,
+            Route = Route,
+            CallerTag = usage.CallerTag,
             IsStreaming = isStreaming,
             InvolvedToolCalls = involvedToolCalls
         });

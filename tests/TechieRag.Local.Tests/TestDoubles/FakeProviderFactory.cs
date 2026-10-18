@@ -8,16 +8,23 @@ internal static class FakeProviderFactory
     /// <param name="configure">Optional settings.</param>
     /// <param name="freeMemory">What the memory reading returns; null means unknown.</param>
     /// <param name="isPhone">Whether to behave as on Android or iOS.</param>
+    /// <param name="supportsToolCalling">Whether the folder model should advertise tool calling.</param>
     /// <returns>The provider.</returns>
     public static LocalLlmProvider Create(
         FakeLocalLlmRuntime? runtime,
         Action<LocalLlmOptions>? configure = null,
         long? freeMemory = null,
-        bool isPhone = false)
+        bool isPhone = false,
+        bool supportsToolCalling = false)
     {
         var options = new LocalLlmOptions
         {
-            Model = LocalModel.FromFolder(Path.Combine(Path.GetTempPath(), "techierag-local-tests", "fake-model"), LocalChatTemplate.ChatMl)
+            Model = LocalModel.FromFolder(
+                Path.Combine(Path.GetTempPath(), "techierag-local-tests", "fake-model"),
+                LocalChatTemplate.ChatMl,
+                4_096,
+                131_072,
+                supportsToolCalling)
         };
         configure?.Invoke(options);
         return new LocalLlmProvider(options, null, runtime, new MemoryGate(() => freeMemory), LocalModelStore.Shared, isPhone);

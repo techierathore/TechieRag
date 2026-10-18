@@ -133,6 +133,30 @@ public sealed class LocalModelStoreTests : IDisposable
     }
 
     /// <summary>
+    /// A file left by an earlier conversion that is larger than the current pin is treated as
+    /// incomplete, so the terms show the real remaining cost and the stale file is overwritten
+    /// rather than deleted one-by-one during verification (TR-RAG-051).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-061 LargerStaleFileIsReplacedAtFullPendingSize")]
+    public async Task LargerStaleFileIsReplacedAtFullPendingSize()
+    {
+        var (model, variant) = TestModel();
+        Directory.CreateDirectory(directory);
+        var stale = new byte[first.Length + 10_000];
+        RandomNumberGenerator.Fill(stale);
+        await File.WriteAllBytesAsync(Path.Combine(directory, "first.bin"), stale);
+
+        var pending = variant.GetPendingBytes(directory);
+
+        Assert.Equal(first.Length + second.Length, pending);
+
+        await LocalModelStore.Shared.EnsureAsync(model, variant, directory, Accepted(), null, CancellationToken.None);
+
+        Assert.Equal(first, await File.ReadAllBytesAsync(Path.Combine(directory, "first.bin")));
+        Assert.Equal(second, await File.ReadAllBytesAsync(Path.Combine(directory, "second.bin")));
+    }
+
+    /// <summary>
     /// The terms a host shows before a resumed download carry the bytes that download will transfer, not
     /// the file set's full size: the provider's GetTerms agrees with what EnsureAsync then reports.
     /// </summary>

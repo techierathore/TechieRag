@@ -504,7 +504,11 @@ public class TechieRagBuilder
         customLlmProviderFactory = () => new ChatGptSubscriptionLlmProvider(
             signInCallback,
             providerOptions,
-            config.LoggerFactory?.CreateLogger<ChatGptSubscriptionLlmProvider>());
+            config.LoggerFactory?.CreateLogger<ChatGptSubscriptionLlmProvider>(),
+            config.Llm.RequestTimeout)
+        {
+            Route = $"{SubscriptionConnectorRows.ChatGptName}/{providerOptions.Model}"
+        };
         return this;
     }
 
@@ -1044,12 +1048,20 @@ public class TechieRagBuilder
                 llmConfig.Endpoint ?? "http://localhost:11434",
                 llmConfig.Model,
                 config.LoggerFactory?.CreateLogger<OllamaLlmProvider>(),
-                llmConfig.MaxContextTokens),
+                llmConfig.MaxContextTokens,
+                llmConfig.RequestTimeout)
+            {
+                Route = connector is not null ? $"{connector.Name}/{llmConfig.Model}" : null
+            },
 
             LlmSource.LmStudio => new LmStudioLlmProvider(
                 llmConfig.Endpoint ?? "http://localhost:1234",
                 llmConfig.Model,
-                config.LoggerFactory?.CreateLogger<LmStudioLlmProvider>()),
+                config.LoggerFactory?.CreateLogger<LmStudioLlmProvider>(),
+                llmConfig.RequestTimeout)
+            {
+                Route = connector is not null ? $"{connector.Name}/{llmConfig.Model}" : null
+            },
 
             LlmSource.OpenAICompatible => new OpenAICompatibleLlmProvider(
                 llmConfig.Endpoint ?? throw new InvalidOperationException("Endpoint is required for OpenAI-compatible LLM provider."),
@@ -1057,10 +1069,15 @@ public class TechieRagBuilder
                 llmConfig.Model,
                 llmConfig.Headers,
                 sessionHeader,
-                config.LoggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>())
+                config.LoggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>(),
+                llmConfig.RequestTimeout)
             {
                 // REQ-RAG-131: e.g. Venice's switch for its own system prompt.
-                BodyFields = connector?.RequestBodyFields
+                BodyFields = connector?.RequestBodyFields,
+                Route = connector is not null ? $"{connector.Name}/{llmConfig.Model}" : null,
+                ReasoningControlStyle = connector?.Name.Equals(LlmConnectorCatalog.VeniceName, StringComparison.OrdinalIgnoreCase) == true
+                    ? ReasoningControlStyle.Venice
+                    : ReasoningControlStyle.Default
             },
 
             LlmSource.AzureAIFoundry => new AzureAIFoundryLlmProvider(
@@ -1068,20 +1085,32 @@ public class TechieRagBuilder
                 llmConfig.ApiKey ?? throw new InvalidOperationException("ApiKey is required for Azure AI Foundry LLM provider."),
                 llmConfig.Model,
                 llmConfig.ApiVersion ?? "2024-12-01-preview",
-                config.LoggerFactory?.CreateLogger<AzureAIFoundryLlmProvider>()),
+                config.LoggerFactory?.CreateLogger<AzureAIFoundryLlmProvider>(),
+                llmConfig.RequestTimeout)
+            {
+                Route = connector is not null ? $"{connector.Name}/{llmConfig.Model}" : null
+            },
 
             LlmSource.GoogleGemini => new GoogleGeminiLlmProvider(
                 llmConfig.ApiKey ?? throw new InvalidOperationException("ApiKey is required for Google Gemini LLM provider."),
                 llmConfig.Model,
                 llmConfig.Endpoint,
-                config.LoggerFactory?.CreateLogger<GoogleGeminiLlmProvider>()),
+                config.LoggerFactory?.CreateLogger<GoogleGeminiLlmProvider>(),
+                llmConfig.RequestTimeout)
+            {
+                Route = connector is not null ? $"{connector.Name}/{llmConfig.Model}" : null
+            },
 
             LlmSource.Anthropic => new AnthropicLlmProvider(
                 llmConfig.ApiKey ?? throw new InvalidOperationException("ApiKey is required for Anthropic LLM provider."),
                 llmConfig.Model,
                 llmConfig.Endpoint,
                 llmConfig.MaxTokens,
-                config.LoggerFactory?.CreateLogger<AnthropicLlmProvider>()),
+                config.LoggerFactory?.CreateLogger<AnthropicLlmProvider>(),
+                llmConfig.RequestTimeout)
+            {
+                Route = connector is not null ? $"{connector.Name}/{llmConfig.Model}" : null
+            },
 
             // REQ-FN-066: a subscription cannot come from configuration alone; it needs the host's
             // sign-in callback. Same exception as LlmProviderFactory.Create gives for the connector.

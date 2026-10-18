@@ -4,13 +4,13 @@
 |---|---|
 | App | TechieRag |
 | Upstream | TechieFlow |
-| Updated | 2026-10-09 (TF-005, TF-006 added) |
+| Updated | 2026-10-18 (TF-005 to TF-007 fixed upstream) |
 
 ## Summary
 
-6 entries: 0 blocking now, 2 open (TF-005, TF-006, both minor), 0 fixed upstream, 4 closed (TF-001 to TF-004).
+7 entries: 0 blocking now, 0 open, 3 fixed upstream and not yet re-checked here (TF-005, TF-006, TF-007, all fixed 2026-10-18, ship in TechieFlow v1.2.0), 4 closed (TF-001 to TF-004).
 
-Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and closed.
+Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and closed. TF-005 to TF-007 are fixed upstream; re-check them here.
 
 ## Entries
 
@@ -136,6 +136,16 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 ## Replies from TechieFlow
 
 <!-- The upstream team's answers, newest block first. Left in full: this is the record. -->
+
+### Resolution status (TechieFlow team, 2026-10-18)
+
+All three fixes ship in **TechieFlow v1.2.0**. They are already in this project's `.tfcore/` through the framework update.
+
+| ID | Fix | Check it here |
+|---|---|---|
+| TF-005 | Fixed upstream, both parts. (1) `tf-triage.sh new` takes the next free id across every checklist of the app (this part shipped with Chatur's TF-011 on 2026-10-14) and now also across `docs/metrics/gates.jsonl`, `misses.jsonl` and `runs.jsonl`, so an id a record still carries after its row was renamed is never handed out again. (2) Without `--prefix`, a checklist with no REQ-FN row takes the one prefix it uses and says so (`note: every row of docs/TechieRag-P3-Checklist.md is REQ-RAG-…`). A checklist with several prefixes and no FN row is refused with `name the prefix: --prefix …`. A checklist with FN rows keeps FN as before. Regression case `tr_005` fails both checks against the scripts you had and passes now. | After the framework update, a `tf-triage.sh TechieRag new "<title>" "<acceptance>"` with no `--prefix` on phase 3 gives the next free REQ-RAG id, never a second REQ-FN-001. |
+| TF-006 | Fixed upstream in `tf-verify-boot.sh`, as you suggested. A windows head now needs a web view: a `BlazorWebView` or `AddMauiBlazorWebView` in the project's code, or the `Microsoft.AspNetCore.Components.WebView.Maui` package. A Blazor Hybrid project is picked before a plain MAUI one. A plain MAUI app is refused at once with `NONE head=windows kind=no-webview … not drivable over CDP; its rows are graded by their tests`, instead of a 300 s wait. A start that times out now also stops the relay on the Windows side, which outlived its WSL parent and caused the second try's "Only one usage of each socket address". Regression case `tr_006` fails both checks against the script you had and passes now. | Proved on your repository: `bash .tfcore/utils/tf-verify-boot.sh start --dry-run` with your script printed `PICK head=windows project=samples/TechieRag.Probe/TechieRag.Probe.csproj`. The new one printed the `kind=no-webview` line in under a second. Lekhak's and Sevak's Blazor Hybrid heads are still picked. After the framework update, the verify in your next `*triage-and-fix` reports the app as not booted at once and grades the rows by their tests. |
+| TF-007 | Fixed upstream; Lekhak filed the same fault as its TF-034. (1) `guard-status-html.sh` now prints `Run: bash .tfcore/utils/tf-brd-status.sh TechieRag --phase 2` for `docs/TechieRag-P2-BRD.md`. (2) `tf-brd-status.sh TechieRag-P2` also works: a name that carries the phase is read as the app and that phase. Regression case `lk_034` fails both checks against the scripts you had and passes now. | Proved on a copy of your `docs/`: `tf-brd-status.sh TechieRag-P2` with your script printed `docs/TechieRag-P2-P3-Checklist.md does not exist yet; nothing to do`. The new one printed `docs/TechieRag-P2-BRD.md Development status updated: 18 screens, 90 of 90 requirements verified, 1 not applicable`. After the framework update, the hook's command works as printed. |
 
 ### Resolution status (TechieFlow team, 2026-10-06, fourth reply)
 

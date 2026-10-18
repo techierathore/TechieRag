@@ -25,6 +25,12 @@ public interface ITokenTracker
     /// <summary>Gets the current budget status.</summary>
     BudgetStatus? GetBudgetStatus();
 
+    /// <summary>Throws when the configured budget is set to block and has already been exceeded.</summary>
+    /// <param name="callerTag">Optional caller tag to include in the exception message.</param>
+    /// <exception cref="Models.TechieRagBudgetExceededException">The budget is exceeded and blocking is enabled.</exception>
+    /// <remarks>Callers should invoke this before issuing an LLM call to prevent spending after the budget is gone.</remarks>
+    void ThrowIfBudgetExceeded(string? callerTag = null);
+
     /// <summary>Resets all tracked usage.</summary>
     void Reset();
 

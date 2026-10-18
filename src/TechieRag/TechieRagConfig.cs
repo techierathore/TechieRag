@@ -1,3 +1,4 @@
+using System;
 using Microsoft.Extensions.Logging;
 using TechieRag.Models;
 
@@ -544,6 +545,11 @@ public class LlmConfig
     /// allocates the whole window up front, and an unasked-for 128k window can stop a local model
     /// from loading.</remarks>
     public int? MaxContextTokens { get; set; }
+
+    /// <summary>Gets or sets the default request timeout for LLM calls.</summary>
+    /// <remarks>Null uses the provider's default (120 seconds). A per-call timeout in
+    /// <see cref="LlmCompletionOptions.RequestTimeout"/> overrides this.</remarks>
+    public TimeSpan? RequestTimeout { get; set; }
 
     /// <summary>
     /// Gets or sets the named connector from <c>LlmConnectorCatalog</c> to use, e.g. <c>groq</c>

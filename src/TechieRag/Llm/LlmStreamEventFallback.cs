@@ -72,6 +72,9 @@ internal static class LlmStreamEventFallback
         {
             InputTokens = messages.Sum(m => provider.EstimateTokenCount(m.Content ?? string.Empty)),
             OutputTokens = provider.EstimateTokenCount(text.ToString()),
+            IsEstimated = true,
+            Route = provider.Route,
+            CallerTag = options?.CallerTag,
             ModelName = provider.ModelName,
             ProviderName = provider.Name
         };

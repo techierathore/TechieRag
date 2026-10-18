@@ -144,8 +144,8 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
     public string ModelName => Model.Id;
 
     /// <inheritdoc/>
-    /// <remarks>False until a live test proves a local model calls tools reliably (REQ-RAG-063).</remarks>
-    public bool SupportsToolCalling => false;
+    /// <remarks>True for the shipped catalogue models that are trained for tool calling (TR-RAG-052).</remarks>
+    public bool SupportsToolCalling => Model.SupportsToolCalling;
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
@@ -280,24 +280,31 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
         CancellationToken cancellationToken = default)
     {
         var text = new StringBuilder();
+        List<ToolCall>? toolCalls = null;
         LlmStreamEvent? completed = null;
         await foreach (var streamEvent in StreamCoreAsync(messages, options, isStreaming: false, cancellationToken).ConfigureAwait(false))
         {
-            if (streamEvent.Kind == LlmStreamEventKind.TextDelta)
+            switch (streamEvent.Kind)
             {
-                text.Append(streamEvent.Text);
-            }
-            else if (streamEvent.Kind == LlmStreamEventKind.Completed)
-            {
-                completed = streamEvent;
+                case LlmStreamEventKind.TextDelta:
+                    text.Append(streamEvent.Text);
+                    break;
+                case LlmStreamEventKind.ToolCall when streamEvent.ToolCall is not null:
+                    (toolCalls ??= new List<ToolCall>()).Add(streamEvent.ToolCall);
+                    break;
+                case LlmStreamEventKind.Completed:
+                    completed = streamEvent;
+                    break;
             }
         }
 
+        var hasToolCalls = toolCalls is { Count: > 0 };
         return new LlmResponse
         {
-            Content = text.ToString(),
+            Content = hasToolCalls ? null : text.ToString(),
+            ToolCalls = hasToolCalls ? toolCalls : null,
             Usage = completed!.Usage!,
-            FinishReason = completed.FinishReason ?? "stop",
+            FinishReason = hasToolCalls ? "tool_calls" : (completed.FinishReason ?? "stop"),
             ModelName = Model.Id
         };
     }
@@ -527,6 +534,8 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                 ThrowIfDisposed();
                 var watch = Stopwatch.StartNew();
                 var produced = 0;
+                var hasTools = callOptions?.Tools is { Count: > 0 } && SupportsToolCalling;
+                var toolBuffer = hasTools ? new StringBuilder() : null;
                 var pieces = model.GenerateAsync(prompt, settings, token).GetAsyncEnumerator(token);
                 try
                 {
@@ -537,8 +546,15 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                         var text = filter.Push(pieces.Current);
                         if (text.Length > 0)
                         {
-                            yield return LlmStreamEvent.FromText(text);
-                            ThrowIfDisposed();
+                            if (toolBuffer is null)
+                            {
+                                yield return LlmStreamEvent.FromText(text);
+                                ThrowIfDisposed();
+                            }
+                            else
+                            {
+                                toolBuffer.Append(text);
+                            }
                         }
 
                         if (filter.Stopped || produced >= settings.MaxTokens)
@@ -555,12 +571,38 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                 var rest = filter.Flush();
                 if (rest.Length > 0)
                 {
-                    yield return LlmStreamEvent.FromText(rest);
+                    if (toolBuffer is null)
+                    {
+                        yield return LlmStreamEvent.FromText(rest);
+                        ThrowIfDisposed();
+                    }
+                    else
+                    {
+                        toolBuffer.Append(rest);
+                    }
+                }
+
+                var rawOutput = toolBuffer?.ToString() ?? string.Empty;
+                var parsedToolCalls = hasTools ? ToolPromptFormatter.ParseToolCalls(Model, rawOutput) : null;
+                var finishReason = parsedToolCalls is { Count: > 0 }
+                    ? "tool_calls"
+                    : (!filter.Stopped && produced >= settings.MaxTokens ? "length" : "stop");
+                var usage = new TokenUsage { InputTokens = promptTokens, OutputTokens = produced, ModelName = Model.Id, ProviderName = Name };
+
+                if (parsedToolCalls is { Count: > 0 })
+                {
+                    foreach (var toolCall in parsedToolCalls)
+                    {
+                        yield return LlmStreamEvent.FromToolCall(toolCall);
+                        ThrowIfDisposed();
+                    }
+                }
+                else if (toolBuffer is not null && toolBuffer.Length > 0)
+                {
+                    yield return LlmStreamEvent.FromText(toolBuffer.ToString());
                     ThrowIfDisposed();
                 }
 
-                var finishReason = !filter.Stopped && produced >= settings.MaxTokens ? "length" : "stop";
-                var usage = new TokenUsage { InputTokens = promptTokens, OutputTokens = produced, ModelName = Model.Id, ProviderName = Name };
                 RaiseCompleted(usage, watch.Elapsed, isStreaming);
                 yield return LlmStreamEvent.FromCompleted(usage, finishReason, Model.Id);
             }
@@ -578,7 +620,7 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
     private void RefuseUnsupported(LlmCompletionOptions? callOptions)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (callOptions?.Tools is { Count: > 0 })
+        if (callOptions?.Tools is { Count: > 0 } && !SupportsToolCalling)
         {
             throw new NotSupportedException("The local model does not call tools (SupportsToolCalling is false); send the request without tools.");
         }
@@ -604,6 +646,12 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
             system = string.IsNullOrEmpty(system) ? jsonRule : system + "\n" + jsonRule;
         }
 
+        if (callOptions?.Tools is { Count: > 0 } && SupportsToolCalling)
+        {
+            var toolInstruction = ToolPromptFormatter.BuildToolInstruction(Model, callOptions.Tools);
+            system = string.IsNullOrEmpty(system) ? toolInstruction : system + "\n\n" + toolInstruction;
+        }
+
         if (!string.IsNullOrEmpty(system))
         {
             var existing = conversation.FindIndex(m => string.Equals(m.Role, "system", StringComparison.OrdinalIgnoreCase));
@@ -614,6 +662,25 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
             else
             {
                 conversation.Insert(0, ChatMessage.System(system));
+            }
+        }
+
+        for (var i = 0; i < conversation.Count; i++)
+        {
+            var message = conversation[i];
+            if (string.Equals(message.Role, "tool", StringComparison.OrdinalIgnoreCase)
+                && SupportsToolCalling
+                && !string.IsNullOrEmpty(message.Content))
+            {
+                conversation[i] = new ChatMessage
+                {
+                    Role = message.Role,
+                    Content = ToolPromptFormatter.FormatToolResult(Model, message.ToolCallId ?? string.Empty, message.Name ?? string.Empty, message.Content),
+                    ToolCallId = message.ToolCallId,
+                    Name = message.Name,
+                    Parts = message.Parts,
+                    CacheBoundary = message.CacheBoundary
+                };
             }
         }
 

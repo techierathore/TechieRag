@@ -47,6 +47,7 @@ public sealed class LocalModel
     /// <param name="variants">The file set, one per format (one format today).</param>
     /// <param name="folder">For a model loaded from a folder, that folder; null for a downloadable one.</param>
     /// <param name="huggingFace">For a model named on Hugging Face, its name; null otherwise.</param>
+    /// <param name="supportsToolCalling">Whether the provider should treat this model as able to call tools.</param>
     internal LocalModel(
         string id,
         string displayName,
@@ -58,7 +59,8 @@ public sealed class LocalModel
         bool runsOnPhones,
         IReadOnlyList<LocalModelVariant> variants,
         string? folder = null,
-        HuggingFaceModelSource? huggingFace = null)
+        HuggingFaceModelSource? huggingFace = null,
+        bool supportsToolCalling = false)
     {
         Id = id;
         DisplayName = displayName;
@@ -71,6 +73,7 @@ public sealed class LocalModel
         this.variants = variants;
         Folder = folder;
         HuggingFace = huggingFace;
+        SupportsToolCalling = supportsToolCalling;
     }
 
     /// <summary>
@@ -110,7 +113,8 @@ public sealed class LocalModel
                     new("tokenizer.json", "tokenizer.json", 11_421_892, "3fd169731d2cbde95e10bf356d66d5997fd885dd8dbb6fb4684da3f23b2585d8"),
                     new("tokenizer_config.json", "tokenizer_config.json", 691, "bd9df05957db8b747d5b6fae78d8a00cc1f1bebe46f7bf3d159c17e0aaf9a5b2")
                 ])
-        ]);
+        ],
+        supportsToolCalling: true);
 
     /// <summary>
     /// Phi-3-mini-4k-instruct (MIT): 3.8 billion parameters, 4,096-token context. The desktop default.
@@ -142,7 +146,8 @@ public sealed class LocalModel
                     new("tokenizer.model", "tokenizer.model", 499_723, "9e556afd44213b6bd1be2b850ebbbd98f5481437a8021afaf58ee7fb1818d347"),
                     new("tokenizer_config.json", "tokenizer_config.json", 3_441, "32f66c2bab499baaa8341819ad9a13342f957501ce1e989bcb90853a01336cc0")
                 ])
-        ]);
+        ],
+        supportsToolCalling: true);
 
     /// <summary>Every model this package can download.</summary>
     public static IReadOnlyList<LocalModel> All { get; } = [Qwen25Instruct05B, Phi3Mini4kInstruct];
@@ -188,6 +193,13 @@ public sealed class LocalModel
     /// <summary>Gets whether the model is allowed on Android and iOS.</summary>
     public bool RunsOnPhones { get; }
 
+    /// <summary>
+    /// Gets whether this model can call tools through <see cref="LocalLlmProvider"/> (TR-RAG-052).
+    /// True for the shipped catalogue models trained for tool calling; false for host-supplied
+    /// folder models unless explicitly enabled.
+    /// </summary>
+    public bool SupportsToolCalling { get; }
+
     /// <summary>Gets the folder a host-supplied model is loaded from; null for a downloadable model.</summary>
     public string? Folder { get; }
 
@@ -228,7 +240,24 @@ public sealed class LocalModel
         string folder,
         LocalChatTemplate chatTemplate,
         int contextLength = 4_096,
-        long kvBytesPerToken = 131_072)
+        long kvBytesPerToken = 131_072) =>
+        FromFolder(folder, chatTemplate, contextLength, kvBytesPerToken, supportsToolCalling: false);
+
+    /// <summary>
+    /// Describes a model the host has already placed in a folder, optionally enabling tool calling.
+    /// </summary>
+    /// <param name="folder">The folder of an ONNX Runtime GenAI model.</param>
+    /// <param name="chatTemplate">The chat format the model was trained on.</param>
+    /// <param name="contextLength">The longest context the model supports, in tokens.</param>
+    /// <param name="kvBytesPerToken">Memory the context cache takes per token.</param>
+    /// <param name="supportsToolCalling">Whether the provider should treat this model as able to call tools.</param>
+    /// <returns>The model.</returns>
+    internal static LocalModel FromFolder(
+        string folder,
+        LocalChatTemplate chatTemplate,
+        int contextLength,
+        long kvBytesPerToken,
+        bool supportsToolCalling)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(folder);
         if (contextLength <= 0) throw new ArgumentException("The context length must be positive.", nameof(contextLength));
@@ -236,7 +265,7 @@ public sealed class LocalModel
         var fullPath = Path.GetFullPath(folder);
         var name = Path.GetFileName(fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         return new LocalModel(name, name, "supplied by the host", null, chatTemplate, contextLength, kvBytesPerToken,
-            runsOnPhones: true, variants: [], folder: fullPath);
+            runsOnPhones: true, variants: [], folder: fullPath, supportsToolCalling: supportsToolCalling);
     }
 
     /// <summary>
