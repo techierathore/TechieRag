@@ -98,6 +98,7 @@ internal static class TechieRagConfigMapper
         target.ApiVersion = source.ApiVersion;
         target.ProjectId = source.ProjectId;
         target.MaxContextTokens = source.MaxContextTokens;
+        target.RequestTimeout = source.RequestTimeout;
         target.Connector = source.Connector;
         target.Headers = new Dictionary<string, string>(source.Headers, StringComparer.OrdinalIgnoreCase);
         target.SessionHeader = source.SessionHeader;

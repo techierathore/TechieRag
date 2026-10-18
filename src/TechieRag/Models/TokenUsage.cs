@@ -7,6 +7,8 @@ public class TokenUsage
     public int InputTokens { get; set; }
 
     /// <summary>Gets or sets the number of output/completion tokens.</summary>
+    /// <remarks>This includes reasoning tokens when the provider folds them into completion tokens.
+    /// See <see cref="ReasoningTokens"/> for the separately reported reasoning portion.</remarks>
     public int OutputTokens { get; set; }
 
     /// <summary>Gets the total tokens (input + output).</summary>
@@ -22,6 +24,28 @@ public class TokenUsage
     /// tracked separately rather than folded into <see cref="InputTokens"/>: a caller comparing the cost
     /// of caching against not caching needs the two apart.</remarks>
     public int CacheWriteTokens { get; set; }
+
+    /// <summary>Gets or sets the number of reasoning tokens the provider reported separately.</summary>
+    /// <remarks>Some providers (e.g. Venice/OpenAI-style <c>completion_tokens_details.reasoning_tokens</c>)
+    /// bill reasoning separately from visible completion tokens. This figure is included in
+    /// <see cref="OutputTokens"/>, not added on top of it, so callers can compute visible completion
+    /// tokens as <c>OutputTokens - ReasoningTokens</c>.</remarks>
+    public int ReasoningTokens { get; set; }
+
+    /// <summary>Gets or sets whether any token count was estimated because the provider sent none.</summary>
+    /// <remarks>When <see langword="true"/>, <see cref="InputTokens"/> and/or <see cref="OutputTokens"/>
+    /// were derived from the provider's text rather than its own usage report. The reasoning figure is
+    /// never estimated: if the provider did not report it, it is left at zero.</remarks>
+    public bool IsEstimated { get; set; }
+
+    /// <summary>Gets or sets the route the call was made on, for example <c>venice/qwen-3-6-plus</c>.</summary>
+    /// <remarks>Set from the provider's route when available; null when the provider was created directly.</remarks>
+    public string? Route { get; set; }
+
+    /// <summary>Gets or sets a caller-supplied tag that names the agent or component that spent the tokens.</summary>
+    /// <remarks>Set via <see cref="LlmCompletionOptions.CallerTag"/> so a host can break down usage by
+    /// its own agent name.</remarks>
+    public string? CallerTag { get; set; }
 
     /// <summary>Gets or sets the estimated cost in USD.</summary>
     public decimal EstimatedCostUsd { get; set; }
@@ -45,8 +69,15 @@ public class TokenUsageSummary
     /// <summary>Gets or sets the total output tokens.</summary>
     public long TotalOutputTokens { get; set; }
 
+    /// <summary>Gets or sets the total reasoning tokens.</summary>
+    /// <remarks>Included in <see cref="TotalOutputTokens"/>, not in addition to it.</remarks>
+    public long TotalReasoningTokens { get; set; }
+
     /// <summary>Gets the total tokens.</summary>
     public long TotalTokens => TotalInputTokens + TotalOutputTokens;
+
+    /// <summary>Gets the total visible completion tokens (output minus reasoning).</summary>
+    public long TotalCompletionTokens => TotalOutputTokens - TotalReasoningTokens;
 
     /// <summary>Gets or sets the total estimated cost in USD.</summary>
     public decimal TotalEstimatedCostUsd { get; set; }

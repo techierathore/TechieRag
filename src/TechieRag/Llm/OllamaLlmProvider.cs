@@ -26,6 +26,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     private readonly string endpoint;
     private readonly ILogger<OllamaLlmProvider> logger;
     private readonly int? contextTokens;
+    private readonly TimeSpan? configuredTimeout;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -38,6 +39,9 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
     /// <inheritdoc/>
     public string ModelName { get; }
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
 
     /// <inheritdoc/>
     public bool SupportsToolCalling => true;
@@ -63,7 +67,8 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="logger">Logger instance.</param>
     /// <param name="contextTokens">Context window sent as <c>options.num_ctx</c>; null leaves Ollama's
     /// own default in place (TR-RAG-003).</param>
-    public OllamaLlmProvider(string endpoint, string model, ILogger<OllamaLlmProvider>? logger = null, int? contextTokens = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    public OllamaLlmProvider(string endpoint, string model, ILogger<OllamaLlmProvider>? logger = null, int? contextTokens = null, TimeSpan? requestTimeout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(endpoint);
         ArgumentException.ThrowIfNullOrEmpty(model);
@@ -72,10 +77,13 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         ModelName = model;
         this.logger = logger ?? NullLogger<OllamaLlmProvider>.Instance;
         this.contextTokens = contextTokens;
+        configuredTimeout = requestTimeout;
         httpClient = new HttpClient
         {
             BaseAddress = new Uri(this.endpoint),
-            Timeout = TimeSpan.FromSeconds(120)
+            // The effective timeout is enforced per-call through a linked cancellation token, so the
+            // HttpClient timeout must never truncate a host token that allows more time (TR-RAG-010).
+            Timeout = Timeout.InfiniteTimeSpan
         };
     }
 
@@ -87,7 +95,8 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="model">Model name to use.</param>
     /// <param name="logger">Logger instance.</param>
     /// <param name="contextTokens">Context window sent as <c>options.num_ctx</c>, or null.</param>
-    internal OllamaLlmProvider(HttpClient httpClient, string model, ILogger<OllamaLlmProvider>? logger = null, int? contextTokens = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    internal OllamaLlmProvider(HttpClient httpClient, string model, ILogger<OllamaLlmProvider>? logger = null, int? contextTokens = null, TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
@@ -95,6 +104,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         ModelName = model;
         this.logger = logger ?? NullLogger<OllamaLlmProvider>.Instance;
         this.contextTokens = contextTokens;
+        configuredTimeout = requestTimeout;
     }
 
     /// <inheritdoc/>
@@ -125,15 +135,18 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: false);
         var json = JsonSerializer.Serialize(request, JsonOptions);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync("/api/chat", content, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.PostAsync("/api/chat", content, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var responseJson = await response.Content.ReadAsStringAsync(callToken).ConfigureAwait(false);
         var ollamaResponse = JsonSerializer.Deserialize<OllamaChatResponse>(responseJson, JsonOptions)
             ?? throw new InvalidOperationException("Failed to parse Ollama response");
 
@@ -141,25 +154,29 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var inputTokens = ollamaResponse.PromptEvalCount ?? 0;
         var outputTokens = ollamaResponse.EvalCount ?? 0;
-
         var toolCalls = ParseToolCalls(ollamaResponse.Message?.ToolCalls);
+
+        var usage = new TokenUsage
+        {
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            IsEstimated = ollamaResponse.PromptEvalCount is null && ollamaResponse.EvalCount is null,
+            Route = Route,
+            CallerTag = options?.CallerTag,
+            ModelName = ModelName,
+            ProviderName = Name
+        };
 
         var llmResponse = new LlmResponse
         {
             Content = ollamaResponse.Message?.Content,
             ToolCalls = toolCalls,
-            Usage = new TokenUsage
-            {
-                InputTokens = inputTokens,
-                OutputTokens = outputTokens,
-                ModelName = ModelName,
-                ProviderName = Name
-            },
+            Usage = usage,
             FinishReason = MapFinishReason(ollamaResponse.DoneReason, toolCalls is { Count: > 0 }),
             ModelName = ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls);
+        RaiseCompletionEvent(usage, sw.Elapsed, false, llmResponse.HasToolCalls);
         return llmResponse;
     }
 
@@ -173,16 +190,19 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// after the text (REQ-RAG-067 / BRD-110).</remarks>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: true);
         var json = JsonSerializer.Serialize(request, JsonOptions);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, "/api/chat") { Content = content };
-        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
         int totalInputTokens = 0;
@@ -192,7 +212,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         string? doneReason = null;
 
         // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        while (await reader.ReadLineAsync(callToken).ConfigureAwait(false) is { } line)
         {
             if (string.IsNullOrEmpty(line)) continue;
 
@@ -221,10 +241,10 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
             yield return LlmStreamEvent.FromToolCall(toolCall);
         }
 
-        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { });
+        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { }, Route, options?.CallerTag);
         var usage = context.BuildUsage(totalInputTokens, totalOutputTokens, 0, outputText.ToString());
         sw.Stop();
-        RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, toolCalls.Count > 0);
+        RaiseCompletionEvent(usage, sw.Elapsed, true, toolCalls.Count > 0);
 
         yield return LlmStreamEvent.FromCompleted(usage, MapFinishReason(doneReason, toolCalls.Count > 0), ModelName);
     }
@@ -390,18 +410,22 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         }).ToList();
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
+    private void RaiseCompletionEvent(TokenUsage usage, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
     {
         TechieRagTelemetry.RecordLlmCompletion(
-            Name, ModelName, inputTokens, outputTokens, duration, isStreaming);
+            Name, ModelName, usage.InputTokens, usage.OutputTokens, duration, isStreaming);
 
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens,
+            InputTokens = usage.InputTokens,
+            OutputTokens = usage.OutputTokens,
+            ReasoningTokens = usage.ReasoningTokens,
+            IsEstimated = usage.IsEstimated,
             Duration = duration,
             ModelName = ModelName,
             ProviderName = Name,
+            Route = Route,
+            CallerTag = usage.CallerTag,
             IsStreaming = isStreaming,
             InvolvedToolCalls = involvedToolCalls
         });

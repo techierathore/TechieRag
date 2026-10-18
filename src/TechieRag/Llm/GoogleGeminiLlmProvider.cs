@@ -27,12 +27,16 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
     private readonly string apiKey;
     private readonly string baseUrl;
     private readonly ILogger<GoogleGeminiLlmProvider> logger;
+    private readonly TimeSpan? configuredTimeout;
 
     /// <inheritdoc/>
     public string Name => "Google Gemini";
 
     /// <inheritdoc/>
     public string ModelName { get; }
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
 
     /// <inheritdoc/>
     public bool SupportsToolCalling => true;
@@ -55,7 +59,8 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="model">Model name (e.g., "gemini-2.0-flash").</param>
     /// <param name="endpoint">API endpoint (defaults to Google's generative language API).</param>
     /// <param name="logger">Logger instance.</param>
-    public GoogleGeminiLlmProvider(string apiKey, string model = "gemini-2.0-flash", string? endpoint = null, ILogger<GoogleGeminiLlmProvider>? logger = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    public GoogleGeminiLlmProvider(string apiKey, string model = "gemini-2.0-flash", string? endpoint = null, ILogger<GoogleGeminiLlmProvider>? logger = null, TimeSpan? requestTimeout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(apiKey);
         ArgumentException.ThrowIfNullOrEmpty(model);
@@ -64,7 +69,13 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         ModelName = model;
         baseUrl = (endpoint ?? "https://generativelanguage.googleapis.com").TrimEnd('/');
         this.logger = logger ?? NullLogger<GoogleGeminiLlmProvider>.Instance;
-        httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+        configuredTimeout = requestTimeout;
+        httpClient = new HttpClient
+        {
+            // The effective timeout is enforced per-call through a linked cancellation token, so the
+            // HttpClient timeout must never truncate a host token that allows more time (TR-RAG-010).
+            Timeout = Timeout.InfiniteTimeSpan
+        };
     }
 
     /// <summary>
@@ -75,7 +86,8 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="apiKey">Google AI API key.</param>
     /// <param name="model">Model name.</param>
     /// <param name="logger">Logger instance.</param>
-    internal GoogleGeminiLlmProvider(HttpClient httpClient, string apiKey, string model, ILogger<GoogleGeminiLlmProvider>? logger = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    internal GoogleGeminiLlmProvider(HttpClient httpClient, string apiKey, string model, ILogger<GoogleGeminiLlmProvider>? logger = null, TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
@@ -83,6 +95,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         ModelName = model;
         baseUrl = httpClient.BaseAddress?.ToString().TrimEnd('/') ?? "https://generativelanguage.googleapis.com";
         this.logger = logger ?? NullLogger<GoogleGeminiLlmProvider>.Instance;
+        configuredTimeout = requestTimeout;
     }
 
     /// <inheritdoc/>
@@ -113,16 +126,19 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var url = $"{baseUrl}/v1beta/models/{options?.Model ?? ModelName}:generateContent?key={apiKey}";
         var request = BuildGeminiRequest(messages, options);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.PostAsync(url, content, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var responseJson = await response.Content.ReadAsStringAsync(callToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<GeminiResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("Failed to parse Gemini response");
 
@@ -135,23 +151,28 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var outputTokens = result.UsageMetadata?.CandidatesTokenCount ?? 0;
         var cacheReadTokens = result.UsageMetadata?.CachedContentTokenCount ?? 0;
 
+        var usage = new TokenUsage
+        {
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            IsEstimated = result.UsageMetadata is null,
+            Route = Route,
+            CallerTag = options?.CallerTag,
+            CacheReadTokens = cacheReadTokens,
+            ModelName = ModelName,
+            ProviderName = Name
+        };
+
         var llmResponse = new LlmResponse
         {
             Content = textContent,
             ToolCalls = toolCalls,
-            Usage = new TokenUsage
-            {
-                InputTokens = inputTokens,
-                OutputTokens = outputTokens,
-                CacheReadTokens = cacheReadTokens,
-                ModelName = ModelName,
-                ProviderName = Name
-            },
+            Usage = usage,
             FinishReason = toolCalls is { Count: > 0 } ? "tool_calls" : "stop",
             ModelName = ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens);
+        RaiseCompletionEvent(usage, sw.Elapsed, false, llmResponse.HasToolCalls);
         return llmResponse;
     }
 
@@ -165,6 +186,9 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// the text (REQ-RAG-067 / BRD-110).</remarks>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var url = $"{baseUrl}/v1beta/models/{options?.Model ?? ModelName}:streamGenerateContent?key={apiKey}&alt=sse";
         var request = BuildGeminiRequest(messages, options);
@@ -172,10 +196,10 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
         int totalInputTokens = 0;
@@ -185,7 +209,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var toolCalls = new List<ToolCall>();
 
         // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
-        while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
+        while (await reader.ReadLineAsync(callToken).ConfigureAwait(false) is { } line)
         {
             if (string.IsNullOrEmpty(line) || !line.StartsWith("data: ")) continue;
 
@@ -216,10 +240,10 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
             yield return LlmStreamEvent.FromToolCall(toolCall);
         }
 
-        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { });
+        var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { }, Route, options?.CallerTag);
         var usage = context.BuildUsage(totalInputTokens, totalOutputTokens, cacheReadTokens, outputText.ToString());
         sw.Stop();
-        RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, toolCalls.Count > 0, cacheReadTokens);
+        RaiseCompletionEvent(usage, sw.Elapsed, true, toolCalls.Count > 0, cacheReadTokens);
 
         yield return LlmStreamEvent.FromCompleted(usage, toolCalls.Count > 0 ? "tool_calls" : "stop", ModelName);
     }
@@ -387,18 +411,22 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return functionCalls.Count > 0 ? functionCalls : null;
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
+    private void RaiseCompletionEvent(TokenUsage usage, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
     {
         TechieRagTelemetry.RecordLlmCompletion(
-            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens);
+            Name, ModelName, usage.InputTokens, usage.OutputTokens, duration, isStreaming, cacheReadTokens);
 
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens,
+            InputTokens = usage.InputTokens,
+            OutputTokens = usage.OutputTokens,
+            ReasoningTokens = usage.ReasoningTokens,
+            IsEstimated = usage.IsEstimated,
             Duration = duration,
             ModelName = ModelName,
             ProviderName = Name,
+            Route = Route,
+            CallerTag = usage.CallerTag,
             IsStreaming = isStreaming,
             InvolvedToolCalls = involvedToolCalls
         });

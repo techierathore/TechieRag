@@ -87,6 +87,71 @@ public sealed class FakeVectorStore : IVectorStore
 }
 
 /// <summary>
+/// Simple LLM provider double that returns a fixed response for every call.
+/// </summary>
+public sealed class FakeLlmProvider : ILlmProvider
+{
+    /// <inheritdoc/>
+    public string Name => "FakeLlm";
+
+    /// <inheritdoc/>
+    public string ModelName { get; init; } = "fake-model";
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
+
+    /// <inheritdoc/>
+    public bool SupportsToolCalling => false;
+
+    /// <inheritdoc/>
+    public bool SupportsStreaming => false;
+
+    /// <inheritdoc/>
+#pragma warning disable CS0067
+    public event EventHandler<LlmCompletionEventArgs>? OnCompletionCompleted;
+#pragma warning restore CS0067
+
+    /// <inheritdoc/>
+    public Task<LlmResponse> CompleteAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Response(options));
+
+    /// <inheritdoc/>
+    public IAsyncEnumerable<string> CompleteStreamAsync(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc/>
+    public Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Response(options));
+
+    /// <inheritdoc/>
+    public IAsyncEnumerable<string> ChatStreamAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc/>
+    public IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc/>
+    public Task<T> CompleteAsync<T>(string prompt, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default) where T : class =>
+        throw new NotSupportedException();
+
+    /// <inheritdoc/>
+    public int EstimateTokenCount(string text) => Math.Max(1, text.Length / 4);
+
+    private static LlmResponse Response(LlmCompletionOptions? options) => new()
+    {
+        Content = "ok",
+        Usage = new TokenUsage
+        {
+            ModelName = options?.Model ?? "fake-model",
+            ProviderName = "FakeLlm",
+            CallerTag = options?.CallerTag
+        },
+        ModelName = options?.Model ?? "fake-model"
+    };
+}
+
+/// <summary>
 /// Scripted LLM provider that streams a fixed sequence of tokens and records the last
 /// messages it received, so streaming and prompt-construction behavior can be asserted.
 /// </summary>

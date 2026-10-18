@@ -57,9 +57,11 @@
     <None Include="build\content\TechieRag-AI-Reference.md" Pack="true" PackagePath="buildTransitive\content\" />
     <None Include="build\content\techierag-claude-command.md" Pack="true" PackagePath="buildTransitive\content\" />
     <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="buildTransitive\content\" />
+    <None Include="build\content\techierag-codex-agent.toml" Pack="true" PackagePath="buildTransitive\content\" />
     <None Include="build\content\TechieRag-AI-Reference.md" Pack="true" PackagePath="build\content\" />
     <None Include="build\content\techierag-claude-command.md" Pack="true" PackagePath="build\content\" />
     <None Include="build\content\techierag-opencode-command.md" Pack="true" PackagePath="build\content\" />
+    <None Include="build\content\techierag-codex-agent.toml" Pack="true" PackagePath="build\content\" />
   </ItemGroup>
 
   <!-- REQ-FN-056: no Dapper. Its Reflection.Emit mappers throw in every AOT-compiled iOS and

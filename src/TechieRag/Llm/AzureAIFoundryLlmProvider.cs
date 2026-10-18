@@ -24,12 +24,16 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
     private readonly HttpClient httpClient;
     private readonly string completionsPath;
     private readonly ILogger<AzureAIFoundryLlmProvider> logger;
+    private readonly TimeSpan? configuredTimeout;
 
     /// <inheritdoc/>
     public string Name => "Azure AI Foundry";
 
     /// <inheritdoc/>
     public string ModelName { get; }
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
 
     /// <inheritdoc/>
     public bool SupportsToolCalling => true;
@@ -53,7 +57,8 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="model">Deployment/model name.</param>
     /// <param name="apiVersion">API version.</param>
     /// <param name="logger">Logger instance.</param>
-    public AzureAIFoundryLlmProvider(string endpoint, string apiKey, string model, string apiVersion = "2024-12-01-preview", ILogger<AzureAIFoundryLlmProvider>? logger = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    public AzureAIFoundryLlmProvider(string endpoint, string apiKey, string model, string apiVersion = "2024-12-01-preview", ILogger<AzureAIFoundryLlmProvider>? logger = null, TimeSpan? requestTimeout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(endpoint);
         ArgumentException.ThrowIfNullOrEmpty(apiKey);
@@ -61,12 +66,15 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         ModelName = model;
         this.logger = logger ?? NullLogger<AzureAIFoundryLlmProvider>.Instance;
+        configuredTimeout = requestTimeout;
         completionsPath = $"/openai/deployments/{model}/chat/completions?api-version={apiVersion}";
 
         httpClient = new HttpClient
         {
             BaseAddress = new Uri(endpoint.TrimEnd('/')),
-            Timeout = TimeSpan.FromSeconds(120)
+            // The effective timeout is enforced per-call through a linked cancellation token, so the
+            // HttpClient timeout must never truncate a host token that allows more time (TR-RAG-010).
+            Timeout = Timeout.InfiniteTimeSpan
         };
         httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
     }
@@ -79,13 +87,15 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="model">Deployment/model name.</param>
     /// <param name="apiVersion">API version.</param>
     /// <param name="logger">Logger instance.</param>
-    internal AzureAIFoundryLlmProvider(HttpClient httpClient, string model, string apiVersion = "2024-12-01-preview", ILogger<AzureAIFoundryLlmProvider>? logger = null)
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
+    internal AzureAIFoundryLlmProvider(HttpClient httpClient, string model, string apiVersion = "2024-12-01-preview", ILogger<AzureAIFoundryLlmProvider>? logger = null, TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
         ModelName = model;
         completionsPath = $"/openai/deployments/{model}/chat/completions?api-version={apiVersion}";
         this.logger = logger ?? NullLogger<AzureAIFoundryLlmProvider>.Instance;
+        configuredTimeout = requestTimeout;
     }
 
     /// <inheritdoc/>
@@ -116,15 +126,18 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: false);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await httpClient.PostAsync(completionsPath, content, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.PostAsync(completionsPath, content, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var responseJson = await response.Content.ReadAsStringAsync(callToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<OpenAIChatResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("Failed to parse Azure response");
 
@@ -133,26 +146,33 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var choice = result.Choices?.FirstOrDefault();
         var inputTokens = result.Usage?.PromptTokens ?? 0;
         var outputTokens = result.Usage?.CompletionTokens ?? 0;
+        var reasoningTokens = result.Usage?.ReasoningTokens ?? 0;
         var cacheReadTokens = result.Usage?.CachedTokens ?? 0;
         var toolCalls = ParseToolCalls(choice?.Message?.ToolCalls);
+
+        var usage = new TokenUsage
+        {
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens,
+            ReasoningTokens = reasoningTokens,
+            IsEstimated = result.Usage is null,
+            Route = Route,
+            CallerTag = options?.CallerTag,
+            CacheReadTokens = cacheReadTokens,
+            ModelName = ModelName,
+            ProviderName = Name
+        };
 
         var llmResponse = new LlmResponse
         {
             Content = choice?.Message?.Content,
             ToolCalls = toolCalls,
-            Usage = new TokenUsage
-            {
-                InputTokens = inputTokens,
-                OutputTokens = outputTokens,
-                CacheReadTokens = cacheReadTokens,
-                ModelName = ModelName,
-                ProviderName = Name
-            },
+            Usage = usage,
             FinishReason = choice?.FinishReason ?? "stop",
             ModelName = ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens);
+        RaiseCompletionEvent(usage, sw.Elapsed, false, llmResponse.HasToolCalls);
         return llmResponse;
     }
 
@@ -164,22 +184,25 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: true);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         var requestMessage = new HttpRequestMessage(HttpMethod.Post, completionsPath) { Content = content };
-        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
         var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (usage, involvedToolCalls) =>
-            RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, involvedToolCalls, usage.CacheReadTokens));
+            RaiseCompletionEvent(usage, sw.Elapsed, true, involvedToolCalls), Route, options?.CallerTag);
 
-        await foreach (var streamEvent in OpenAIStreamReader.ReadAsync(reader, context, cancellationToken).ConfigureAwait(false))
+        await foreach (var streamEvent in OpenAIStreamReader.ReadAsync(reader, context, callToken).ConfigureAwait(false))
         {
             yield return streamEvent;
         }
@@ -291,18 +314,22 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
         }).ToList();
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
+    private void RaiseCompletionEvent(TokenUsage usage, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
     {
         TechieRagTelemetry.RecordLlmCompletion(
-            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens);
+            Name, ModelName, usage.InputTokens, usage.OutputTokens, duration, isStreaming, usage.CacheReadTokens);
 
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens,
+            InputTokens = usage.InputTokens,
+            OutputTokens = usage.OutputTokens,
+            ReasoningTokens = usage.ReasoningTokens,
+            IsEstimated = usage.IsEstimated,
             Duration = duration,
             ModelName = ModelName,
             ProviderName = Name,
+            Route = Route,
+            CallerTag = usage.CallerTag,
             IsStreaming = isStreaming,
             InvolvedToolCalls = involvedToolCalls
         });

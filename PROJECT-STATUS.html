@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-10-15</div>
+    <div class="sub">Last rendered: 2026-10-18</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,18 +121,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-10-18 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, then build and publish the package — its shipped documents are current; no agent command</div>
+      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, create GitHub Release v1.1.7, dispatch publish-nuget.yml dry run, then real</div>
     </div>
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-10-15</td></tr>
-<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 21 of 21 verified</td></tr>
+<tr><th>last_updated</th><td>2026-10-18</td></tr>
+<tr><th>current_phase</th><td>Handoff — release 1.1.7 ready, TR-RAG-052 local tool calling verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-10-15</td></tr>
+<tr><th>last_verified_date</th><td>2026-10-18</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,13 +149,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3 (Consumer feedback from Sevak). All 21 rows Verified on 2026-10-15. New today, from Lekhak TR-RAG-007: a failed LLM call throws <code>LlmHttpException</code> carrying the status code, the response body and the provider's own message (REQ-RAG-134, BRD-194). The AI reference, agent guides, release notes, UsageGuide and P3 DevGuide describe it, and Lekhak's feedback file has the reply. It ships in the next package after 1.1.5.</p>
+<p>Phase 3 of 3. TR-RAG-052 is implemented: built-in local models now report <code>SupportsToolCalling</code>, <code>LocalLlmProvider</code> prompts and parses tool calls, and the conformance suite proves the round-trip. All tests pass. Shipped docs and release notes are updated. The intended release is 1.1.7.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
-<pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
+<pre><code>(owner) commit, create GitHub Release v1.1.7, dispatch publish-nuget.yml dry run, then real</code></pre>
 <p>OpenCode:</p>
-<pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
-<p>Why: every row in this phase's scope is terminal and the shipped documents were brought up to date; working docs/TechieRag-P3-Checklist.md.</p>
+<pre><code>(owner) commit, create GitHub Release v1.1.7, dispatch publish-nuget.yml dry run, then real</code></pre>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
 <thead><tr><th>Status</th><th>Count</th></tr></thead>
@@ -173,39 +172,20 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>🔶 <strong>Release:</strong> NuGet is at 1.1.5; publish the next release with the "Next release after 1.1.5" section of <code>RELEASE-NOTES.md</code>.
+<li>Release needs the owner to create GitHub Release <code>v1.1.7</code> and dispatch <code>publish-nuget.yml</code>.
 </li>
-<li>🔶 <strong>Owner git:</strong> commit TechieRag and Lekhak (TR-RAG-007 reply in <code>docs/Lekhak-TechieRag-Feedback.md</code>).
-</li>
-<li>🔶 <strong>Behaviour change:</strong> failed LLM calls throw <code>LlmHttpException</code>; exact-type checks must accept it; rerankers, embedders not covered (REQ-RAG-134).
-</li>
-<li>🔶 <strong>No live Venice or GLM call:</strong> no key here; loopback-tested.
-</li>
-<li>🔶 <strong>CI #53:</strong> GitHub-side failure; re-run it.
-</li>
-<li>🔶 <strong>Gmail live test flaky:</strong> REQ-RAG-110 failed twice on Gmail IMAP search, then passed.
-</li>
-<li>🔶 <strong>ONNX Runtime issue:</strong> ORT-001 ready to post; fill the macOS version.
-</li>
-<li>🔶 <strong>Local model re-check:</strong> REQ-RAG-057/059/063/065 skip below 4.6 GB free.
-</li>
-<li>🔶 <strong>Postgres (REQ-RAG-044):</strong> <code>TechieRagTestPostgres</code> unset; live test skipped.
-</li>
-<li>🔶 <strong>Windows probe head not driven</strong> (TechieFlow TF-006); rows graded by their tests.
-</li>
-<li>🔶 <strong>Keys in chat:</strong> OpenCode Go key and Gmail app password; rotate if shared.
+<li>Agents cannot run <code>git</code>/<code>gh</code>/workflow commands.
 </li>
 </ul>
 <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
-<p>Last five passes; older passes live in <code>docs/metrics/gates.jsonl</code>.</p>
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>16/16 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-11</td><td>triage-and-fix + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-11</td><td>fix-issues + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-15</td><td>triage-and-fix + handoff</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-15</td><td>fix-issues</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-11</td><td>triage-and-fix + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
+<tr><td>2026-10-15</td><td>triage-and-fix + handoff</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
+<tr><td>2026-10-15</td><td>fix-issues</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
+<tr><td>2026-10-18</td><td>status</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
+<tr><td>2026-10-18</td><td>build + test + TR-RAG-052</td><td>all green</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -214,35 +194,19 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
 </li>
-<li>TechieFlow: 3 open · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
+<li>TechieFlow: 0 open · 3 fixed upstream, not yet re-checked (TF-005, TF-006, TF-007) · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 </li>
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
 <ul>
-<li>Last check 2026-10-15: 0 findings, see the checklist Remarks.
+<li>Last check 2026-10-18: 0 findings, see the checklist Remarks.
 </li>
 </ul>
 <h2 id="deferred-future"><a id="deferred--future"></a>Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
-<li>OS built-in models (Apple, Android Gemini Nano) as a later <code>ILocalLlmRuntime</code>.
+<li>Open consumer feedback entries (TR-RAG-020/021/022/026/035, etc.) for a future release.
 </li>
-<li>LLamaSharp with Metal on the Mac (decision 2 option B).
-</li>
-<li>Hugging Face tokens for gated models in <code>LocalModel.FromHuggingFace</code>.
-</li>
-<li><code>REQ-RAG-046</code> deferred endpoints; <code>TechieRag.Agents</code> phase D items.
-</li>
-<li>Ollama and Gemini multi-turn tool use.
-</li>
-<li>OpenCode Go models on <code>/responses</code> and <code>/messages</code>.
-</li>
-<li>Rename TechieDesk to Sevak in about 15 XML doc comments.
-</li>
-<li>Update the Android emulator in Visual Studio's SDK.
-</li>
-<li>Gemini model listing, if a consumer asks.
-</li>
-<li>Typed Venice switches (web search, thinking); the model-id suffix works today.
+<li>OS built-in models as a later <code>ILocalLlmRuntime</code>.
 </li>
 </ul>
   </main>

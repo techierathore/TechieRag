@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using TechieRag.Abstractions;
+using TechieRag.Models;
 
 namespace TechieRag.Llm;
 
@@ -28,6 +29,7 @@ public static class LlmProviderFactory
     /// <param name="maxTokens">Default max output tokens, used by providers that require it up front.</param>
     /// <param name="contextTokens">Context window for runtimes that size it per request (Ollama's
     /// <c>num_ctx</c>); null leaves the runtime's own default (TR-RAG-003).</param>
+    /// <param name="requestTimeout">Default timeout for calls from the created provider; null uses 120 seconds.</param>
     /// <returns>A provider configured for the route.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="route"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the connector needs an API key and none was supplied,
@@ -37,7 +39,8 @@ public static class LlmProviderFactory
         string? apiKey,
         ILoggerFactory? loggerFactory = null,
         int maxTokens = 2048,
-        int? contextTokens = null)
+        int? contextTokens = null,
+        TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(route);
 
@@ -59,24 +62,40 @@ public static class LlmProviderFactory
                 route.ModelId,
                 connector.Endpoint,
                 maxTokens,
-                loggerFactory?.CreateLogger<AnthropicLlmProvider>()),
+                loggerFactory?.CreateLogger<AnthropicLlmProvider>(),
+                requestTimeout)
+            {
+                Route = $"{connector.Name}/{route.ModelId}"
+            },
 
             LlmSource.GoogleGemini => new GoogleGeminiLlmProvider(
                 apiKey!,
                 route.ModelId,
                 connector.Endpoint,
-                loggerFactory?.CreateLogger<GoogleGeminiLlmProvider>()),
+                loggerFactory?.CreateLogger<GoogleGeminiLlmProvider>(),
+                requestTimeout)
+            {
+                Route = $"{connector.Name}/{route.ModelId}"
+            },
 
             LlmSource.Ollama => new OllamaLlmProvider(
                 connector.Endpoint ?? "http://localhost:11434",
                 route.ModelId,
                 loggerFactory?.CreateLogger<OllamaLlmProvider>(),
-                contextTokens),
+                contextTokens,
+                requestTimeout)
+            {
+                Route = $"{connector.Name}/{route.ModelId}"
+            },
 
             LlmSource.LmStudio => new LmStudioLlmProvider(
                 connector.Endpoint ?? "http://localhost:1234",
                 route.ModelId,
-                loggerFactory?.CreateLogger<LmStudioLlmProvider>()),
+                loggerFactory?.CreateLogger<LmStudioLlmProvider>(),
+                requestTimeout)
+            {
+                Route = $"{connector.Name}/{route.ModelId}"
+            },
 
             LlmSource.OpenAICompatible => new OpenAICompatibleLlmProvider(
                 connector.Endpoint ?? throw new InvalidOperationException($"Connector '{connector.Name}' has no endpoint."),
@@ -84,9 +103,14 @@ public static class LlmProviderFactory
                 route.ModelId,
                 headers: null,
                 connector.SessionHeader,
-                loggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>())
+                loggerFactory?.CreateLogger<OpenAICompatibleLlmProvider>(),
+                requestTimeout)
             {
-                BodyFields = connector.RequestBodyFields
+                BodyFields = connector.RequestBodyFields,
+                Route = $"{connector.Name}/{route.ModelId}",
+                ReasoningControlStyle = connector.Name.Equals(LlmConnectorCatalog.VeniceName, StringComparison.OrdinalIgnoreCase)
+                    ? ReasoningControlStyle.Venice
+                    : ReasoningControlStyle.Default
             },
 
             // REQ-RAG-070: a subscription has no API key; it needs the host's sign-in callback.
@@ -112,6 +136,7 @@ public static class LlmProviderFactory
     /// another machine (<c>http://192.168.1.20:1234</c>); null keeps the default (REQ-RAG-127, Lekhak TR-RAG-005).
     /// Ignored by the in-process model, which has no endpoint.
     /// </param>
+    /// <param name="requestTimeout">Default timeout for calls from the created provider; null uses 120 seconds (TR-RAG-010).</param>
     /// <returns>A provider for the service the model name resolves to.</returns>
     /// <exception cref="InvalidOperationException">Thrown when the model name identifies no single service.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
@@ -124,8 +149,9 @@ public static class LlmProviderFactory
         ILoggerFactory? loggerFactory = null,
         int maxTokens = 2048,
         int? contextTokens = null,
-        string? endpoint = null) =>
-        Create(WithEndpoint(ModelRouter.Require(modelName), endpoint), apiKey, loggerFactory, maxTokens, contextTokens);
+        string? endpoint = null,
+        TimeSpan? requestTimeout = null) =>
+        Create(WithEndpoint(ModelRouter.Require(modelName), endpoint), apiKey, loggerFactory, maxTokens, contextTokens, requestTimeout);
 
     /// <summary>
     /// The 1.1.2 shape of <see cref="CreateForModel(string, string?, ILoggerFactory?, int, int?, string?)"/>,
@@ -146,7 +172,7 @@ public static class LlmProviderFactory
         ILoggerFactory? loggerFactory,
         int maxTokens,
         int? contextTokens) =>
-        Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens, contextTokens);
+        Create(ModelRouter.Require(modelName), apiKey, loggerFactory, maxTokens, contextTokens, requestTimeout: null);
 
     /// <summary>
     /// Lists the models a route's service reports, for LM Studio, Ollama, every OpenAI-compatible connector and
@@ -249,6 +275,7 @@ public static class LlmProviderFactory
     /// <param name="signInCallback">Called with the page and code when the user must sign in; the host opens the browser.</param>
     /// <param name="sessionStore">Where the session is kept; null keeps it in memory.</param>
     /// <param name="loggerFactory">Optional logger factory.</param>
+    /// <param name="requestTimeout">Default timeout for model calls from the created provider; null uses 120 seconds (TR-RAG-010).</param>
     /// <returns>A provider billed to the signed-in user's subscription.</returns>
     /// <exception cref="ArgumentNullException">A required argument is null.</exception>
     /// <exception cref="SubscriptionSignInException">The route's vendor does not permit subscription sign-in
@@ -258,7 +285,8 @@ public static class LlmProviderFactory
         ModelRoute route,
         Func<Models.SubscriptionSignInPrompt, CancellationToken, Task> signInCallback,
         ISubscriptionSessionStore? sessionStore = null,
-        ILoggerFactory? loggerFactory = null)
+        ILoggerFactory? loggerFactory = null,
+        TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(route);
         ArgumentNullException.ThrowIfNull(signInCallback);
@@ -274,7 +302,11 @@ public static class LlmProviderFactory
             SubscriptionConnectorRows.ChatGptName when connector.Subscription.Permitted => new ChatGptSubscriptionLlmProvider(
                 signInCallback,
                 new ChatGptSubscriptionOptions { Model = route.ModelId, SessionStore = sessionStore },
-                loggerFactory?.CreateLogger<ChatGptSubscriptionLlmProvider>()),
+                loggerFactory?.CreateLogger<ChatGptSubscriptionLlmProvider>(),
+                requestTimeout)
+            {
+                Route = $"{connector.Name}/{route.ModelId}"
+            },
 
             _ => throw NotPermitted(connector)
         };

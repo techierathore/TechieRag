@@ -31,7 +31,7 @@ internal static class OpenAIStreamReader
     {
         var toolCalls = new SortedDictionary<int, ToolCallFragments>();
         var outputText = new StringBuilder();
-        var usage = (Input: 0, Output: 0, Cached: 0);
+        var usage = (Input: 0, Output: 0, Reasoning: 0, Cached: 0);
         string? finishReason = null;
 
         // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
@@ -45,7 +45,7 @@ internal static class OpenAIStreamReader
             var chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data, ReadOptions);
             if (chunk?.Usage is not null)
             {
-                usage = (chunk.Usage.PromptTokens, chunk.Usage.CompletionTokens, chunk.Usage.CachedTokens);
+                usage = (chunk.Usage.PromptTokens, chunk.Usage.CompletionTokens, chunk.Usage.ReasoningTokens, chunk.Usage.CachedTokens);
             }
 
             var choice = chunk?.Choices?.FirstOrDefault();
@@ -65,7 +65,7 @@ internal static class OpenAIStreamReader
             yield return LlmStreamEvent.FromToolCall(fragments.ToToolCall());
         }
 
-        var tokenUsage = context.BuildUsage(usage.Input, usage.Output, usage.Cached, outputText.ToString());
+        var tokenUsage = context.BuildUsage(usage.Input, usage.Output, usage.Cached, outputText.ToString(), reasoningTokens: usage.Reasoning);
         context.OnCompleted(tokenUsage, toolCalls.Count > 0);
 
         var reason = finishReason ?? (toolCalls.Count > 0 ? "tool_calls" : "stop");

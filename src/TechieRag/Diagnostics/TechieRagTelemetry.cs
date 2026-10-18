@@ -130,6 +130,7 @@ public static class TechieRagTelemetry
     /// <param name="isStreaming">Whether the response was streamed.</param>
     /// <param name="cacheReadTokens">Prompt tokens served from the provider's cache (REQ-RAG-043).</param>
     /// <param name="cacheWriteTokens">Prompt tokens written into the provider's cache (REQ-RAG-043).</param>
+    /// <param name="reasoningTokens">Completion tokens the provider reported as reasoning.</param>
     public static void RecordLlmCompletion(
         string providerName,
         string modelName,
@@ -138,7 +139,8 @@ public static class TechieRagTelemetry
         TimeSpan duration,
         bool isStreaming,
         int cacheReadTokens = 0,
-        int cacheWriteTokens = 0)
+        int cacheWriteTokens = 0,
+        int reasoningTokens = 0)
     {
         if (!Enabled) return;
 
@@ -151,6 +153,7 @@ public static class TechieRagTelemetry
 
         RecordTokens(inputTokens, "input", provider, model);
         RecordTokens(outputTokens, "output", provider, model);
+        RecordTokens(reasoningTokens, "reasoning", provider, model);
         RecordTokens(cacheReadTokens, "cache.read", provider, model);
         RecordTokens(cacheWriteTokens, "cache.write", provider, model);
     }

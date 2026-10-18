@@ -86,6 +86,7 @@ public class TokenUsageTracker : ITokenTracker
         {
             TotalInputTokens = records.Sum(r => (long)r.InputTokens),
             TotalOutputTokens = records.Sum(r => (long)r.OutputTokens),
+            TotalReasoningTokens = records.Sum(r => (long)r.ReasoningTokens),
             TotalEstimatedCostUsd = records.Sum(r => r.EstimatedCostUsd),
             OperationCount = records.Length,
             FirstOperationAt = records.Min(r => r.Timestamp),
@@ -98,6 +99,27 @@ public class TokenUsageTracker : ITokenTracker
     {
         var records = usageRecords.ToArray();
         var grouped = records.GroupBy(r => r.ModelName);
+        return SummarizeByKey(grouped);
+    }
+
+    /// <summary>Gets token usage breakdown by route.</summary>
+    public IReadOnlyDictionary<string, TokenUsageSummary> GetUsageByRoute()
+    {
+        var records = usageRecords.ToArray();
+        var grouped = records.GroupBy(r => r.Route ?? string.Empty);
+        return SummarizeByKey(grouped);
+    }
+
+    /// <summary>Gets token usage breakdown by caller tag.</summary>
+    public IReadOnlyDictionary<string, TokenUsageSummary> GetUsageByCaller()
+    {
+        var records = usageRecords.ToArray();
+        var grouped = records.GroupBy(r => r.CallerTag ?? string.Empty);
+        return SummarizeByKey(grouped);
+    }
+
+    private static IReadOnlyDictionary<string, TokenUsageSummary> SummarizeByKey(IEnumerable<IGrouping<string, TokenUsage>> grouped)
+    {
         var result = new Dictionary<string, TokenUsageSummary>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var group in grouped)
@@ -107,6 +129,7 @@ public class TokenUsageTracker : ITokenTracker
             {
                 TotalInputTokens = groupRecords.Sum(r => (long)r.InputTokens),
                 TotalOutputTokens = groupRecords.Sum(r => (long)r.OutputTokens),
+                TotalReasoningTokens = groupRecords.Sum(r => (long)r.ReasoningTokens),
                 TotalEstimatedCostUsd = groupRecords.Sum(r => r.EstimatedCostUsd),
                 OperationCount = groupRecords.Length,
                 FirstOperationAt = groupRecords.Min(r => r.Timestamp),
@@ -130,6 +153,35 @@ public class TokenUsageTracker : ITokenTracker
         lock (budgetLock)
         {
             currentBudget = budget;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void ThrowIfBudgetExceeded(string? callerTag = null)
+    {
+        lock (budgetLock)
+        {
+            if (currentBudget is null) return;
+            if (!currentBudget.BlockOnExceeded) return;
+
+            var status = new BudgetStatus
+            {
+                Budget = currentBudget,
+                CurrentUsage = GetSessionUsage()
+            };
+
+            if (!status.IsExceeded) return;
+
+            var scope = string.IsNullOrWhiteSpace(callerTag) ? string.Empty : $" for caller '{callerTag}'";
+            throw new TechieRagBudgetExceededException(
+                $"The session token budget has been exceeded{scope}. " +
+                $"Tokens: {status.CurrentUsage.TotalTokens}/{status.Budget.MaxTotalTokens}, " +
+                $"Cost: ${status.CurrentUsage.TotalEstimatedCostUsd:F6}/${status.Budget.MaxCostUsd:F6}.")
+            {
+                Budget = currentBudget,
+                CurrentUsage = status.CurrentUsage,
+                CallerTag = callerTag
+            };
         }
     }
 

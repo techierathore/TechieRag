@@ -29,6 +29,7 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     private readonly string completionsPath;
     private readonly string? sessionHeader;
     private readonly string defaultSessionId = Guid.NewGuid().ToString("N");
+    private readonly TimeSpan? configuredTimeout;
     private readonly ILogger<OpenAICompatibleLlmProvider> logger;
 
     /// <inheritdoc/>
@@ -36,6 +37,12 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
     /// <inheritdoc/>
     public string ModelName { get; }
+
+    /// <inheritdoc/>
+    public string? Route { get; init; }
+
+    /// <summary>How reasoning controls are mapped onto the request body.</summary>
+    internal ReasoningControlStyle ReasoningControlStyle { get; init; }
 
     /// <inheritdoc/>
     public bool SupportsToolCalling => true;
@@ -74,19 +81,22 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="sessionHeader">The header that carries <see cref="LlmCompletionOptions.SessionId"/>,
     /// e.g. <c>x-opencode-session</c>; null sends none.</param>
     /// <param name="logger">Logger instance; never receives a header value.</param>
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
     public OpenAICompatibleLlmProvider(
         string endpoint,
         string apiKey,
         string model,
         IReadOnlyDictionary<string, string>? headers,
         string? sessionHeader,
-        ILogger<OpenAICompatibleLlmProvider>? logger = null)
+        ILogger<OpenAICompatibleLlmProvider>? logger = null,
+        TimeSpan? requestTimeout = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(endpoint);
         ArgumentException.ThrowIfNullOrEmpty(model);
 
         ModelName = model;
         this.sessionHeader = string.IsNullOrWhiteSpace(sessionHeader) ? null : sessionHeader;
+        this.configuredTimeout = requestTimeout;
         this.logger = logger ?? NullLogger<OpenAICompatibleLlmProvider>.Instance;
 
         // The request URI is composed as "{endpoint}/chat/completions", by keeping the whole endpoint
@@ -102,7 +112,9 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         httpClient = new HttpClient
         {
             BaseAddress = new Uri(baseUri + "/"),
-            Timeout = TimeSpan.FromSeconds(120)
+            // The effective timeout is enforced per-call through a linked cancellation token, so the
+            // HttpClient timeout must never truncate a host token that allows more time (TR-RAG-010).
+            Timeout = Timeout.InfiniteTimeSpan
         };
 
         if (!string.IsNullOrEmpty(apiKey))
@@ -124,18 +136,21 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <param name="logger">Logger instance.</param>
     /// <param name="headers">Headers sent on every request.</param>
     /// <param name="sessionHeader">The header that carries the session id, or null for none.</param>
+    /// <param name="requestTimeout">Optional default timeout for calls from this provider; null uses 120 seconds.</param>
     internal OpenAICompatibleLlmProvider(
         HttpClient httpClient,
         string model,
         ILogger<OpenAICompatibleLlmProvider>? logger = null,
         IReadOnlyDictionary<string, string>? headers = null,
-        string? sessionHeader = null)
+        string? sessionHeader = null,
+        TimeSpan? requestTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         this.httpClient = httpClient;
         ModelName = model;
         completionsPath = "/v1/chat/completions";
         this.sessionHeader = string.IsNullOrWhiteSpace(sessionHeader) ? null : sessionHeader;
+        this.configuredTimeout = requestTimeout;
         this.logger = logger ?? NullLogger<OpenAICompatibleLlmProvider>.Instance;
         ApplyHeaders(httpClient, headers);
     }
@@ -185,16 +200,19 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: false);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         using var requestMessage = CreateRequest(content, options);
-        var response = await httpClient.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(requestMessage, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        var responseJson = await response.Content.ReadAsStringAsync(callToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<OpenAIChatResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("Failed to parse response");
 
@@ -203,7 +221,9 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var choice = result.Choices?.FirstOrDefault();
         var inputTokens = result.Usage?.PromptTokens ?? 0;
         var outputTokens = result.Usage?.CompletionTokens ?? 0;
+        var reasoningTokens = result.Usage?.ReasoningTokens ?? 0;
         var cacheReadTokens = result.Usage?.CachedTokens ?? 0;
+        var isEstimated = result.Usage is null;
         var toolCalls = ParseToolCalls(choice?.Message?.ToolCalls);
 
         var llmResponse = new LlmResponse
@@ -214,6 +234,10 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
             {
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens,
+                ReasoningTokens = reasoningTokens,
+                IsEstimated = isEstimated,
+                Route = Route,
+                CallerTag = options?.CallerTag,
                 CacheReadTokens = cacheReadTokens,
                 ModelName = ModelName,
                 ProviderName = Name
@@ -222,7 +246,7 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
             ModelName = result.Model ?? ModelName
         };
 
-        RaiseCompletionEvent(inputTokens, outputTokens, sw.Elapsed, false, llmResponse.HasToolCalls, cacheReadTokens);
+        RaiseCompletionEvent(llmResponse.Usage, sw.Elapsed, false, llmResponse.HasToolCalls);
         return llmResponse;
     }
 
@@ -234,22 +258,25 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
     /// <inheritdoc/>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
+        var callToken = timeoutCts?.Token ?? cancellationToken;
+
         var sw = Stopwatch.StartNew();
         var request = BuildRequest(messages, options, stream: true);
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
         using var requestMessage = CreateRequest(content, options);
-        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, callToken).ConfigureAwait(false);
+        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
 
         var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (usage, involvedToolCalls) =>
-            RaiseCompletionEvent(usage.InputTokens, usage.OutputTokens, sw.Elapsed, true, involvedToolCalls, usage.CacheReadTokens));
+            RaiseCompletionEvent(usage, sw.Elapsed, true, involvedToolCalls), Route, options?.CallerTag);
 
-        await foreach (var streamEvent in OpenAIStreamReader.ReadAsync(reader, context, cancellationToken).ConfigureAwait(false))
+        await foreach (var streamEvent in OpenAIStreamReader.ReadAsync(reader, context, callToken).ConfigureAwait(false))
         {
             yield return streamEvent;
         }
@@ -359,6 +386,18 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         if (options?.StopSequences is not null) request["stop"] = options.StopSequences;
         if (options?.Seed is not null) request["seed"] = options.Seed.Value;
 
+        // Merge connector body fields first so provider-specific reasoning controls can deep-merge
+        // nested structures such as Venice's venice_parameters (REQ-RAG-135).
+        if (BodyFields is not null)
+        {
+            foreach (var field in BodyFields)
+            {
+                request.TryAdd(field.Key, field.Value);
+            }
+        }
+
+        ApplyReasoningControls(request, options);
+
         if (options?.JsonMode == true)
             request["response_format"] = new { type = "json_object" };
 
@@ -379,14 +418,6 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
                 request["tool_choice"] = options.ToolChoice;
         }
 
-        if (BodyFields is not null)
-        {
-            foreach (var field in BodyFields)
-            {
-                request.TryAdd(field.Key, field.Value);
-            }
-        }
-
         return request;
     }
 
@@ -402,18 +433,73 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         }).ToList();
     }
 
-    private void RaiseCompletionEvent(int inputTokens, int outputTokens, TimeSpan duration, bool isStreaming, bool involvedToolCalls, int cacheReadTokens = 0)
+    private void ApplyReasoningControls(Dictionary<string, object> request, LlmCompletionOptions? options)
+    {
+        if (options is null) return;
+
+        if (ReasoningControlStyle == ReasoningControlStyle.Venice)
+        {
+            // Venice nests its reasoning switches under venice_parameters. Preserve the existing
+            // parameters (e.g. include_venice_system_prompt) and merge the reasoning controls.
+            if (!request.TryGetValue("venice_parameters", out var existing) ||
+                existing is not Dictionary<string, object> veniceParameters)
+            {
+                veniceParameters = new Dictionary<string, object>();
+            }
+
+            if (options.DisableReasoning)
+            {
+                veniceParameters["disable_thinking"] = true;
+                veniceParameters["strip_thinking_response"] = true;
+            }
+
+            if (options.MaxReasoningTokens is > 0)
+            {
+                veniceParameters["max_thinking_tokens"] = options.MaxReasoningTokens.Value;
+            }
+
+            if (veniceParameters.Count > 0)
+            {
+                request["venice_parameters"] = veniceParameters;
+            }
+
+            return;
+        }
+
+        // Standard OpenAI-style reasoning controls.
+        if (options.DisableReasoning)
+        {
+            // OpenAI does not have an explicit "off" switch; map disable to the lowest effort.
+            request["reasoning_effort"] = "low";
+        }
+        else if (!string.IsNullOrWhiteSpace(options.ReasoningEffort))
+        {
+            request["reasoning_effort"] = options.ReasoningEffort;
+        }
+
+        if (options.MaxReasoningTokens is > 0)
+        {
+            request["max_reasoning_tokens"] = options.MaxReasoningTokens.Value;
+        }
+    }
+
+    private void RaiseCompletionEvent(TokenUsage usage, TimeSpan duration, bool isStreaming, bool involvedToolCalls)
     {
         TechieRagTelemetry.RecordLlmCompletion(
-            Name, ModelName, inputTokens, outputTokens, duration, isStreaming, cacheReadTokens);
+            Name, ModelName, usage.InputTokens, usage.OutputTokens, duration, isStreaming,
+            usage.CacheReadTokens, usage.CacheWriteTokens);
 
         OnCompletionCompleted?.Invoke(this, new LlmCompletionEventArgs
         {
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens,
+            InputTokens = usage.InputTokens,
+            OutputTokens = usage.OutputTokens,
+            ReasoningTokens = usage.ReasoningTokens,
+            IsEstimated = usage.IsEstimated,
             Duration = duration,
             ModelName = ModelName,
             ProviderName = Name,
+            Route = Route,
+            CallerTag = usage.CallerTag,
             IsStreaming = isStreaming,
             InvolvedToolCalls = involvedToolCalls
         });

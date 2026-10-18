@@ -422,7 +422,7 @@ A custom `ILlmProvider` that implements `ChatStreamAsync` on top of the typed me
 
 ### 2. Local model: `TechieRag.Local`
 
-Package `TechieRag.Local` (depends on `TechieRag.Embedded`); namespace `TechieRag.Local`. One provider, `LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable`, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws `PlatformNotSupportedException` on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. `SupportsToolCalling` is false; a request with tools is refused. A MAUI app writes no native wiring: the package's `buildTransitive` targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.
+Package `TechieRag.Local` (depends on `TechieRag.Embedded`); namespace `TechieRag.Local`. One provider, `LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable`, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws `PlatformNotSupportedException` on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. `SupportsToolCalling` is true for the shipped catalogue models (`Qwen25Instruct05B`, `Phi3Mini4kInstruct`); a request with tools is refused for unsupported models. A MAUI app writes no native wiring: the package's `buildTransitive` targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.
 
 | Model | Id | Where it is the default | Download | Licence |
 |-------|----|-------------------------|----------|---------|
@@ -1331,6 +1331,26 @@ try { reply = await oldProvider.ChatAsync(messages); }
 catch (ObjectDisposedException) { /* the model was unloaded or swapped: retry on `next` */ }
 ```
 
+### Local model tool calling
+
+Package `TechieRag.Local`; namespace `TechieRag.Local` (TR-RAG-052). The built-in catalogue models `LocalModel.Qwen25Instruct05B` and `LocalModel.Phi3Mini4kInstruct` now report `SupportsToolCalling == true`. `LocalLlmProvider` injects the tool definitions into the system prompt in the model's own format (Hermes-style `<tools>` / `<tool_call>` blocks for Qwen2.5, JSON-mode for Phi-3), parses the generated `<tool_call>` or JSON output into `LlmResponse.ToolCalls`, and formats tool results back into the conversation. `AgentLoopRunner` can therefore run tools on the in-process model with no network and no other program. Host-supplied folder models do not enable tool calling unless explicitly configured.
+
+```csharp
+var registry = new ToolRegistry();
+registry.Register("get_weather", "Gets the weather for a city.",
+    """{"type":"object","properties":{"city":{"type":"string"}}}""",
+    arguments => "Sunny, 22 C");
+
+using var local = new LocalLlmProvider(new LocalLlmOptions
+{
+    Model = LocalModel.Qwen25Instruct05B,
+    TermsAccepted = true
+});
+
+var runner = new AgentLoopRunner(local, registry);
+var answer = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);
+```
+
 ### Choosing a model for a piece of work: `ModelChooser`
 
 Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-128, Chatur TR-RAG-006). `ModelRouter` turns a model name into a service; `ModelChooser` decides which name. `new ModelChooser(smallModel, options?)` takes any `ILlmProvider`; a cheap or local one is enough. `ChooseAsync(request, candidates)` takes the request text and `ModelCandidate { ModelId, Tier?, Notes?, Cost? }` items, the free-text fields written in the host's own words. It returns a `ModelChoice` with `Candidate`, `ModelId`, `Reason` (one sentence to show and log), `Source` (`ModelChoiceSource.SmallModel`, `OnlyCandidate` or `Fallback`) and the small model's `Usage`. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to `ModelChooserOptions.MaxRequestCharacters` (default 4000). The reply's id is matched ignoring case. An id without its `connector/` prefix matches when exactly one candidate ends with it. **The answer is always a candidate:** a reply that is not JSON, or names a model that was not offered, gives `ModelChooserOptions.FallbackModelId` (else the first candidate) with `Source = Fallback`. **A failure of the small model is thrown** (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. `ModelChooserOptions.Guidance` adds the host's rule to the instructions. The interface `IModelChooser` lets a unit test pass a fixed choice.
@@ -1398,6 +1418,86 @@ catch (LlmHttpException ex)
     // ex.StatusCode == HttpStatusCode.NotFound, ex.ProviderMessage == "Specified model not found: wrong-model"
     status.Text = $"{(int?)ex.StatusCode}: {ex.ProviderMessage ?? ex.Message}";
 }
+```
+
+### Consumption monitoring and budgets
+
+Package `TechieRag`; namespaces `TechieRag.Models`, `TechieRag.Services` (Lekhak TR-RAG-008 / TR-RAG-009 / TR-RAG-010). Every provider now reports its own prompt/completion/reasoning token counts, the route, and a caller tag on every call, streamed or not.
+
+- `TokenUsage` carries `ReasoningTokens`, `IsEstimated`, `Route` and `CallerTag`.
+- `TokenUsageSummary` carries `TotalReasoningTokens` and `TotalCompletionTokens`.
+- `LlmCompletionOptions.CallerTag` names the agent or component making the call; it is copied into usage and the `OnCompletionCompleted` event but is never sent to the provider.
+- `LlmCompletionOptions.RequestTimeout` overrides the provider's default timeout for one call.
+- `LlmConfig.RequestTimeout` and `LlmFallback.RequestTimeout` set the default timeout from configuration or the builder.
+
+```csharp
+var tracker = new TokenUsageTracker();
+tracker.SetBudget(new UsageBudget { MaxTotalTokens = 1_000_000, BlockOnExceeded = true });
+
+var llm = new BudgetEnforcingLlmProvider(
+    LlmProviderFactory.CreateForModel("venice/qwen-3-6-plus", key),
+    tracker);
+
+llm.OnCompletionCompleted += (_, args) =>
+    Console.WriteLine($"{args.Route} {args.CallerTag}: {args.InputTokens}+{args.OutputTokens} (reasoning {args.ReasoningTokens})");
+
+var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
+{
+    CallerTag = "story-writer",
+    MaxReasoningTokens = 500,
+    RequestTimeout = TimeSpan.FromMinutes(5)
+});
+```
+
+### Reasoning controls
+
+Package `TechieRag`; namespace `TechieRag.Models` (Lekhak TR-RAG-009). `LlmCompletionOptions` exposes provider-neutral reasoning controls that each connector maps to its own wire fields.
+
+- `DisableReasoning = true`: Venice sends `venice_parameters.disable_thinking` and `strip_thinking_response`; OpenAI-style services send `reasoning_effort: low`.
+- `MaxReasoningTokens`: Venice sends `venice_parameters.max_thinking_tokens`; OpenAI-style services send `max_reasoning_tokens`.
+- `ReasoningEffort`: standard values `low`, `medium`, `high`; mapped to `reasoning_effort` on OpenAI-style providers.
+
+```csharp
+var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
+{
+    DisableReasoning = true,
+    MaxReasoningTokens = 250
+});
+```
+
+### Per-call and per-provider request timeout
+
+Package `TechieRag`; namespaces `TechieRag.Models`, `TechieRag.Llm` (Lekhak TR-RAG-010). The old fixed 120-second provider timeout is gone. The effective timeout is, in order:
+
+1. `LlmCompletionOptions.RequestTimeout` on the call.
+2. `LlmConfig.RequestTimeout` on the provider's configuration.
+3. The default 120 seconds.
+
+The caller's own cancellation token is always honoured and wins if it cancels sooner.
+
+```csharp
+// Per-call
+await llm.ChatAsync(messages, new LlmCompletionOptions { RequestTimeout = TimeSpan.FromMinutes(5) });
+
+// Per-provider from configuration
+var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+{
+    ["Llm:RequestTimeout"] = "00:05:00"
+}).Build();
+services.AddTechieRag(section);
+```
+
+### Codex agent
+
+The TechieRag NuGet package now deploys a native Codex custom agent to `.codex/agents/techierag.toml` on every consumer build (TechieFlow TR-RAG-003). The agent reads `.techierag/TechieRag-AI-Reference.md` and the consumer's `AGENTS.md`, and contains no Claude or OpenCode-specific ritual. Build once after installing the package to make the specialist discoverable.
+
+```csharp
+// The agent is deployed automatically by the TechieRag NuGet target on every build.
+// Verify it is present after building:
+var agentPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".codex", "agents", "techierag.toml");
+Console.WriteLine(File.Exists(agentPath) ? "techierag agent ready" : "build to deploy");
 ```
 
 ---
@@ -1573,6 +1673,14 @@ public class LlmCompletionOptions
     public IReadOnlyList<ToolDefinition>? Tools { get; set; }
     public string? ToolChoice { get; set; }           // "auto", "none", "required"
     public int? Seed { get; set; }
+    public string? Model { get; set; }                // per-request model override; null = provider default
+    public PromptCacheOptions? PromptCache { get; set; }
+    public string? SessionId { get; set; }            // carried in the connector's session header, e.g. x-opencode-session
+    public string? CallerTag { get; set; }            // names the agent/component; copied into TokenUsage.CallerTag
+    public bool DisableReasoning { get; set; }        // ask the provider to disable reasoning
+    public int? MaxReasoningTokens { get; set; }      // cap on reasoning tokens
+    public string? ReasoningEffort { get; set; }      // "low", "medium", "high" for OpenAI-style providers
+    public TimeSpan? RequestTimeout { get; set; }     // per-call timeout; overrides provider/config default
 }
 ```
 
@@ -1610,8 +1718,14 @@ public class RagResponse
 public class TokenUsage
 {
     public int InputTokens { get; set; }
-    public int OutputTokens { get; set; }
+    public int OutputTokens { get; set; }             // includes ReasoningTokens
     public int TotalTokens { get; }
+    public int ReasoningTokens { get; set; }          // separately reported reasoning portion
+    public bool IsEstimated { get; set; }             // true when the provider sent no usage
+    public string? Route { get; set; }                // e.g. "venice/qwen-3-6-plus"
+    public string? CallerTag { get; set; }            // from LlmCompletionOptions.CallerTag
+    public int CacheReadTokens { get; set; }
+    public int CacheWriteTokens { get; set; }
     public decimal EstimatedCostUsd { get; set; }
     public string ModelName { get; set; }
     public string ProviderName { get; set; }
@@ -1623,6 +1737,8 @@ public class TokenUsageSummary
     public long TotalInputTokens { get; set; }
     public long TotalOutputTokens { get; set; }
     public long TotalTokens { get; }
+    public long TotalReasoningTokens { get; set; }
+    public long TotalCompletionTokens { get; }        // output minus reasoning
     public decimal TotalEstimatedCostUsd { get; set; }
     public int OperationCount { get; set; }
 }
