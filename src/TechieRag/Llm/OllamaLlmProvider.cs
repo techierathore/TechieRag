@@ -155,6 +155,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var inputTokens = ollamaResponse.PromptEvalCount ?? 0;
         var outputTokens = ollamaResponse.EvalCount ?? 0;
         var toolCalls = ParseToolCalls(ollamaResponse.Message?.ToolCalls);
+        var (thinking, answer) = ThinkBlockSplitter.Split(ollamaResponse.Message?.Content, ollamaResponse.Message?.Thinking);
 
         var usage = new TokenUsage
         {
@@ -169,7 +170,8 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var llmResponse = new LlmResponse
         {
-            Content = ollamaResponse.Message?.Content,
+            Content = answer,
+            Thinking = thinking,
             ToolCalls = toolCalls,
             Usage = usage,
             FinishReason = MapFinishReason(ollamaResponse.DoneReason, toolCalls is { Count: > 0 }),
@@ -187,7 +189,8 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
     /// <inheritdoc/>
     /// <remarks>Ollama sends each tool call whole inside one chunk; they are collected and emitted
-    /// after the text (REQ-RAG-067 / BRD-110).</remarks>
+    /// after the text (REQ-RAG-067 / BRD-110). The <c>thinking</c> field, and a <c>&lt;think&gt;</c> block
+    /// opening the answer text, stream as thinking events (REQ-RAG-141).</remarks>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
@@ -209,6 +212,7 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         int totalOutputTokens = 0;
         var outputText = new StringBuilder();
         var toolCalls = new List<ToolCall>();
+        var thinkBlock = new ThinkBlockSplitter();
         string? doneReason = null;
 
         // ReadLineAsync returning null is end of stream; EndOfStream would block synchronously (CA2024).
@@ -221,10 +225,17 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
             toolCalls.AddRange(ParseToolCalls(chunk.Message?.ToolCalls) ?? []);
 
+            if (!string.IsNullOrEmpty(chunk.Message?.Thinking))
+            {
+                yield return LlmStreamEvent.FromThinking(chunk.Message.Thinking);
+            }
+
             if (!string.IsNullOrEmpty(chunk.Message?.Content))
             {
-                outputText.Append(chunk.Message.Content);
-                yield return LlmStreamEvent.FromText(chunk.Message.Content);
+                foreach (var part in thinkBlock.Push(chunk.Message.Content))
+                {
+                    yield return ToEvent(part, outputText);
+                }
             }
 
             if (chunk.Done == true)
@@ -234,6 +245,11 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
                 doneReason = chunk.DoneReason;
                 break;
             }
+        }
+
+        foreach (var part in thinkBlock.Flush())
+        {
+            yield return ToEvent(part, outputText);
         }
 
         foreach (var toolCall in toolCalls)
@@ -285,6 +301,26 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return (int)Math.Ceiling(text.Length / 4.0);
     }
 
+    /// <summary>A settled piece of answer text as its event; only answer text counts toward the output estimate.</summary>
+    private static LlmStreamEvent ToEvent((bool IsThinking, string Text) part, StringBuilder outputText)
+    {
+        if (part.IsThinking) return LlmStreamEvent.FromThinking(part.Text);
+
+        outputText.Append(part.Text);
+        return LlmStreamEvent.FromText(part.Text);
+    }
+
+    /// <summary>
+    /// The <c>think</c> setting a call asks for (REQ-RAG-141): true when the app sets a reasoning budget or
+    /// effort, false when it disables reasoning, and null (left out) otherwise, so the model's default holds.
+    /// </summary>
+    private static bool? ThinkSetting(LlmCompletionOptions? options)
+    {
+        if (options is null) return null;
+        if (options.DisableReasoning) return false;
+        return options.MaxReasoningTokens is > 0 || !string.IsNullOrWhiteSpace(options.ReasoningEffort) ? true : null;
+    }
+
     private object BuildRequest(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options, bool stream)
     {
         var ollamaMessages = messages.Select(m =>
@@ -325,6 +361,9 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         if (options?.JsonMode == true)
             request["format"] = "json";
+
+        if (ThinkSetting(options) is { } think)
+            request["think"] = think;
 
         if (options?.Tools is { Count: > 0 })
         {
@@ -456,6 +495,10 @@ public class OllamaLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         [JsonPropertyName("content")]
         public string? Content { get; set; }
+
+        /// <summary>The model's thinking, sent apart from the answer when <c>think</c> is on (REQ-RAG-141).</summary>
+        [JsonPropertyName("thinking")]
+        public string? Thinking { get; set; }
 
         [JsonPropertyName("tool_calls")]
         public List<OllamaToolCall>? ToolCalls { get; set; }

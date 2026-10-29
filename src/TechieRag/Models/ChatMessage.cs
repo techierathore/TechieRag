@@ -39,6 +39,16 @@ public class ChatMessage
     /// </remarks>
     public bool CacheBoundary { get; set; }
 
+    /// <summary>Gets or sets data a provider needs back with this assistant message on the next call, kept
+    /// unchanged by the host (REQ-RAG-139).</summary>
+    /// <remarks>
+    /// Opaque to everything but the provider that wrote it. Anthropic puts the signed thinking blocks of a
+    /// turn here, because its service refuses a tool-use turn with thinking on when they are missing.
+    /// Copied from <see cref="LlmResponse.ProviderState"/> by <see cref="LlmResponse.ToChatMessage"/>; a
+    /// provider ignores state another provider wrote. Never shown as text.
+    /// </remarks>
+    public string? ProviderState { get; set; }
+
     /// <summary>Gets whether this message carries at least one image part.</summary>
     public bool HasImages => Parts is not null && Parts.Any(part => part.Kind == ChatContentKind.Image);
 

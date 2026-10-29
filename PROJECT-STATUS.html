@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-10-18</div>
+    <div class="sub">Last rendered: 2026-10-29</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,18 +121,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-10-18 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, create GitHub Release v1.1.7, dispatch publish-nuget.yml dry run, then real</div>
+      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, then build and publish the package — its shipped documents are current; no agent command</div>
     </div>
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-10-18</td></tr>
-<tr><th>current_phase</th><td>Handoff — release 1.1.7 ready, TR-RAG-052 local tool calling verified</td></tr>
+<tr><th>last_updated</th><td>2026-10-29</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 29 of 29 verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-10-18</td></tr>
+<tr><th>last_verified_date</th><td>2026-10-29</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,12 +149,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3. TR-RAG-052 is implemented: built-in local models now report <code>SupportsToolCalling</code>, <code>LocalLlmProvider</code> prompts and parses tool calls, and the conformance suite proves the round-trip. All tests pass. Shipped docs and release notes are updated. The intended release is 1.1.7.</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak). All 29 items are Verified. Every built-in provider now sends a reasoning model's thinking apart from the answer: Anthropic, Gemini, Ollama, the local model and the ChatGPT subscription join the OpenAI-style three. Anthropic keeps its signed thinking for the next tool turn. The AI reference lists what each provider sends. All three test projects pass. Not tried against the live services.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
-<pre><code>(owner) commit, create GitHub Release v1.1.7, dispatch publish-nuget.yml dry run, then real</code></pre>
+<pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
 <p>OpenCode:</p>
-<pre><code>(owner) commit, create GitHub Release v1.1.7, dispatch publish-nuget.yml dry run, then real</code></pre>
+<pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
 <thead><tr><th>Status</th><th>Count</th></tr></thead>
@@ -172,20 +172,19 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>Release needs the owner to create GitHub Release <code>v1.1.7</code> and dispatch <code>publish-nuget.yml</code>.
-</li>
-<li>Agents cannot run <code>git</code>/<code>gh</code>/workflow commands.
+<li>None
 </li>
 </ul>
 <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
+<p>Last five passes; older passes live in <code>docs/metrics/gates.jsonl</code>.</p>
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-11</td><td>triage-and-fix + handoff</td><td>20/20 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
-<tr><td>2026-10-15</td><td>triage-and-fix + handoff</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
-<tr><td>2026-10-15</td><td>fix-issues</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
 <tr><td>2026-10-18</td><td>status</td><td>21/21 Verified</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
 <tr><td>2026-10-18</td><td>build + test + TR-RAG-052</td><td>all green</td><td>docs/TechieRag-P3-Checklist.md</td></tr>
+<tr><td>2026-10-29</td><td>fix-issues + handoff</td><td>23/23 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-29</td><td>amend-docs</td><td>23/29 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-10-29</td><td>build-phase</td><td>29/29 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -194,16 +193,20 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>OnnxRuntimeGenAI: 2 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
 </li>
-<li>TechieFlow: 0 open · 3 fixed upstream, not yet re-checked (TF-005, TF-006, TF-007) · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
+<li>TechieFlow: 0 open · 4 fixed upstream, not yet re-checked (TF-005, TF-006, TF-007 …) · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
 </li>
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
 <ul>
-<li>Last check 2026-10-18: 0 findings, see the checklist Remarks.
+<li>Last check 2026-10-29: 0 findings, see the checklist Remarks.
 </li>
 </ul>
 <h2 id="deferred-future"><a id="deferred--future"></a>Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
+<li>Gemini thought signatures on function calls (newer Gemini models may ask for them back); not sent today.
+</li>
+<li>Checklist rows for the 1.1.7 Lekhak work whose tests carry REQ-RAG-135 and REQ-RAG-136 (TF-008).
+</li>
 <li>Open consumer feedback entries (TR-RAG-020/021/022/026/035, etc.) for a future release.
 </li>
 <li>OS built-in models as a later <code>ILocalLlmRuntime</code>.

@@ -116,6 +116,7 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
     public async Task<LlmResponse> ChatAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default)
     {
         var text = new StringBuilder();
+        var thinking = new StringBuilder();
         var toolCalls = new List<ToolCall>();
         LlmStreamEvent? completed = null;
 
@@ -124,14 +125,16 @@ public sealed class ChatGptSubscriptionLlmProvider : ILlmProvider, IDisposable
             switch (streamEvent.Kind)
             {
                 case LlmStreamEventKind.TextDelta: text.Append(streamEvent.Text); break;
+                case LlmStreamEventKind.Thinking: thinking.Append(streamEvent.Text); break;
                 case LlmStreamEventKind.ToolCall: toolCalls.Add(streamEvent.ToolCall!); break;
-                default: completed = streamEvent; break;
+                case LlmStreamEventKind.Completed: completed = streamEvent; break;
             }
         }
 
         return new LlmResponse
         {
             Content = text.ToString(),
+            Thinking = thinking.Length > 0 ? thinking.ToString() : null,
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
             Usage = completed?.Usage ?? new TokenUsage { ModelName = ModelName, ProviderName = Name },
             FinishReason = completed?.FinishReason ?? "stop",

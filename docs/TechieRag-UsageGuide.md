@@ -109,6 +109,12 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** 1) `TextDelta` events (if the model writes any), then one `ToolCall` with name `get_weather` and complete JSON arguments, then one `Completed` with usage, last; 2) text only, as before; 3) text streams as it arrives, `ToolCallRequested` then `ToolExecuted` carrying the registry's result, the answer's text, then `Completed` with usage summed over the run.
 - **Covers:** REQ-RAG-067, REQ-RAG-068
 
+### Thinking text from reasoning models (phase 3)
+- **Sign in as:** user 1, with a reasoning model on any built-in provider (for example `ollama/qwen3`, DeepSeek or Kimi on OpenAI-compatible, Claude on Anthropic)
+- **Steps:** 1) iterate `ChatStreamEventsAsync` with `MaxReasoningTokens = 2048` 2) `ChatAsync` with the same options 3) with one tool, run `AgentLoopRunner.RunStreamAsync` on Anthropic with thinking on 4) repeat step 1 without the reasoning options on Anthropic
+- **Expected:** 1) `Thinking` events, then `TextDelta` events with no `<think>` text in them, then one `Completed` 2) `LlmResponse.Thinking` holds the reasoning, `Content` the answer only 3) the tool turn succeeds; the service does not refuse it 4) no `Thinking` event.
+- **Covers:** REQ-RAG-137, REQ-RAG-138, REQ-RAG-139, REQ-RAG-140, REQ-RAG-141, REQ-RAG-142, REQ-RAG-143, REQ-RAG-144
+
 ### Subscription catalog
 - **Sign in as:** user 1
 - **Steps:** 1) list `LlmConnectorCatalog.All.Where(c => c.Source == LlmSource.Subscription)` and read each row's `Subscription.Terms`, `AppliesTo` and `CheckedOn` 2) call `LlmProviderFactory.CreateSubscription(ModelRouter.Require("claude-subscription/claude-sonnet-4-5"), callback)`

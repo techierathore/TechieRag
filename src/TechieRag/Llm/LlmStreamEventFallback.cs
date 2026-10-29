@@ -16,7 +16,7 @@ internal static class LlmStreamEventFallback
     /// <param name="messages">The conversation.</param>
     /// <param name="options">Completion options.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Text deltas, tool calls, then a completed event.</returns>
+    /// <returns>Thinking, text deltas, tool calls, then a completed event.</returns>
     public static IAsyncEnumerable<LlmStreamEvent> StreamAsync(
         ILlmProvider provider,
         IReadOnlyList<ChatMessage> messages,
@@ -41,6 +41,11 @@ internal static class LlmStreamEventFallback
     {
         var response = await provider.ChatAsync(messages, options, cancellationToken).ConfigureAwait(false);
 
+        if (!string.IsNullOrEmpty(response.Thinking))
+        {
+            yield return LlmStreamEvent.FromThinking(response.Thinking);
+        }
+
         if (!string.IsNullOrEmpty(response.Content))
         {
             yield return LlmStreamEvent.FromText(response.Content);
@@ -52,7 +57,7 @@ internal static class LlmStreamEventFallback
         }
 
         var modelName = string.IsNullOrEmpty(response.ModelName) ? provider.ModelName : response.ModelName;
-        yield return LlmStreamEvent.FromCompleted(response.Usage, response.FinishReason, modelName);
+        yield return LlmStreamEvent.FromCompleted(response.Usage, response.FinishReason, modelName, response.ProviderState);
     }
 
     private static async IAsyncEnumerable<LlmStreamEvent> FromTextStreamAsync(

@@ -296,6 +296,7 @@ public class AgentLoopRunner
     private sealed class StreamedTurn
     {
         private readonly System.Text.StringBuilder text = new();
+        private readonly System.Text.StringBuilder thinking = new();
         private readonly List<ToolCall> toolCalls = new();
         private LlmStreamEvent? completed;
 
@@ -310,6 +311,9 @@ public class AgentLoopRunner
                 case LlmStreamEventKind.ToolCall when streamEvent.ToolCall is not null:
                     toolCalls.Add(streamEvent.ToolCall);
                     return null;
+                case LlmStreamEventKind.Thinking:
+                    thinking.Append(streamEvent.Text);
+                    return null;
                 case LlmStreamEventKind.Completed:
                     completed = streamEvent;
                     return null;
@@ -322,6 +326,8 @@ public class AgentLoopRunner
         public LlmResponse ToResponse(ILlmProvider provider) => new()
         {
             Content = text.Length > 0 ? text.ToString() : null,
+            Thinking = thinking.Length > 0 ? thinking.ToString() : null,
+            ProviderState = completed?.ProviderState,
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
             Usage = completed?.Usage ?? new TokenUsage { ModelName = provider.ModelName, ProviderName = provider.Name },
             FinishReason = completed?.FinishReason ?? (toolCalls.Count > 0 ? "tool_calls" : "stop"),

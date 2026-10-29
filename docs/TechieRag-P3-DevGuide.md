@@ -302,6 +302,56 @@ REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133 (owner report from Lekhak's p
 
 **Calculations on this service:** none.
 
+### Thinking text: `LlmStreamEventKind.Thinking`, `LlmResponse.Thinking`, `ThinkBlockSplitter` (`TechieRag`)
+
+![Sevak's LLM settings screen, July 2026: where a host picks the reasoning model whose thinking it would show; it predates this change](screenshots/TechieRag/llm-settings.png)
+
+REQ-RAG-137 (Chatur TR-RAG-008) and REQ-RAG-138 (Chatur TR-RAG-009), added 2026-10-29. Covered by `tests/TechieRag.Tests/Llm/ThinkingStreamTests.cs` and, for the Agent Framework adapter, `tests/TechieRag.Agents.Tests/Interop/LlmProviderChatClientTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: no sample streams a reasoning model. The tests feed the stream shapes Chatur recorded against OpenCode Go (kimi-k2.7-code's `reasoning_content`, minimax-m3's `<think>` block with both tags cut across chunks) to OpenAI-compatible, LM Studio and Azure AI Foundry through a stub handler. Not run against OpenCode Go: no key on the build machine. Tests run 2026-10-29: REQ-RAG-137 8 passed, REQ-RAG-138 9 passed; core suite 1084 passed, Agents suite 30 passed.
+
+**Call chain (stream):** `ChatStreamEventsAsync` → `OpenAIStreamReader.ReadAsync` → per chunk: `reasoning_content` or `reasoning` → `FromThinking`; `content` → `ThinkBlockSplitter.Push` → `ToEvent` (thinking → `FromThinking`, answer → `FromText` and the output-text estimate) → at the end `ThinkBlockSplitter.Flush` → tool calls → `Completed` with `ReasoningTokens` from `completion_tokens_details`.
+
+**Call chain (whole reply):** `ChatAsync` → `ThinkBlockSplitter.Split(content, reasoning_content ?? reasoning)` → `LlmResponse.Content` (answer) and `LlmResponse.Thinking`. A provider with no typed stream of its own gets the same through `LlmStreamEventFallback.FromChatAsync`, which yields `Thinking` first.
+
+The splitter only looks at the start of the answer. It holds back text that could still become `<think>` or `</think>` until the next chunk settles it, so a tag cut as `<thi` + `nk>` is still found. The answer's leading white space after `</think>` is dropped.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/OpenAIStreamReader.cs:61` | `ReadAsync` | `reasoning` | each kimi `reasoning_content` fragment, yielded as `Thinking` |
+| `src/TechieRag/Llm/OpenAIStreamReader.cs:67` | `ReadAsync` | `thinkBlock.Push(delta)` | empty for `<thi`; then `(true, "The user greets")` once `nk>` arrives |
+| `src/TechieRag/Llm/ThinkBlockSplitter.cs:92` | `Drain` | `state` | `Start` → `InBlock` → `AfterBlock` → `Answer`; straight to `Answer` when the reply does not open with `<think>` |
+| `src/TechieRag/Llm/ThinkBlockSplitter.cs:55` | `Split` | the return | `(null, content)` unchanged when no block opens the answer |
+| `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:229` | `ChatAsync` | `thinking`, `answer` | `Content` never starts with `<think>` |
+| `src/TechieRag.Agents/Interop/LlmProviderChatClient.cs:105` | `ToUpdate` | `update.Contents` | one `TextReasoningContent`, no `FinishReason` |
+
+**Calculations on this service:** the output-token estimate (used only when the service reports no usage) counts answer text only; `ReasoningTokens` is never estimated.
+
+### Thinking on every provider: `AnthropicThinking`, `ChatMessage.ProviderState` (`TechieRag`, `TechieRag.Local`)
+
+![Sevak's LLM settings screen, July 2026: where a host picks the provider whose thinking it would show; it predates this change](screenshots/TechieRag/llm-settings.png)
+
+REQ-RAG-139 to REQ-RAG-144 (owner request), added 2026-10-29. Covered by `tests/TechieRag.Tests/Llm/ProviderThinkingTests.cs`, `tests/TechieRag.Local.Tests/LocalThinkingTests.cs` and `ProviderStateSurvivesTheAdapter` in `tests/TechieRag.Agents.Tests/Interop/LlmProviderChatClientTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: recorded replies through stub handlers, the fake ChatGPT server and the scripted local runtime. Not run against a live Anthropic, Gemini, Ollama or ChatGPT service. Tests run 2026-10-29: core 1111 passed, local 154 passed, Agents 31 passed.
+
+**Call chains:** Anthropic `content_block_start` (`thinking`) → `thinking_delta` → `FromThinking`; `signature_delta` and `content_block_stop` keep the signed block → `Completed.ProviderState`. Gemini parts with `thought: true` → `FromThinking`; `thoughtsTokenCount` → `ReasoningTokens`, added to `OutputTokens`. Ollama `message.thinking` → `FromThinking`; `content` → `ThinkBlockSplitter`. Local generated pieces → `ThinkBlockSplitter` (with tools, `Split` on the held output before `ParseToolCalls`). Subscription `response.reasoning_summary_text.delta` → `FromThinking`.
+
+**Next call:** `LlmResponse.ToChatMessage()` and `AgentLoopRunner` copy `ProviderState` onto the assistant message; `BuildAnthropicRequest` puts its blocks first in that message's content.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/AnthropicStreamState.cs:131` | `ApplyDelta` | `fragment` | each thinking fragment, never appended to `OutputText` |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:352` | `BuildAnthropicRequest` | `thinkingBlocks` | the earlier turn's blocks, `thinking` before `tool_use` |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:398` | `BuildAnthropicRequest` | `budget` | null unless `MaxReasoningTokens` or `ReasoningEffort` is set |
+| `src/TechieRag/Llm/GoogleGeminiLlmProvider.cs:236` | `ChatStreamEventsAsync` | `thought` | thought text only; `text` never holds it |
+| `src/TechieRag/Llm/OllamaLlmProvider.cs:228` | `ChatStreamEventsAsync` | `chunk.Message.Thinking` | set only when `think` is on |
+| `src/TechieRag.Local/LocalLlmProvider.cs:608` | `StreamCoreAsync` | `rawOutput` | starts at `<tool_call>`, the block removed |
+| `src/TechieRag/Llm/OpenAIResponsesStreamReader.cs:88` | `Apply` | the return | `(delta, true)` |
+| `src/TechieRag/Services/AgentLoopRunner.cs:330` | `ToResponse` | `ProviderState` | the `Completed` event's state |
+
+**Calculations on this service:** Anthropic reports no separate thinking count, so its `ReasoningTokens` is 0; the local count uses the model's tokenizer, capped at the tokens produced.
+
 ### Provider error text: `LlmHttpException` (`TechieRag`)
 
 ![Sevak's LLM settings screen, July 2026: where a host's Test connection shows why a call failed; it predates this change](screenshots/TechieRag/llm-settings.png)

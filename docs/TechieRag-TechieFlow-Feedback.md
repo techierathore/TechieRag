@@ -4,11 +4,11 @@
 |---|---|
 | App | TechieRag |
 | Upstream | TechieFlow |
-| Updated | 2026-10-18 (TF-005 to TF-007 fixed upstream) |
+| Updated | 2026-10-29 (TF-008 fixed upstream, ships in TechieFlow v1.2.2) |
 
 ## Summary
 
-7 entries: 0 blocking now, 0 open, 3 fixed upstream and not yet re-checked here (TF-005, TF-006, TF-007, all fixed 2026-10-18, ship in TechieFlow v1.2.0), 4 closed (TF-001 to TF-004).
+8 entries: 0 blocking now, 0 open, 4 fixed upstream and not yet re-checked here (TF-005 to TF-007, fixed 2026-10-18, ship in TechieFlow v1.2.0; TF-008, fixed 2026-10-29, ships in v1.2.2), 4 closed (TF-001 to TF-004).
 
 Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and closed. TF-005 to TF-007 are fixed upstream; re-check them here.
 
@@ -133,9 +133,35 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Suggested fix:** in `guard-status-html.sh`, split `<App>-P<n>` into the app name and `--phase <n>` when it builds the command.
 - **Seen again 2026-10-15:** same message after a `tf-triage.sh note` on REQ-FN-057 (P2 checklist) in `*fix-issues TechieRag`; same workaround worked.
 
+### TF-008 — a new triage row takes an id that tests and source already carry, though no checklist row holds it
+
+- **Status:** fixed upstream 2026-10-29, ships in TechieFlow v1.2.2; not yet re-checked here.
+- **Severity:** minor
+- **Blocks:** no — the two rows were renumbered by hand to REQ-RAG-137 and REQ-RAG-138 and the run carried on.
+- **Repro:** in TechieRag, where the 1.1.7 work for Lekhak put `REQ-RAG-135` and `REQ-RAG-136` in xUnit DisplayNames (`tests/TechieRag.Tests/Llm/GenericRoutesAndVeniceTests.cs`) without adding checklist rows:
+  ```text
+  bash .tfcore/utils/tf-triage.sh TechieRag new "<title>" "<acceptance>" --prefix RAG --phase 3 --section "LLM streaming"
+  REQ-RAG-135: new Not Started row — …
+  ```
+  Then `*verify REQ-RAG-135,REQ-RAG-136 --phase 3` graded both new rows PASS on the old Venice tests (`REQ-RAG-135 VeniceNonStreamedReplyReportsReasoningTokens`, `REQ-RAG-136 RequestTimeoutCancelsSlowProvider`), before the new rows' own tests were renamed.
+- **Expected:** `new` takes the next id free in the checklists, the telemetry streams, and the test and source trees. Or the verifier refuses to grade a row whose id is carried by tests written before the row existed.
+- **Actual:** `new` reads only the checklists and the telemetry, so it reused an id the tests already carried, and the verifier then passed the new rows on unrelated tests.
+- **Encountered in:** `*fix-issues TechieRag` for Chatur TR-RAG-008 and TR-RAG-009, 2026-10-29.
+- **Workaround:** the rows, their misses and gate records were renamed to REQ-RAG-137/138 within the same run, before any commit, and the wrong verify run's records were removed. The checklist still has no rows for the Lekhak work that uses REQ-RAG-135/136.
+- **Suggested fix:** in `tf-triage.py` `new`, also scan `src/`, `source/` and `tests/` for `REQ-<prefix>-NNN` and start above the highest. In `tf-verify-tests.sh`, warn when a row's matching tests sit in files older than the row's "logged" date.
+- **Reply (TechieFlow team, 2026-10-29):** Fixed both ways you suggested. **`tf-triage new`** now takes the next id past the highest one in the checklists, the telemetry streams, and the source and test files under `src/`, `source/`, `tests/` and `test/` (code files only; `bin/`, `obj/`, `node_modules/` and test results are skipped). **`tf-verify-tests`** warns when a row that triage logged (`logged from UAT <date>` in its Remark) has tests that carried its id before that day: a `WARN` line, `tests_older_than_row` in `tests.json`, and a ⚠ note in the row's Remark from the verdict. The day an id first appeared comes from the history (the first commit that added it under those folders), else from the files' dates. It warns; it does not fail the row. Regression case `tr_008`. Miss `MISS-TechieFlow-20261029-04`. **Measured here:** `new --prefix RAG` on phase 3 gives REQ-RAG-139 with the old and the new script alike, because the two rows are already renamed to 137 and 138; the new scan reads 552 files and adds about 1.3 s. **Check it here:** with a test named `REQ-RAG-140 …` and no row, `bash .tfcore/utils/tf-triage.sh TechieRag new "<title>" "<acceptance>" --prefix RAG --phase 3` gives REQ-RAG-141.
+
 ## Replies from TechieFlow
 
 <!-- The upstream team's answers, newest block first. Left in full: this is the record. -->
+
+### Resolution status (TechieFlow team, 2026-10-29)
+
+Ships in **TechieFlow v1.2.2**, the next release after v1.2.1. Already in this project's `.tfcore/` through the framework update.
+
+| ID | Fix | Check it here |
+|---|---|---|
+| TF-008 | Fixed upstream. The reply is under the entry. | with a test named `REQ-RAG-140 …` and no row, `bash .tfcore/utils/tf-triage.sh TechieRag new "<title>" "<acceptance>" --prefix RAG --phase 3` gives REQ-RAG-141. |
 
 ### Resolution status (TechieFlow team, 2026-10-18)
 

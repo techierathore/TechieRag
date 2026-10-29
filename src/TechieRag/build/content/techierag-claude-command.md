@@ -64,7 +64,7 @@ persona:
       - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models (UseEmbedded: bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS; UseModelRoot; ModelDownloadService)
       - All 3 vector stores (SqliteVec, PgVector, Qdrant)
       - Tool calling and AgentLoopRunner (ToolRegistry, IToolHandler, ToolDefinition; RunStreamAsync with AgentStreamEvent)
-      - Typed streaming (LlmStreamEvent: TextDelta, ToolCall, Completed; LlmStreamEventExtensions.ToTextStreamAsync)
+      - Typed streaming (LlmStreamEvent: TextDelta, Thinking, ToolCall, Completed; LlmStreamEventExtensions.ToTextStreamAsync); a reasoning model's thinking arrives as Thinking events and LlmResponse.Thinking on every built-in provider, never in the answer; keep ChatMessage.ProviderState when rebuilding a conversation
       - Agents on Microsoft Agent Framework (TechieRag.Agents: TechieRagAgentBuilder, ITechieRagAgent, AgentRagResponse, AddTechieRagAgent, the Interop seam adapters)
       - Agentic retrieval on the classic loop (TechieRag.Agentic: RegisterKnowledgeBase, TechieRagRetrievalSource, RetrievalTurnState, AgenticInstructions)
       - Local model (TechieRag.Local: UseLocalLlm overloads, LocalModel.FromHuggingFace, LocalLlm.Register, LocalLlmOptions.ConfirmTermsAsync / TermsAccepted, Qwen2.5 0.5B on phones, Phi-3 mini on desktops, the Local* exceptions)
@@ -300,7 +300,7 @@ Implements an agent (package `TechieRag.Agents`, namespaces `TechieRag.Agents`, 
 
 Implements typed streaming (core package; see "Phase-2 Features, 1"):
 
-1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))` and switch on `e.Kind`: `LlmStreamEventKind.TextDelta` (`e.Text`), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last; `FinishReason` is `stop`, `tool_calls` or `length` (cut off at `MaxTokens`)
+1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))` and switch on `e.Kind`: `LlmStreamEventKind.TextDelta` (`e.Text`), `Thinking` (`e.Text`, the model's reasoning; show it apart or ignore it), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last, and named in its own `case` (never a `default:`); `FinishReason` is `stop`, `tool_calls` or `length` (cut off at `MaxTokens`)
 2. For the agent loop: `new AgentLoopRunner(llm, registry).RunStreamAsync(messages, options, progress)` yields `AgentStreamEvent` (`AgentStreamEventKind.TextDelta`, `ToolCallRequested`, `ToolExecuted`, `Completed` with `Response` and `MaxIterationsReached`)
 3. In Blazor call `StateHasChanged()` per event; keep a `CancellationTokenSource` per run
 4. A custom `ILlmProvider` that builds `ChatStreamAsync` on the typed method must override `ChatStreamEventsAsync` too; `events.ToTextStreamAsync()` is the text projection

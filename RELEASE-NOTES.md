@@ -2,6 +2,26 @@
 
 Paste the section for a release into its GitHub Release when you publish it. All five packages (TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Local, TechieRag.Agents) ship together at one version. The newest release is first.
 
+## Next release after 1.1.7
+
+### Behaviour, stated plainly
+
+- **Thinking text no longer lands in the answer** (REQ-RAG-138, Chatur TR-RAG-009). On OpenAI-style services, a `<think>…</think>` block that opens a model's answer (OpenCode Go's minimax-m3, for example) is taken out of `LlmResponse.Content` and out of the `TextDelta` events and handed over as thinking instead. A `<think>` later in the answer is kept. Code that stripped the block itself still works; it simply finds nothing to strip.
+- **`LlmStreamEventKind` has a new last member, `Thinking`.** A `switch` that sends every value other than `TextDelta` and `ToolCall` to a `default:` branch meant for `Completed` must now name `Completed`, or it will read a thinking event as the end of the stream. The existing members keep their numeric values.
+
+### New
+
+- **Thinking events while streaming** (REQ-RAG-137, Chatur TR-RAG-008). `ChatStreamEventsAsync` yields `LlmStreamEventKind.Thinking` events (`LlmStreamEvent.FromThinking`) for the `reasoning_content` or `reasoning` fragments a reasoning model sends before its answer, on `OpenAICompatible`, LM Studio and Azure AI Foundry. `ChatAsync` returns the same text in the new `LlmResponse.Thinking`. The reasoning token count stays on `Usage.ReasoningTokens`. `ChatStreamAsync` still yields the answer only. In TechieRag.Agents, `LlmProviderChatClient` maps thinking to `TextReasoningContent`. 
+- **Thinking on every built-in provider** (REQ-RAG-139 to REQ-RAG-144). Anthropic sends its `thinking` blocks, Gemini its `thought` parts (with `thoughtsTokenCount` as `ReasoningTokens`), Ollama its `thinking` field and a leading `<think>` block, the local model a leading `<think>` block (with tools too), and the ChatGPT subscription its reasoning summary (with `reasoning_tokens`). Anthropic, Gemini, Ollama and the subscription only think when the call sets `MaxReasoningTokens` or `ReasoningEffort`; `DisableReasoning` now also reaches Gemini (`thinkingBudget: 0`) and Ollama (`think: false`).
+- **`ChatMessage.ProviderState`, `LlmResponse.ProviderState` and `LlmStreamEvent.ProviderState`** (REQ-RAG-139), with a new `FromCompleted` overload. An opaque string the provider needs back on the next call: Anthropic keeps a turn's signed thinking blocks there, because its service refuses a tool-use turn with thinking on when they are missing. `ToChatMessage()` and `AgentLoopRunner` carry it; a host that stores and rebuilds conversations should keep it too.
+
+### Behaviour, stated plainly (thinking on every provider)
+
+- **Gemini `OutputTokens` now includes thinking tokens** when the model thinks, the same as on the OpenAI-style services; before, they were not counted at all.
+- **Anthropic with thinking on leaves out `temperature` and `top_p`**, which the service refuses while it thinks, and raises `max_tokens` above the thinking budget when it is lower.
+
+The call example and the per-provider table are in the AI reference section "Thinking text from reasoning models".
+
 ## Next release after 1.1.5
 
 ### Behaviour, stated plainly

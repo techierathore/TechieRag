@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Architecture</h1>
-    <div class="sub">Last rendered: 2026-10-09</div>
+    <div class="sub">Last rendered: 2026-10-29</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#stack-decisions">1. Stack decisions</a></li>
@@ -123,7 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Architecture</h1>
-    <div class="subtitle">Rendered 2026-10-09 &middot; source <code>TechieRag-Architecture.md</code></div>
+    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-Architecture.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -301,16 +301,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 IAsyncEnumerable&lt;LlmStreamEvent&gt; ChatStreamEventsAsync(
     IReadOnlyList&lt;ChatMessage&gt; messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default);
 
-public enum LlmStreamEventKind { TextDelta, ToolCall, Completed }
+public enum LlmStreamEventKind { TextDelta, ToolCall, Completed, Thinking }   // Thinking added last (BRD-195)
 public sealed class LlmStreamEvent
 {
     LlmStreamEventKind Kind; string? Text; ToolCall? ToolCall; TokenUsage? Usage; string? FinishReason; string? ModelName;
-    static LlmStreamEvent FromText(string); FromToolCall(ToolCall); FromCompleted(TokenUsage, string finishReason, string modelName);
+    static LlmStreamEvent FromText(string); FromThinking(string); FromToolCall(ToolCall); FromCompleted(TokenUsage, string finishReason, string modelName);
 }
 // TechieRag.Llm.LlmStreamEventExtensions
 static IAsyncEnumerable&lt;string&gt; ToTextStreamAsync(this IAsyncEnumerable&lt;LlmStreamEvent&gt;, CancellationToken = default);</code></pre>
 <ul>
 <li><strong>Order:</strong> zero or more <code>TextDelta</code>, then zero or more <code>ToolCall</code> (each complete: id, name, full arguments JSON), then exactly one <code>Completed</code> (usage, finish reason, model), always last.
+</li>
+<li><strong>Thinking (BRD-195…202, done 2026-10-29):</strong> <code>Thinking</code> events, normally first; whole replies carry <code>LlmResponse.Thinking</code>. Never in answer text. <code>Llm/ThinkBlockSplitter</code> splits a leading <code>&lt;think&gt;</code> block. Sources: <code>reasoning_content</code>/<code>reasoning</code>, Anthropic <code>thinking</code> blocks, Gemini <code>thought</code> parts, Ollama <code>message.thinking</code>, subscription reasoning summary. <code>ProviderState</code> carries Anthropic's signed blocks.
 </li>
 <li><strong>Built-in providers:</strong> all six override it. <code>ChatStreamAsync</code> is now <code>ChatStreamEventsAsync(...).ToTextStreamAsync()</code> in each, so the text path cannot drift from the typed path, and <code>CompleteStreamAsync</code> still delegates to <code>ChatStreamAsync</code> (unchanged behaviour). OpenAI-style services (<code>OpenAICompatible</code>, <code>LmStudio</code>, <code>AzureAIFoundry</code>) share <code>Llm/OpenAIStreamReader</code>, which assembles <code>tool_calls</code> fragments by <code>index</code>; Anthropic assembles <code>input_json_delta</code> fragments in <code>Llm/AnthropicStreamState</code> and emits the call at <code>content_block_stop</code>; Ollama and Gemini send calls whole, emitted after the text. Each still raises <code>OnCompletionCompleted</code> once, now with <code>InvolvedToolCalls</code> and cache-read tokens.
 </li>
@@ -323,7 +325,7 @@ static IAsyncEnumerable&lt;string&gt; ToTextStreamAsync(this IAsyncEnumerable&lt
 <p><strong>Agentic retrieval contract (core, <code>TechieRag.Agentic</code>, zero packages; ADR-009).</strong> <code>IRetrievalSource</code> (<code>TechieRagRetrievalSource</code> over <code>ITechieRag</code> with an explicit rerank switch, <code>DelegateRetrievalSource</code> over delegates), <code>RetrievalToolOptions</code> (TopK 5, MaxTopK 20, MaxSearchesPerTurn 4, WeakScoreThreshold 0.55, NoneScoreThreshold 0.35, MaxChunkChars 1500), <code>RetrievalTurnState</code> (budget, refs S1… stable per chunk across turns, typed <code>Collected</code> results, <code>Searches</code> traces; <code>BeginTurn()</code> per user turn), <code>RetrievalTrace</code>, <code>KnowledgeBaseTools</code> (descriptions, schemas, <code>ExecuteSearchAsync</code> → JSON with <code>status</code> strong / weak / none / limit_reached, <code>best_score</code>, <code>searches_used</code>, <code>searches_remaining</code>, <code>results[]</code> with <code>ref</code>, <code>document</code>, <code>document_id</code>, <code>page</code>, <code>chunk_index</code>, <code>score</code>, <code>text</code>, and <code>hint</code>), <code>AgenticInstructions.Default</code> / <code>WithDomainGuidance</code>, and <code>ToolRegistry.RegisterKnowledgeBase(source, options, state)</code>. Model-facing strings are invariant English.</p>
 <p><strong><code>TechieRag.Agents</code> (ADR-008/011).</strong> <code>TechieRagAgentBuilder(ITechieRag)</code> → <code>ITechieRagAgent</code> (<code>Agent : AIAgent</code>, <code>Rag</code>, <code>CreateSessionAsync</code>, <code>AskAsync(string | IEnumerable&lt;ChatMessage&gt;, AgentSession?)</code> → <code>AgentRagResponse { Answer, Sources, Searches, PendingApprovals, Raw }</code>, <code>AskStreamAsync</code> → <code>RagStreamEvent</code>s). <code>Build()</code> wraps the chosen <code>IChatClient</code> in <code>FunctionInvokingChatClient</code> (cap <code>WithMaxToolIterations</code>, default 8), creates a <code>ChatClientAgent</code> whose <code>AIContextProviders</code> include <code>RetrievalContextProvider</code> (one <code>RetrievalTurnState</code> per <code>AgentSession</code>, tools served through adapter 2a over a <code>ToolRegistry</code>), and applies <code>AgentStepReporter</code> when <code>WithTrace</code> is set. Public adapters in <code>Interop/</code>: <code>LlmProviderChatClient</code> (<code>ILlmProvider</code> → <code>IChatClient</code>; its streaming runs over <code>ChatStreamEventsAsync</code>, so a tool-using MAF turn streams end to end), <code>ToolHandlerFunctions</code> / <code>ToolHandlerAIFunction</code> (<code>IToolHandler</code> → <code>AITool</code>, <code>RequiresConfirmation</code> → <code>ApprovalRequiredAIFunction</code>), <code>AIToolHandler</code> (<code>AITool</code> / <code>AIAgent</code> → <code>IToolHandler</code>), <code>AgentStepReporter.WithAgentSteps</code> (MAF run and function middleware → <code>IProgress&lt;AgentStep&gt;</code>, four loop kinds only, <code>ToolResult.Message</code> codes carried), <code>ConversationMemoryChatHistoryProvider</code> (<code>IConversationMemory</code> → <code>ChatHistoryProvider</code>). DI: <code>AddTechieRagAgent(Action&lt;TechieRagAgentBuilder&gt;)</code> registers <code>ITechieRagAgent</code> and a keyed <code>AIAgent</code> (<code>"techierag"</code>). Not used: <code>HarnessAgent</code>, hosted tools, MAF exporters.</p>
 <h3 id="techierag-local-brd-96-109-adr-014-2026-09-24"><a id="32-techieraglocal-brd-96109-adr-014-2026-09-24"></a>3.2 <code>TechieRag.Local</code> (BRD-96…109, ADR-014; 2026-09-24)<a class="anchor-link" href="#techierag-local-brd-96-109-adr-014-2026-09-24">#</a></h3>
-<p><strong>One provider, a runtime per platform underneath.</strong> <code>LocalLlmProvider : ILlmProvider</code> is the only thing an app sees. Everything observable is done in it, above the internal seam, so every runtime behaves the same: the chat template (<code>ChatTemplateFormatter</code>: ChatML, Phi-3, Llama 3, Gemma, applied in managed code), stop sequences (<code>StopSequenceFilter</code>, the caller's plus the template's end-of-turn marker, never partly streamed), the context-length refusal (<code>LocalPromptTooLongException</code> before inference), <code>MaxTokens</code> clamped to the room left, usage from the model's tokenizer, the typed-stream order, <code>OnCompletionCompleted</code> once per call. <code>ChatStreamAsync</code> is <code>ChatStreamEventsAsync(...).ToTextStreamAsync()</code>; <code>ChatStreamEventsAsync</code> is overridden. <code>CompleteAsync&lt;T&gt;</code> sends <code>T</code>'s JSON schema (<code>JsonSchemaExporter</code>) with JSON mode so a runtime can constrain to it, then parses strictly. <code>SupportsToolCalling</code> is false and a request with tools is refused.</p>
+<p><strong>One provider, a runtime per platform underneath.</strong> <code>LocalLlmProvider : ILlmProvider</code> is the only thing an app sees. Everything observable is done in it, above the internal seam, so every runtime behaves the same: the chat template (<code>ChatTemplateFormatter</code>: ChatML, Phi-3, Llama 3, Gemma, applied in managed code), stop sequences (<code>StopSequenceFilter</code>, the caller's plus the template's end-of-turn marker, never partly streamed), the context-length refusal (<code>LocalPromptTooLongException</code> before inference), <code>MaxTokens</code> clamped to the room left, usage from the model's tokenizer, the typed-stream order, <code>OnCompletionCompleted</code> once per call. <code>ChatStreamAsync</code> is <code>ChatStreamEventsAsync(...).ToTextStreamAsync()</code>; <code>ChatStreamEventsAsync</code> is overridden. <code>CompleteAsync&lt;T&gt;</code> sends <code>T</code>'s JSON schema (<code>JsonSchemaExporter</code>) with JSON mode so a runtime can constrain to it, then parses strictly. <code>SupportsToolCalling</code> is true for the shipped catalogue models (<code>Qwen25Instruct05B</code>, <code>Phi3Mini4kInstruct</code>); the provider prompts and parses tool calls in managed code, so <code>AgentLoopRunner</code> runs tools on the in-process model.</p>
 <pre><code class="language-csharp">internal interface ILocalLlmRuntime   // OnnxGenAiRuntime on every platform (DECISIONS.md 2026-09-25)
 {
     string Name { get; }                       // logs only
@@ -492,6 +494,11 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 <tr><td>2026-10-06</td><td>Add <code>IWorkspaceManager</code>; <code>GetWorkspaceManager()</code> keeps its return type</td><td>Testable, no caller breaks</td><td>planned (BRD-176)</td></tr>
 <tr><td>2026-10-06</td><td>Text ingestion takes an optional key that replaces the earlier document</td><td>Re-syncs stored copies</td><td>planned (BRD-179)</td></tr>
 <tr><td>2026-10-06</td><td>Parsed mail gains an optional notes list</td><td>Skipped content vanished; an addition breaks no caller</td><td>planned (BRD-180)</td></tr>
+<tr><td>2026-10-29</td><td>Thinking is its own event (<code>Thinking</code>, last enum member) and field (<code>LlmResponse.Thinking</code>)</td><td>Keeps answers clean and old enum values</td><td>done (BRD-195/196)</td></tr>
+<tr><td>2026-10-29</td><td>Thinking is asked for only through <code>MaxReasoningTokens</code> / <code>ReasoningEffort</code>, and turned off by <code>DisableReasoning</code>; no new option</td><td>It costs tokens; the switches exist</td><td>done 2026-10-29 (BRD-197…199)</td></tr>
+<tr><td>2026-10-29</td><td>Anthropic sends thinking blocks, with signatures, back on tool-use turns</td><td>The service refuses the turn otherwise</td><td>done 2026-10-29 (BRD-197)</td></tr>
+<tr><td>2026-10-29</td><td><code>ThinkBlockSplitter</code> reaches <code>TechieRag.Local</code> by <code>InternalsVisibleTo</code></td><td>No new public surface</td><td>done 2026-10-29 (BRD-200)</td></tr>
+<tr><td>2026-10-29</td><td>Encrypted reasoning and <code>redacted_thinking</code> are never shown; the subscription sends its summary</td><td>The services send no readable text</td><td>done 2026-10-29 (BRD-201)</td></tr>
 </tbody>
 </table>
 <h2 id="module-responsibilities"><a id="7-module-responsibilities"></a>7. Module responsibilities<a class="anchor-link" href="#module-responsibilities">#</a></h2>
@@ -525,33 +532,33 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 </table>
 <h2 id="open-questions"><a id="8-open-questions"></a>8. Open questions<a class="anchor-link" href="#open-questions">#</a></h2>
 <ol>
-<li><strong>sqlite-vec is never loaded.</strong> Resolved 2026-09-24 (BRD-93, REQ-RAG-056): the dead loading code is removed and the managed scan is the documented path, vectorised (<code>VectorStores/ManagedVectorSearch.cs</code>, zero-copy BLOB read, bounded top-K heap) and measured at 1k/10k/50k chunks in the UsageGuide.
+<li><strong>sqlite-vec is never loaded.</strong> Resolved 2026-09-24 (BRD-93, REQ-RAG-056): the dead code is removed; the vectorised managed scan (<code>VectorStores/ManagedVectorSearch.cs</code>) is the documented path, measured in the UsageGuide.
 </li>
-<li><strong>Every vector store was fixed at 1024 dimensions.</strong> Resolved 2026-09-25 (BRD-158, REQ-RAG-106): <code>Build()</code> passes the embedder's <code>Dimensions</code> into every store; Cohere, OpenAI and Gemini embedders work with pgvector and Qdrant.
+<li><strong>Every vector store was fixed at 1024 dimensions.</strong> Resolved 2026-09-25 (BRD-158): <code>Build()</code> passes the embedder's <code>Dimensions</code> to every store.
 </li>
-<li><strong>Two paths published to nuget.org.</strong> Resolved 2026-09-25 (BRD-160, REQ-FN-067): only the manual dispatch of <code>publish-nuget.yml</code> publishes there; the automatic job in <code>publish-github-packages.yml</code> is removed.
+<li><strong>Two paths published to nuget.org.</strong> Resolved 2026-09-25 (BRD-160): only the manual <code>publish-nuget.yml</code> publishes there.
 </li>
-<li><strong><code>TechieRag.Telemetry</code> was never packed or published.</strong> Resolved 2026-09-25 (BRD-156, REQ-FN-065): both workflows pack and publish it with the same SourceLink, symbol and README settings as the other packages.
+<li><strong><code>TechieRag.Telemetry</code> was never packed or published.</strong> Resolved 2026-09-25 (BRD-156): both workflows pack and publish it.
 </li>
 <li><strong>The <code>IConfiguration</code> registration path is lossy.</strong> It drops <code>VectorStore.ApiKey</code> (so Qdrant with a key cannot come from appsettings), the embedding <code>Dimensions</code>, <code>ApiFormat</code>, <code>ApiPath</code>, <code>RequestDelayMs</code>, and the whole <code>Prompt</code> section; <code>AddTechieRag(TechieRagConfig)</code> maps even less. <code>Microsoft.Extensions.Options</code> is referenced but no <code>IOptions&lt;T&gt;</code> pattern exists.
 </li>
-<li><strong>No store records a schema version.</strong> The only migration is an attempt-and-swallow <code>ALTER TABLE TrMessage ADD COLUMN ContentJson</code>. A future column change has nowhere to hang.
+<li><strong>No store records a schema version.</strong> The only migration is a swallowed <code>ALTER TABLE TrMessage ADD COLUMN ContentJson</code>.
 </li>
-<li><strong>Model cache location.</strong> The library writes under the <code>TechieRag.Embedded.dll</code> folder (read-only on phones); the live reranker and embedder tests stage weights under <code>~/.cache/techierag-models/</code>. BRD-89 moves the library to the per-user application data root; the tests should follow.
+<li><strong>Model cache location.</strong> The library writes beside <code>TechieRag.Embedded.dll</code> (read-only on phones); BRD-89 moves it to the per-user data root, and the live tests under <code>~/.cache/techierag-models/</code> should follow.
 </li>
 <li><strong><code>net8.0</code> is built but never tested</strong>: <code>TechieRag.Tests</code> targets <code>net10.0</code> only.
 </li>
-<li><strong><code>ConfigureAwait(false)</code> is inconsistent</strong>: about 374 uses against about 305 awaits without it; the vector stores and older code omit it, <code>Persistence</code>, <code>Mcp</code> and <code>Connectors</code> use it. The Coding Standards require it in library code.
+<li><strong><code>ConfigureAwait(false)</code> is inconsistent</strong>: about 374 uses against 305 awaits without it, mostly in the vector stores and older code. The Coding Standards require it.
 </li>
-<li><strong>Download progress is written with <code>Console.WriteLine</code>.</strong> Resolved 2026-09-24 (BRD-92, REQ-RAG-055): the three calls are gone; <code>ModelDownloadService.DownloadAsync</code> is the one public downloader (size-known event before the first byte, progress, resume) for the embedder, the reranker and the planned local model.
+<li><strong>Download progress is written with <code>Console.WriteLine</code>.</strong> Resolved 2026-09-24 (BRD-92, REQ-RAG-055): <code>ModelDownloadService.DownloadAsync</code> is the one public downloader, with size, progress and resume.
 </li>
-<li><strong>Local runtime choice — answered 2026-09-25:</strong> ONNX Runtime GenAI on Windows, Android, iOS and Mac Catalyst, measured on the Windows laptop and the M4 Max Mac (<code>DECISIONS.md</code> 2026-09-25). History: it was to be decided after the probe comparison on named devices (plan 08 step 2) and recorded in <code>DECISIONS.md</code> before BRD-96…98 are built. Costly to reverse. 2026-09-24: everything above the runtime seam is built (§3.2); the desktop comparison (WSL and Windows on the Windows 11 laptop), the per-platform package facts (LLamaSharp ships no iOS or Mac Catalyst native library; ONNX Runtime GenAI ships none for Mac Catalyst) and a recommendation are in <code>docs/TechieRag-Decision-Request.md</code> for the owner; phone and Mac numbers need the owner's devices.
+<li><strong>Local runtime choice — answered 2026-09-25:</strong> ONNX Runtime GenAI on Windows, Android, iOS and Mac Catalyst, measured on the Windows laptop and the M4 Max Mac (<code>DECISIONS.md</code> 2026-09-25; the comparison is in <code>docs/TechieRag-Decision-Request.md</code>).
 </li>
 <li><strong>Vendor subscription policy</strong> changes: OpenAI permits external-tool use for personal use, Anthropic prohibits it since April 2026, Google, Groq, xAI and Meta unknown (BRD-114 research before BRD-112).
 </li>
-<li><strong>Mobile memory limits</strong>: iOS and Android kill an over-budget app without warning; <code>MemoryGate</code> (BRD-99), small default models (BRD-91, BRD-96) and per-device limits in the matrix (BRD-108).
+<li><strong>Mobile memory limits</strong>: phones kill an over-budget app silently; covered by <code>MemoryGate</code> (BRD-99), small default models (BRD-91, BRD-96) and the device matrix (BRD-108).
 </li>
-<li><strong>Owner-run git after the split</strong>: <code>tests/TechieDesk.Tests/TestResults/res.trx</code> is still tracked; the gitignore audit printed the <code>git rm -r --cached</code> line for the owner, and the deletions of 2026-09-24 are uncommitted until the owner commits.
+<li><strong>Owner-run git after the split</strong>: <code>tests/TechieDesk.Tests/TestResults/res.trx</code> is still tracked; the owner removes it with <code>git rm --cached</code>.
 </li>
 </ol>
   </main>

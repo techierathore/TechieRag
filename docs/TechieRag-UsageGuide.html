@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Usage Guide</h1>
-    <div class="sub">Last rendered: 2026-10-15</div>
+    <div class="sub">Last rendered: 2026-10-29</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#test-users">Test users</a></li>
@@ -124,6 +124,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#ollama-context-window-and-cut-off-answers">Ollama: context window and cut-off answers</a></li>
         <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
         <li class="h3"><a href="#typed-streaming-and-the-streaming-agent-loop">Typed streaming and the streaming agent loop</a></li>
+        <li class="h3"><a href="#thinking-text-from-reasoning-models-phase-3">Thinking text from reasoning models (phase 3)</a></li>
         <li class="h3"><a href="#subscription-catalog">Subscription catalog</a></li>
         <li class="h3"><a href="#subscription-sign-in-chatgpt">Subscription sign-in (ChatGPT)</a></li>
         <li class="h3"><a href="#agents-package-microsoft-agent-framework">Agents package (Microsoft Agent Framework)</a></li>
@@ -156,7 +157,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Usage Guide</h1>
-    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>TechieRag-UsageGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-UsageGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -176,6 +177,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#ollama-context-window-and-cut-off-answers">Ollama: context window and cut-off answers</a></li>
         <li class="h3"><a href="#agent-loop-mcp-tools-and-flows">Agent loop, MCP tools and flows</a></li>
         <li class="h3"><a href="#typed-streaming-and-the-streaming-agent-loop">Typed streaming and the streaming agent loop</a></li>
+        <li class="h3"><a href="#thinking-text-from-reasoning-models-phase-3">Thinking text from reasoning models (phase 3)</a></li>
         <li class="h3"><a href="#subscription-catalog">Subscription catalog</a></li>
         <li class="h3"><a href="#subscription-sign-in-chatgpt">Subscription sign-in (ChatGPT)</a></li>
         <li class="h3"><a href="#agents-package-microsoft-agent-framework">Agents package (Microsoft Agent Framework)</a></li>
@@ -368,6 +370,17 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Expected:</strong> 1) <code>TextDelta</code> events (if the model writes any), then one <code>ToolCall</code> with name <code>get_weather</code> and complete JSON arguments, then one <code>Completed</code> with usage, last; 2) text only, as before; 3) text streams as it arrives, <code>ToolCallRequested</code> then <code>ToolExecuted</code> carrying the registry's result, the answer's text, then <code>Completed</code> with usage summed over the run.
 </li>
 <li><strong>Covers:</strong> REQ-RAG-067, REQ-RAG-068
+</li>
+</ul>
+<h3 id="thinking-text-from-reasoning-models-phase-3">Thinking text from reasoning models (phase 3)<a class="anchor-link" href="#thinking-text-from-reasoning-models-phase-3">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1, with a reasoning model on any built-in provider (for example <code>ollama/qwen3</code>, DeepSeek or Kimi on OpenAI-compatible, Claude on Anthropic)
+</li>
+<li><strong>Steps:</strong> 1) iterate <code>ChatStreamEventsAsync</code> with <code>MaxReasoningTokens = 2048</code> 2) <code>ChatAsync</code> with the same options 3) with one tool, run <code>AgentLoopRunner.RunStreamAsync</code> on Anthropic with thinking on 4) repeat step 1 without the reasoning options on Anthropic
+</li>
+<li><strong>Expected:</strong> 1) <code>Thinking</code> events, then <code>TextDelta</code> events with no <code>&lt;think&gt;</code> text in them, then one <code>Completed</code> 2) <code>LlmResponse.Thinking</code> holds the reasoning, <code>Content</code> the answer only 3) the tool turn succeeds; the service does not refuse it 4) no <code>Thinking</code> event.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-137, REQ-RAG-138, REQ-RAG-139, REQ-RAG-140, REQ-RAG-141, REQ-RAG-142, REQ-RAG-143, REQ-RAG-144
 </li>
 </ul>
 <h3 id="subscription-catalog">Subscription catalog<a class="anchor-link" href="#subscription-catalog">#</a></h3>

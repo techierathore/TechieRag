@@ -146,15 +146,18 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var candidate = result.Candidates?.FirstOrDefault();
         var textContent = ExtractText(candidate);
+        var thinking = ExtractText(candidate, thought: true);
         var toolCalls = ExtractToolCalls(candidate);
         var inputTokens = result.UsageMetadata?.PromptTokenCount ?? 0;
-        var outputTokens = result.UsageMetadata?.CandidatesTokenCount ?? 0;
+        var reasoningTokens = result.UsageMetadata?.ThoughtsTokenCount ?? 0;
+        var outputTokens = (result.UsageMetadata?.CandidatesTokenCount ?? 0) + reasoningTokens;
         var cacheReadTokens = result.UsageMetadata?.CachedContentTokenCount ?? 0;
 
         var usage = new TokenUsage
         {
             InputTokens = inputTokens,
             OutputTokens = outputTokens,
+            ReasoningTokens = reasoningTokens,
             IsEstimated = result.UsageMetadata is null,
             Route = Route,
             CallerTag = options?.CallerTag,
@@ -166,6 +169,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var llmResponse = new LlmResponse
         {
             Content = textContent,
+            Thinking = thinking,
             ToolCalls = toolCalls,
             Usage = usage,
             FinishReason = toolCalls is { Count: > 0 } ? "tool_calls" : "stop",
@@ -183,7 +187,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
     /// <inheritdoc/>
     /// <remarks>Gemini sends each <c>functionCall</c> part whole; they are collected and emitted after
-    /// the text (REQ-RAG-067 / BRD-110).</remarks>
+    /// the text (REQ-RAG-067 / BRD-110). Parts marked <c>thought</c> stream as thinking events (REQ-RAG-140).</remarks>
     public async IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         using var timeoutCts = LlmTimeoutHelper.CreateLinkedTokenSource(options, configuredTimeout, cancellationToken);
@@ -204,6 +208,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         int totalInputTokens = 0;
         int totalOutputTokens = 0;
+        int reasoningTokens = 0;
         int cacheReadTokens = 0;
         var outputText = new StringBuilder();
         var toolCalls = new List<ToolCall>();
@@ -220,12 +225,19 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
             if (chunk.UsageMetadata is not null)
             {
                 totalInputTokens = chunk.UsageMetadata.PromptTokenCount;
-                totalOutputTokens = chunk.UsageMetadata.CandidatesTokenCount;
+                reasoningTokens = chunk.UsageMetadata.ThoughtsTokenCount;
+                totalOutputTokens = chunk.UsageMetadata.CandidatesTokenCount + reasoningTokens;
                 cacheReadTokens = chunk.UsageMetadata.CachedContentTokenCount;
             }
 
             var candidate = chunk.Candidates?.FirstOrDefault();
             toolCalls.AddRange(ExtractToolCalls(candidate) ?? []);
+
+            var thought = ExtractText(candidate, thought: true);
+            if (!string.IsNullOrEmpty(thought))
+            {
+                yield return LlmStreamEvent.FromThinking(thought);
+            }
 
             var text = ExtractText(candidate);
             if (!string.IsNullOrEmpty(text))
@@ -241,7 +253,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         }
 
         var context = new StreamReadContext(Name, ModelName, messages, EstimateTokenCount, (_, _) => { }, Route, options?.CallerTag);
-        var usage = context.BuildUsage(totalInputTokens, totalOutputTokens, cacheReadTokens, outputText.ToString());
+        var usage = context.BuildUsage(totalInputTokens, totalOutputTokens, cacheReadTokens, outputText.ToString(), reasoningTokens: reasoningTokens);
         sw.Stop();
         RaiseCompletionEvent(usage, sw.Elapsed, true, toolCalls.Count > 0, cacheReadTokens);
 
@@ -306,6 +318,7 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         if (options?.Temperature is not null) genConfig["temperature"] = options.Temperature.Value;
         if (options?.MaxTokens is not null) genConfig["maxOutputTokens"] = options.MaxTokens.Value;
         if (options?.TopP is not null) genConfig["topP"] = options.TopP.Value;
+        if (BuildThinkingConfig(options) is { } thinkingConfig) genConfig["thinkingConfig"] = thinkingConfig;
 
         if (genConfig.Count > 0)
             request["generationConfig"] = genConfig;
@@ -333,6 +346,31 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         }
 
         return request;
+    }
+
+    /// <summary>
+    /// The <c>thinkingConfig</c> a call asks for (REQ-RAG-140): thought parts are returned only when the app
+    /// sets a reasoning budget or effort; <see cref="LlmCompletionOptions.DisableReasoning"/> sends a zero
+    /// budget. Null leaves the model's own default.
+    /// </summary>
+    private static Dictionary<string, object>? BuildThinkingConfig(LlmCompletionOptions? options)
+    {
+        if (options is null) return null;
+        if (options.DisableReasoning) return new Dictionary<string, object> { ["thinkingBudget"] = 0 };
+
+        int? budget = options.MaxReasoningTokens is > 0
+            ? options.MaxReasoningTokens
+            : options.ReasoningEffort?.ToLowerInvariant() switch
+            {
+                "low" or "minimal" => 1024,
+                "medium" => 8192,
+                "high" => 24576,
+                _ => null
+            };
+
+        return budget is null
+            ? null
+            : new Dictionary<string, object> { ["includeThoughts"] = true, ["thinkingBudget"] = budget.Value };
     }
 
     /// <summary>Builds Gemini parts for one message, images included (REQ-RAG-039).</summary>
@@ -381,12 +419,13 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return parts;
     }
 
-    private static string? ExtractText(GeminiCandidate? candidate)
+    /// <summary>The answer text of a candidate, or with <paramref name="thought"/> its thought text (REQ-RAG-140).</summary>
+    private static string? ExtractText(GeminiCandidate? candidate, bool thought = false)
     {
         if (candidate?.Content?.Parts is null) return null;
 
         var textParts = candidate.Content.Parts
-            .Where(p => !string.IsNullOrEmpty(p.Text))
+            .Where(p => !string.IsNullOrEmpty(p.Text) && p.Thought == thought)
             .Select(p => p.Text);
 
         var text = string.Join("", textParts);
@@ -461,6 +500,10 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         [JsonPropertyName("text")]
         public string? Text { get; set; }
 
+        /// <summary>Whether this part is the model's thinking rather than its answer (REQ-RAG-140).</summary>
+        [JsonPropertyName("thought")]
+        public bool Thought { get; set; }
+
         [JsonPropertyName("functionCall")]
         public GeminiFunctionCall? FunctionCall { get; set; }
     }
@@ -488,5 +531,9 @@ public class GoogleGeminiLlmProvider : ILlmProvider, IMultimodalLlmProvider
         /// <summary>Prompt tokens served from a cachedContent resource (REQ-RAG-043).</summary>
         [JsonPropertyName("cachedContentTokenCount")]
         public int CachedContentTokenCount { get; set; }
+
+        /// <summary>Thinking tokens, reported apart from <see cref="CandidatesTokenCount"/> (REQ-RAG-140).</summary>
+        [JsonPropertyName("thoughtsTokenCount")]
+        public int ThoughtsTokenCount { get; set; }
     }
 }

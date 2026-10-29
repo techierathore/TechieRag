@@ -142,17 +142,18 @@ flowchart TB
 IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(
     IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options = null, CancellationToken cancellationToken = default);
 
-public enum LlmStreamEventKind { TextDelta, ToolCall, Completed }
+public enum LlmStreamEventKind { TextDelta, ToolCall, Completed, Thinking }   // Thinking added last (BRD-195)
 public sealed class LlmStreamEvent
 {
     LlmStreamEventKind Kind; string? Text; ToolCall? ToolCall; TokenUsage? Usage; string? FinishReason; string? ModelName;
-    static LlmStreamEvent FromText(string); FromToolCall(ToolCall); FromCompleted(TokenUsage, string finishReason, string modelName);
+    static LlmStreamEvent FromText(string); FromThinking(string); FromToolCall(ToolCall); FromCompleted(TokenUsage, string finishReason, string modelName);
 }
 // TechieRag.Llm.LlmStreamEventExtensions
 static IAsyncEnumerable<string> ToTextStreamAsync(this IAsyncEnumerable<LlmStreamEvent>, CancellationToken = default);
 ```
 
 - **Order:** zero or more `TextDelta`, then zero or more `ToolCall` (each complete: id, name, full arguments JSON), then exactly one `Completed` (usage, finish reason, model), always last.
+- **Thinking (BRD-195…202, done 2026-10-29):** `Thinking` events, normally first; whole replies carry `LlmResponse.Thinking`. Never in answer text. `Llm/ThinkBlockSplitter` splits a leading `<think>` block. Sources: `reasoning_content`/`reasoning`, Anthropic `thinking` blocks, Gemini `thought` parts, Ollama `message.thinking`, subscription reasoning summary. `ProviderState` carries Anthropic's signed blocks.
 - **Built-in providers:** all six override it. `ChatStreamAsync` is now `ChatStreamEventsAsync(...).ToTextStreamAsync()` in each, so the text path cannot drift from the typed path, and `CompleteStreamAsync` still delegates to `ChatStreamAsync` (unchanged behaviour). OpenAI-style services (`OpenAICompatible`, `LmStudio`, `AzureAIFoundry`) share `Llm/OpenAIStreamReader`, which assembles `tool_calls` fragments by `index`; Anthropic assembles `input_json_delta` fragments in `Llm/AnthropicStreamState` and emits the call at `content_block_stop`; Ollama and Gemini send calls whole, emitted after the text. Each still raises `OnCompletionCompleted` once, now with `InvolvedToolCalls` and cache-read tokens.
 - **Decorators:** `RetryHandler` (circuit breaker, no mid-stream retry) and `FallbackLlmHandler` (fails over before the first event) forward it.
 - **Default for custom providers** (`Llm/LlmStreamEventFallback`): with tools, or when `SupportsStreaming` is false, it calls `ChatAsync` and replays text, tool calls, completed; otherwise it projects `ChatStreamAsync` into text deltas with estimated usage. A custom provider that implements `ChatStreamAsync` over the typed method must override the typed method too, or the two defaults recurse.
@@ -324,6 +325,11 @@ One row per decision. Every package added to the project has a row saying why.
 | 2026-10-06 | Add `IWorkspaceManager`; `GetWorkspaceManager()` keeps its return type | Testable, no caller breaks | planned (BRD-176) |
 | 2026-10-06 | Text ingestion takes an optional key that replaces the earlier document | Re-syncs stored copies | planned (BRD-179) |
 | 2026-10-06 | Parsed mail gains an optional notes list | Skipped content vanished; an addition breaks no caller | planned (BRD-180) |
+| 2026-10-29 | Thinking is its own event (`Thinking`, last enum member) and field (`LlmResponse.Thinking`) | Keeps answers clean and old enum values | done (BRD-195/196) |
+| 2026-10-29 | Thinking is asked for only through `MaxReasoningTokens` / `ReasoningEffort`, and turned off by `DisableReasoning`; no new option | It costs tokens; the switches exist | done 2026-10-29 (BRD-197…199) |
+| 2026-10-29 | Anthropic sends thinking blocks, with signatures, back on tool-use turns | The service refuses the turn otherwise | done 2026-10-29 (BRD-197) |
+| 2026-10-29 | `ThinkBlockSplitter` reaches `TechieRag.Local` by `InternalsVisibleTo` | No new public surface | done 2026-10-29 (BRD-200) |
+| 2026-10-29 | Encrypted reasoning and `redacted_thinking` are never shown; the subscription sends its summary | The services send no readable text | done 2026-10-29 (BRD-201) |
 
 ## 7. Module responsibilities
 
@@ -355,17 +361,17 @@ One row per decision. Every package added to the project has a row saying why.
 
 ## 8. Open questions
 
-1. **sqlite-vec is never loaded.** Resolved 2026-09-24 (BRD-93, REQ-RAG-056): the dead loading code is removed and the managed scan is the documented path, vectorised (`VectorStores/ManagedVectorSearch.cs`, zero-copy BLOB read, bounded top-K heap) and measured at 1k/10k/50k chunks in the UsageGuide.
-2. **Every vector store was fixed at 1024 dimensions.** Resolved 2026-09-25 (BRD-158, REQ-RAG-106): `Build()` passes the embedder's `Dimensions` into every store; Cohere, OpenAI and Gemini embedders work with pgvector and Qdrant.
-3. **Two paths published to nuget.org.** Resolved 2026-09-25 (BRD-160, REQ-FN-067): only the manual dispatch of `publish-nuget.yml` publishes there; the automatic job in `publish-github-packages.yml` is removed.
-4. **`TechieRag.Telemetry` was never packed or published.** Resolved 2026-09-25 (BRD-156, REQ-FN-065): both workflows pack and publish it with the same SourceLink, symbol and README settings as the other packages.
+1. **sqlite-vec is never loaded.** Resolved 2026-09-24 (BRD-93, REQ-RAG-056): the dead code is removed; the vectorised managed scan (`VectorStores/ManagedVectorSearch.cs`) is the documented path, measured in the UsageGuide.
+2. **Every vector store was fixed at 1024 dimensions.** Resolved 2026-09-25 (BRD-158): `Build()` passes the embedder's `Dimensions` to every store.
+3. **Two paths published to nuget.org.** Resolved 2026-09-25 (BRD-160): only the manual `publish-nuget.yml` publishes there.
+4. **`TechieRag.Telemetry` was never packed or published.** Resolved 2026-09-25 (BRD-156): both workflows pack and publish it.
 5. **The `IConfiguration` registration path is lossy.** It drops `VectorStore.ApiKey` (so Qdrant with a key cannot come from appsettings), the embedding `Dimensions`, `ApiFormat`, `ApiPath`, `RequestDelayMs`, and the whole `Prompt` section; `AddTechieRag(TechieRagConfig)` maps even less. `Microsoft.Extensions.Options` is referenced but no `IOptions<T>` pattern exists.
-6. **No store records a schema version.** The only migration is an attempt-and-swallow `ALTER TABLE TrMessage ADD COLUMN ContentJson`. A future column change has nowhere to hang.
-7. **Model cache location.** The library writes under the `TechieRag.Embedded.dll` folder (read-only on phones); the live reranker and embedder tests stage weights under `~/.cache/techierag-models/`. BRD-89 moves the library to the per-user application data root; the tests should follow.
+6. **No store records a schema version.** The only migration is a swallowed `ALTER TABLE TrMessage ADD COLUMN ContentJson`.
+7. **Model cache location.** The library writes beside `TechieRag.Embedded.dll` (read-only on phones); BRD-89 moves it to the per-user data root, and the live tests under `~/.cache/techierag-models/` should follow.
 8. **`net8.0` is built but never tested**: `TechieRag.Tests` targets `net10.0` only.
-9. **`ConfigureAwait(false)` is inconsistent**: about 374 uses against about 305 awaits without it; the vector stores and older code omit it, `Persistence`, `Mcp` and `Connectors` use it. The Coding Standards require it in library code.
-10. **Download progress is written with `Console.WriteLine`.** Resolved 2026-09-24 (BRD-92, REQ-RAG-055): the three calls are gone; `ModelDownloadService.DownloadAsync` is the one public downloader (size-known event before the first byte, progress, resume) for the embedder, the reranker and the planned local model.
-11. **Local runtime choice — answered 2026-09-25:** ONNX Runtime GenAI on Windows, Android, iOS and Mac Catalyst, measured on the Windows laptop and the M4 Max Mac (`DECISIONS.md` 2026-09-25). History: it was to be decided after the probe comparison on named devices (plan 08 step 2) and recorded in `DECISIONS.md` before BRD-96…98 are built. Costly to reverse. 2026-09-24: everything above the runtime seam is built (§3.2); the desktop comparison (WSL and Windows on the Windows 11 laptop), the per-platform package facts (LLamaSharp ships no iOS or Mac Catalyst native library; ONNX Runtime GenAI ships none for Mac Catalyst) and a recommendation are in `docs/TechieRag-Decision-Request.md` for the owner; phone and Mac numbers need the owner's devices.
+9. **`ConfigureAwait(false)` is inconsistent**: about 374 uses against 305 awaits without it, mostly in the vector stores and older code. The Coding Standards require it.
+10. **Download progress is written with `Console.WriteLine`.** Resolved 2026-09-24 (BRD-92, REQ-RAG-055): `ModelDownloadService.DownloadAsync` is the one public downloader, with size, progress and resume.
+11. **Local runtime choice — answered 2026-09-25:** ONNX Runtime GenAI on Windows, Android, iOS and Mac Catalyst, measured on the Windows laptop and the M4 Max Mac (`DECISIONS.md` 2026-09-25; the comparison is in `docs/TechieRag-Decision-Request.md`).
 12. **Vendor subscription policy** changes: OpenAI permits external-tool use for personal use, Anthropic prohibits it since April 2026, Google, Groq, xAI and Meta unknown (BRD-114 research before BRD-112).
-13. **Mobile memory limits**: iOS and Android kill an over-budget app without warning; `MemoryGate` (BRD-99), small default models (BRD-91, BRD-96) and per-device limits in the matrix (BRD-108).
-14. **Owner-run git after the split**: `tests/TechieDesk.Tests/TestResults/res.trx` is still tracked; the gitignore audit printed the `git rm -r --cached` line for the owner, and the deletions of 2026-09-24 are uncommitted until the owner commits.
+13. **Mobile memory limits**: phones kill an over-budget app silently; covered by `MemoryGate` (BRD-99), small default models (BRD-91, BRD-96) and the device matrix (BRD-108).
+14. **Owner-run git after the split**: `tests/TechieDesk.Tests/TestResults/res.trx` is still tracked; the owner removes it with `git rm --cached`.

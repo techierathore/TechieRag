@@ -16,6 +16,9 @@ namespace TechieRag.Llm;
 /// whole <c>function_call</c>, and <c>response.completed</c> with usage — so the wire format does not match
 /// and the shared piece is <see cref="StreamReadContext"/>, which both use for usage and telemetry.</para>
 /// <para><b>Order kept:</b> text deltas as they arrive, then each tool call, then exactly one completed event.</para>
+/// <para><b>Thinking:</b> the service never sends its raw reasoning in readable form; when the request asks
+/// for a summary, <c>response.reasoning_summary_text.delta</c> fragments stream as thinking events, with a
+/// blank line between summary parts (REQ-RAG-143).</para>
 /// </remarks>
 internal static class OpenAIResponsesStreamReader
 {
@@ -39,8 +42,10 @@ internal static class OpenAIResponsesStreamReader
             var data = line["data:".Length..].Trim();
             if (data.Length == 0 || data == "[DONE]") continue;
 
-            var delta = state.Apply(data);
-            if (!string.IsNullOrEmpty(delta)) yield return LlmStreamEvent.FromText(delta);
+            var (delta, isThinking) = state.Apply(data);
+            if (string.IsNullOrEmpty(delta)) continue;
+
+            yield return isThinking ? LlmStreamEvent.FromThinking(delta) : LlmStreamEvent.FromText(delta);
         }
 
         foreach (var call in state.ToolCalls)
@@ -48,7 +53,7 @@ internal static class OpenAIResponsesStreamReader
             yield return LlmStreamEvent.FromToolCall(call);
         }
 
-        var usage = context.BuildUsage(state.InputTokens, state.OutputTokens, state.CachedTokens, state.OutputText.ToString());
+        var usage = context.BuildUsage(state.InputTokens, state.OutputTokens, state.CachedTokens, state.OutputText.ToString(), reasoningTokens: state.ReasoningTokens);
         context.OnCompleted(usage, state.ToolCalls.Count > 0);
         yield return LlmStreamEvent.FromCompleted(usage, state.FinishReason, context.ModelName);
     }
@@ -61,13 +66,14 @@ internal static class OpenAIResponsesStreamReader
         public int InputTokens { get; private set; }
         public int OutputTokens { get; private set; }
         public int CachedTokens { get; private set; }
+        public int ReasoningTokens { get; private set; }
         public bool Finished { get; private set; }
         public bool Incomplete { get; private set; }
 
         public string FinishReason => ToolCalls.Count > 0 ? "tool_calls" : Incomplete ? "length" : "stop";
 
-        /// <summary>Applies one event and returns its text delta, if it has one.</summary>
-        public string? Apply(string data)
+        /// <summary>Applies one event and returns its text delta, if it has one, and whether it is thinking.</summary>
+        public (string? Delta, bool IsThinking) Apply(string data)
         {
             using var document = JsonDocument.Parse(data);
             var root = document.RootElement;
@@ -78,21 +84,25 @@ internal static class OpenAIResponsesStreamReader
                 case "response.output_text.delta":
                     var delta = root.TryGetProperty("delta", out var text) ? text.GetString() : null;
                     OutputText.Append(delta);
-                    return delta;
+                    return (delta, false);
+                case "response.reasoning_summary_text.delta":
+                    return (ReadString(root, "delta"), true);
+                case "response.reasoning_summary_part.added":
+                    return (root.TryGetProperty("summary_index", out var index) && index.TryGetInt32(out var number) && number > 0 ? "\n\n" : null, true);
                 case "response.output_item.done":
                     AddToolCall(root);
-                    return null;
+                    return (null, false);
                 case "response.completed":
                 case "response.incomplete":
                     Incomplete = type == "response.incomplete";
                     ReadUsage(root);
                     Finished = true;
-                    return null;
+                    return (null, false);
                 case "response.failed":
                 case "error":
                     throw new InvalidOperationException($"The subscription model call failed: {ReadError(root)}.");
                 default:
-                    return null;
+                    return (null, false);
             }
         }
 
@@ -118,6 +128,11 @@ internal static class OpenAIResponsesStreamReader
             if (usage.TryGetProperty("input_tokens_details", out var details) && details.ValueKind == JsonValueKind.Object)
             {
                 CachedTokens = ReadInt(details, "cached_tokens");
+            }
+
+            if (usage.TryGetProperty("output_tokens_details", out var outputDetails) && outputDetails.ValueKind == JsonValueKind.Object)
+            {
+                ReasoningTokens = ReadInt(outputDetails, "reasoning_tokens");
             }
         }
 

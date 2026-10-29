@@ -163,9 +163,12 @@ public class AzureAIFoundryLlmProvider : ILlmProvider, IMultimodalLlmProvider
             ProviderName = Name
         };
 
+        var (thinking, answer) = ThinkBlockSplitter.Split(choice?.Message?.Content, choice?.Message?.ReasoningContent ?? choice?.Message?.Reasoning);
+
         var llmResponse = new LlmResponse
         {
-            Content = choice?.Message?.Content,
+            Content = answer,
+            Thinking = thinking,
             ToolCalls = toolCalls,
             Usage = usage,
             FinishReason = choice?.FinishReason ?? "stop",

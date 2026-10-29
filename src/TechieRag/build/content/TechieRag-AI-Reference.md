@@ -9,7 +9,7 @@ TechieRag is a complete RAG (Retrieval-Augmented Generation) + LLM management pl
 - **Vector Storage** - Store and search vectors (3 backends)
 - **Document Processing** - Ingest PDFs, Office files, Markdown, text, HTML, code, etc. (13 processors)
 - **LLM Completions** - Chat, streaming, structured output (6 API providers, a local in-process model, a ChatGPT subscription)
-- **Typed Streaming** - `LlmStreamEvent` (text delta, tool call, completed) from every provider, and the streaming agent loop
+- **Typed Streaming** - `LlmStreamEvent` (text delta, thinking, tool call, completed) from every provider, and the streaming agent loop
 - **Tool/Function Calling** - Full agent loop with tool execution, MCP tool servers, flows
 - **Agents** - Microsoft Agent Framework over TechieRag (`TechieRag.Agents`), and agentic retrieval on the classic loop
 - **Local Model** - Qwen2.5 0.5B on phones, Phi-3 mini on desktops, any ONNX Runtime GenAI model by name (`TechieRag.Local`)
@@ -351,22 +351,26 @@ Package `TechieRag`; namespaces `TechieRag.Abstractions`, `TechieRag.Models`, `T
 
 ```csharp
 // ILlmProvider - additive with a default implementation; the six built-in providers, the local model
-// and the subscription provider override it. Order: TextDelta*, ToolCall*, then exactly one Completed.
+// and the subscription provider override it. Order: TextDelta* (Thinking events among them, normally
+// all before the answer), ToolCall*, then exactly one Completed.
 IAsyncEnumerable<LlmStreamEvent> ChatStreamEventsAsync(IReadOnlyList<ChatMessage> messages,
     LlmCompletionOptions? options = null, CancellationToken cancellationToken = default);
 
-public enum LlmStreamEventKind { TextDelta, ToolCall, Completed }
+public enum LlmStreamEventKind { TextDelta, ToolCall, Completed, Thinking }
 public sealed class LlmStreamEvent
 {
     public required LlmStreamEventKind Kind { get; init; }
-    public string? Text { get; init; }          // TextDelta
+    public string? Text { get; init; }          // TextDelta and Thinking
     public ToolCall? ToolCall { get; init; }    // ToolCall: id, name, complete arguments JSON
     public TokenUsage? Usage { get; init; }     // Completed
     public string? FinishReason { get; init; }  // Completed
     public string? ModelName { get; init; }     // Completed
+    public string? ProviderState { get; init; } // Completed: opaque, for the next call (Anthropic thinking blocks)
     public static LlmStreamEvent FromText(string text);
+    public static LlmStreamEvent FromThinking(string text);
     public static LlmStreamEvent FromToolCall(ToolCall toolCall);
     public static LlmStreamEvent FromCompleted(TokenUsage usage, string finishReason, string modelName);
+    public static LlmStreamEvent FromCompleted(TokenUsage usage, string finishReason, string modelName, string? providerState);
 }
 
 // TechieRag.Llm.LlmStreamEventExtensions - the text-only projection (what ChatStreamAsync returns)
@@ -1453,9 +1457,10 @@ var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
 
 Package `TechieRag`; namespace `TechieRag.Models` (Lekhak TR-RAG-009). `LlmCompletionOptions` exposes provider-neutral reasoning controls that each connector maps to its own wire fields.
 
-- `DisableReasoning = true`: Venice sends `venice_parameters.disable_thinking` and `strip_thinking_response`; OpenAI-style services send `reasoning_effort: low`.
-- `MaxReasoningTokens`: Venice sends `venice_parameters.max_thinking_tokens`; OpenAI-style services send `max_reasoning_tokens`.
-- `ReasoningEffort`: standard values `low`, `medium`, `high`; mapped to `reasoning_effort` on OpenAI-style providers.
+- `DisableReasoning = true`: Venice sends `venice_parameters.disable_thinking` and `strip_thinking_response`; OpenAI-style services send `reasoning_effort: low`; Gemini sends `thinkingBudget: 0`; Ollama sends `think: false`; Anthropic and the ChatGPT subscription ask for no thinking.
+- `MaxReasoningTokens`: Venice sends `venice_parameters.max_thinking_tokens`; OpenAI-style services send `max_reasoning_tokens`; Anthropic turns on extended thinking with that `budget_tokens` (at least 1024, and `max_tokens` is raised above it); Gemini sends `thinkingConfig` with that `thinkingBudget` and `includeThoughts: true`; Ollama sends `think: true`; the ChatGPT subscription asks for a reasoning summary.
+- `ReasoningEffort`: standard values `low`, `medium`, `high`; mapped to `reasoning_effort` on OpenAI-style providers and to `reasoning.effort` on the ChatGPT subscription. Without a budget, Anthropic and Gemini turn it into one (low 1024; medium 4096 on Anthropic, 8192 on Gemini; high 16384 on Anthropic, 24576 on Gemini), and Ollama sends `think: true`.
+- **Anthropic with thinking on** leaves out `temperature` and `top_p`, because the service refuses them while it thinks.
 
 ```csharp
 var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
@@ -1464,6 +1469,49 @@ var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
     MaxReasoningTokens = 250
 });
 ```
+
+### Thinking text from reasoning models
+
+Package `TechieRag`; namespaces `TechieRag.Models`, `TechieRag.Llm` (Chatur TR-RAG-008 and TR-RAG-009; REQ-RAG-137 to REQ-RAG-144). A reasoning model's thinking is kept out of the answer and handed to the host on its own, so a screen can show it, fold it away or ignore it.
+
+- **Streaming.** `ChatStreamEventsAsync` yields `LlmStreamEventKind.Thinking` events, with the fragment in `Text`. They normally all come before the first `TextDelta`. `ChatStreamAsync` and `ToTextStreamAsync` return the answer only; thinking never reaches them.
+- **Whole replies.** `ChatAsync` returns the thinking in `LlmResponse.Thinking` (null when there was none) and the answer alone in `Content`. `ToChatMessage()` leaves the thinking text out, so it is not sent back to the model on the next turn.
+- **Rules every built-in provider keeps.** Thinking never appears in the answer text. A call with no thinking yields no `Thinking` event and a null `LlmResponse.Thinking`. The event order is unchanged: `Thinking` and `TextDelta` events, then `ToolCall` events, then exactly one `Completed`, last.
+- **Token count.** The `Completed` event's `Usage.ReasoningTokens` (and `LlmResponse.Usage.ReasoningTokens`) is the count the service reported, inside `OutputTokens`; it is never estimated, and it stays 0 where the service reports none.
+- **A leading `<think>` block.** Some models write their reasoning into the answer text as `<think>…</think>`. Where noted below it is split out, even when the tags arrive cut across chunks. Only a block at the very start counts, after optional white space; a `<think>` later in the answer is the model's own text and is kept. A block the model never closed (the token limit hit mid-thought) is all thinking.
+- **Asking for thinking.** Anthropic, Gemini, Ollama and the ChatGPT subscription only return thinking when the call sets `MaxReasoningTokens` or `ReasoningEffort` (see Reasoning controls); the OpenAI-style services and the local model send what the model produces.
+
+| Provider | Sends thinking | From | Reasoning token count |
+|---|---|---|---|
+| `OpenAICompatible` and every connector and route on it, `LmStudio`, `AzureAIFoundry` | Yes | `reasoning_content` (DeepSeek, Kimi, OpenCode Go) or `reasoning` (OpenRouter) field; a leading `<think>` block (minimax-m3, DeepSeek-R1 and Qwen builds) | `completion_tokens_details.reasoning_tokens` |
+| `Anthropic` and `anthropic-compatible/` routes | Yes, when asked | `thinking` content blocks (`thinking_delta` while streaming) | No: the service counts thinking inside `output_tokens` without a separate figure, so it is 0 |
+| `GoogleGemini` | Yes, when asked | parts marked `thought: true` | `thoughtsTokenCount` (added to `OutputTokens`) |
+| `Ollama` | Yes | the `thinking` field of `/api/chat` (`think: true`); a leading `<think>` block when the model writes one | No: Ollama reports none |
+| `TechieRag.Local` (`LocalLlmProvider`) | Yes | a leading `<think>` block (Qwen3, DeepSeek-R1 builds) | Counted with the model's own tokenizer |
+| ChatGPT subscription (`ChatGptSubscriptionLlmProvider`) | A summary, when asked | `response.reasoning_summary_text.delta`; parts joined by a blank line | `output_tokens_details.reasoning_tokens` |
+| A custom provider on the default `ChatStreamEventsAsync` | Only what its `ChatAsync` puts in `LlmResponse.Thinking`, sent first | | What it reports |
+
+**What cannot be shown.** The ChatGPT subscription never returns its raw reasoning, only the summary. Anthropic `redacted_thinking` blocks carry encrypted data and no text. Neither is ever put in `Thinking`. A model that does not reason sends nothing, on every provider.
+
+**Anthropic tool turns keep their thinking.** With thinking on, Anthropic refuses a tool-use turn whose earlier assistant message lost its signed thinking blocks. They travel in `ChatMessage.ProviderState`, an opaque string that `LlmResponse.ProviderState`, the `Completed` event's `ProviderState` and `ToChatMessage()` carry. The provider sends them back first and unchanged. Keep `ProviderState` when you store or rebuild the conversation; other providers ignore it. `AgentLoopRunner` keeps it on its own. Through `TechieRag.Agents` it rides a `TextReasoningContent` with empty text and the state in `ProtectedData`.
+
+- **Agent Framework.** `LlmProviderChatClient` maps a `Thinking` event, and a whole reply's `LlmResponse.Thinking`, to `TextReasoningContent`.
+
+```csharp
+var thinking = new StringBuilder();
+var answer = new StringBuilder();
+await foreach (var e in llm.ChatStreamEventsAsync(messages))
+{
+    switch (e.Kind)
+    {
+        case LlmStreamEventKind.Thinking: thinking.Append(e.Text); break;   // show greyed, or fold away
+        case LlmStreamEventKind.TextDelta: answer.Append(e.Text); break;
+        case LlmStreamEventKind.Completed: Console.WriteLine($"reasoning tokens: {e.Usage!.ReasoningTokens}"); break;
+    }
+}
+```
+
+A `switch` over `LlmStreamEventKind` that treated every other value as `Completed` (a `default:` branch) must now name `Completed` itself, or it will read a `Thinking` event as the end of the stream.
 
 ### Per-call and per-provider request timeout
 

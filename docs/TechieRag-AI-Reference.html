@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-15</div>
+    <div class="sub">Last rendered: 2026-10-29</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -154,10 +154,16 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
+        <li class="h3"><a href="#local-model-tool-calling">Local model tool calling</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
         <li class="h3"><a href="#why-a-call-failed-llmhttpexception">Why a call failed: LlmHttpException</a></li>
+        <li class="h3"><a href="#consumption-monitoring-and-budgets">Consumption monitoring and budgets</a></li>
+        <li class="h3"><a href="#reasoning-controls">Reasoning controls</a></li>
+        <li class="h3"><a href="#thinking-text-from-reasoning-models">Thinking text from reasoning models</a></li>
+        <li class="h3"><a href="#per-call-and-per-provider-request-timeout">Per-call and per-provider request timeout</a></li>
+        <li class="h3"><a href="#codex-agent">Codex agent</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -197,7 +203,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -247,10 +253,16 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#model-listing-and-endpoints-listmodelsasync-createformodel-endpoint">Model listing and endpoints: ListModelsAsync, CreateForModel(…, endpoint)</a></li>
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
+        <li class="h3"><a href="#local-model-tool-calling">Local model tool calling</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
         <li class="h3"><a href="#why-a-call-failed-llmhttpexception">Why a call failed: LlmHttpException</a></li>
+        <li class="h3"><a href="#consumption-monitoring-and-budgets">Consumption monitoring and budgets</a></li>
+        <li class="h3"><a href="#reasoning-controls">Reasoning controls</a></li>
+        <li class="h3"><a href="#thinking-text-from-reasoning-models">Thinking text from reasoning models</a></li>
+        <li class="h3"><a href="#per-call-and-per-provider-request-timeout">Per-call and per-provider request timeout</a></li>
+        <li class="h3"><a href="#codex-agent">Codex agent</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -300,7 +312,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li><strong>LLM Completions</strong> - Chat, streaming, structured output (6 API providers, a local in-process model, a ChatGPT subscription)
 </li>
-<li><strong>Typed Streaming</strong> - <code>LlmStreamEvent</code> (text delta, tool call, completed) from every provider, and the streaming agent loop
+<li><strong>Typed Streaming</strong> - <code>LlmStreamEvent</code> (text delta, thinking, tool call, completed) from every provider, and the streaming agent loop
 </li>
 <li><strong>Tool/Function Calling</strong> - Full agent loop with tool execution, MCP tool servers, flows
 </li>
@@ -607,22 +619,26 @@ var response = await rag.AskAsync("What is quantum computing?");</code></pre>
 <h3 id="typed-streaming-chatstreameventsasync-and-runstreamasync"><a id="1-typed-streaming-chatstreameventsasync-and-runstreamasync"></a>1. Typed streaming: <code>ChatStreamEventsAsync</code> and <code>RunStreamAsync</code><a class="anchor-link" href="#typed-streaming-chatstreameventsasync-and-runstreamasync">#</a></h3>
 <p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Abstractions</code>, <code>TechieRag.Models</code>, <code>TechieRag.Services</code>, <code>TechieRag.Llm</code>.</p>
 <pre><code class="language-csharp">// ILlmProvider - additive with a default implementation; the six built-in providers, the local model
-// and the subscription provider override it. Order: TextDelta*, ToolCall*, then exactly one Completed.
+// and the subscription provider override it. Order: TextDelta* (Thinking events among them, normally
+// all before the answer), ToolCall*, then exactly one Completed.
 IAsyncEnumerable&lt;LlmStreamEvent&gt; ChatStreamEventsAsync(IReadOnlyList&lt;ChatMessage&gt; messages,
     LlmCompletionOptions? options = null, CancellationToken cancellationToken = default);
 
-public enum LlmStreamEventKind { TextDelta, ToolCall, Completed }
+public enum LlmStreamEventKind { TextDelta, ToolCall, Completed, Thinking }
 public sealed class LlmStreamEvent
 {
     public required LlmStreamEventKind Kind { get; init; }
-    public string? Text { get; init; }          // TextDelta
+    public string? Text { get; init; }          // TextDelta and Thinking
     public ToolCall? ToolCall { get; init; }    // ToolCall: id, name, complete arguments JSON
     public TokenUsage? Usage { get; init; }     // Completed
     public string? FinishReason { get; init; }  // Completed
     public string? ModelName { get; init; }     // Completed
+    public string? ProviderState { get; init; } // Completed: opaque, for the next call (Anthropic thinking blocks)
     public static LlmStreamEvent FromText(string text);
+    public static LlmStreamEvent FromThinking(string text);
     public static LlmStreamEvent FromToolCall(ToolCall toolCall);
     public static LlmStreamEvent FromCompleted(TokenUsage usage, string finishReason, string modelName);
+    public static LlmStreamEvent FromCompleted(TokenUsage usage, string finishReason, string modelName, string? providerState);
 }
 
 // TechieRag.Llm.LlmStreamEventExtensions - the text-only projection (what ChatStreamAsync returns)
@@ -671,7 +687,7 @@ await foreach (var step in runner.RunStreamAsync(messages))
 }</code></pre>
 <p>A custom <code>ILlmProvider</code> that implements <code>ChatStreamAsync</code> on top of the typed method must override <code>ChatStreamEventsAsync</code> too, or the two defaults call each other.</p>
 <h3 id="local-model-techierag-local"><a id="2-local-model-techieraglocal"></a>2. Local model: <code>TechieRag.Local</code><a class="anchor-link" href="#local-model-techierag-local">#</a></h3>
-<p>Package <code>TechieRag.Local</code> (depends on <code>TechieRag.Embedded</code>); namespace <code>TechieRag.Local</code>. One provider, <code>LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable</code>, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws <code>PlatformNotSupportedException</code> on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. <code>SupportsToolCalling</code> is false; a request with tools is refused. A MAUI app writes no native wiring: the package's <code>buildTransitive</code> targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.</p>
+<p>Package <code>TechieRag.Local</code> (depends on <code>TechieRag.Embedded</code>); namespace <code>TechieRag.Local</code>. One provider, <code>LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable</code>, over ONNX Runtime GenAI on Windows, Linux (x64, Arm64), Apple-silicon macOS, Android, iOS and Mac Catalyst (an Intel Mac throws <code>PlatformNotSupportedException</code> on load). The weights are downloaded once into the model root after the user accepts the licence terms, never packed. <code>SupportsToolCalling</code> is true for the shipped catalogue models (<code>Qwen25Instruct05B</code>, <code>Phi3Mini4kInstruct</code>); a request with tools is refused for unsupported models. A MAUI app writes no native wiring: the package's <code>buildTransitive</code> targets add the ONNX Runtime GenAI native library on Android, iOS and Mac Catalyst.</p>
 <table>
 <thead><tr><th>Model</th><th>Id</th><th>Where it is the default</th><th>Download</th><th>Licence</th></tr></thead>
 <tbody>
@@ -1420,6 +1436,21 @@ var canOffer = LocalLlmProvider.IsRuntimeAvailable &amp;&amp; (needed is null ||
 var next = LocalLlm.Create("phi-3-mini-4k-instruct");
 try { reply = await oldProvider.ChatAsync(messages); }
 catch (ObjectDisposedException) { /* the model was unloaded or swapped: retry on `next` */ }</code></pre>
+<h3 id="local-model-tool-calling">Local model tool calling<a class="anchor-link" href="#local-model-tool-calling">#</a></h3>
+<p>Package <code>TechieRag.Local</code>; namespace <code>TechieRag.Local</code> (TR-RAG-052). The built-in catalogue models <code>LocalModel.Qwen25Instruct05B</code> and <code>LocalModel.Phi3Mini4kInstruct</code> now report <code>SupportsToolCalling == true</code>. <code>LocalLlmProvider</code> injects the tool definitions into the system prompt in the model's own format (Hermes-style <code>&lt;tools&gt;</code> / <code>&lt;tool_call&gt;</code> blocks for Qwen2.5, JSON-mode for Phi-3), parses the generated <code>&lt;tool_call&gt;</code> or JSON output into <code>LlmResponse.ToolCalls</code>, and formats tool results back into the conversation. <code>AgentLoopRunner</code> can therefore run tools on the in-process model with no network and no other program. Host-supplied folder models do not enable tool calling unless explicitly configured.</p>
+<pre><code class="language-csharp">var registry = new ToolRegistry();
+registry.Register("get_weather", "Gets the weather for a city.",
+    """{"type":"object","properties":{"city":{"type":"string"}}}""",
+    arguments =&gt; "Sunny, 22 C");
+
+using var local = new LocalLlmProvider(new LocalLlmOptions
+{
+    Model = LocalModel.Qwen25Instruct05B,
+    TermsAccepted = true
+});
+
+var runner = new AgentLoopRunner(local, registry);
+var answer = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);</code></pre>
 <h3 id="choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: <code>ModelChooser</code><a class="anchor-link" href="#choosing-a-model-for-a-piece-of-work-modelchooser">#</a></h3>
 <p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-128, Chatur TR-RAG-006). <code>ModelRouter</code> turns a model name into a service; <code>ModelChooser</code> decides which name. <code>new ModelChooser(smallModel, options?)</code> takes any <code>ILlmProvider</code>; a cheap or local one is enough. <code>ChooseAsync(request, candidates)</code> takes the request text and <code>ModelCandidate { ModelId, Tier?, Notes?, Cost? }</code> items, the free-text fields written in the host's own words. It returns a <code>ModelChoice</code> with <code>Candidate</code>, <code>ModelId</code>, <code>Reason</code> (one sentence to show and log), <code>Source</code> (<code>ModelChoiceSource.SmallModel</code>, <code>OnlyCandidate</code> or <code>Fallback</code>) and the small model's <code>Usage</code>. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to <code>ModelChooserOptions.MaxRequestCharacters</code> (default 4000). The reply's id is matched ignoring case. An id without its <code>connector/</code> prefix matches when exactly one candidate ends with it. <strong>The answer is always a candidate:</strong> a reply that is not JSON, or names a model that was not offered, gives <code>ModelChooserOptions.FallbackModelId</code> (else the first candidate) with <code>Source = Fallback</code>. <strong>A failure of the small model is thrown</strong> (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. <code>ModelChooserOptions.Guidance</code> adds the host's rule to the instructions. The interface <code>IModelChooser</code> lets a unit test pass a fixed choice.</p>
 <pre><code class="language-csharp">var chooser = new ModelChooser(
@@ -1479,6 +1510,127 @@ catch (LlmHttpException ex)
     // ex.StatusCode == HttpStatusCode.NotFound, ex.ProviderMessage == "Specified model not found: wrong-model"
     status.Text = $"{(int?)ex.StatusCode}: {ex.ProviderMessage ?? ex.Message}";
 }</code></pre>
+<h3 id="consumption-monitoring-and-budgets">Consumption monitoring and budgets<a class="anchor-link" href="#consumption-monitoring-and-budgets">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Models</code>, <code>TechieRag.Services</code> (Lekhak TR-RAG-008 / TR-RAG-009 / TR-RAG-010). Every provider now reports its own prompt/completion/reasoning token counts, the route, and a caller tag on every call, streamed or not.</p>
+<ul>
+<li><code>TokenUsage</code> carries <code>ReasoningTokens</code>, <code>IsEstimated</code>, <code>Route</code> and <code>CallerTag</code>.
+</li>
+<li><code>TokenUsageSummary</code> carries <code>TotalReasoningTokens</code> and <code>TotalCompletionTokens</code>.
+</li>
+<li><code>LlmCompletionOptions.CallerTag</code> names the agent or component making the call; it is copied into usage and the <code>OnCompletionCompleted</code> event but is never sent to the provider.
+</li>
+<li><code>LlmCompletionOptions.RequestTimeout</code> overrides the provider's default timeout for one call.
+</li>
+<li><code>LlmConfig.RequestTimeout</code> and <code>LlmFallback.RequestTimeout</code> set the default timeout from configuration or the builder.
+</li>
+</ul>
+<pre><code class="language-csharp">var tracker = new TokenUsageTracker();
+tracker.SetBudget(new UsageBudget { MaxTotalTokens = 1_000_000, BlockOnExceeded = true });
+
+var llm = new BudgetEnforcingLlmProvider(
+    LlmProviderFactory.CreateForModel("venice/qwen-3-6-plus", key),
+    tracker);
+
+llm.OnCompletionCompleted += (_, args) =&gt;
+    Console.WriteLine($"{args.Route} {args.CallerTag}: {args.InputTokens}+{args.OutputTokens} (reasoning {args.ReasoningTokens})");
+
+var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
+{
+    CallerTag = "story-writer",
+    MaxReasoningTokens = 500,
+    RequestTimeout = TimeSpan.FromMinutes(5)
+});</code></pre>
+<h3 id="reasoning-controls">Reasoning controls<a class="anchor-link" href="#reasoning-controls">#</a></h3>
+<p>Package <code>TechieRag</code>; namespace <code>TechieRag.Models</code> (Lekhak TR-RAG-009). <code>LlmCompletionOptions</code> exposes provider-neutral reasoning controls that each connector maps to its own wire fields.</p>
+<ul>
+<li><code>DisableReasoning = true</code>: Venice sends <code>venice_parameters.disable_thinking</code> and <code>strip_thinking_response</code>; OpenAI-style services send <code>reasoning_effort: low</code>; Gemini sends <code>thinkingBudget: 0</code>; Ollama sends <code>think: false</code>; Anthropic and the ChatGPT subscription ask for no thinking.
+</li>
+<li><code>MaxReasoningTokens</code>: Venice sends <code>venice_parameters.max_thinking_tokens</code>; OpenAI-style services send <code>max_reasoning_tokens</code>; Anthropic turns on extended thinking with that <code>budget_tokens</code> (at least 1024, and <code>max_tokens</code> is raised above it); Gemini sends <code>thinkingConfig</code> with that <code>thinkingBudget</code> and <code>includeThoughts: true</code>; Ollama sends <code>think: true</code>; the ChatGPT subscription asks for a reasoning summary.
+</li>
+<li><code>ReasoningEffort</code>: standard values <code>low</code>, <code>medium</code>, <code>high</code>; mapped to <code>reasoning_effort</code> on OpenAI-style providers and to <code>reasoning.effort</code> on the ChatGPT subscription. Without a budget, Anthropic and Gemini turn it into one (low 1024; medium 4096 on Anthropic, 8192 on Gemini; high 16384 on Anthropic, 24576 on Gemini), and Ollama sends <code>think: true</code>.
+</li>
+<li><strong>Anthropic with thinking on</strong> leaves out <code>temperature</code> and <code>top_p</code>, because the service refuses them while it thinks.
+</li>
+</ul>
+<pre><code class="language-csharp">var reply = await llm.ChatAsync(messages, new LlmCompletionOptions
+{
+    DisableReasoning = true,
+    MaxReasoningTokens = 250
+});</code></pre>
+<h3 id="thinking-text-from-reasoning-models">Thinking text from reasoning models<a class="anchor-link" href="#thinking-text-from-reasoning-models">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Models</code>, <code>TechieRag.Llm</code> (Chatur TR-RAG-008 and TR-RAG-009; REQ-RAG-137 to REQ-RAG-144). A reasoning model's thinking is kept out of the answer and handed to the host on its own, so a screen can show it, fold it away or ignore it.</p>
+<ul>
+<li><strong>Streaming.</strong> <code>ChatStreamEventsAsync</code> yields <code>LlmStreamEventKind.Thinking</code> events, with the fragment in <code>Text</code>. They normally all come before the first <code>TextDelta</code>. <code>ChatStreamAsync</code> and <code>ToTextStreamAsync</code> return the answer only; thinking never reaches them.
+</li>
+<li><strong>Whole replies.</strong> <code>ChatAsync</code> returns the thinking in <code>LlmResponse.Thinking</code> (null when there was none) and the answer alone in <code>Content</code>. <code>ToChatMessage()</code> leaves the thinking text out, so it is not sent back to the model on the next turn.
+</li>
+<li><strong>Rules every built-in provider keeps.</strong> Thinking never appears in the answer text. A call with no thinking yields no <code>Thinking</code> event and a null <code>LlmResponse.Thinking</code>. The event order is unchanged: <code>Thinking</code> and <code>TextDelta</code> events, then <code>ToolCall</code> events, then exactly one <code>Completed</code>, last.
+</li>
+<li><strong>Token count.</strong> The <code>Completed</code> event's <code>Usage.ReasoningTokens</code> (and <code>LlmResponse.Usage.ReasoningTokens</code>) is the count the service reported, inside <code>OutputTokens</code>; it is never estimated, and it stays 0 where the service reports none.
+</li>
+<li><strong>A leading <code>&lt;think&gt;</code> block.</strong> Some models write their reasoning into the answer text as <code>&lt;think&gt;…&lt;/think&gt;</code>. Where noted below it is split out, even when the tags arrive cut across chunks. Only a block at the very start counts, after optional white space; a <code>&lt;think&gt;</code> later in the answer is the model's own text and is kept. A block the model never closed (the token limit hit mid-thought) is all thinking.
+</li>
+<li><strong>Asking for thinking.</strong> Anthropic, Gemini, Ollama and the ChatGPT subscription only return thinking when the call sets <code>MaxReasoningTokens</code> or <code>ReasoningEffort</code> (see Reasoning controls); the OpenAI-style services and the local model send what the model produces.
+</li>
+</ul>
+<table>
+<thead><tr><th>Provider</th><th>Sends thinking</th><th>From</th><th>Reasoning token count</th></tr></thead>
+<tbody>
+<tr><td><code>OpenAICompatible</code> and every connector and route on it, <code>LmStudio</code>, <code>AzureAIFoundry</code></td><td>Yes</td><td><code>reasoning_content</code> (DeepSeek, Kimi, OpenCode Go) or <code>reasoning</code> (OpenRouter) field; a leading <code>&lt;think&gt;</code> block (minimax-m3, DeepSeek-R1 and Qwen builds)</td><td><code>completion_tokens_details.reasoning_tokens</code></td></tr>
+<tr><td><code>Anthropic</code> and <code>anthropic-compatible/</code> routes</td><td>Yes, when asked</td><td><code>thinking</code> content blocks (<code>thinking_delta</code> while streaming)</td><td>No: the service counts thinking inside <code>output_tokens</code> without a separate figure, so it is 0</td></tr>
+<tr><td><code>GoogleGemini</code></td><td>Yes, when asked</td><td>parts marked <code>thought: true</code></td><td><code>thoughtsTokenCount</code> (added to <code>OutputTokens</code>)</td></tr>
+<tr><td><code>Ollama</code></td><td>Yes</td><td>the <code>thinking</code> field of <code>/api/chat</code> (<code>think: true</code>); a leading <code>&lt;think&gt;</code> block when the model writes one</td><td>No: Ollama reports none</td></tr>
+<tr><td><code>TechieRag.Local</code> (<code>LocalLlmProvider</code>)</td><td>Yes</td><td>a leading <code>&lt;think&gt;</code> block (Qwen3, DeepSeek-R1 builds)</td><td>Counted with the model's own tokenizer</td></tr>
+<tr><td>ChatGPT subscription (<code>ChatGptSubscriptionLlmProvider</code>)</td><td>A summary, when asked</td><td><code>response.reasoning_summary_text.delta</code>; parts joined by a blank line</td><td><code>output_tokens_details.reasoning_tokens</code></td></tr>
+<tr><td>A custom provider on the default <code>ChatStreamEventsAsync</code></td><td>Only what its <code>ChatAsync</code> puts in <code>LlmResponse.Thinking</code>, sent first</td><td></td><td>What it reports</td></tr>
+</tbody>
+</table>
+<p><strong>What cannot be shown.</strong> The ChatGPT subscription never returns its raw reasoning, only the summary. Anthropic <code>redacted_thinking</code> blocks carry encrypted data and no text. Neither is ever put in <code>Thinking</code>. A model that does not reason sends nothing, on every provider.</p>
+<p><strong>Anthropic tool turns keep their thinking.</strong> With thinking on, Anthropic refuses a tool-use turn whose earlier assistant message lost its signed thinking blocks. They travel in <code>ChatMessage.ProviderState</code>, an opaque string that <code>LlmResponse.ProviderState</code>, the <code>Completed</code> event's <code>ProviderState</code> and <code>ToChatMessage()</code> carry. The provider sends them back first and unchanged. Keep <code>ProviderState</code> when you store or rebuild the conversation; other providers ignore it. <code>AgentLoopRunner</code> keeps it on its own. Through <code>TechieRag.Agents</code> it rides a <code>TextReasoningContent</code> with empty text and the state in <code>ProtectedData</code>.</p>
+<ul>
+<li><strong>Agent Framework.</strong> <code>LlmProviderChatClient</code> maps a <code>Thinking</code> event, and a whole reply's <code>LlmResponse.Thinking</code>, to <code>TextReasoningContent</code>.
+</li>
+</ul>
+<pre><code class="language-csharp">var thinking = new StringBuilder();
+var answer = new StringBuilder();
+await foreach (var e in llm.ChatStreamEventsAsync(messages))
+{
+    switch (e.Kind)
+    {
+        case LlmStreamEventKind.Thinking: thinking.Append(e.Text); break;   // show greyed, or fold away
+        case LlmStreamEventKind.TextDelta: answer.Append(e.Text); break;
+        case LlmStreamEventKind.Completed: Console.WriteLine($"reasoning tokens: {e.Usage!.ReasoningTokens}"); break;
+    }
+}</code></pre>
+<p>A <code>switch</code> over <code>LlmStreamEventKind</code> that treated every other value as <code>Completed</code> (a <code>default:</code> branch) must now name <code>Completed</code> itself, or it will read a <code>Thinking</code> event as the end of the stream.</p>
+<h3 id="per-call-and-per-provider-request-timeout">Per-call and per-provider request timeout<a class="anchor-link" href="#per-call-and-per-provider-request-timeout">#</a></h3>
+<p>Package <code>TechieRag</code>; namespaces <code>TechieRag.Models</code>, <code>TechieRag.Llm</code> (Lekhak TR-RAG-010). The old fixed 120-second provider timeout is gone. The effective timeout is, in order:</p>
+<ol>
+<li><code>LlmCompletionOptions.RequestTimeout</code> on the call.
+</li>
+<li><code>LlmConfig.RequestTimeout</code> on the provider's configuration.
+</li>
+<li>The default 120 seconds.
+</li>
+</ol>
+<p>The caller's own cancellation token is always honoured and wins if it cancels sooner.</p>
+<pre><code class="language-csharp">// Per-call
+await llm.ChatAsync(messages, new LlmCompletionOptions { RequestTimeout = TimeSpan.FromMinutes(5) });
+
+// Per-provider from configuration
+var section = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary&lt;string, string?&gt;
+{
+    ["Llm:RequestTimeout"] = "00:05:00"
+}).Build();
+services.AddTechieRag(section);</code></pre>
+<h3 id="codex-agent">Codex agent<a class="anchor-link" href="#codex-agent">#</a></h3>
+<p>The TechieRag NuGet package now deploys a native Codex custom agent to <code>.codex/agents/techierag.toml</code> on every consumer build (TechieFlow TR-RAG-003). The agent reads <code>.techierag/TechieRag-AI-Reference.md</code> and the consumer's <code>AGENTS.md</code>, and contains no Claude or OpenCode-specific ritual. Build once after installing the package to make the specialist discoverable.</p>
+<pre><code class="language-csharp">// The agent is deployed automatically by the TechieRag NuGet target on every build.
+// Verify it is present after building:
+var agentPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+    ".codex", "agents", "techierag.toml");
+Console.WriteLine(File.Exists(agentPath) ? "techierag agent ready" : "build to deploy");</code></pre>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>
@@ -1620,6 +1772,14 @@ Task&lt;ConnectorIngestionResult&gt; IngestConnectorAsync(IDataConnector connect
     public IReadOnlyList&lt;ToolDefinition&gt;? Tools { get; set; }
     public string? ToolChoice { get; set; }           // "auto", "none", "required"
     public int? Seed { get; set; }
+    public string? Model { get; set; }                // per-request model override; null = provider default
+    public PromptCacheOptions? PromptCache { get; set; }
+    public string? SessionId { get; set; }            // carried in the connector's session header, e.g. x-opencode-session
+    public string? CallerTag { get; set; }            // names the agent/component; copied into TokenUsage.CallerTag
+    public bool DisableReasoning { get; set; }        // ask the provider to disable reasoning
+    public int? MaxReasoningTokens { get; set; }      // cap on reasoning tokens
+    public string? ReasoningEffort { get; set; }      // "low", "medium", "high" for OpenAI-style providers
+    public TimeSpan? RequestTimeout { get; set; }     // per-call timeout; overrides provider/config default
 }</code></pre>
 <h3 id="llmresponse">LlmResponse<a class="anchor-link" href="#llmresponse">#</a></h3>
 <pre><code class="language-csharp">public class LlmResponse
@@ -1645,8 +1805,14 @@ Task&lt;ConnectorIngestionResult&gt; IngestConnectorAsync(IDataConnector connect
 <pre><code class="language-csharp">public class TokenUsage
 {
     public int InputTokens { get; set; }
-    public int OutputTokens { get; set; }
+    public int OutputTokens { get; set; }             // includes ReasoningTokens
     public int TotalTokens { get; }
+    public int ReasoningTokens { get; set; }          // separately reported reasoning portion
+    public bool IsEstimated { get; set; }             // true when the provider sent no usage
+    public string? Route { get; set; }                // e.g. "venice/qwen-3-6-plus"
+    public string? CallerTag { get; set; }            // from LlmCompletionOptions.CallerTag
+    public int CacheReadTokens { get; set; }
+    public int CacheWriteTokens { get; set; }
     public decimal EstimatedCostUsd { get; set; }
     public string ModelName { get; set; }
     public string ProviderName { get; set; }
@@ -1658,6 +1824,8 @@ public class TokenUsageSummary
     public long TotalInputTokens { get; set; }
     public long TotalOutputTokens { get; set; }
     public long TotalTokens { get; }
+    public long TotalReasoningTokens { get; set; }
+    public long TotalCompletionTokens { get; }        // output minus reasoning
     public decimal TotalEstimatedCostUsd { get; set; }
     public int OperationCount { get; set; }
 }
