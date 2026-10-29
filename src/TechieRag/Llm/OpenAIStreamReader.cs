@@ -14,6 +14,8 @@ namespace TechieRag.Llm;
 /// tool call as fragments keyed by <c>index</c>: the first carries the id and name, later ones append to
 /// the arguments string. The fragments are assembled here and each call is emitted once, whole, after
 /// the text. A server that sends a call in one chunk (older LM Studio builds) assembles trivially.
+/// Reasoning fragments (<c>reasoning_content</c> or <c>reasoning</c>) and a <c>&lt;think&gt;</c> block that
+/// opens the answer text are yielded as thinking events, never as answer text (REQ-RAG-137 / REQ-RAG-138).
 /// </remarks>
 internal static class OpenAIStreamReader
 {
@@ -31,6 +33,7 @@ internal static class OpenAIStreamReader
     {
         var toolCalls = new SortedDictionary<int, ToolCallFragments>();
         var outputText = new StringBuilder();
+        var thinkBlock = new ThinkBlockSplitter();
         var usage = (Input: 0, Output: 0, Reasoning: 0, Cached: 0);
         string? finishReason = null;
 
@@ -52,12 +55,25 @@ internal static class OpenAIStreamReader
             finishReason = choice?.FinishReason ?? finishReason;
             AppendToolCallFragments(toolCalls, choice?.Delta?.ToolCalls);
 
+            var reasoning = choice?.Delta?.ReasoningContent ?? choice?.Delta?.Reasoning;
+            if (!string.IsNullOrEmpty(reasoning))
+            {
+                yield return LlmStreamEvent.FromThinking(reasoning);
+            }
+
             var delta = choice?.Delta?.Content;
             if (!string.IsNullOrEmpty(delta))
             {
-                outputText.Append(delta);
-                yield return LlmStreamEvent.FromText(delta);
+                foreach (var part in thinkBlock.Push(delta))
+                {
+                    yield return ToEvent(part, outputText);
+                }
             }
+        }
+
+        foreach (var part in thinkBlock.Flush())
+        {
+            yield return ToEvent(part, outputText);
         }
 
         foreach (var fragments in toolCalls.Values)
@@ -70,6 +86,14 @@ internal static class OpenAIStreamReader
 
         var reason = finishReason ?? (toolCalls.Count > 0 ? "tool_calls" : "stop");
         yield return LlmStreamEvent.FromCompleted(tokenUsage, reason, context.ModelName);
+    }
+
+    private static LlmStreamEvent ToEvent((bool IsThinking, string Text) part, StringBuilder outputText)
+    {
+        if (part.IsThinking) return LlmStreamEvent.FromThinking(part.Text);
+
+        outputText.Append(part.Text);
+        return LlmStreamEvent.FromText(part.Text);
     }
 
     private static void AppendToolCallFragments(SortedDictionary<int, ToolCallFragments> toolCalls, List<OpenAIToolCall>? deltas)

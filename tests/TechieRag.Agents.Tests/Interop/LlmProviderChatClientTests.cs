@@ -58,6 +58,55 @@ public class LlmProviderChatClientTests
     }
 
     /// <summary>
+    /// A thinking event streams as reasoning content, never as answer text and never as the finish
+    /// update (REQ-RAG-137).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-137 StreamingMapsThinkingToReasoningContent")]
+    public async Task StreamingMapsThinkingToReasoningContent()
+    {
+        var provider = new ScriptedLlmProvider([LlmStreamEvent.FromThinking("A greeting."), Text("Hello!"), Done()]);
+        var client = new LlmProviderChatClient(provider);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([new MeaiChatMessage(ChatRole.User, "say hello")]))
+        {
+            updates.Add(update);
+        }
+
+        Assert.Equal("A greeting.", Assert.IsType<TextReasoningContent>(Assert.Single(updates[0].Contents)).Text);
+        Assert.Null(updates[0].FinishReason);
+        Assert.Equal("Hello!", string.Concat(updates.Select(u => u.Text)));
+        Assert.Equal(ChatFinishReason.Stop, updates[^1].FinishReason);
+    }
+
+    /// <summary>
+    /// The provider's state for the next call (Anthropic's signed thinking blocks) survives an Agent
+    /// Framework turn: it rides the completed update, stays on the assembled assistant message, and reaches
+    /// the provider again with that message (REQ-RAG-139).
+    /// </summary>
+    [Fact(DisplayName = "REQ-RAG-139 ProviderStateSurvivesTheAdapter")]
+    public async Task ProviderStateSurvivesTheAdapter()
+    {
+        var provider = new ScriptedLlmProvider(
+            [LlmStreamEvent.FromThinking("Need the weather."), Call("c1", "get_weather", """{"city":"Paris"}"""), LlmStreamEvent.FromCompleted(new TokenUsage(), "tool_calls", "scripted", "state-1")],
+            [Text("Sunny."), Done()]);
+        var client = new LlmProviderChatClient(provider);
+
+        var updates = new List<ChatResponseUpdate>();
+        await foreach (var update in client.GetStreamingResponseAsync([new MeaiChatMessage(ChatRole.User, "Weather?")], new ChatOptions { Tools = [Weather] }))
+        {
+            updates.Add(update);
+        }
+
+        var assistant = Assert.Single(updates.ToChatResponse().Messages);
+        await client.GetResponseAsync([new MeaiChatMessage(ChatRole.User, "Weather?"), assistant, new MeaiChatMessage(ChatRole.Tool, [new FunctionResultContent("c1", "22 C")])]);
+
+        var sentAssistant = provider.Calls[1].Single(m => m.Role == "assistant");
+        Assert.Equal("state-1", sentAssistant.ProviderState);
+        Assert.Null(sentAssistant.Content);
+    }
+
+    /// <summary>
     /// A tool result coming back from the agent loop reaches the provider as a core tool message tied to the call id,
     /// after the assistant message that carried the call.
     /// </summary>

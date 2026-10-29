@@ -47,7 +47,7 @@ You are deeply knowledgeable in:
 - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models: UseEmbedded (bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS), UseModelRoot, ModelDownloadService (DownloadSizeKnown, Decline, ProgressChanged, resume)
 - All 3 vector stores: SqliteVec, PgVector, Qdrant
 - Tool calling: ToolRegistry, IToolHandler, AgentLoopRunner (RunAsync, RunStreamAsync), ToolDefinition, ToolCall, ToolResult
-- Typed streaming: LlmStreamEvent (TextDelta, ToolCall, Completed), AgentStreamEvent, LlmStreamEventExtensions.ToTextStreamAsync
+- Typed streaming: LlmStreamEvent (TextDelta, Thinking, ToolCall, Completed), AgentStreamEvent, LlmStreamEventExtensions.ToTextStreamAsync; thinking text arrives as Thinking events and LlmResponse.Thinking on every built-in provider, never in the answer; keep ChatMessage.ProviderState when rebuilding a conversation
 - Agents on Microsoft Agent Framework (TechieRag.Agents): TechieRagAgentBuilder, ITechieRagAgent, AgentRagResponse, AddTechieRagAgent, the Interop seam adapters (LlmProviderChatClient, ToolHandlerFunctions.From, AIToolHandler.FromAgent, WithAgentSteps, ConversationMemoryChatHistoryProvider)
 - Agentic retrieval on the classic loop (TechieRag.Agentic): RegisterKnowledgeBase, TechieRagRetrievalSource, RetrievalToolOptions, RetrievalTurnState, AgenticInstructions
 - Local model (TechieRag.Local): UseLocalLlm overloads, LocalModel.FromHuggingFace, LocalLlm.Register, LocalLlmOptions.ConfirmTermsAsync / TermsAccepted, Qwen2.5 0.5B on phones, Phi-3 mini on desktops, LocalModelTermsNotAcceptedException, LocalModelMemoryException, LocalPromptTooLongException
@@ -352,7 +352,7 @@ Package `TechieRag.Agents`, namespaces `TechieRag.Agents`, `TechieRag.Agents.Int
 
 Core package (AI reference: "Phase-2 Features, 1"):
 
-1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))`; switch on `e.Kind`: `TextDelta` (`e.Text`), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last; `FinishReason` is `stop`, `tool_calls` or `length` (cut off at `MaxTokens`)
+1. `await foreach (var e in llm.ChatStreamEventsAsync(messages, options))`; switch on `e.Kind`: `TextDelta` (`e.Text`), `Thinking` (`e.Text`, the model's reasoning; show it apart or ignore it), `ToolCall` (`e.ToolCall`), `Completed` (`e.Usage`, `e.FinishReason`, `e.ModelName`); exactly one Completed, always last, and named in its own `case` (never a `default:`); `FinishReason` is `stop`, `tool_calls` or `length` (cut off at `MaxTokens`)
 2. Agent loop: `new AgentLoopRunner(llm, registry).RunStreamAsync(messages, options, progress)` yields `AgentStreamEvent` (`TextDelta`, `ToolCallRequested`, `ToolExecuted`, `Completed` with `Response` and `MaxIterationsReached`)
 3. Blazor: `StateHasChanged()` per event; a `CancellationTokenSource` per run
 4. A custom `ILlmProvider` that builds `ChatStreamAsync` on the typed method must override `ChatStreamEventsAsync` too; `events.ToTextStreamAsync()` is the text projection
@@ -453,7 +453,7 @@ When the user provides a requirements document (PRD, spec, story, or any structu
 | `llm.ChatStreamAsync(messages)` | Streaming chat |
 | `llm.CompleteAsync<T>(prompt)` | Typed/structured JSON output |
 | `llm.EstimateTokenCount(text)` | Token estimation |
-| `llm.ChatStreamEventsAsync(messages)` | Typed streaming: `LlmStreamEvent` (TextDelta, ToolCall, Completed) |
+| `llm.ChatStreamEventsAsync(messages)` | Typed streaming: `LlmStreamEvent` (TextDelta, Thinking, ToolCall, Completed) |
 | `new AgentLoopRunner(llm, registry).RunStreamAsync(messages)` | Streaming agent loop: `AgentStreamEvent` |
 
 ### Key Namespaces

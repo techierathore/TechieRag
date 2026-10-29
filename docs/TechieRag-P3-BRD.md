@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text). Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider). Each item names the Sevak feedback entry it answers.
 
 ## 2. Screens and flow
 
@@ -117,6 +117,22 @@ A host can list a service's models, reach a service on another machine by its mo
   - *Acceptance:* When a developer points the Anthropic provider at https://api.z.ai/api/anthropic on Model routing, then messages go to https://api.z.ai/api/anthropic/v1/messages.
 - **BRD-194** — A failed LLM call shall carry the provider's error text: the status code, the response body (cut to a safe length) and the provider's own error message, in a typed exception that is still an HttpRequestException, so an app can say why a call failed *(Lekhak feedback TR-RAG-007, added 2026-10-15)* *Screen:* Model routing
   - *Acceptance:* When a service on Model routing answers a chat with 404 and an error message, then the thrown LlmHttpException carries that message, the body and the status.
+- **BRD-195** — A reasoning model's thinking text shall reach the app on its own while streaming, apart from the answer, as a thinking event, and a whole reply shall return it in its own field, with the reasoning token count still reported *(Chatur feedback TR-RAG-008, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a reasoning model streams reasoning_content on Model routing, then each fragment arrives as a Thinking event and the TextDelta events hold only the answer.
+- **BRD-196** — A thinking block that opens a model's answer shall be taken out of the answer and handed over as thinking text, even when its tags arrive cut across pieces of the stream; the same tag later in the answer is kept *(Chatur feedback TR-RAG-009, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a model on Model routing opens its answer with a `<think>` block, then the block arrives as Thinking events and the answer text holds only the answer.
+- **BRD-197** — The Anthropic provider shall send a model's extended-thinking content blocks as thinking text, streamed and whole, ask for thinking when the app sets a reasoning budget or effort, and send the thinking blocks back unchanged on a tool-using turn, as the service requires *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a recorded Anthropic reply on Model routing carries a thinking block, then Thinking events and LlmResponse.Thinking hold it and the answer text holds only the answer.
+- **BRD-198** — The Gemini provider shall send a model's thought parts as thinking text, streamed and whole, ask the service for them when the app sets a reasoning budget or effort, and report the service's thought token count as the reasoning token count *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a recorded Gemini reply on Model routing carries a thought part, then Thinking holds it, the answer text is clean, and the thought token count is reported.
+- **BRD-199** — The Ollama provider shall send the thinking field of its chat reply as thinking text, streamed and whole, map the app's reasoning switch to the service's think setting, and also split a leading think block out of the answer text *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a recorded Ollama reply on Model routing carries a thinking field or opens with a `<think>` block, then Thinking holds it and the answer text is clean.
+- **BRD-200** — The local model provider shall split a think block that opens the model's answer out of the answer, streamed and whole, so a local reasoning model's thinking reaches the app as thinking text *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a local model on Model routing opens its answer with a `<think>` block, then Thinking holds the block and the answer text holds only the answer.
+- **BRD-201** — The ChatGPT subscription provider shall send the reasoning summary its service returns as thinking text, streamed and whole, and report the service's reasoning token count; the raw reasoning stays hidden because the service never sends it *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a recorded subscription stream on Model routing carries reasoning summary text, then Thinking events hold it, the answer is clean, and the reasoning count is reported.
+- **BRD-202** — The AI reference shall name the providers that send thinking text and the ones that cannot, and state the rules every provider keeps: thinking never inside the answer, no Thinking event where there is no thinking, and the event order *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
+  - *Acceptance:* When a developer reads the thinking section of the AI reference on Model routing, then every built-in provider is listed as sending thinking or not, with the reason.
 
 ### Local model lifetime
 
@@ -129,7 +145,7 @@ A host can unload or swap a local model while calls are still using it, and the 
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-15.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-10-29.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -137,6 +153,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Local model fit check | 1 | 1 | 0 | Done |
 | Model routing | 8 | 8 | 0 | Done |
 | Local model lifetime | 1 | 1 | 0 | Done |
+| LLM streaming | 8 | 8 | 0 | Done |
 
 ## 6. Where the rest lives
 

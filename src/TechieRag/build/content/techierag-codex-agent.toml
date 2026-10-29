@@ -37,7 +37,7 @@ To force redeploy after a NuGet update: `dotnet build -t:TechieRagRedeployAgentF
 - All 8 API embedding providers (Ollama, LM Studio, OpenAI-compatible, Azure OpenAI, Cohere, Gemini, HTTP, ONNX) and the embedded models: UseEmbedded (bge-m3 on desktops, all-MiniLM-L6-v2 on Android and iOS), UseModelRoot, ModelDownloadService
 - All 3 vector stores: SqliteVec, PgVector, Qdrant
 - Tool calling: ToolRegistry, IToolHandler, AgentLoopRunner (RunAsync, RunStreamAsync), ToolDefinition, ToolCall, ToolResult
-- Typed streaming: LlmStreamEvent (TextDelta, ToolCall, Completed), AgentStreamEvent, LlmStreamEventExtensions.ToTextStreamAsync
+- Typed streaming: LlmStreamEvent (TextDelta, Thinking, ToolCall, Completed), AgentStreamEvent, LlmStreamEventExtensions.ToTextStreamAsync; thinking text arrives as Thinking events and LlmResponse.Thinking on every built-in provider, never in the answer; keep ChatMessage.ProviderState when rebuilding a conversation
 - Agents on Microsoft Agent Framework (TechieRag.Agents): TechieRagAgentBuilder, ITechieRagAgent, AgentRagResponse, AddTechieRagAgent, the Interop seam adapters
 - Agentic retrieval on the classic loop (TechieRag.Agentic): RegisterKnowledgeBase, TechieRagRetrievalSource, RetrievalToolOptions, RetrievalTurnState, AgenticInstructions
 - Local model (TechieRag.Local): UseLocalLlm overloads, LocalModel.FromHuggingFace, LocalLlm.Register, LocalLlmOptions.ConfirmTermsAsync / TermsAccepted, Qwen2.5 0.5B on phones, Phi-3 mini on desktops

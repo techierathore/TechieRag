@@ -175,6 +175,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var textContent = ExtractText(result.Content);
         var toolCalls = ExtractToolCalls(result.Content);
+        var (thinking, providerState) = ExtractThinking(result.Content);
         var inputTokens = result.Usage?.InputTokens ?? 0;
         var outputTokens = result.Usage?.OutputTokens ?? 0;
         var cacheReadTokens = result.Usage?.CacheReadInputTokens ?? 0;
@@ -183,6 +184,8 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var llmResponse = new LlmResponse
         {
             Content = textContent,
+            Thinking = thinking,
+            ProviderState = providerState,
             ToolCalls = toolCalls,
             Usage = new TokenUsage
             {
@@ -258,7 +261,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         RaiseCompletionEvent(usage, sw.Elapsed, true, state.ToolCallCount > 0);
 
         var finishReason = state.StopReason == "tool_use" ? "tool_calls" : state.StopReason ?? (state.ToolCallCount > 0 ? "tool_calls" : "stop");
-        yield return LlmStreamEvent.FromCompleted(usage, finishReason, ModelName);
+        yield return LlmStreamEvent.FromCompleted(usage, finishReason, ModelName, state.ProviderState);
     }
 
     /// <inheritdoc/>
@@ -346,14 +349,17 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
                     };
                 }
 
-                if (m.ToolCalls is { Count: > 0 })
+                IReadOnlyList<JsonElement> thinkingBlocks = m.Role == "assistant" ? AnthropicThinking.FromProviderState(m.ProviderState) : [];
+                if (m.ToolCalls is { Count: > 0 } || thinkingBlocks.Count > 0)
                 {
-                    var contentBlocks = new List<object>();
+                    // The turn's signed thinking blocks go back first and unchanged: with thinking on, the
+                    // service refuses a tool-use turn that lost them (REQ-RAG-139).
+                    var contentBlocks = new List<object>(thinkingBlocks.Cast<object>());
                     if (!string.IsNullOrEmpty(m.Content))
                     {
                         contentBlocks.Add(new Dictionary<string, object> { ["type"] = "text", ["text"] = m.Content });
                     }
-                    foreach (var tc in m.ToolCalls)
+                    foreach (var tc in m.ToolCalls ?? [])
                     {
                         contentBlocks.Add(new Dictionary<string, object>
                         {
@@ -387,8 +393,20 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         request["messages"] = apiMessages;
 
-        if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
-        if (options?.TopP is not null) request["top_p"] = options.TopP.Value;
+        // Thinking (REQ-RAG-139): the budget counts inside max_tokens, which must stay above it, and the
+        // service refuses a changed temperature or top_p while thinking is on.
+        if (AnthropicThinking.Budget(options) is { } budget)
+        {
+            request["thinking"] = new Dictionary<string, object> { ["type"] = "enabled", ["budget_tokens"] = budget };
+            var maxTokens = (int)request["max_tokens"];
+            if (maxTokens <= budget) request["max_tokens"] = budget + maxTokens;
+        }
+        else
+        {
+            if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
+            if (options?.TopP is not null) request["top_p"] = options.TopP.Value;
+        }
+
         if (options?.StopSequences is not null) request["stop_sequences"] = options.StopSequences;
 
         // Tool definitions
@@ -510,6 +528,30 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return string.IsNullOrEmpty(joined) ? null : joined;
     }
 
+    /// <summary>The thinking text of a whole reply and its signed blocks for the next call (REQ-RAG-139).</summary>
+    /// <remarks>A <c>redacted_thinking</c> block has no readable text; it is kept for the next call only.</remarks>
+    private static (string? Thinking, string? ProviderState) ExtractThinking(List<AnthropicContentBlock>? contentBlocks)
+    {
+        if (contentBlocks is null) return (null, null);
+
+        var blocks = new List<object>();
+        var text = new StringBuilder();
+        foreach (var block in contentBlocks)
+        {
+            if (block.Type == "thinking")
+            {
+                text.Append(block.Thinking);
+                blocks.Add(AnthropicThinking.Block(block.Thinking ?? string.Empty, block.Signature ?? string.Empty));
+            }
+            else if (block.Type == "redacted_thinking")
+            {
+                blocks.Add(new Dictionary<string, object> { ["type"] = "redacted_thinking", ["data"] = block.Data ?? string.Empty });
+            }
+        }
+
+        return (text.Length > 0 ? text.ToString() : null, AnthropicThinking.ToProviderState(blocks));
+    }
+
     private static List<ToolCall>? ExtractToolCalls(List<AnthropicContentBlock>? contentBlocks)
     {
         if (contentBlocks is null) return null;
@@ -588,6 +630,18 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         [JsonPropertyName("input")]
         public JsonElement? Input { get; set; }
+
+        /// <summary>The text of a <c>thinking</c> block (REQ-RAG-139).</summary>
+        [JsonPropertyName("thinking")]
+        public string? Thinking { get; set; }
+
+        /// <summary>The signature of a <c>thinking</c> block.</summary>
+        [JsonPropertyName("signature")]
+        public string? Signature { get; set; }
+
+        /// <summary>The encrypted data of a <c>redacted_thinking</c> block.</summary>
+        [JsonPropertyName("data")]
+        public string? Data { get; set; }
     }
 
     private class AnthropicUsage

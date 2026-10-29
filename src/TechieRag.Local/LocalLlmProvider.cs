@@ -280,6 +280,7 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
         CancellationToken cancellationToken = default)
     {
         var text = new StringBuilder();
+        var thinking = new StringBuilder();
         List<ToolCall>? toolCalls = null;
         LlmStreamEvent? completed = null;
         await foreach (var streamEvent in StreamCoreAsync(messages, options, isStreaming: false, cancellationToken).ConfigureAwait(false))
@@ -288,6 +289,9 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
             {
                 case LlmStreamEventKind.TextDelta:
                     text.Append(streamEvent.Text);
+                    break;
+                case LlmStreamEventKind.Thinking:
+                    thinking.Append(streamEvent.Text);
                     break;
                 case LlmStreamEventKind.ToolCall when streamEvent.ToolCall is not null:
                     (toolCalls ??= new List<ToolCall>()).Add(streamEvent.ToolCall);
@@ -302,6 +306,7 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
         return new LlmResponse
         {
             Content = hasToolCalls ? null : text.ToString(),
+            Thinking = thinking.Length > 0 ? thinking.ToString() : null,
             ToolCalls = hasToolCalls ? toolCalls : null,
             Usage = completed!.Usage!,
             FinishReason = hasToolCalls ? "tool_calls" : (completed.FinishReason ?? "stop"),
@@ -496,6 +501,15 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
         }
     }
 
+    /// <summary>A settled piece of output as its event, keeping the thinking text for the reasoning count.</summary>
+    private static LlmStreamEvent ToEvent((bool IsThinking, string Text) part, StringBuilder thinkingText)
+    {
+        if (!part.IsThinking) return LlmStreamEvent.FromText(part.Text);
+
+        thinkingText.Append(part.Text);
+        return LlmStreamEvent.FromThinking(part.Text);
+    }
+
     private async IAsyncEnumerable<LlmStreamEvent> StreamCoreAsync(
         IReadOnlyList<ChatMessage> messages,
         LlmCompletionOptions? callOptions,
@@ -528,6 +542,11 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
 
             var settings = BuildSettings(callOptions, ContextSize - promptTokens);
             var filter = new StopSequenceFilter(settings.StopSequences);
+
+            // REQ-RAG-142: a reasoning model (Qwen3, DeepSeek-R1 builds) opens its answer with a <think>
+            // block; it streams as thinking and never reaches the answer text.
+            var thinkBlock = new ThinkBlockSplitter();
+            var thinkingText = new StringBuilder();
             await WhileAliveAsync(generateGate.WaitAsync(token), cancellationToken).ConfigureAwait(false);
             try
             {
@@ -548,8 +567,11 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                         {
                             if (toolBuffer is null)
                             {
-                                yield return LlmStreamEvent.FromText(text);
-                                ThrowIfDisposed();
+                                foreach (var part in thinkBlock.Push(text))
+                                {
+                                    yield return ToEvent(part, thinkingText);
+                                    ThrowIfDisposed();
+                                }
                             }
                             else
                             {
@@ -569,25 +591,41 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                 }
 
                 var rest = filter.Flush();
-                if (rest.Length > 0)
+                if (toolBuffer is null)
                 {
-                    if (toolBuffer is null)
+                    foreach (var part in thinkBlock.Push(rest).Concat(thinkBlock.Flush()))
                     {
-                        yield return LlmStreamEvent.FromText(rest);
+                        yield return ToEvent(part, thinkingText);
                         ThrowIfDisposed();
                     }
-                    else
-                    {
-                        toolBuffer.Append(rest);
-                    }
+                }
+                else
+                {
+                    toolBuffer.Append(rest);
                 }
 
-                var rawOutput = toolBuffer?.ToString() ?? string.Empty;
+                // With tools the output is held whole, so its think block is split before the calls are parsed.
+                var (bufferedThinking, rawOutput) = ThinkBlockSplitter.Split(toolBuffer?.ToString() ?? string.Empty);
+                rawOutput ??= string.Empty;
+                if (bufferedThinking is not null)
+                {
+                    thinkingText.Append(bufferedThinking);
+                    yield return LlmStreamEvent.FromThinking(bufferedThinking);
+                    ThrowIfDisposed();
+                }
+
                 var parsedToolCalls = hasTools ? ToolPromptFormatter.ParseToolCalls(Model, rawOutput) : null;
                 var finishReason = parsedToolCalls is { Count: > 0 }
                     ? "tool_calls"
                     : (!filter.Stopped && produced >= settings.MaxTokens ? "length" : "stop");
-                var usage = new TokenUsage { InputTokens = promptTokens, OutputTokens = produced, ModelName = Model.Id, ProviderName = Name };
+                var usage = new TokenUsage
+                {
+                    InputTokens = promptTokens,
+                    OutputTokens = produced,
+                    ReasoningTokens = thinkingText.Length > 0 ? Math.Min(produced, model.CountTokens(thinkingText.ToString())) : 0,
+                    ModelName = Model.Id,
+                    ProviderName = Name
+                };
 
                 if (parsedToolCalls is { Count: > 0 })
                 {
@@ -597,9 +635,9 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                         ThrowIfDisposed();
                     }
                 }
-                else if (toolBuffer is not null && toolBuffer.Length > 0)
+                else if (rawOutput.Length > 0)
                 {
-                    yield return LlmStreamEvent.FromText(toolBuffer.ToString());
+                    yield return LlmStreamEvent.FromText(rawOutput);
                     ThrowIfDisposed();
                 }
 

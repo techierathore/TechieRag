@@ -15,6 +15,10 @@ namespace TechieRag.Llm;
 /// mode. The subscription backend fixes them per plan, and a request carrying them risks refusal;
 /// <see cref="LlmCompletionOptions.JsonMode"/> is honoured by the instruction the caller already adds.
 /// Images are not sent either: this provider is text and tools only.</para>
+/// <para><b>Reasoning:</b> only when the app asks, through <see cref="LlmCompletionOptions.ReasoningEffort"/>
+/// or <see cref="LlmCompletionOptions.MaxReasoningTokens"/>, the body carries <c>reasoning</c> with
+/// <c>summary: auto</c>, so the summary streams back as thinking text (REQ-RAG-143). The service takes no
+/// budget, so a budget alone only asks for the summary.</para>
 /// </remarks>
 internal static class OpenAIResponsesRequest
 {
@@ -39,6 +43,8 @@ internal static class OpenAIResponsesRequest
             ["store"] = false
         };
 
+        if (BuildReasoning(options) is { } reasoning) request["reasoning"] = reasoning;
+
         if (options?.Tools is not { Count: > 0 }) return request;
 
         request["tools"] = options.Tools.Select(tool => new Dictionary<string, object>
@@ -51,6 +57,18 @@ internal static class OpenAIResponsesRequest
 
         if (options.ToolChoice is not null) request["tool_choice"] = options.ToolChoice;
         return request;
+    }
+
+    private static Dictionary<string, object>? BuildReasoning(LlmCompletionOptions? options)
+    {
+        if (options is null || options.DisableReasoning) return null;
+
+        var effort = options.ReasoningEffort?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(effort) && options.MaxReasoningTokens is not > 0) return null;
+
+        var reasoning = new Dictionary<string, object> { ["summary"] = "auto" };
+        if (!string.IsNullOrEmpty(effort)) reasoning["effort"] = effort;
+        return reasoning;
     }
 
     private static string BuildInstructions(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options, string defaultInstructions)

@@ -48,6 +48,8 @@ public sealed class LlmProviderChatClient : IChatClient
         var response = await provider.ChatAsync(coreMessages, coreOptions, cancellationToken).ConfigureAwait(false);
 
         var contents = new List<AIContent>();
+        if (!string.IsNullOrEmpty(response.Thinking)) contents.Add(new TextReasoningContent(response.Thinking));
+        if (!string.IsNullOrEmpty(response.ProviderState)) contents.Add(ChatMessageMapper.ToProviderStateContent(response.ProviderState));
         if (!string.IsNullOrEmpty(response.Content)) contents.Add(new TextContent(response.Content));
         contents.AddRange((response.ToolCalls ?? []).Select(ChatMessageMapper.ToFunctionCall));
 
@@ -102,8 +104,16 @@ public sealed class LlmProviderChatClient : IChatClient
             case LlmStreamEventKind.ToolCall:
                 update.Contents = [ChatMessageMapper.ToFunctionCall(streamEvent.ToolCall!)];
                 break;
+            case LlmStreamEventKind.Thinking:
+                update.Contents = [new TextReasoningContent(streamEvent.Text)];
+                break;
             default:
                 update.Contents = streamEvent.Usage is { } usage ? [new UsageContent(ToUsage(usage))] : [];
+                if (!string.IsNullOrEmpty(streamEvent.ProviderState))
+                {
+                    update.Contents.Add(ChatMessageMapper.ToProviderStateContent(streamEvent.ProviderState));
+                }
+
                 update.FinishReason = ToFinishReason(streamEvent.FinishReason);
                 update.ModelId = streamEvent.ModelName ?? provider.ModelName;
                 break;

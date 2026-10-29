@@ -13,9 +13,11 @@ namespace TechieRag.Agents.Interop;
 /// (REQ-RAG-017 / BRD-85).
 /// </summary>
 /// <remarks>
-/// Text, images, assistant tool calls and tool results cross the seam; anything else an
-/// <see cref="AIContent"/> can carry (reasoning, approval requests, hosted-file references) has no core
-/// equivalent and is dropped, which is the documented v1 posture (proposal §6 item 10).
+/// Text, images, assistant tool calls and tool results cross the seam. A provider's opaque state
+/// (<see cref="CoreChatMessage.ProviderState"/>, Anthropic's signed thinking blocks) crosses as a
+/// <see cref="TextReasoningContent"/> with empty text and the state in <see cref="TextReasoningContent.ProtectedData"/>,
+/// so it comes back on the next call (REQ-RAG-139). Reasoning text itself, approval requests and hosted-file
+/// references have no core equivalent on the way in and are dropped (proposal §6 item 10).
 /// </remarks>
 internal static class ChatMessageMapper
 {
@@ -106,7 +108,8 @@ internal static class ChatMessageMapper
             Role = message.Role.Value,
             Content = text.Length > 0 || toolCalls.Count == 0 ? text : null,
             ToolCalls = toolCalls.Count > 0 ? toolCalls : null,
-            Name = message.AuthorName
+            Name = message.AuthorName,
+            ProviderState = message.Contents.OfType<TextReasoningContent>().LastOrDefault(content => !string.IsNullOrEmpty(content.ProtectedData))?.ProtectedData
         };
 
         if (images.Count > 0)
@@ -119,6 +122,12 @@ internal static class ChatMessageMapper
 
         return core;
     }
+
+    /// <summary>Wraps a provider's opaque state for the MEAI side (REQ-RAG-139).</summary>
+    /// <param name="providerState">The state.</param>
+    /// <returns>A reasoning content with no text that carries the state.</returns>
+    public static TextReasoningContent ToProviderStateContent(string providerState) =>
+        new(string.Empty) { ProtectedData = providerState };
 
     private static CoreImage? ToImage(AIContent content) => content switch
     {
@@ -140,6 +149,7 @@ internal static class ChatMessageMapper
             return new MeaiChatMessage(role, contents);
         }
 
+        if (!string.IsNullOrEmpty(message.ProviderState)) contents.Add(ToProviderStateContent(message.ProviderState));
         if (!string.IsNullOrEmpty(message.Content)) contents.Add(new TextContent(message.Content));
         foreach (var image in (message.Parts ?? []).Select(part => part.Image).OfType<CoreImage>())
         {

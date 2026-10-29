@@ -12,12 +12,19 @@ namespace TechieRag.Llm;
 /// <c>content_block_delta</c> events of type <c>input_json_delta</c> (argument fragments), then
 /// <c>content_block_stop</c>. The call is emitted at the stop, whole. Usage arrives split: input and
 /// cache tokens on <c>message_start</c>, output tokens and the stop reason on <c>message_delta</c>.
+/// <para>A <c>thinking</c> block streams as <c>thinking_delta</c> fragments, yielded as thinking events, then
+/// a <c>signature_delta</c>; a <c>redacted_thinking</c> block arrives whole with its encrypted data. Both are
+/// kept, signed, for <see cref="ProviderState"/> (REQ-RAG-139).</para>
 /// </remarks>
 internal sealed class AnthropicStreamState
 {
     private readonly StringBuilder toolArguments = new();
+    private readonly StringBuilder thinkingText = new();
+    private readonly StringBuilder thinkingSignature = new();
+    private readonly List<object> thinkingBlocks = [];
     private string? toolId;
     private string? toolName;
+    private bool inThinking;
 
     /// <summary>Gets the streamed assistant text so far.</summary>
     public StringBuilder OutputText { get; } = new();
@@ -39,6 +46,9 @@ internal sealed class AnthropicStreamState
 
     /// <summary>Gets how many tool calls were emitted.</summary>
     public int ToolCallCount { get; private set; }
+
+    /// <summary>Gets the thinking blocks of the turn, signed, to send back on the next call; null when there were none.</summary>
+    public string? ProviderState => AnthropicThinking.ToProviderState(thinkingBlocks);
 
     /// <summary>Applies one stream event.</summary>
     /// <param name="eventData">The parsed <c>data:</c> payload.</param>
@@ -79,7 +89,23 @@ internal sealed class AnthropicStreamState
     private void StartBlock(JsonElement eventData)
     {
         if (!eventData.TryGetProperty("content_block", out var block)) return;
-        if (!block.TryGetProperty("type", out var blockType) || blockType.GetString() != "tool_use") return;
+        if (!block.TryGetProperty("type", out var blockType)) return;
+
+        switch (blockType.GetString())
+        {
+            case "thinking":
+                inThinking = true;
+                thinkingText.Clear();
+                thinkingSignature.Clear();
+                return;
+            case "redacted_thinking":
+                thinkingBlocks.Add(block.Clone());
+                return;
+            case "tool_use":
+                break;
+            default:
+                return;
+        }
 
         toolId = block.TryGetProperty("id", out var id) ? id.GetString() : null;
         toolName = block.TryGetProperty("name", out var name) ? name.GetString() : null;
@@ -96,6 +122,21 @@ internal sealed class AnthropicStreamState
             return null;
         }
 
+        if (delta.TryGetProperty("signature", out var signature))
+        {
+            thinkingSignature.Append(signature.GetString());
+            return null;
+        }
+
+        if (delta.TryGetProperty("thinking", out var thinking))
+        {
+            var fragment = thinking.GetString();
+            if (string.IsNullOrEmpty(fragment)) return null;
+
+            thinkingText.Append(fragment);
+            return LlmStreamEvent.FromThinking(fragment);
+        }
+
         if (!delta.TryGetProperty("text", out var text)) return null;
 
         var value = text.GetString();
@@ -107,6 +148,13 @@ internal sealed class AnthropicStreamState
 
     private LlmStreamEvent? StopBlock()
     {
+        if (inThinking)
+        {
+            inThinking = false;
+            thinkingBlocks.Add(AnthropicThinking.Block(thinkingText.ToString(), thinkingSignature.ToString()));
+            return null;
+        }
+
         if (toolName is null) return null;
 
         var toolCall = new ToolCall

@@ -45,6 +45,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="TechieRag.Tests" />
+    <!-- One think-block splitter for every provider, without public surface (REQ-RAG-142). -->
+    <InternalsVisibleTo Include="TechieRag.Local" />
   </ItemGroup>
 
   <!-- AI Agent Files: Distributed to consumer projects via NuGet -->

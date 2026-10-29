@@ -154,9 +154,12 @@ public class LmStudioLlmProvider : ILlmProvider, IMultimodalLlmProvider
             ProviderName = Name
         };
 
+        var (thinking, answer) = ThinkBlockSplitter.Split(choice?.Message?.Content, choice?.Message?.ReasoningContent ?? choice?.Message?.Reasoning);
+
         var llmResponse = new LlmResponse
         {
-            Content = choice?.Message?.Content,
+            Content = answer,
+            Thinking = thinking,
             ToolCalls = toolCalls,
             Usage = usage,
             FinishReason = choice?.FinishReason ?? "stop",
@@ -363,6 +366,14 @@ internal class OpenAIMessage
     [JsonPropertyName("content")]
     public string? Content { get; set; }
 
+    /// <summary>Reasoning text, as DeepSeek, Kimi and most OpenAI-compatible services name it (REQ-RAG-137).</summary>
+    [JsonPropertyName("reasoning_content")]
+    public string? ReasoningContent { get; set; }
+
+    /// <summary>Reasoning text, as OpenRouter and some others name it (REQ-RAG-137).</summary>
+    [JsonPropertyName("reasoning")]
+    public string? Reasoning { get; set; }
+
     [JsonPropertyName("tool_calls")]
     public List<OpenAIToolCall>? ToolCalls { get; set; }
 }
@@ -454,6 +465,14 @@ internal class OpenAIStreamDelta
 {
     [JsonPropertyName("content")]
     public string? Content { get; set; }
+
+    /// <summary>A reasoning fragment, as DeepSeek, Kimi and most OpenAI-compatible services name it (REQ-RAG-137).</summary>
+    [JsonPropertyName("reasoning_content")]
+    public string? ReasoningContent { get; set; }
+
+    /// <summary>A reasoning fragment, as OpenRouter and some others name it (REQ-RAG-137).</summary>
+    [JsonPropertyName("reasoning")]
+    public string? Reasoning { get; set; }
 
     [JsonPropertyName("tool_calls")]
     public List<OpenAIToolCall>? ToolCalls { get; set; }

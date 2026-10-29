@@ -6,6 +6,19 @@ public class LlmResponse
     /// <summary>Gets or sets the generated text content.</summary>
     public string? Content { get; set; }
 
+    /// <summary>Gets or sets the model's reasoning ("thinking") text, kept out of <see cref="Content"/>;
+    /// null when the model sent none (REQ-RAG-137 / REQ-RAG-138).</summary>
+    /// <remarks>Filled from the service's own thinking field or blocks (<c>reasoning_content</c>, Anthropic
+    /// <c>thinking</c> blocks, Gemini thought parts, Ollama <c>thinking</c>, a reasoning summary), or from a
+    /// <c>&lt;think&gt;…&lt;/think&gt;</c> block at the start of the answer. Not part of
+    /// <see cref="ToChatMessage"/>: thinking text is not sent back to the model.</remarks>
+    public string? Thinking { get; set; }
+
+    /// <summary>Gets or sets data the provider needs back with this turn on the next call; null when it
+    /// needs none (REQ-RAG-139).</summary>
+    /// <remarks>Opaque. <see cref="ToChatMessage"/> copies it to <see cref="ChatMessage.ProviderState"/>.</remarks>
+    public string? ProviderState { get; set; }
+
     /// <summary>Gets or sets the tool calls requested by the LLM.</summary>
     public IReadOnlyList<ToolCall>? ToolCalls { get; set; }
 
@@ -26,6 +39,7 @@ public class LlmResponse
     {
         Role = "assistant",
         Content = Content,
-        ToolCalls = ToolCalls
+        ToolCalls = ToolCalls,
+        ProviderState = ProviderState
     };
 }

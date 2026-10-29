@@ -226,9 +226,12 @@ public class OpenAICompatibleLlmProvider : ILlmProvider, IMultimodalLlmProvider
         var isEstimated = result.Usage is null;
         var toolCalls = ParseToolCalls(choice?.Message?.ToolCalls);
 
+        var (thinking, answer) = ThinkBlockSplitter.Split(choice?.Message?.Content, choice?.Message?.ReasoningContent ?? choice?.Message?.Reasoning);
+
         var llmResponse = new LlmResponse
         {
-            Content = choice?.Message?.Content,
+            Content = answer,
+            Thinking = thinking,
             ToolCalls = toolCalls,
             Usage = new TokenUsage
             {

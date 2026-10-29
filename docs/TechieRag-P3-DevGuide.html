@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-10-15 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -123,6 +123,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local">Local model lifetime: LocalLlmProvider.Dispose, DisposeAsync (TechieRag.Local)</a></li>
         <li class="h3"><a href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">Model routing: LlmProviderFactory.ListModelsAsync, CreateForModel(…, endpoint) (TechieRag)</a></li>
         <li class="h3"><a href="#generic-routes-venice-and-the-connector-list-openai-compatible-anthropic-compatible-venice-llmconnectorcatalog-describe-techierag">Generic routes, Venice and the connector list: openai-compatible/, anthropic-compatible/, venice/, LlmConnectorCatalog.Describe() (TechieRag)</a></li>
+        <li class="h3"><a href="#thinking-text-llmstreameventkind-thinking-llmresponse-thinking-thinkblocksplitter-techierag">Thinking text: LlmStreamEventKind.Thinking, LlmResponse.Thinking, ThinkBlockSplitter (TechieRag)</a></li>
+        <li class="h3"><a href="#thinking-on-every-provider-anthropicthinking-chatmessage-providerstate-techierag-techierag-local">Thinking on every provider: AnthropicThinking, ChatMessage.ProviderState (TechieRag, TechieRag.Local)</a></li>
         <li class="h3"><a href="#provider-error-text-llmhttpexception-techierag">Provider error text: LlmHttpException (TechieRag)</a></li>
         <li class="h3"><a href="#model-choice-modelchooser-imodelchooser-techierag">Model choice: ModelChooser, IModelChooser (TechieRag)</a></li>
         <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
@@ -381,6 +383,45 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> none.</p>
+<h3 id="thinking-text-llmstreameventkind-thinking-llmresponse-thinking-thinkblocksplitter-techierag"><a id="thinking-text-llmstreameventkindthinking-llmresponsethinking-thinkblocksplitter-techierag"></a>Thinking text: <code>LlmStreamEventKind.Thinking</code>, <code>LlmResponse.Thinking</code>, <code>ThinkBlockSplitter</code> (<code>TechieRag</code>)<a class="anchor-link" href="#thinking-text-llmstreameventkind-thinking-llmresponse-thinking-thinkblocksplitter-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host picks the reasoning model whose thinking it would show; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-137 (Chatur TR-RAG-008) and REQ-RAG-138 (Chatur TR-RAG-009), added 2026-10-29. Covered by <code>tests/TechieRag.Tests/Llm/ThinkingStreamTests.cs</code> and, for the Agent Framework adapter, <code>tests/TechieRag.Agents.Tests/Interop/LlmProviderChatClientTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample streams a reasoning model. The tests feed the stream shapes Chatur recorded against OpenCode Go (kimi-k2.7-code's <code>reasoning_content</code>, minimax-m3's <code>&lt;think&gt;</code> block with both tags cut across chunks) to OpenAI-compatible, LM Studio and Azure AI Foundry through a stub handler. Not run against OpenCode Go: no key on the build machine. Tests run 2026-10-29: REQ-RAG-137 8 passed, REQ-RAG-138 9 passed; core suite 1084 passed, Agents suite 30 passed.</p>
+<p><strong>Call chain (stream):</strong> <code>ChatStreamEventsAsync</code> → <code>OpenAIStreamReader.ReadAsync</code> → per chunk: <code>reasoning_content</code> or <code>reasoning</code> → <code>FromThinking</code>; <code>content</code> → <code>ThinkBlockSplitter.Push</code> → <code>ToEvent</code> (thinking → <code>FromThinking</code>, answer → <code>FromText</code> and the output-text estimate) → at the end <code>ThinkBlockSplitter.Flush</code> → tool calls → <code>Completed</code> with <code>ReasoningTokens</code> from <code>completion_tokens_details</code>.</p>
+<p><strong>Call chain (whole reply):</strong> <code>ChatAsync</code> → <code>ThinkBlockSplitter.Split(content, reasoning_content ?? reasoning)</code> → <code>LlmResponse.Content</code> (answer) and <code>LlmResponse.Thinking</code>. A provider with no typed stream of its own gets the same through <code>LlmStreamEventFallback.FromChatAsync</code>, which yields <code>Thinking</code> first.</p>
+<p>The splitter only looks at the start of the answer. It holds back text that could still become <code>&lt;think&gt;</code> or <code>&lt;/think&gt;</code> until the next chunk settles it, so a tag cut as <code>&lt;thi</code> + <code>nk&gt;</code> is still found. The answer's leading white space after <code>&lt;/think&gt;</code> is dropped.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/OpenAIStreamReader.cs:61</code></td><td><code>ReadAsync</code></td><td><code>reasoning</code></td><td>each kimi <code>reasoning_content</code> fragment, yielded as <code>Thinking</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAIStreamReader.cs:67</code></td><td><code>ReadAsync</code></td><td><code>thinkBlock.Push(delta)</code></td><td>empty for <code>&lt;thi</code>; then <code>(true, "The user greets")</code> once <code>nk&gt;</code> arrives</td></tr>
+<tr><td><code>src/TechieRag/Llm/ThinkBlockSplitter.cs:92</code></td><td><code>Drain</code></td><td><code>state</code></td><td><code>Start</code> → <code>InBlock</code> → <code>AfterBlock</code> → <code>Answer</code>; straight to <code>Answer</code> when the reply does not open with <code>&lt;think&gt;</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/ThinkBlockSplitter.cs:55</code></td><td><code>Split</code></td><td>the return</td><td><code>(null, content)</code> unchanged when no block opens the answer</td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:229</code></td><td><code>ChatAsync</code></td><td><code>thinking</code>, <code>answer</code></td><td><code>Content</code> never starts with <code>&lt;think&gt;</code></td></tr>
+<tr><td><code>src/TechieRag.Agents/Interop/LlmProviderChatClient.cs:105</code></td><td><code>ToUpdate</code></td><td><code>update.Contents</code></td><td>one <code>TextReasoningContent</code>, no <code>FinishReason</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> the output-token estimate (used only when the service reports no usage) counts answer text only; <code>ReasoningTokens</code> is never estimated.</p>
+<h3 id="thinking-on-every-provider-anthropicthinking-chatmessage-providerstate-techierag-techierag-local"><a id="thinking-on-every-provider-anthropicthinking-chatmessageproviderstate-techierag-techieraglocal"></a>Thinking on every provider: <code>AnthropicThinking</code>, <code>ChatMessage.ProviderState</code> (<code>TechieRag</code>, <code>TechieRag.Local</code>)<a class="anchor-link" href="#thinking-on-every-provider-anthropicthinking-chatmessage-providerstate-techierag-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host picks the provider whose thinking it would show; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-139 to REQ-RAG-144 (owner request), added 2026-10-29. Covered by <code>tests/TechieRag.Tests/Llm/ProviderThinkingTests.cs</code>, <code>tests/TechieRag.Local.Tests/LocalThinkingTests.cs</code> and <code>ProviderStateSurvivesTheAdapter</code> in <code>tests/TechieRag.Agents.Tests/Interop/LlmProviderChatClientTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: recorded replies through stub handlers, the fake ChatGPT server and the scripted local runtime. Not run against a live Anthropic, Gemini, Ollama or ChatGPT service. Tests run 2026-10-29: core 1111 passed, local 154 passed, Agents 31 passed.</p>
+<p><strong>Call chains:</strong> Anthropic <code>content_block_start</code> (<code>thinking</code>) → <code>thinking_delta</code> → <code>FromThinking</code>; <code>signature_delta</code> and <code>content_block_stop</code> keep the signed block → <code>Completed.ProviderState</code>. Gemini parts with <code>thought: true</code> → <code>FromThinking</code>; <code>thoughtsTokenCount</code> → <code>ReasoningTokens</code>, added to <code>OutputTokens</code>. Ollama <code>message.thinking</code> → <code>FromThinking</code>; <code>content</code> → <code>ThinkBlockSplitter</code>. Local generated pieces → <code>ThinkBlockSplitter</code> (with tools, <code>Split</code> on the held output before <code>ParseToolCalls</code>). Subscription <code>response.reasoning_summary_text.delta</code> → <code>FromThinking</code>.</p>
+<p><strong>Next call:</strong> <code>LlmResponse.ToChatMessage()</code> and <code>AgentLoopRunner</code> copy <code>ProviderState</code> onto the assistant message; <code>BuildAnthropicRequest</code> puts its blocks first in that message's content.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Llm/AnthropicStreamState.cs:131</code></td><td><code>ApplyDelta</code></td><td><code>fragment</code></td><td>each thinking fragment, never appended to <code>OutputText</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/AnthropicLlmProvider.cs:352</code></td><td><code>BuildAnthropicRequest</code></td><td><code>thinkingBlocks</code></td><td>the earlier turn's blocks, <code>thinking</code> before <code>tool_use</code></td></tr>
+<tr><td><code>src/TechieRag/Llm/AnthropicLlmProvider.cs:398</code></td><td><code>BuildAnthropicRequest</code></td><td><code>budget</code></td><td>null unless <code>MaxReasoningTokens</code> or <code>ReasoningEffort</code> is set</td></tr>
+<tr><td><code>src/TechieRag/Llm/GoogleGeminiLlmProvider.cs:236</code></td><td><code>ChatStreamEventsAsync</code></td><td><code>thought</code></td><td>thought text only; <code>text</code> never holds it</td></tr>
+<tr><td><code>src/TechieRag/Llm/OllamaLlmProvider.cs:228</code></td><td><code>ChatStreamEventsAsync</code></td><td><code>chunk.Message.Thinking</code></td><td>set only when <code>think</code> is on</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:608</code></td><td><code>StreamCoreAsync</code></td><td><code>rawOutput</code></td><td>starts at <code>&lt;tool_call&gt;</code>, the block removed</td></tr>
+<tr><td><code>src/TechieRag/Llm/OpenAIResponsesStreamReader.cs:88</code></td><td><code>Apply</code></td><td>the return</td><td><code>(delta, true)</code></td></tr>
+<tr><td><code>src/TechieRag/Services/AgentLoopRunner.cs:330</code></td><td><code>ToResponse</code></td><td><code>ProviderState</code></td><td>the <code>Completed</code> event's state</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> Anthropic reports no separate thinking count, so its <code>ReasoningTokens</code> is 0; the local count uses the model's tokenizer, capped at the tokens produced.</p>
 <h3 id="provider-error-text-llmhttpexception-techierag">Provider error text: <code>LlmHttpException</code> (<code>TechieRag</code>)<a class="anchor-link" href="#provider-error-text-llmhttpexception-techierag">#</a></h3>
 <p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host's Test connection shows why a call failed; it predates this change" style="max-width:100%"></p>
 <p>REQ-RAG-134 (Lekhak TR-RAG-007, added 2026-10-15). Covered by <code>tests/TechieRag.Tests/Llm/ProviderErrorTextTests.cs</code>.</p>
