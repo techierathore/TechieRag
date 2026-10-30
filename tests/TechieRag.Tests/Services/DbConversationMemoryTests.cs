@@ -34,6 +34,26 @@ public class DbConversationMemoryTests : IDisposable
     }
 
     /// <summary>
+    /// Messages saved back to back come back in the order they were saved: the store never gives
+    /// two messages the same time, so the random message id never decides the order. Guards the
+    /// fix for the CI failure of 2026-10-30 (run 40914516648); the tie it fixed needs a busy machine
+    /// or a clock step, so this test alone does not reproduce the old failure every time.
+    /// </summary>
+    [Fact]
+    public async Task RapidMessagesKeepTheirOrder()
+    {
+        var memory = new DbConversationMemory(store, userId: "u1");
+        for (var i = 0; i < 50; i++)
+        {
+            await memory.AddMessageAsync(ChatMessage.User($"m{i}"));
+        }
+
+        var history = await memory.GetHistoryAsync();
+
+        Assert.Equal(Enumerable.Range(0, 50).Select(i => $"m{i}"), history.Select(m => m.Content));
+    }
+
+    /// <summary>
     /// History persists across memory instances: a new memory bound to the same thread id
     /// reads the messages written by the first (survives an application restart).
     /// </summary>
