@@ -21,6 +21,7 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
 {
     private bool initialized;
     private readonly SemaphoreSlim initLock = new(1, 1);
+    private readonly RowClock documentClock = new();
 
     /// <summary>
     /// Creates and opens a database connection.
@@ -163,6 +164,10 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
     {
         ArgumentNullException.ThrowIfNull(document);
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        // Documents are listed ORDER BY AddedAt, so two added on one clock tick, or across a
+        // backward clock step, came back out of the order they were added.
+        document.AddedAt = documentClock.Next(document.AddedAt);
 
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await connection.ExecuteAsync("""

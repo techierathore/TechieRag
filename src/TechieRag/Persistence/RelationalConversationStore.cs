@@ -28,7 +28,7 @@ public abstract class RelationalConversationStore : IConversationStore
 
     private bool initialized;
     private readonly SemaphoreSlim initLock = new(1, 1);
-    private long lastMessageTicks;
+    private readonly RowClock messageClock = new();
 
     /// <summary>
     /// Creates and opens a database connection.
@@ -259,7 +259,9 @@ public abstract class RelationalConversationStore : IConversationStore
             Role = message.Role,
             Content = message.Content,
             Sources = sources,
-            CreatedAt = NextMessageTime()
+            // History is read ORDER BY CreatedAt, MessageId and the id is a random GUID: two
+            // messages on one clock tick came back in random order.
+            CreatedAt = messageClock.Next(DateTime.UtcNow)
         };
 
         var sourcesJson = sources is { Count: > 0 }
@@ -346,25 +348,6 @@ public abstract class RelationalConversationStore : IConversationStore
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// The current UTC time, moved one tick past the last message time this store gave out when
-    /// the clock has not advanced. History is read <c>ORDER BY CreatedAt, MessageId</c> and the
-    /// message id is a random GUID, so two messages saved on the same clock tick came back in
-    /// random order (a user turn after its own reply).
-    /// </summary>
-    private DateTime NextMessageTime()
-    {
-        while (true)
-        {
-            var last = Interlocked.Read(ref lastMessageTicks);
-            var next = Math.Max(DateTime.UtcNow.Ticks, last + 1);
-            if (Interlocked.CompareExchange(ref lastMessageTicks, next, last) == last)
-            {
-                return new DateTime(next, DateTimeKind.Utc);
-            }
-        }
     }
 
     private static ConversationThread MapThread(ThreadRow row) => new()
