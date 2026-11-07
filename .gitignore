@@ -74,3 +74,6 @@ playwright-report/
 
 # TechieFlow agent artifacts — machine-generated test harness & logs, never commit (managed by scaffold/update-framework.sh)
 test-results-*/
+
+# TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)
+tests/verify/testsettings.Local.json

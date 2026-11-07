@@ -1355,6 +1355,26 @@ var runner = new AgentLoopRunner(local, registry);
 var answer = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);
 ```
 
+### Local picture reading: `LocalModel.ReadsImages`, `Phi35VisionInstruct`, `IMultimodalLlmProvider`
+
+Package `TechieRag.Local`; namespace `TechieRag.Local` (owner, 2026-11-05; REQ-RAG-145 to REQ-RAG-151). A picture is read on the user's own machine with the same `ChatImage`, `ChatContentPart` and `ChatMessage.UserWithImages` code a hosted provider takes, so an app's code is the same for local and hosted. The model only turns the picture into text; checking dates, overlaps and duplicates is the app's job.
+
+- **Models.** `LocalModel.Phi35VisionInstruct` (`phi-3.5-vision-instruct`, Microsoft's processor build, about 3.2 GB, MIT) runs on a laptop's processor. `LocalModel.Phi4MultimodalInstruct` (`phi-4-multimodal-instruct`, about 5.1 GB) is a graphics-card build: `LocalModel.RequiresGpu` is true, and loading it throws `NotSupportedException` before its terms are asked and before any download, because this package ships the processor engine only. Neither runs on Android or iOS.
+- **Which models read pictures.** `LocalModel.ReadsImages` is true for the two picture models and false for Qwen2.5 0.5B and Phi-3 mini. For `FromHuggingFace` and `FromFolder` models it is read from the model's own `genai_config.json` (a `model.vision` section), so for a Hugging Face model it is known after the download. `LocalLlmProvider` implements `IMultimodalLlmProvider`; `SupportsInput(ChatContentKind.Image)` (and `SupportsVision()`) gives the same answer as `Model.ReadsImages`.
+- **Asking for pictures.** `LocalLlmOptions.ReadsImages = true` with no model named runs `Phi35VisionInstruct` on a desktop; on a phone, or with a text model named, creating the provider throws `NotSupportedException`.
+- **A text model given a picture** throws `LocalModelInputNotSupportedException` (a `NotSupportedException`) naming the model, before it is loaded or run; `ModelId`, `ModelName`, `InputKind` and `Count` say what was refused. A picture is never dropped without notice.
+- **Bytes only.** Give pictures with `ChatImage.FromBytes` or `FromBase64`. A `ChatImage.FromUrl` picture throws `NotSupportedException`: the local provider never fetches anything.
+- **Context.** A picture's tokens depend on its size: a 1200 × 900 calendar page took 1,960 tokens with its prompt. The engine counts them once it has read the picture; a prompt that does not fit throws `LocalPromptTooLongException` with that count. Keep `ContextSize` at 3,072 or more for a page-sized picture (the default is 4,096).
+
+```csharp
+using var llm = new LocalLlmProvider(new LocalLlmOptions { ReadsImages = true, TermsAccepted = true });
+var turn = ChatMessage.UserWithImages(
+    "Write one line for each meeting, in the form HH:MM - title.",
+    ChatImage.FromBytes(await File.ReadAllBytesAsync("calendar.png"), "image/png"));
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 200, Temperature = 0 });
+// reply.Content: "09:00 - Weekly planning\n10:30 - Budget review with Priya\n…"; the app parses and checks it.
+```
+
 ### Choosing a model for a piece of work: `ModelChooser`
 
 Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-128, Chatur TR-RAG-006). `ModelRouter` turns a model name into a service; `ModelChooser` decides which name. `new ModelChooser(smallModel, options?)` takes any `ILlmProvider`; a cheap or local one is enough. `ChooseAsync(request, candidates)` takes the request text and `ModelCandidate { ModelId, Tier?, Notes?, Cost? }` items, the free-text fields written in the host's own words. It returns a `ModelChoice` with `Candidate`, `ModelId`, `Reason` (one sentence to show and log), `Source` (`ModelChoiceSource.SmallModel`, `OnlyCandidate` or `Fallback`) and the small model's `Usage`. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to `ModelChooserOptions.MaxRequestCharacters` (default 4000). The reply's id is matched ignoring case. An id without its `connector/` prefix matches when exactly one candidate ends with it. **The answer is always a candidate:** a reply that is not JSON, or names a model that was not offered, gives `ModelChooserOptions.FallbackModelId` (else the first candidate) with `Source = Fallback`. **A failure of the small model is thrown** (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. `ModelChooserOptions.Guidance` adds the host's rule to the instructions. The interface `IModelChooser` lets a unit test pass a fixed choice.

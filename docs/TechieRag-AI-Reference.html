@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-29</div>
+    <div class="sub">Last rendered: 2026-11-05</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -155,6 +155,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#local-model-tool-calling">Local model tool calling</a></li>
+        <li class="h3"><a href="#local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider">Local picture reading: LocalModel.ReadsImages, Phi35VisionInstruct, IMultimodalLlmProvider</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
@@ -203,7 +204,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-11-05 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -254,6 +255,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#local-model-tool-calling">Local model tool calling</a></li>
+        <li class="h3"><a href="#local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider">Local picture reading: LocalModel.ReadsImages, Phi35VisionInstruct, IMultimodalLlmProvider</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
@@ -1451,6 +1453,28 @@ using var local = new LocalLlmProvider(new LocalLlmOptions
 
 var runner = new AgentLoopRunner(local, registry);
 var answer = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);</code></pre>
+<h3 id="local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider"><a id="local-picture-reading-localmodelreadsimages-phi35visioninstruct-imultimodalllmprovider"></a>Local picture reading: <code>LocalModel.ReadsImages</code>, <code>Phi35VisionInstruct</code>, <code>IMultimodalLlmProvider</code><a class="anchor-link" href="#local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider">#</a></h3>
+<p>Package <code>TechieRag.Local</code>; namespace <code>TechieRag.Local</code> (owner, 2026-11-05; REQ-RAG-145 to REQ-RAG-151). A picture is read on the user's own machine with the same <code>ChatImage</code>, <code>ChatContentPart</code> and <code>ChatMessage.UserWithImages</code> code a hosted provider takes, so an app's code is the same for local and hosted. The model only turns the picture into text; checking dates, overlaps and duplicates is the app's job.</p>
+<ul>
+<li><strong>Models.</strong> <code>LocalModel.Phi35VisionInstruct</code> (<code>phi-3.5-vision-instruct</code>, Microsoft's processor build, about 3.2 GB, MIT) runs on a laptop's processor. <code>LocalModel.Phi4MultimodalInstruct</code> (<code>phi-4-multimodal-instruct</code>, about 5.1 GB) is a graphics-card build: <code>LocalModel.RequiresGpu</code> is true, and loading it throws <code>NotSupportedException</code> before its terms are asked and before any download, because this package ships the processor engine only. Neither runs on Android or iOS.
+</li>
+<li><strong>Which models read pictures.</strong> <code>LocalModel.ReadsImages</code> is true for the two picture models and false for Qwen2.5 0.5B and Phi-3 mini. For <code>FromHuggingFace</code> and <code>FromFolder</code> models it is read from the model's own <code>genai_config.json</code> (a <code>model.vision</code> section), so for a Hugging Face model it is known after the download. <code>LocalLlmProvider</code> implements <code>IMultimodalLlmProvider</code>; <code>SupportsInput(ChatContentKind.Image)</code> (and <code>SupportsVision()</code>) gives the same answer as <code>Model.ReadsImages</code>.
+</li>
+<li><strong>Asking for pictures.</strong> <code>LocalLlmOptions.ReadsImages = true</code> with no model named runs <code>Phi35VisionInstruct</code> on a desktop; on a phone, or with a text model named, creating the provider throws <code>NotSupportedException</code>.
+</li>
+<li><strong>A text model given a picture</strong> throws <code>LocalModelInputNotSupportedException</code> (a <code>NotSupportedException</code>) naming the model, before it is loaded or run; <code>ModelId</code>, <code>ModelName</code>, <code>InputKind</code> and <code>Count</code> say what was refused. A picture is never dropped without notice.
+</li>
+<li><strong>Bytes only.</strong> Give pictures with <code>ChatImage.FromBytes</code> or <code>FromBase64</code>. A <code>ChatImage.FromUrl</code> picture throws <code>NotSupportedException</code>: the local provider never fetches anything.
+</li>
+<li><strong>Context.</strong> A picture's tokens depend on its size: a 1200 × 900 calendar page took 1,960 tokens with its prompt. The engine counts them once it has read the picture; a prompt that does not fit throws <code>LocalPromptTooLongException</code> with that count. Keep <code>ContextSize</code> at 3,072 or more for a page-sized picture (the default is 4,096).
+</li>
+</ul>
+<pre><code class="language-csharp">using var llm = new LocalLlmProvider(new LocalLlmOptions { ReadsImages = true, TermsAccepted = true });
+var turn = ChatMessage.UserWithImages(
+    "Write one line for each meeting, in the form HH:MM - title.",
+    ChatImage.FromBytes(await File.ReadAllBytesAsync("calendar.png"), "image/png"));
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 200, Temperature = 0 });
+// reply.Content: "09:00 - Weekly planning\n10:30 - Budget review with Priya\n…"; the app parses and checks it.</code></pre>
 <h3 id="choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: <code>ModelChooser</code><a class="anchor-link" href="#choosing-a-model-for-a-piece-of-work-modelchooser">#</a></h3>
 <p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-128, Chatur TR-RAG-006). <code>ModelRouter</code> turns a model name into a service; <code>ModelChooser</code> decides which name. <code>new ModelChooser(smallModel, options?)</code> takes any <code>ILlmProvider</code>; a cheap or local one is enough. <code>ChooseAsync(request, candidates)</code> takes the request text and <code>ModelCandidate { ModelId, Tier?, Notes?, Cost? }</code> items, the free-text fields written in the host's own words. It returns a <code>ModelChoice</code> with <code>Candidate</code>, <code>ModelId</code>, <code>Reason</code> (one sentence to show and log), <code>Source</code> (<code>ModelChoiceSource.SmallModel</code>, <code>OnlyCandidate</code> or <code>Fallback</code>) and the small model's <code>Usage</code>. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to <code>ModelChooserOptions.MaxRequestCharacters</code> (default 4000). The reply's id is matched ignoring case. An id without its <code>connector/</code> prefix matches when exactly one candidate ends with it. <strong>The answer is always a candidate:</strong> a reply that is not JSON, or names a model that was not offered, gives <code>ModelChooserOptions.FallbackModelId</code> (else the first candidate) with <code>Source = Fallback</code>. <strong>A failure of the small model is thrown</strong> (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. <code>ModelChooserOptions.Guidance</code> adds the host's rule to the instructions. The interface <code>IModelChooser</code> lets a unit test pass a fixed choice.</p>
 <pre><code class="language-csharp">var chooser = new ModelChooser(

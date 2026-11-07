@@ -229,6 +229,50 @@ The reads are the ones the load uses, so a host's answer and the load agree. Wit
 
 **Calculations on this service:** required bytes = weight bytes + `KvBytesPerToken` × context size + 256 MB (`LocalModel.cs:348`); context size = the asked size, else 2,048 on a phone and 4,096 elsewhere, never above `ContextLength` (`LocalModel.cs:385`).
 
+### Local picture reading: `LocalModel.ReadsImages`, `LocalLlmProvider` as `IMultimodalLlmProvider` (`TechieRag.Local`)
+
+![The fixed calendar page the live tests send to Phi-3.5 vision on this laptop, 2026-11-05; the model returned each meeting as "HH:MM - title"](screenshots/TechieRag/local-picture-calendar-page.png)
+
+REQ-RAG-145 to REQ-RAG-151 (owner, 2026-11-05). Covered by `tests/TechieRag.Local.Tests/LocalPictureReadingTests.cs` and the live `tests/TechieRag.Local.Tests/Live/LiveVisionTests.cs`.
+
+**Runtime:** live on this laptop's processor (WSL, Linux x64), 2026-11-05. The library downloaded Phi-3.5 vision (3.2 GB), checked every file and loaded it in 3 min 45 s. The calendar page in `tests/TechieRag.Local.Tests/Fixtures/calendar-page.png` came back as every meeting's time and title, in about 6 minutes.
+
+**Sample: a picture in, text out, on the local provider.** The same `ChatImage` and `ChatMessage.UserWithImages` code goes to a hosted provider unchanged. The test `REQ-RAG-149 LiveDevGuideSamplePictureInTextOut` runs these lines.
+
+```csharp
+using var llm = new LocalLlmProvider(new LocalLlmOptions
+{
+    ReadsImages = true,   // no model named: Phi-3.5 vision on a desktop
+    TermsAccepted = true, // the user accepted the model's MIT licence earlier
+    ContextSize = 3072    // a page-sized picture takes about 2,000 tokens
+});
+
+var picture = await File.ReadAllBytesAsync(CalendarPicturePath());
+var turn = ChatMessage.UserWithImages(
+    "Describe this picture in two sentences.",
+    ChatImage.FromBytes(picture, "image/png"));
+
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 120 });
+Console.WriteLine(reply.Content);
+```
+
+**Call chain:** `ChatAsync` → `StreamCoreAsync` → `CollectImages` → `RefuseImagesIfUnreadable` (before the load) → `LoadCoreAsync` (a `RequiresGpu` model is refused here, before any download) → `RefuseImagesIfUnreadable` (again, for a model read from disk) → `ChatTemplateFormatter.Format` with `ImagePromptMarker` → `OnnxGenAiModel.GenerateAsync(prompt, images, …)` → `MultiModalProcessor.ProcessImages` → `Generator.SetInputs`.
+
+A picture's tokens depend on its size, so the engine counts them after it has read the picture. The provider's check before that counts each picture at its fewest tokens. A prompt the engine finds too long comes back as `LocalPromptTooLongException`. Several pictures are written to a private temporary folder and deleted at once, because the engine's managed API loads only one picture from memory. A picture given as a web address is refused, because nothing is fetched.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag.Local/LocalModel.cs:336` | `ReadsImages` | the return | true for Phi-3.5 vision and Phi-4 multimodal; from `genai_config.json` for folder and Hugging Face models |
+| `src/TechieRag.Local/LocalModel.cs:519` | `DefaultFor(isPhone, readsImages)` | the return | `Phi35VisionInstruct` on a desktop; throws on a phone |
+| `src/TechieRag.Local/LocalLlmProvider.cs:174` | `SupportsInput` | `Model.ReadsImages` | the same answer as the catalogue |
+| `src/TechieRag.Local/LocalLlmProvider.cs:257` | `LoadCoreAsync` | `variant.RequiresGpu` | true for Phi-4 multimodal, which throws before the terms and the download |
+| `src/TechieRag.Local/LocalLlmProvider.cs:596` | `StreamCoreAsync` | `promptTokens` | text tokens + 145 per picture (the lower bound) |
+| `src/TechieRag.Local/LocalLlmProvider.cs:790` | `RefuseImagesIfUnreadable` | `Model.ReadsImages` | false throws `LocalModelInputNotSupportedException` naming the model |
+| `src/TechieRag.Local/Runtime/OnnxGenAiModel.cs:140` | `GenerateAsync` (pictures) | `lastImagePromptTokens` | the engine's count, 1,975 for the calendar page with the live prompt |
+| `src/TechieRag.Local/ChatTemplateFormatter.cs:171` | `TextOf` | the marker | `<|image_1|>` where the first picture sat |
+
+**Calculations on this service:** memory for Phi-3.5 vision = 3,220,612,860 bytes of weights + 393,216 × context + 256 MB. That is about 4.7 GB at a 3,072-token context.
+
 ### Local model lifetime: `LocalLlmProvider.Dispose`, `DisposeAsync` (`TechieRag.Local`)
 
 ![The probe's local-model screen on Mac Catalyst, September 2026: the generate path a dispose now cancels safely; it predates this change](screenshots/TechieRag/probe-maccatalyst-generate.png)

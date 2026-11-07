@@ -32,10 +32,16 @@ namespace TechieRag.Local;
 /// next step, before it touches the model again. The model's native memory is freed when the last call
 /// has left, never under a running token. <see cref="DisposeAsync"/> does the same and completes once the
 /// memory is freed, so a host can load the next model after it.</para>
-/// <para><b>Not supported:</b> tool calling (<see cref="SupportsToolCalling"/> is false until a test
-/// proves otherwise, REQ-RAG-063), images, and a per-call model other than the loaded one.</para>
+/// <para><b>Pictures</b> (REQ-RAG-147…151 / BRD-205…209). The provider is an <see cref="IMultimodalLlmProvider"/>:
+/// a chat turn's <see cref="ChatImage"/> parts, given as bytes or base64 (never a web address, which the
+/// local provider does not fetch), reach a model that reads pictures (<see cref="LocalModel.ReadsImages"/>)
+/// in order with the text, and the answer is text like any other chat. A model that does not read pictures
+/// throws <see cref="LocalModelInputNotSupportedException"/> naming it, before any inference.</para>
+/// <para><b>Not supported:</b> tool calling on a model that does not do it (<see cref="SupportsToolCalling"/>,
+/// REQ-RAG-063), a graphics-card model (<see cref="LocalModel.RequiresGpu"/>, refused before any download), and a
+/// per-call model other than the loaded one.</para>
 /// </remarks>
-public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposable
+public sealed class LocalLlmProvider : ILlmProvider, IMultimodalLlmProvider, IDisposable, IAsyncDisposable
 {
     private const string JsonSystemPrompt = "You are a helpful assistant that responds only with valid JSON.";
 
@@ -62,7 +68,10 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
     /// </summary>
     /// <param name="options">Model, context size, defaults and terms acceptance; null uses the platform default model.</param>
     /// <param name="logger">Optional logger.</param>
-    /// <exception cref="NotSupportedException">The model is too large for Android or iOS.</exception>
+    /// <exception cref="NotSupportedException">
+    /// The model is too large for Android or iOS, or <see cref="LocalLlmOptions.ReadsImages"/> asks for pictures
+    /// from a model that does not read them or on a phone.
+    /// </exception>
     public LocalLlmProvider(LocalLlmOptions? options = null, ILogger<LocalLlmProvider>? logger = null)
         : this(options ?? new LocalLlmOptions(), logger, LocalRuntimeSelector.ForCurrentPlatform(),
             MemoryGate.ForThisDevice, LocalModelStore.Shared, LocalModel.IsPhonePlatform)
@@ -91,8 +100,14 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
         this.memoryGate = memoryGate;
         this.store = store;
         this.isPhone = isPhone;
-        Model = options.Model ?? LocalModel.DefaultFor(isPhone);
+        Model = options.Model ?? LocalModel.DefaultFor(isPhone, options.ReadsImages);
         Model.EnsureSupported(isPhone);
+        if (options.ReadsImages && Model.ImageSupportKnown && !Model.ReadsImages)
+        {
+            throw new NotSupportedException(
+                $"LocalLlmOptions.ReadsImages asks for pictures, but the local model '{Model.DisplayName}' ({Model.Id}) does not read them. "
+                + "Name a model that does, such as LocalModel.Phi35VisionInstruct, or leave the model unset.");
+        }
     }
 
     /// <inheritdoc/>
@@ -149,6 +164,19 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
 
     /// <inheritdoc/>
     public bool SupportsStreaming => true;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Text always; a picture when the model reads pictures (<see cref="LocalModel.ReadsImages"/>), the same
+    /// answer the catalogue gives (REQ-RAG-148). For a model named on Hugging Face that answer is known once
+    /// its configuration is on disk, after the download.
+    /// </remarks>
+    public bool SupportsInput(ChatContentKind kind) => kind switch
+    {
+        ChatContentKind.Text => true,
+        ChatContentKind.Image => Model.ReadsImages,
+        _ => false
+    };
 
     /// <summary>
     /// Gets the terms the user accepts before the model downloads, with the bytes the download would
@@ -226,6 +254,16 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
 
             await store.PrepareAsync(Model, cancellationToken).ConfigureAwait(false);
             var (resolvedRuntime, variant, directory) = Resolve();
+            if (variant is { RequiresGpu: true } && !resolvedRuntime.RunsGpuModels)
+            {
+                // REQ-RAG-146 (BRD-204): a graphics-card build is refused before its terms are asked and before
+                // its first byte; the processor engine this package ships cannot load it.
+                throw new NotSupportedException(
+                    $"The local model '{Model.DisplayName}' ({Model.Id}) is a graphics-card build and needs an ONNX Runtime GenAI GPU runtime. "
+                    + "TechieRag.Local runs models on the processor only, so nothing was downloaded. "
+                    + "On a laptop, use LocalModel.Phi35VisionInstruct, which reads pictures on the processor.");
+            }
+
             if (variant is not null)
             {
                 // REQ-RAG-125 (Sevak TR-RAG-047): a model that cannot fit is refused before its first byte is
@@ -250,6 +288,11 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
 
             loaded = await Task.Run(() => resolvedRuntime.Load(directory, ContextSize, options.Threads), cancellationToken)
                 .ConfigureAwait(false);
+            if (!Model.ImageSupportKnown)
+            {
+                Model.TryReadImageSupport(directory);
+            }
+
             tokenizer?.Dispose();
             tokenizer = null;
         }
@@ -519,6 +562,11 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
         ArgumentNullException.ThrowIfNull(messages);
         RefuseUnsupported(callOptions);
 
+        // REQ-RAG-151 (BRD-209): pictures for a model that cannot read them are refused before the load and
+        // before any inference; a model whose configuration is not on disk yet is checked again after the load.
+        var images = CollectImages(messages);
+        RefuseImagesIfUnreadable(images.Count, beforeLoad: true);
+
         // REQ-RAG-129 (Sevak TR-RAG-053): the call is counted from here to its last step, so the native
         // model is never freed under it, and the flag is checked after every await before the model is used.
         Enter();
@@ -530,11 +578,22 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
             ThrowIfDisposed();
             var model = loaded!;
 
+            RefuseImagesIfUnreadable(images.Count, beforeLoad: false);
+            Func<int, string>? imageMarker = null;
+            if (images.Count > 0)
+            {
+                _ = ImagePromptMarker.For(Model, 1);
+                imageMarker = number => ImagePromptMarker.For(Model, number);
+            }
+
             var conversation = PrepareConversation(messages, callOptions);
             var prompt = Model.ChatTemplate == LocalChatTemplate.ModelDefined
-                ? model.ApplyChatTemplate(ChatTemplateFormatter.ToMessagesJson(conversation))
-                : ChatTemplateFormatter.Format(Model.ChatTemplate, conversation);
-            var promptTokens = model.CountTokens(prompt);
+                ? model.ApplyChatTemplate(ChatTemplateFormatter.ToMessagesJson(conversation, imageMarker))
+                : ChatTemplateFormatter.Format(Model.ChatTemplate, conversation, imageMarker);
+
+            // Each picture is counted at the fewest tokens it takes; the engine counts it exactly once it has
+            // processed it and refuses a prompt that leaves no room, which surfaces as the same exception.
+            var promptTokens = model.CountTokens(prompt) + (images.Count * Model.ImageTokenFloor);
             if (promptTokens >= ContextSize)
             {
                 throw new LocalPromptTooLongException(Model.Id, promptTokens, ContextSize);
@@ -555,10 +614,12 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                 var produced = 0;
                 var hasTools = callOptions?.Tools is { Count: > 0 } && SupportsToolCalling;
                 var toolBuffer = hasTools ? new StringBuilder() : null;
-                var pieces = model.GenerateAsync(prompt, settings, token).GetAsyncEnumerator(token);
+                var pieces = (images.Count > 0
+                    ? model.GenerateAsync(prompt, images, promptTokens, settings, token)
+                    : model.GenerateAsync(prompt, settings, token)).GetAsyncEnumerator(token);
                 try
                 {
-                    while (await WhileAliveAsync(pieces.MoveNextAsync(), cancellationToken).ConfigureAwait(false))
+                    while (await WhileAliveAsync(MoveNextRefusingLongPictureAsync(pieces), cancellationToken).ConfigureAwait(false))
                     {
                         ThrowIfDisposed();
                         produced++;
@@ -620,7 +681,7 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
                     : (!filter.Stopped && produced >= settings.MaxTokens ? "length" : "stop");
                 var usage = new TokenUsage
                 {
-                    InputTokens = promptTokens,
+                    InputTokens = images.Count > 0 ? model.LastImagePromptTokens ?? promptTokens : promptTokens,
                     OutputTokens = produced,
                     ReasoningTokens = thinkingText.Length > 0 ? Math.Min(produced, model.CountTokens(thinkingText.ToString())) : 0,
                     ModelName = Model.Id,
@@ -671,6 +732,69 @@ public sealed class LocalLlmProvider : ILlmProvider, IDisposable, IAsyncDisposab
             throw new NotSupportedException(
                 $"This local provider runs '{Model.Id}' and cannot switch to '{requested}' per call; create a provider for that model.");
         }
+    }
+
+    /// <summary>
+    /// Moves to the next piece, turning the engine's refusal of a picture prompt longer than the context into
+    /// the <see cref="LocalPromptTooLongException"/> every over-long prompt gets (REQ-RAG-147).
+    /// </summary>
+    /// <param name="pieces">The generation.</param>
+    /// <returns>Whether a piece is there.</returns>
+    /// <exception cref="LocalPromptTooLongException">The prompt with its pictures does not fit the context.</exception>
+    private async ValueTask<bool> MoveNextRefusingLongPictureAsync(IAsyncEnumerator<string> pieces)
+    {
+        try
+        {
+            return await pieces.MoveNextAsync().ConfigureAwait(false);
+        }
+        catch (LocalImagePromptTooLongException exception)
+        {
+            throw new LocalPromptTooLongException(Model.Id, exception.PromptTokens ?? ContextSize, ContextSize);
+        }
+    }
+
+    /// <summary>
+    /// Takes every picture of a conversation, in order, as bytes; a picture given as a web address is refused,
+    /// because the local provider never fetches anything (REQ-RAG-147).
+    /// </summary>
+    /// <param name="messages">The conversation.</param>
+    /// <returns>The pictures, in the order of their markers.</returns>
+    /// <exception cref="NotSupportedException">A picture is a web address, not bytes.</exception>
+    private List<LocalImage> CollectImages(IReadOnlyList<ChatMessage> messages)
+    {
+        var images = new List<LocalImage>();
+        foreach (var part in messages.Where(m => m.HasImages).SelectMany(m => m.Parts!))
+        {
+            if (part is not { Kind: ChatContentKind.Image, Image: { } image })
+            {
+                continue;
+            }
+
+            if (!image.IsInline)
+            {
+                throw new NotSupportedException(
+                    $"The local model '{Model.DisplayName}' takes pictures as bytes only (ChatImage.FromBytes or FromBase64); it never fetches "
+                    + $"a web address such as {image.Url}. Nothing was sent to the model.");
+            }
+
+            images.Add(new LocalImage(Convert.FromBase64String(image.Base64Data!), image.MediaType));
+        }
+
+        return images;
+    }
+
+    /// <summary>Throws when a turn's pictures would reach a model that does not read them (REQ-RAG-151).</summary>
+    /// <param name="imageCount">How many pictures the turn carries.</param>
+    /// <param name="beforeLoad">True before the load, when a model whose configuration is not read yet is let through.</param>
+    /// <exception cref="LocalModelInputNotSupportedException">The model does not read pictures.</exception>
+    private void RefuseImagesIfUnreadable(int imageCount, bool beforeLoad)
+    {
+        if (imageCount == 0 || Model.ReadsImages || (beforeLoad && !Model.ImageSupportKnown))
+        {
+            return;
+        }
+
+        throw new LocalModelInputNotSupportedException(Model.Id, Model.DisplayName, ChatContentKind.Image, imageCount);
     }
 
     private List<ChatMessage> PrepareConversation(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? callOptions)

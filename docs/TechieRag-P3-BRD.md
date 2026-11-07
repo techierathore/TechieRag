@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider). Each item names the Sevak feedback entry it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase because phase 2, at 90 verified items and waiting for UAT, would be reopened and taken past the 100-item limit. The items make workspaces testable and faster, make connector runs survive a cancel, let re-syncs replace a document, report what the mail parser drops, stop duplicate tool definitions, answer two flow-builder questions, and give an app that names no database folder a stable per-app location without moving existing data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider), BRD-203 to 209 (owner, local picture reading), BRD-210 to BRD-213 (owner, 2026-11-07: what Sevak's assistant phases need: PostgreSQL end to end, the host-data skill, image generation). Each item names the Sevak feedback entry or requirement it answers.
 
 ## 2. Screens and flow
 
@@ -28,6 +28,10 @@ Each row is a public surface this phase extends; the Route column names its entr
 | Local model fit check | `LocalLlmProvider`, `LocalModel`, `AvailableMemory` | App developer | — (library, no mockup) | runtime available, memory needed, memory free, download progress |
 | Model routing | `LlmProviderFactory.ListModelsAsync`, `LlmProviderFactory.CreateForModel`, `ModelChooser` | App developer | — (library, no mockup) | connector, endpoint, model ids, candidates, chosen model, reason |
 | Local model lifetime | `LocalLlmProvider.Dispose`, `LocalLlmProvider.DisposeAsync` | App developer | — (library, no mockup) | calls inside, memory freed |
+| Local picture reading | `LocalModel`, `LocalLlmProvider` as `IMultimodalLlmProvider`, `ChatImage`, `ChatContentPart` | App developer | — (library, no mockup) | model, reads pictures, images in the turn, text out, error naming the model |
+| PostgreSQL end to end | `UsePostgres`, `UsePgVector`, the live PostgreSQL tests | App developer | — (library, no mockup) | connection string, vectors, conversations, workspaces in one database |
+| Host data skill | `HostDataSkill`, `IHostEntity`, `HostDataChange` | Agent builder | — (library, no mockup) | entity, fields, handlers, change record, undo |
+| Image generation | `IImageGenerationProvider`, `GenerateImageAsync` | App developer | — (library, no mockup) | prompt, size, provider, bytes, media type, usage |
 
 **Primary journey:**
 1. A developer builds an app on the packages without naming a database folder; the data lands in the per-user TechieRag folder under the app's own name, and the log says where.
@@ -134,6 +138,26 @@ A host can list a service's models, reach a service on another machine by its mo
 - **BRD-202** — The AI reference shall name the providers that send thinking text and the ones that cannot, and state the rules every provider keeps: thinking never inside the answer, no Thinking event where there is no thinking, and the event order *(owner request, thinking for every provider, added 2026-10-29)* *Screen:* Model routing
   - *Acceptance:* When a developer reads the thinking section of the AI reference on Model routing, then every built-in provider is listed as sending thinking or not, with the reason.
 
+### Local picture reading
+
+An app reads a picture with a model on the user's own machine, through the same image types a hosted provider takes, so its code is the same for local and hosted. The model only turns the picture into text; checking dates, overlaps and duplicates stays in the app *(owner, 2026-11-05: Sevak reads a screenshot or phone photo of an office calendar into draft tasks, and nothing leaves the laptop; extends BRD-149 to the local provider)*.
+
+- **BRD-203** — TechieRag.Local shall download, check and load a model that reads pictures from Hugging Face the same way it loads text models today (terms, fit check, fingerprint check, then load), with ONNX Runtime GenAI's multimodal processor. The catalogue shall name one that runs on a laptop CPU: Phi-3.5-vision-instruct, `microsoft/Phi-3.5-vision-instruct-onnx`, folder `cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4` (MIT, about 3.2 GB), pinned to one commit *(owner, added 2026-11-05)* *Screen:* Local picture reading
+  - *Acceptance:* When a developer loads the Phi-3.5 vision model on Local picture reading on a CPU-only laptop, then its files download, pass their fingerprints and load.
+- **BRD-204** — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, `microsoft/Phi-4-multimodal-instruct-onnx`, folder `gpu/gpu-int4-rtn-block-32` (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so *(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request)* *Screen:* Local picture reading
+  - *Acceptance:* When a developer loads the Phi-4 multimodal model on Local picture reading, then it loads with the GPU runtime and refuses before any download without it.
+- **BRD-205** — The local provider shall implement `IMultimodalLlmProvider`: a chat turn with one or more `ChatImage` parts shall reach a model that reads pictures, in order with the text, and the answer comes back as text like any other chat *(owner, added 2026-11-05)* *Screen:* Local picture reading
+  - *Acceptance:* When a developer on Local picture reading sends a turn with two images to a vision model, then both reach the model and text comes back.
+- **BRD-206** — The model catalogue shall say per model whether it reads pictures, for built-in models and for a model named by its Hugging Face repository (read from the model's own configuration), and `SupportsInput(Image)` shall give the same answer for the loaded model *(owner, added 2026-11-05)* *Screen:* Local picture reading
+  - *Acceptance:* When a developer on Local picture reading lists the catalogue, then the two vision models say they read pictures and Qwen2.5 0.5B and Phi-3 mini say they do not.
+- **BRD-207** — The DevGuide shall have one sample on the local provider: a picture in, text out, with the same `ChatImage` and `ChatContentPart` code a hosted provider takes *(owner, added 2026-11-05)* *Screen:* Local picture reading
+  - *Acceptance:* When a developer on Local picture reading runs the DevGuide sample on a picture, then the local model's text description comes back.
+- **BRD-208** — A test with one fixed picture of a calendar page, kept in the test fixtures, shall send it to the local vision model and check that the text contains each meeting title and time on that page *(owner, added 2026-11-05)* *Screen:* Local picture reading
+  - *Acceptance:* When the calendar-page test runs on Local picture reading, then every meeting title and its time on the fixed picture appears in the model's text.
+
+- **BRD-209** — A local model that does not read pictures, given a chat turn with an image, shall throw a clear error naming the model before any inference; an image is never dropped without notice *(owner, added 2026-11-05; today the template formatter keeps only the text parts)* *Screen:* Local picture reading
+  - *Acceptance:* When a developer on Local picture reading sends an image to Phi-3 mini, then the call throws an error naming Phi-3 mini before inference.
+
 ### Local model lifetime
 
 A host can unload or swap a local model while calls are still using it, and the process never crashes.
@@ -141,19 +165,45 @@ A host can unload or swap a local model while calls are still using it, and the 
 - **BRD-189** — Disposing a local model provider shall cancel or wait for the calls already inside it, free the native model only once none is left, and make every call that resumes afterwards throw ObjectDisposedException before it touches the model *(Sevak feedback TR-RAG-053, added 2026-10-11)* *Screen:* Local model lifetime
   - *Acceptance:* When a developer disposes a local provider on Local model lifetime while three calls are inside, then each ends with ObjectDisposedException and the model is freed once.
 
+### PostgreSQL end to end
+
+A host offers its users a server database of their own: vectors, conversations and workspaces in one PostgreSQL, proven on a real server in CI.
+
+- **BRD-210** — The PostgreSQL path shall be proven end to end on a real PostgreSQL 18 with pgvector that the test harness starts in Docker: `UsePgVector` for the vectors and the PostgreSQL conversation and workspace stores in the same database, reached through one `UsePostgres(connectionString)` builder call, with `LivePgVectorStoreTests` (BRD-157) and live store tests run in CI, so a host can offer its users a server database of their own *(Sevak feedback TR-RAG-055; Sevak phase 4, BRD-182 to BRD-185; owner, 2026-11-07)* The live tests read their connection string from a settings file beside the tests (a git-ignored `livetests.settings.json` with a committed example), never from an environment variable (owner's rule, 2026-11-07; today `LivePostgresFactAttribute` reads `TechieRagTestPostgres`). *Screen:* PostgreSQL end to end
+  - *Acceptance:* When a developer runs the live PostgreSQL tests on PostgreSQL end to end against the harness-started server, then vectors, conversations and workspaces round-trip in one database.
+
+### Host data skill
+
+A host's assistant reads and changes the host's own data in plain words, and every change can be undone.
+
+- **BRD-211** — The library shall offer a host-data skill: a host registers its own entities (name, fields, and handlers to list, read, create, update and delete) and the agent gets one tool set for them, so a host's assistant can read and change the host's data in plain words *(Sevak feedback TR-RAG-056; Sevak BRD-203; owner, 2026-11-07)* *Screen:* Host data skill
+  - *Acceptance:* When a developer registers a "task" entity on Host data skill and a user asks for a task, then the create handler runs with the extracted fields.
+- **BRD-212** — Every change the host-data skill makes shall come back to the host as a typed change record (entity, id, before, after, the turn that caused it), and the skill shall reverse a record on request through the host's own handlers, so a host can show a card with Undo *(Sevak feedback TR-RAG-057; Sevak BRD-204; owner, 2026-11-07)* *Screen:* Host data skill
+  - *Acceptance:* When a developer calls Undo with a change record on Host data skill, then the entity is restored to its "before" state through the host's handler.
+
+### Image generation
+
+Images from a prompt, through the same routing as the chat providers.
+
+- **BRD-213** — The library shall generate images: an `IImageGenerationProvider` with `GenerateImageAsync(prompt, size, options)` returning the image bytes, its media type and the usage, for OpenAI, Gemini and Venice, routed like the chat providers, with no key ever persisted; this re-scopes BRD-161 for images only *(Sevak feedback TR-RAG-058; Sevak BRD-127 and BRD-281; owner, 2026-11-07)* *Screen:* Image generation
+  - *Acceptance:* When a developer calls GenerateImageAsync on Image generation with a prompt, a size and a keyed provider, then PNG bytes of that size and the usage come back.
+
 ## 5. Development status
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-29.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-11-07.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
-| RAG / AI requirements | 11 | 11 | 0 | Done |
+| RAG / AI requirements | 12 | 11 | 1 | Partial |
 | Local model fit check | 1 | 1 | 0 | Done |
 | Model routing | 8 | 8 | 0 | Done |
 | Local model lifetime | 1 | 1 | 0 | Done |
 | LLM streaming | 8 | 8 | 0 | Done |
+| Local picture reading (`LocalModel`, `LocalLlmProvider` as `IMultimodalLlmProvider`, `ChatImage`, `ChatContentPart`) | 7 | 5 | 2 | Partial |
+| Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`) | 2 | 0 | 2 | Planned |
+| Image generation (`IImageGenerationProvider`, `GenerateImageAsync`) | 1 | 0 | 1 | Planned |
 
 ## 6. Where the rest lives
 

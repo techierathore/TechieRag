@@ -4,13 +4,13 @@
 |---|---|
 | App | TechieRag |
 | Upstream | ONNX Runtime GenAI (microsoft/onnxruntime-genai) |
-| Updated | 2026-10-01 (consolidated at handoff; no change) |
+| Updated | 2026-11-05 (ORTGENAI-003 added) |
 
 ## Summary
 
-2 entries: 0 blocking now, 2 filed and not blocking, 0 fixed upstream.
+3 entries: 1 blocking now, 2 filed and not blocking, 0 fixed upstream.
 
-Nothing is blocked. `TechieRag.Local` wires the Mac Catalyst library itself until the package does.
+ORTGENAI-003 blocks the graphics-card picture model (REQ-RAG-146) on the engine the owner chose. `TechieRag.Local` wires the Mac Catalyst library itself until the package does.
 
 ## Entries
 
@@ -43,5 +43,18 @@ Git and `gh` are manual in this repository, so the owner posts this as an issue 
 - **Suggested fix:** link `libmat.so` with `-Wl,-z,max-page-size=16384` (NDK r27+ does it by default) and republish the `.aar`
 
 Git and `gh` are manual in this repository, so the owner posts this as an issue at https://github.com/microsoft/onnxruntime-genai/issues. Suggested title: "Android aar: libmat.so is not 16 KB page aligned (XA0141)".
+
+### ORTGENAI-003 — No DirectML package exists for ONNX Runtime GenAI 0.15 or later
+
+- **Severity:** major
+- **Blocks:** yes — REQ-RAG-146 (BRD-204): the owner chose DirectML, in a separate opt-in package, for the graphics-card picture model (Phi-4 multimodal), and no DirectML package matches the engine version this library ships
+- **Repro:** `https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntimegenai.directml/index.json`, read 2026-11-05
+- **Expected:** a `Microsoft.ML.OnnxRuntimeGenAI.DirectML` release at the version of `Microsoft.ML.OnnxRuntimeGenAI` (0.16.0 here), as there was up to 0.14
+- **Actual:** the last release is 0.14.1, which depends on `Microsoft.ML.OnnxRuntime.DirectML` 1.23.0. `TechieRag.Local` is on GenAI 0.16.0 with ONNX Runtime 1.30.0, which `TechieRag.Embedded` shares. From 0.17.0 nuget.org has `Microsoft.ML.OnnxRuntimeGenAI.WinML` and `.Cuda` instead
+- **Encountered in:** REQ-RAG-146 build, 2026-11-05
+- **Workaround:** none taken. The catalogue entry and the refusal before download are built; loading the model on a graphics card waits for the owner's choice between WinML and CUDA, both of which need the library's engine moved from 0.16.0 to 0.17.0 or later
+- **Suggested fix:** state on the package page that DirectML ended at 0.14.1 and that WinML replaces it, with the version to move to
+
+Probably intended [Likely]: the WinML package appearing at 0.17.0 reads as DirectML's replacement, but nothing on nuget.org says so. Git and `gh` are manual in this repository, so the owner posts this as an issue at https://github.com/microsoft/onnxruntime-genai/issues if wanted. Suggested title: "NuGet: DirectML package stopped at 0.14.1; document the move to WinML".
 
 ## Replies from ONNX Runtime GenAI

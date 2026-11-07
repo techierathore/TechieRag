@@ -4,11 +4,11 @@
 |---|---|
 | App | TechieRag |
 | Upstream | TechieFlow |
-| Updated | 2026-10-29 (TF-008 fixed upstream, ships in TechieFlow v1.2.2) |
+| Updated | 2026-11-05 (TF-009 added) |
 
 ## Summary
 
-8 entries: 0 blocking now, 0 open, 4 fixed upstream and not yet re-checked here (TF-005 to TF-007, fixed 2026-10-18, ship in TechieFlow v1.2.0; TF-008, fixed 2026-10-29, ships in v1.2.2), 4 closed (TF-001 to TF-004).
+9 entries: 0 blocking now, 1 open (TF-009), 4 fixed upstream and not yet re-checked here (TF-005 to TF-007, fixed 2026-10-18, ship in TechieFlow v1.2.0; TF-008, fixed 2026-10-29, ships in v1.2.2), 4 closed (TF-001 to TF-004).
 
 Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and closed. TF-005 to TF-007 are fixed upstream; re-check them here.
 
@@ -150,6 +150,21 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Workaround:** the rows, their misses and gate records were renamed to REQ-RAG-137/138 within the same run, before any commit, and the wrong verify run's records were removed. The checklist still has no rows for the Lekhak work that uses REQ-RAG-135/136.
 - **Suggested fix:** in `tf-triage.py` `new`, also scan `src/`, `source/` and `tests/` for `REQ-<prefix>-NNN` and start above the highest. In `tf-verify-tests.sh`, warn when a row's matching tests sit in files older than the row's "logged" date.
 - **Reply (TechieFlow team, 2026-10-29):** Fixed both ways you suggested. **`tf-triage new`** now takes the next id past the highest one in the checklists, the telemetry streams, and the source and test files under `src/`, `source/`, `tests/` and `test/` (code files only; `bin/`, `obj/`, `node_modules/` and test results are skipped). **`tf-verify-tests`** warns when a row that triage logged (`logged from UAT <date>` in its Remark) has tests that carried its id before that day: a `WARN` line, `tests_older_than_row` in `tests.json`, and a ⚠ note in the row's Remark from the verdict. The day an id first appeared comes from the history (the first commit that added it under those folders), else from the files' dates. It warns; it does not fail the row. Regression case `tr_008`. Miss `MISS-TechieFlow-20261029-04`. **Measured here:** `new --prefix RAG` on phase 3 gives REQ-RAG-139 with the old and the new script alike, because the two rows are already renamed to 137 and 138; the new scan reads 552 files and adds about 1.3 s. **Check it here:** with a test named `REQ-RAG-140 …` and no row, `bash .tfcore/utils/tf-triage.sh TechieRag new "<title>" "<acceptance>" --prefix RAG --phase 3` gives REQ-RAG-141.
+
+### TF-009 — the verifier writes Verified over a Blocked row when one test carrying its id passes
+
+- **Severity:** major
+- **Blocks:** no — the row was put back to Blocked by hand in the same run; the hook allows it, since only Verified is guarded.
+- **Repro:** in TechieRag phase 3, REQ-RAG-146 was `Blocked` (its GPU-load half waits on an owner decision; its refusal half is built and has the test `REQ-RAG-146 GpuModelRefusedBeforeDownload`). Then:
+  ```text
+  bash .tfcore/utils/tf-verify-verdict.sh TechieRag --apply --started 2026-11-05T13:34:06Z
+  | REQ-RAG-146 | PASS | - | Verified | test `REQ-RAG-146 GpuModelRefusedBeforeDownload` |
+  ```
+- **Expected:** a `Blocked` row stays `Blocked` (its passing test can go in the Remark), or the verdict asks for every clause of the acceptance line to have a test before it writes `Verified`.
+- **Actual:** the row became `Verified 100%` on a test of one of its two clauses, and `tf-verify-emit.sh` wrote a PASS gate record for it.
+- **Encountered in:** `*build-phase TechieRag`, the chained verify, 2026-11-05.
+- **Workaround:** REQ-RAG-146 set back to `Blocked 50%` with a Remark naming the passing half; the gate record for that run still reads PASS.
+- **Suggested fix:** in `tf-verify-verdict.sh`, never raise a row whose Status is `Blocked` above it; write the test result into its Remark instead.
 
 ## Replies from TechieFlow
 

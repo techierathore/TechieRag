@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 3: Consumer feedback from Sevak</h1>
-    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-P3-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-11-07 &middot; source <code>TechieRag-P3-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -122,7 +122,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#flow-step-names-and-model-use">Flow step names and model use</a></li>
         <li class="h3"><a href="#local-model-fit-check">Local model fit check</a></li>
         <li class="h3"><a href="#model-routing">Model routing</a></li>
+        <li class="h3"><a href="#local-picture-reading">Local picture reading</a></li>
         <li class="h3"><a href="#local-model-lifetime">Local model lifetime</a></li>
+        <li class="h3"><a href="#postgresql-end-to-end">PostgreSQL end to end</a></li>
+        <li class="h3"><a href="#host-data-skill">Host data skill</a></li>
+        <li class="h3"><a href="#image-generation">Image generation</a></li>
         <li><a href="#development-status">5. Development status</a></li>
         <li><a href="#where-the-rest-lives">6. Where the rest lives</a></li>
       </ol>
@@ -139,7 +143,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <h2 id="summary"><a id="1-summary"></a>1. Summary<a class="anchor-link" href="#summary">#</a></h2>
-<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase for two reasons. Phase 2 is at 90 verified items and waiting for UAT, so adding them there would reopen it. They would also take it past the 100-item limit for one phase. The items make workspaces testable and faster, make connector runs survive a cancel with their sync state, let repeated syncs replace a document instead of duplicating it, report what the mail parser drops, stop duplicate tool definitions, and answer two questions a flow builder needs. They also give an app that names no database folder a stable, per-app location beside the shared model folder, without moving any existing app's data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider). Each item names the Sevak feedback entry it answers.</p>
+<p>Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase because phase 2, at 90 verified items and waiting for UAT, would be reopened and taken past the 100-item limit. The items make workspaces testable and faster, make connector runs survive a cancel, let re-syncs replace a document, report what the mail parser drops, stop duplicate tool definitions, answer two flow-builder questions, and give an app that names no database folder a stable per-app location without moving existing data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider), BRD-203 to 209 (owner, local picture reading), BRD-210 to BRD-213 (owner, 2026-11-07: what Sevak's assistant phases need: PostgreSQL end to end, the host-data skill, image generation). Each item names the Sevak feedback entry or requirement it answers.</p>
 <h2 id="screens-and-flow"><a id="2-screens-and-flow"></a>2. Screens and flow<a class="anchor-link" href="#screens-and-flow">#</a></h2>
 <p>Each row is a public surface this phase extends; the Route column names its entry point. No mockups exist for a library.</p>
 <table>
@@ -154,6 +158,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Local model fit check</td><td><code>LocalLlmProvider</code>, <code>LocalModel</code>, <code>AvailableMemory</code></td><td>App developer</td><td>— (library, no mockup)</td><td>runtime available, memory needed, memory free, download progress</td></tr>
 <tr><td>Model routing</td><td><code>LlmProviderFactory.ListModelsAsync</code>, <code>LlmProviderFactory.CreateForModel</code>, <code>ModelChooser</code></td><td>App developer</td><td>— (library, no mockup)</td><td>connector, endpoint, model ids, candidates, chosen model, reason</td></tr>
 <tr><td>Local model lifetime</td><td><code>LocalLlmProvider.Dispose</code>, <code>LocalLlmProvider.DisposeAsync</code></td><td>App developer</td><td>— (library, no mockup)</td><td>calls inside, memory freed</td></tr>
+<tr><td>Local picture reading</td><td><code>LocalModel</code>, <code>LocalLlmProvider</code> as <code>IMultimodalLlmProvider</code>, <code>ChatImage</code>, <code>ChatContentPart</code></td><td>App developer</td><td>— (library, no mockup)</td><td>model, reads pictures, images in the turn, text out, error naming the model</td></tr>
+<tr><td>PostgreSQL end to end</td><td><code>UsePostgres</code>, <code>UsePgVector</code>, the live PostgreSQL tests</td><td>App developer</td><td>— (library, no mockup)</td><td>connection string, vectors, conversations, workspaces in one database</td></tr>
+<tr><td>Host data skill</td><td><code>HostDataSkill</code>, <code>IHostEntity</code>, <code>HostDataChange</code></td><td>Agent builder</td><td>— (library, no mockup)</td><td>entity, fields, handlers, change record, undo</td></tr>
+<tr><td>Image generation</td><td><code>IImageGenerationProvider</code>, <code>GenerateImageAsync</code></td><td>App developer</td><td>— (library, no mockup)</td><td>prompt, size, provider, bytes, media type, usage</td></tr>
 </tbody>
 </table>
 <p><strong>Primary journey:</strong></p>
@@ -367,6 +375,52 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 </li>
 </ul>
+<h3 id="local-picture-reading">Local picture reading<a class="anchor-link" href="#local-picture-reading">#</a></h3>
+<p>An app reads a picture with a model on the user's own machine, through the same image types a hosted provider takes, so its code is the same for local and hosted. The model only turns the picture into text; checking dates, overlaps and duplicates stays in the app <em>(owner, 2026-11-05: Sevak reads a screenshot or phone photo of an office calendar into draft tasks, and nothing leaves the laptop; extends BRD-149 to the local provider)</em>.</p>
+<ul>
+<li><strong>BRD-203</strong> — TechieRag.Local shall download, check and load a model that reads pictures from Hugging Face the same way it loads text models today (terms, fit check, fingerprint check, then load), with ONNX Runtime GenAI's multimodal processor. The catalogue shall name one that runs on a laptop CPU: Phi-3.5-vision-instruct, <code>microsoft/Phi-3.5-vision-instruct-onnx</code>, folder <code>cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4</code> (MIT, about 3.2 GB), pinned to one commit <em>(owner, added 2026-11-05)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When a developer loads the Phi-3.5 vision model on Local picture reading on a CPU-only laptop, then its files download, pass their fingerprints and load.
+</li>
+</ul>
+</li>
+<li><strong>BRD-204</strong> — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, <code>microsoft/Phi-4-multimodal-instruct-onnx</code>, folder <code>gpu/gpu-int4-rtn-block-32</code> (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so <em>(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When a developer loads the Phi-4 multimodal model on Local picture reading, then it loads with the GPU runtime and refuses before any download without it.
+</li>
+</ul>
+</li>
+<li><strong>BRD-205</strong> — The local provider shall implement <code>IMultimodalLlmProvider</code>: a chat turn with one or more <code>ChatImage</code> parts shall reach a model that reads pictures, in order with the text, and the answer comes back as text like any other chat <em>(owner, added 2026-11-05)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When a developer on Local picture reading sends a turn with two images to a vision model, then both reach the model and text comes back.
+</li>
+</ul>
+</li>
+<li><strong>BRD-206</strong> — The model catalogue shall say per model whether it reads pictures, for built-in models and for a model named by its Hugging Face repository (read from the model's own configuration), and <code>SupportsInput(Image)</code> shall give the same answer for the loaded model <em>(owner, added 2026-11-05)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When a developer on Local picture reading lists the catalogue, then the two vision models say they read pictures and Qwen2.5 0.5B and Phi-3 mini say they do not.
+</li>
+</ul>
+</li>
+<li><strong>BRD-207</strong> — The DevGuide shall have one sample on the local provider: a picture in, text out, with the same <code>ChatImage</code> and <code>ChatContentPart</code> code a hosted provider takes <em>(owner, added 2026-11-05)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When a developer on Local picture reading runs the DevGuide sample on a picture, then the local model's text description comes back.
+</li>
+</ul>
+</li>
+<li><strong>BRD-208</strong> — A test with one fixed picture of a calendar page, kept in the test fixtures, shall send it to the local vision model and check that the text contains each meeting title and time on that page <em>(owner, added 2026-11-05)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When the calendar-page test runs on Local picture reading, then every meeting title and its time on the fixed picture appears in the model's text.
+</li>
+</ul>
+</li>
+<li><strong>BRD-209</strong> — A local model that does not read pictures, given a chat turn with an image, shall throw a clear error naming the model before any inference; an image is never dropped without notice <em>(owner, added 2026-11-05; today the template formatter keeps only the text parts)</em> <em>Screen:</em> Local picture reading
+<ul>
+<li><em>Acceptance:</em> When a developer on Local picture reading sends an image to Phi-3 mini, then the call throws an error naming Phi-3 mini before inference.
+</li>
+</ul>
+</li>
+</ul>
 <h3 id="local-model-lifetime">Local model lifetime<a class="anchor-link" href="#local-model-lifetime">#</a></h3>
 <p>A host can unload or swap a local model while calls are still using it, and the process never crashes.</p>
 <ul>
@@ -377,17 +431,56 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 </li>
 </ul>
+<h3 id="postgresql-end-to-end">PostgreSQL end to end<a class="anchor-link" href="#postgresql-end-to-end">#</a></h3>
+<p>A host offers its users a server database of their own: vectors, conversations and workspaces in one PostgreSQL, proven on a real server in CI.</p>
+<ul>
+<li><strong>BRD-210</strong> — The PostgreSQL path shall be proven end to end on a real PostgreSQL 18 with pgvector that the test harness starts in Docker: <code>UsePgVector</code> for the vectors and the PostgreSQL conversation and workspace stores in the same database, reached through one <code>UsePostgres(connectionString)</code> builder call, with <code>LivePgVectorStoreTests</code> (BRD-157) and live store tests run in CI, so a host can offer its users a server database of their own <em>(Sevak feedback TR-RAG-055; Sevak phase 4, BRD-182 to BRD-185; owner, 2026-11-07)</em> The live tests read their connection string from a settings file beside the tests (a git-ignored <code>livetests.settings.json</code> with a committed example), never from an environment variable (owner's rule, 2026-11-07; today <code>LivePostgresFactAttribute</code> reads <code>TechieRagTestPostgres</code>). <em>Screen:</em> PostgreSQL end to end
+<ul>
+<li><em>Acceptance:</em> When a developer runs the live PostgreSQL tests on PostgreSQL end to end against the harness-started server, then vectors, conversations and workspaces round-trip in one database.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="host-data-skill">Host data skill<a class="anchor-link" href="#host-data-skill">#</a></h3>
+<p>A host's assistant reads and changes the host's own data in plain words, and every change can be undone.</p>
+<ul>
+<li><strong>BRD-211</strong> — The library shall offer a host-data skill: a host registers its own entities (name, fields, and handlers to list, read, create, update and delete) and the agent gets one tool set for them, so a host's assistant can read and change the host's data in plain words <em>(Sevak feedback TR-RAG-056; Sevak BRD-203; owner, 2026-11-07)</em> <em>Screen:</em> Host data skill
+<ul>
+<li><em>Acceptance:</em> When a developer registers a "task" entity on Host data skill and a user asks for a task, then the create handler runs with the extracted fields.
+</li>
+</ul>
+</li>
+<li><strong>BRD-212</strong> — Every change the host-data skill makes shall come back to the host as a typed change record (entity, id, before, after, the turn that caused it), and the skill shall reverse a record on request through the host's own handlers, so a host can show a card with Undo <em>(Sevak feedback TR-RAG-057; Sevak BRD-204; owner, 2026-11-07)</em> <em>Screen:</em> Host data skill
+<ul>
+<li><em>Acceptance:</em> When a developer calls Undo with a change record on Host data skill, then the entity is restored to its "before" state through the host's handler.
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="image-generation">Image generation<a class="anchor-link" href="#image-generation">#</a></h3>
+<p>Images from a prompt, through the same routing as the chat providers.</p>
+<ul>
+<li><strong>BRD-213</strong> — The library shall generate images: an <code>IImageGenerationProvider</code> with <code>GenerateImageAsync(prompt, size, options)</code> returning the image bytes, its media type and the usage, for OpenAI, Gemini and Venice, routed like the chat providers, with no key ever persisted; this re-scopes BRD-161 for images only <em>(Sevak feedback TR-RAG-058; Sevak BRD-127 and BRD-281; owner, 2026-11-07)</em> <em>Screen:</em> Image generation
+<ul>
+<li><em>Acceptance:</em> When a developer calls GenerateImageAsync on Image generation with a prompt, a size and a keyed provider, then PNG bytes of that size and the usage come back.
+</li>
+</ul>
+</li>
+</ul>
 <h2 id="development-status"><a id="5-development-status"></a>5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-29.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-11-07.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
-<tr><td>RAG / AI requirements</td><td>11</td><td>11</td><td>0</td><td>Done</td></tr>
+<tr><td>RAG / AI requirements</td><td>12</td><td>11</td><td>1</td><td>Partial</td></tr>
 <tr><td>Local model fit check</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Model routing</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
 <tr><td>Local model lifetime</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>LLM streaming</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
+<tr><td>Local picture reading (<code>LocalModel</code>, <code>LocalLlmProvider</code> as <code>IMultimodalLlmProvider</code>, <code>ChatImage</code>, <code>ChatContentPart</code>)</td><td>7</td><td>5</td><td>2</td><td>Partial</td></tr>
+<tr><td>Host data skill (<code>HostDataSkill</code>, <code>IHostEntity</code>, <code>HostDataChange</code>)</td><td>2</td><td>0</td><td>2</td><td>Planned</td></tr>
+<tr><td>Image generation (<code>IImageGenerationProvider</code>, <code>GenerateImageAsync</code>)</td><td>1</td><td>0</td><td>1</td><td>Planned</td></tr>
 </tbody>
 </table>
 <h2 id="where-the-rest-lives"><a id="6-where-the-rest-lives"></a>6. Where the rest lives<a class="anchor-link" href="#where-the-rest-lives">#</a></h2>

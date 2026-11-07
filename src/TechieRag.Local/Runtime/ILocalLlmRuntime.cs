@@ -23,6 +23,12 @@ internal interface ILocalLlmRuntime
     LocalModelFormat Format { get; }
 
     /// <summary>
+    /// Gets whether this runtime runs a graphics-card build (<see cref="LocalModelVariant.RequiresGpu"/>).
+    /// False for the CPU engine this package ships (REQ-RAG-146 / BRD-204).
+    /// </summary>
+    bool RunsGpuModels => false;
+
+    /// <summary>
     /// Loads only the tokenizer of a model folder, cheaply, so token counts are exact before the
     /// weights are loaded (REQ-RAG-065).
     /// </summary>

@@ -72,6 +72,15 @@ public sealed class PhaseThreeReferenceTests
         { "REQ-RAG-142", "LocalLlmProvider" },
         { "REQ-RAG-143", "response.reasoning_summary_text.delta" },
         { "REQ-RAG-144", "What cannot be shown." },
+        { "REQ-RAG-145", "LocalModel.Phi35VisionInstruct" },
+        { "REQ-RAG-145", "LocalLlmOptions.ReadsImages" },
+        { "REQ-RAG-146", "LocalModel.Phi4MultimodalInstruct" },
+        { "REQ-RAG-146", "LocalModel.RequiresGpu" },
+        { "REQ-RAG-147", "IMultimodalLlmProvider" },
+        { "REQ-RAG-147", "ChatImage.FromUrl" },
+        { "REQ-RAG-148", "LocalModel.ReadsImages" },
+        { "REQ-RAG-148", "SupportsInput(ChatContentKind.Image)" },
+        { "REQ-RAG-151", "LocalModelInputNotSupportedException" },
     };
 
     /// <summary>
@@ -95,7 +104,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(20, sections.Count);  // 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007) + TR-RAG-052 (Sevak local tool calling) + consumption monitoring / reasoning controls / timeout / codex agent (feedback sweep 2026-10-16) + REQ-RAG-137/138 thinking text (Chatur TR-RAG-008/009)
+        Assert.Equal(21, sections.Count);  // local picture reading (owner 2026-11-05, REQ-RAG-145…151) + 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007) + TR-RAG-052 (Sevak local tool calling) + consumption monitoring / reasoning controls / timeout / codex agent (feedback sweep 2026-10-16) + REQ-RAG-137/138 thinking text (Chatur TR-RAG-008/009)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 

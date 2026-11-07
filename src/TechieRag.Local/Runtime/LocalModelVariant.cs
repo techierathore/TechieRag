@@ -13,11 +13,16 @@ namespace TechieRag.Local.Runtime;
 /// served only from a mirror (<c>TECHIERAG_MODEL_BASE_URL</c>) until its default address is known.
 /// </param>
 /// <param name="Files">The files, each with size and SHA-256.</param>
+/// <param name="RequiresGpu">
+/// Whether the file set is a graphics-card build that only an ONNX Runtime GenAI GPU runtime loads
+/// (REQ-RAG-146 / BRD-204); the CPU engine refuses it before any download.
+/// </param>
 internal sealed record LocalModelVariant(
     LocalModelFormat Format,
     string FolderName,
     string? DefaultBaseUrl,
-    IReadOnlyList<LocalModelFileSpec> Files)
+    IReadOnlyList<LocalModelFileSpec> Files,
+    bool RequiresGpu = false)
 {
     /// <summary>Gets the total size of the files in bytes.</summary>
     public long DownloadBytes => Files.Sum(f => f.Bytes);

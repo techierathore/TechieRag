@@ -21,7 +21,7 @@ namespace TechieRag.Local.Runtime;
 /// without guidance support throws on it once; from then on the answer is unconstrained and relies on
 /// the provider's JSON instruction and strict parsing, which is what every other provider does.</para>
 /// </remarks>
-internal sealed class OnnxGenAiModel : ILocalLlmModel
+internal sealed partial class OnnxGenAiModel : ILocalLlmModel
 {
     private static volatile bool guidanceUnavailable;
 
@@ -29,6 +29,9 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
     private readonly Model model;
     private readonly Tokenizer tokenizer;
     private readonly int contextSize;
+    private readonly object processorLock = new();
+    private MultiModalProcessor? processor;
+    private int? lastImagePromptTokens;
     private volatile bool disposed;
 
     /// <summary>Loads a model folder on the CPU.</summary>
@@ -95,6 +98,58 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
     }
 
     /// <inheritdoc/>
+    public int? LastImagePromptTokens => lastImagePromptTokens;
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <para>The prompt and the pictures go through GenAI's <see cref="MultiModalProcessor"/>, which turns each
+    /// picture into the vision model's input and the prompt's image markers into its tokens, and the result
+    /// is handed to the generator with <see cref="Generator.SetInputs"/> (REQ-RAG-147 / BRD-205).</para>
+    /// <para>One picture is loaded from memory. Several are written to a private temporary folder on this
+    /// machine, loaded by path and deleted as soon as the processor has read them, because GenAI 0.16.0's
+    /// managed API loads only one picture from memory. Nothing is sent anywhere.</para>
+    /// </remarks>
+    public async IAsyncEnumerable<string> GenerateAsync(
+        string prompt,
+        IReadOnlyList<LocalImage> images,
+        int promptTokens,
+        LocalGenerationSettings settings,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(prompt);
+        ArgumentNullException.ThrowIfNull(images);
+        ArgumentNullException.ThrowIfNull(settings);
+        if (images.Count == 0)
+        {
+            throw new ArgumentException("A generation with pictures needs at least one picture.", nameof(images));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(disposed, this);
+
+        var multiModal = Processor();
+        using var inputs = await Task.Run(() => ProcessImages(multiModal, prompt, images), cancellationToken).ConfigureAwait(false);
+        ObjectDisposedException.ThrowIf(disposed, this);
+        // A picture's token count depends on its size and is known only once the processor has run, so the
+        // generation may use the whole context; the provider stops the answer at its MaxTokens.
+        var search = OnnxGenAiSearchOptions.From(settings, Math.Max(promptTokens, contextSize), contextSize);
+        using var parameters = CreateParameters(search);
+        using var generator = new Generator(model, parameters);
+        await Task.Run(() => SetInputs(generator, inputs), cancellationToken).ConfigureAwait(false);
+        ObjectDisposedException.ThrowIf(disposed, this);
+        lastImagePromptTokens = ReadPromptLength(generator);
+        using var stream = multiModal.CreateStream();
+        while (!generator.IsDone())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var token = await Task.Run(() => NextToken(generator), cancellationToken).ConfigureAwait(false);
+            ObjectDisposedException.ThrowIf(disposed, this);
+            yield return DecodedText.Clean(stream.Decode(token));
+            ObjectDisposedException.ThrowIf(disposed, this);
+        }
+    }
+
+    /// <inheritdoc/>
     /// <remarks>
     /// GenAI 0.16.0's <c>Tokenizer.ApplyChatTemplate</c> with no template text uses the model folder's own
     /// (<c>chat_template.jinja</c>, else <c>tokenizer_config.json</c>'s <c>chat_template</c>). The start
@@ -117,6 +172,12 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
         }
 
         disposed = true;
+        lock (processorLock)
+        {
+            processor?.Dispose();
+            processor = null;
+        }
+
         tokenizer.Dispose();
         model.Dispose();
         config.Dispose();
@@ -142,6 +203,86 @@ internal sealed class OnnxGenAiModel : ILocalLlmModel
         }
 
         return overlay.ToJsonString();
+    }
+
+    private static NamedTensors ProcessImages(MultiModalProcessor multiModal, string prompt, IReadOnlyList<LocalImage> images)
+    {
+        if (images.Count == 1)
+        {
+            using var one = Images.Load(images[0].Bytes);
+            return multiModal.ProcessImages(prompt, one);
+        }
+
+        var folder = Path.Combine(Path.GetTempPath(), "techierag-local-images", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var paths = images.Select((image, index) => WriteImage(folder, index, image)).ToArray();
+            using var loaded = Images.Load(paths);
+            return multiModal.ProcessImages(prompt, loaded);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(folder, recursive: true);
+            }
+            catch (IOException)
+            {
+                // A virus scanner may hold a file a moment longer; the folder is under the user's temp path.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // As above.
+            }
+        }
+    }
+
+    private static string WriteImage(string folder, int index, LocalImage image)
+    {
+        var path = Path.Combine(folder, $"{index + 1}{ExtensionFor(image.MediaType)}");
+        File.WriteAllBytes(path, image.Bytes);
+        return path;
+    }
+
+    private static string ExtensionFor(string mediaType) => mediaType.ToLowerInvariant() switch
+    {
+        "image/jpeg" or "image/jpg" => ".jpg",
+        "image/gif" => ".gif",
+        "image/webp" => ".webp",
+        "image/bmp" => ".bmp",
+        _ => ".png"
+    };
+
+    private static void SetInputs(Generator generator, NamedTensors inputs)
+    {
+        try
+        {
+            generator.SetInputs(inputs);
+        }
+        catch (OnnxRuntimeGenAIException exception) when (exception.Message.Contains("exceeds max length", StringComparison.Ordinal))
+        {
+            var match = InputIdsSize().Match(exception.Message);
+            throw new LocalImagePromptTooLongException(match.Success ? int.Parse(match.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : null, exception);
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"input_ids size \((\d+)\)")]
+    private static partial System.Text.RegularExpressions.Regex InputIdsSize();
+
+    private static int? ReadPromptLength(Generator generator)
+    {
+        var count = (long)generator.TokenCount();
+        return count is > 0 and <= int.MaxValue ? (int)count : null;
+    }
+
+    private MultiModalProcessor Processor()
+    {
+        lock (processorLock)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            return processor ??= new MultiModalProcessor(model);
+        }
     }
 
     private static int NextToken(Generator generator)

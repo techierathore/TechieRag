@@ -19,11 +19,16 @@ internal static class ChatTemplateFormatter
     /// </summary>
     /// <param name="template">The model's chat format.</param>
     /// <param name="messages">The conversation.</param>
+    /// <param name="imageMarker">
+    /// For a model that reads pictures, the marker for picture number n (from one, across the conversation),
+    /// written where each image part sits (REQ-RAG-147); null keeps only the text parts.
+    /// </param>
     /// <returns>The prompt text.</returns>
-    public static string Format(LocalChatTemplate template, IReadOnlyList<ChatMessage> messages)
+    public static string Format(LocalChatTemplate template, IReadOnlyList<ChatMessage> messages, Func<int, string>? imageMarker = null)
     {
         ArgumentNullException.ThrowIfNull(messages);
         var builder = new StringBuilder();
+        var images = new ImageCounter(imageMarker);
         var pendingSystem = template == LocalChatTemplate.Gemma ? SystemText(messages) : null;
 
         foreach (var message in messages)
@@ -34,7 +39,7 @@ internal static class ChatTemplateFormatter
                 continue;
             }
 
-            var text = TextOf(message);
+            var text = TextOf(message, images);
             if (pendingSystem is not null && role == "user")
             {
                 text = pendingSystem + "\n\n" + text;
@@ -71,10 +76,12 @@ internal static class ChatTemplateFormatter
     /// because templates such as Gemma's refuse a conversation whose turns do not alternate.
     /// </summary>
     /// <param name="messages">The conversation.</param>
+    /// <param name="imageMarker">The marker for picture number n, or null to keep only the text parts.</param>
     /// <returns>A JSON array of <c>{"role", "content"}</c> objects.</returns>
-    public static string ToMessagesJson(IReadOnlyList<ChatMessage> messages)
+    public static string ToMessagesJson(IReadOnlyList<ChatMessage> messages, Func<int, string>? imageMarker = null)
     {
         ArgumentNullException.ThrowIfNull(messages);
+        var images = new ImageCounter(imageMarker);
         var turns = new List<(string Role, string Text)>();
         if (SystemText(messages) is { } system)
         {
@@ -89,7 +96,7 @@ internal static class ChatTemplateFormatter
                 continue;
             }
 
-            var text = TextOf(message);
+            var text = TextOf(message, images);
             if (turns.Count > 0 && turns[^1].Role == role)
             {
                 turns[^1] = (role, turns[^1].Text + "\n\n" + text);
@@ -153,12 +160,32 @@ internal static class ChatTemplateFormatter
 
     private static string? SystemText(IReadOnlyList<ChatMessage> messages)
     {
-        var parts = messages.Where(m => NormaliseRole(m.Role) == "system").Select(TextOf).ToList();
+        var parts = messages.Where(m => NormaliseRole(m.Role) == "system").Select(m => TextOf(m, ImageCounter.None)).ToList();
         return parts.Count == 0 ? null : string.Join("\n\n", parts);
     }
 
-    private static string TextOf(ChatMessage message)
+    private static string TextOf(ChatMessage message, ImageCounter images)
     {
+        // A message with pictures follows its parts, which are authoritative: each picture's marker is
+        // written where the picture sits, in order with the text (REQ-RAG-147).
+        if (images.Enabled && message.HasImages)
+        {
+            var builder = new StringBuilder();
+            foreach (var part in message.Parts!)
+            {
+                if (part.Kind == ChatContentKind.Image)
+                {
+                    builder.Append(images.Next()).Append('\n');
+                }
+                else if (part.Kind == ChatContentKind.Text)
+                {
+                    builder.Append(part.Text);
+                }
+            }
+
+            return builder.ToString();
+        }
+
         if (!string.IsNullOrEmpty(message.Content))
         {
             return message.Content;
@@ -167,5 +194,23 @@ internal static class ChatTemplateFormatter
         return message.Parts is null
             ? string.Empty
             : string.Concat(message.Parts.Where(p => p.Kind == ChatContentKind.Text).Select(p => p.Text));
+    }
+
+    /// <summary>Numbers the pictures of one prompt from one, across every message.</summary>
+    private sealed class ImageCounter
+    {
+        private readonly Func<int, string>? marker;
+        private int count;
+
+        public ImageCounter(Func<int, string>? marker)
+        {
+            this.marker = marker;
+        }
+
+        public static ImageCounter None { get; } = new(null);
+
+        public bool Enabled => marker is not null;
+
+        public string Next() => marker!(++count);
     }
 }

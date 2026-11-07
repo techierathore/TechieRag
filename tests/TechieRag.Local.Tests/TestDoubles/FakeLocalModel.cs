@@ -45,6 +45,32 @@ internal sealed partial class FakeLocalModel : ILocalLlmModel
     }
 
     /// <inheritdoc/>
+    /// <summary>Records the pictures and the prompt, then plays the script (REQ-RAG-147).</summary>
+    public IAsyncEnumerable<string> GenerateAsync(
+        string prompt,
+        IReadOnlyList<LocalImage> images,
+        int promptTokens,
+        LocalGenerationSettings settings,
+        CancellationToken cancellationToken)
+    {
+        runtime.Images.Add(images);
+        if (runtime.ImagePromptTooLong is { } tokens)
+        {
+            return Refuse(tokens);
+        }
+
+        return GenerateAsync(prompt, settings, cancellationToken);
+    }
+
+    private static async IAsyncEnumerable<string> Refuse(int tokens)
+    {
+        await Task.Yield();
+        throw new LocalImagePromptTooLongException(tokens);
+#pragma warning disable CS0162 // An iterator needs a yield; the throw above always runs first.
+        yield break;
+#pragma warning restore CS0162
+    }
+
     public void Dispose()
     {
     }

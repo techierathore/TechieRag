@@ -11,8 +11,10 @@ namespace TechieRag.Local.HuggingFace;
 /// results, profiling traces (Arm's Gemma 3 1B carries a 10 MB one), lock files. Only these are
 /// fetched, from the named folder itself and not its sub-folders: <c>genai_config.json</c>; the ONNX
 /// graphs and their external weights (<c>*.onnx</c>, <c>*.onnx.data</c>, <c>*.onnx_data</c>); the
-/// tokenizer's files; the chat template; and <c>config.json</c>. After the download every file
-/// <c>genai_config.json</c> names is checked to be among them.
+/// tokenizer's files; the chat template; <c>config.json</c>; and, for a model that reads pictures, the
+/// multimodal processor's settings (<c>processor_config.json</c>, <c>vision_processor.json</c>,
+/// <c>speech_processor.json</c>) and the ONNX adapters (<c>*.onnx_adapter</c>, REQ-RAG-145). After the
+/// download every file <c>genai_config.json</c> names is checked to be among them.
 /// </remarks>
 internal static partial class HuggingFaceFileSelector
 {
@@ -29,7 +31,10 @@ internal static partial class HuggingFaceFileSelector
         "vocab.txt",
         "merges.txt",
         "chat_template.jinja",
-        "chat_template.json"
+        "chat_template.json",
+        "processor_config.json",
+        "vision_processor.json",
+        "speech_processor.json"
     };
 
     /// <summary>Gets whether a file in the folder is one the engine needs.</summary>
@@ -40,7 +45,8 @@ internal static partial class HuggingFaceFileSelector
         && (NamedFiles.Contains(fileName)
             || fileName.EndsWith(".onnx", StringComparison.Ordinal)
             || fileName.EndsWith(".onnx.data", StringComparison.Ordinal)
-            || fileName.EndsWith(".onnx_data", StringComparison.Ordinal));
+            || fileName.EndsWith(".onnx_data", StringComparison.Ordinal)
+            || fileName.EndsWith(".onnx_adapter", StringComparison.Ordinal));
 
     /// <summary>Gets whether a name is safe as a single file name in the model folder.</summary>
     /// <param name="fileName">The name.</param>

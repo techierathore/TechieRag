@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-11-05 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -120,6 +120,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#storage-defaults-dataroot-usesqlitevec-withpersistence-provider-connectionstring-null-defaultuserid-techierag">Storage defaults: DataRoot, UseSqliteVec(), WithPersistence(provider, connectionString = null, defaultUserId) (TechieRag)</a></li>
         <li class="h3"><a href="#flow-step-names-and-model-use-flownodecatalog-createnode-flowdefinition-useslanguagemodel-techierag">Flow step names and model use: FlowNodeCatalog.CreateNode, FlowDefinition.UsesLanguageModel (TechieRag)</a></li>
         <li class="h3"><a href="#local-model-fit-check-localllmprovider-isruntimeavailable-localmodel-estimaterequiredmemorybytes-availablememory-read-techierag-local">Local model fit check: LocalLlmProvider.IsRuntimeAvailable, LocalModel.EstimateRequiredMemoryBytes, AvailableMemory.Read (TechieRag.Local)</a></li>
+        <li class="h3"><a href="#local-picture-reading-localmodel-readsimages-localllmprovider-as-imultimodalllmprovider-techierag-local">Local picture reading: LocalModel.ReadsImages, LocalLlmProvider as IMultimodalLlmProvider (TechieRag.Local)</a></li>
         <li class="h3"><a href="#local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local">Local model lifetime: LocalLlmProvider.Dispose, DisposeAsync (TechieRag.Local)</a></li>
         <li class="h3"><a href="#model-routing-llmproviderfactory-listmodelsasync-createformodel-endpoint-techierag">Model routing: LlmProviderFactory.ListModelsAsync, CreateForModel(…, endpoint) (TechieRag)</a></li>
         <li class="h3"><a href="#generic-routes-venice-and-the-connector-list-openai-compatible-anthropic-compatible-venice-llmconnectorcatalog-describe-techierag">Generic routes, Venice and the connector list: openai-compatible/, anthropic-compatible/, venice/, LlmConnectorCatalog.Describe() (TechieRag)</a></li>
@@ -326,6 +327,41 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> required bytes = weight bytes + <code>KvBytesPerToken</code> × context size + 256 MB (<code>LocalModel.cs:348</code>); context size = the asked size, else 2,048 on a phone and 4,096 elsewhere, never above <code>ContextLength</code> (<code>LocalModel.cs:385</code>).</p>
+<h3 id="local-picture-reading-localmodel-readsimages-localllmprovider-as-imultimodalllmprovider-techierag-local"><a id="local-picture-reading-localmodelreadsimages-localllmprovider-as-imultimodalllmprovider-techieraglocal"></a>Local picture reading: <code>LocalModel.ReadsImages</code>, <code>LocalLlmProvider</code> as <code>IMultimodalLlmProvider</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#local-picture-reading-localmodel-readsimages-localllmprovider-as-imultimodalllmprovider-techierag-local">#</a></h3>
+<p><img src="screenshots/TechieRag/local-picture-calendar-page.png" alt="The fixed calendar page the live tests send to Phi-3.5 vision on this laptop, 2026-11-05; the model returned each meeting as "HH:MM - title"" style="max-width:100%"></p>
+<p>REQ-RAG-145 to REQ-RAG-151 (owner, 2026-11-05). Covered by <code>tests/TechieRag.Local.Tests/LocalPictureReadingTests.cs</code> and the live <code>tests/TechieRag.Local.Tests/Live/LiveVisionTests.cs</code>.</p>
+<p><strong>Runtime:</strong> live on this laptop's processor (WSL, Linux x64), 2026-11-05. The library downloaded Phi-3.5 vision (3.2 GB), checked every file and loaded it in 3 min 45 s. The calendar page in <code>tests/TechieRag.Local.Tests/Fixtures/calendar-page.png</code> came back as every meeting's time and title, in about 6 minutes.</p>
+<p><strong>Sample: a picture in, text out, on the local provider.</strong> The same <code>ChatImage</code> and <code>ChatMessage.UserWithImages</code> code goes to a hosted provider unchanged. The test <code>REQ-RAG-149 LiveDevGuideSamplePictureInTextOut</code> runs these lines.</p>
+<pre><code class="language-csharp">using var llm = new LocalLlmProvider(new LocalLlmOptions
+{
+    ReadsImages = true,   // no model named: Phi-3.5 vision on a desktop
+    TermsAccepted = true, // the user accepted the model's MIT licence earlier
+    ContextSize = 3072    // a page-sized picture takes about 2,000 tokens
+});
+
+var picture = await File.ReadAllBytesAsync(CalendarPicturePath());
+var turn = ChatMessage.UserWithImages(
+    "Describe this picture in two sentences.",
+    ChatImage.FromBytes(picture, "image/png"));
+
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 120 });
+Console.WriteLine(reply.Content);</code></pre>
+<p><strong>Call chain:</strong> <code>ChatAsync</code> → <code>StreamCoreAsync</code> → <code>CollectImages</code> → <code>RefuseImagesIfUnreadable</code> (before the load) → <code>LoadCoreAsync</code> (a <code>RequiresGpu</code> model is refused here, before any download) → <code>RefuseImagesIfUnreadable</code> (again, for a model read from disk) → <code>ChatTemplateFormatter.Format</code> with <code>ImagePromptMarker</code> → <code>OnnxGenAiModel.GenerateAsync(prompt, images, …)</code> → <code>MultiModalProcessor.ProcessImages</code> → <code>Generator.SetInputs</code>.</p>
+<p>A picture's tokens depend on its size, so the engine counts them after it has read the picture. The provider's check before that counts each picture at its fewest tokens. A prompt the engine finds too long comes back as <code>LocalPromptTooLongException</code>. Several pictures are written to a private temporary folder and deleted at once, because the engine's managed API loads only one picture from memory. A picture given as a web address is refused, because nothing is fetched.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag.Local/LocalModel.cs:336</code></td><td><code>ReadsImages</code></td><td>the return</td><td>true for Phi-3.5 vision and Phi-4 multimodal; from <code>genai_config.json</code> for folder and Hugging Face models</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalModel.cs:519</code></td><td><code>DefaultFor(isPhone, readsImages)</code></td><td>the return</td><td><code>Phi35VisionInstruct</code> on a desktop; throws on a phone</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:174</code></td><td><code>SupportsInput</code></td><td><code>Model.ReadsImages</code></td><td>the same answer as the catalogue</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:257</code></td><td><code>LoadCoreAsync</code></td><td><code>variant.RequiresGpu</code></td><td>true for Phi-4 multimodal, which throws before the terms and the download</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:596</code></td><td><code>StreamCoreAsync</code></td><td><code>promptTokens</code></td><td>text tokens + 145 per picture (the lower bound)</td></tr>
+<tr><td><code>src/TechieRag.Local/LocalLlmProvider.cs:790</code></td><td><code>RefuseImagesIfUnreadable</code></td><td><code>Model.ReadsImages</code></td><td>false throws <code>LocalModelInputNotSupportedException</code> naming the model</td></tr>
+<tr><td><code>src/TechieRag.Local/Runtime/OnnxGenAiModel.cs:140</code></td><td><code>GenerateAsync</code> (pictures)</td><td><code>lastImagePromptTokens</code></td><td>the engine's count, 1,975 for the calendar page with the live prompt</td></tr>
+<tr><td><code>src/TechieRag.Local/ChatTemplateFormatter.cs:171</code></td><td><code>TextOf</code></td><td>the marker</td><td>`&lt;</td><td>image_1</td><td>&gt;` where the first picture sat</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> memory for Phi-3.5 vision = 3,220,612,860 bytes of weights + 393,216 × context + 256 MB. That is about 4.7 GB at a 3,072-token context.</p>
 <h3 id="local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local"><a id="local-model-lifetime-localllmproviderdispose-disposeasync-techieraglocal"></a>Local model lifetime: <code>LocalLlmProvider.Dispose</code>, <code>DisposeAsync</code> (<code>TechieRag.Local</code>)<a class="anchor-link" href="#local-model-lifetime-localllmprovider-dispose-disposeasync-techierag-local">#</a></h3>
 <p><img src="screenshots/TechieRag/probe-maccatalyst-generate.png" alt="The probe's local-model screen on Mac Catalyst, September 2026: the generate path a dispose now cancels safely; it predates this change" style="max-width:100%"></p>
 <p>REQ-RAG-129 (Sevak TR-RAG-053, added 2026-10-11). Covered by <code>tests/TechieRag.Local.Tests/LocalProviderDisposeTests.cs</code>.</p>
