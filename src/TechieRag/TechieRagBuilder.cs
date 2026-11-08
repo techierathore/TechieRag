@@ -273,6 +273,28 @@ public class TechieRagBuilder
         return UseVectorStore(VectorStoreType.PgVector, connectionString);
     }
 
+    /// <summary>
+    /// Puts the vectors, the conversations and the workspaces in one PostgreSQL database
+    /// (REQ-RAG-152 / BRD-210).
+    /// </summary>
+    /// <param name="connectionString">The PostgreSQL connection string; the server needs the <c>vector</c>
+    /// extension available (pgvector).</param>
+    /// <param name="defaultUserId">Default user for persistent conversation memory.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>
+    /// The same as <see cref="UsePgVector(string)"/> followed by
+    /// <c>WithPersistence(StoreProvider.Postgres, connectionString, defaultUserId)</c>: one call, one database,
+    /// so a host can offer its users a server database of their own. Each store creates its own tables
+    /// on first use (<c>Documents</c>/<c>Chunks</c>, <c>TrThread</c>/<c>TrMessage</c>, <c>TrWorkspace</c>/<c>TrWorkspaceDocument</c>).
+    /// </remarks>
+    /// <exception cref="ArgumentException"><paramref name="connectionString"/> is null or empty.</exception>
+    public TechieRagBuilder UsePostgres(string connectionString, string defaultUserId = "default")
+    {
+        ArgumentException.ThrowIfNullOrEmpty(connectionString);
+        UsePgVector(connectionString);
+        return WithPersistence(StoreProvider.Postgres, connectionString, defaultUserId);
+    }
+
     public TechieRagBuilder UseQdrant(string endpoint = "http://localhost:6334", string? apiKey = null)
         => UseVectorStore(VectorStoreType.Qdrant, endpoint, apiKey);
 

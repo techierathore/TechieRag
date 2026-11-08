@@ -9,8 +9,8 @@
 # `ref` to be (or sit exactly on) a `v*` tag; a DRY run may use any ref and packs a throwaway
 # `-dryrun.N` version for inspection.
 #
-# THE VERSION COMES FROM THE TAG, NEVER FROM THE CSPROJ. The csproj `<Version>` is a standing
-# development number (1.0.0) that was never bumped, and before 2026-09-03 this workflow packed
+# THE VERSION COMES FROM THE TAG, NEVER FROM THE CSPROJ. The csproj `<Version>` is a local
+# development number (1.0.0 until 2026-11-08, then set by hand to 1.1.9), and before 2026-09-03 this workflow packed
 # whatever it found there and pushed with --skip-duplicate — so every run after the first one
 # re-packed 1.0.0 and silently no-op'd (nuget.org sat at 1.0.0 while tags reached v1.0.6).
 # Now: `Determine version` derives it from the tag, refuses a version nuget.org already has,

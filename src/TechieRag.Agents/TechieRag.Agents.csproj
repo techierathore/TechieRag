@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>TechieRag.Agents</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.1.9</Version>
     <Authors>Techie Rathor</Authors>
     <Company>TechieRathor</Company>
     <Description>Microsoft Agent Framework agents over TechieRag: a fluent TechieRagAgentBuilder (LM Studio first, Ollama, OpenAI, OpenAI-compatible, or the LLM already configured on TechieRag), agentic retrieval tools with citation refs and match-quality status, and public adapters between TechieRag's ILlmProvider, IToolHandler, IProgress&lt;AgentStep&gt; and IConversationMemory seams and Microsoft.Extensions.AI / Agent Framework. No hosted tools, no telemetry exporters: nothing leaves the machine except calls to the model you configure.</Description>

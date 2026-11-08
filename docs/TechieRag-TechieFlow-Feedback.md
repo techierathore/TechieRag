@@ -4,13 +4,16 @@
 |---|---|
 | App | TechieRag |
 | Upstream | TechieFlow |
-| Updated | 2026-10-29 (TF-008 fixed upstream, ships in TechieFlow v1.2.2) |
+| Updated | 2026-11-08 (TF-005 to TF-010 re-checked here after update-framework.sh and closed) |
 
 ## Summary
 
-8 entries: 0 blocking now, 0 open, 4 fixed upstream and not yet re-checked here (TF-005 to TF-007, fixed 2026-10-18, ship in TechieFlow v1.2.0; TF-008, fixed 2026-10-29, ships in v1.2.2), 4 closed (TF-001 to TF-004).
+- 0 blockers, 2 majors, 8 minors, 0 nice-to-haves; all 10 closed
+- Last consolidated: 2026-11-08
 
-Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and closed. TF-005 to TF-007 are fixed upstream; re-check them here.
+10 entries: 0 blocking now, 0 open, 10 closed (TF-001 to TF-004 on 2026-10-06; TF-005 to TF-010 on 2026-11-08).
+
+Nothing is blocked. Every entry was re-checked here and closed; TF-007 was re-checked by reading the hook, the others by running the scripts.
 
 ## Entries
 
@@ -88,6 +91,8 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 
 ### TF-005 — a new triage row takes an id that another phase's checklist already uses
 
+> ✅ **Closed 2026-11-08** — re-checked here: 2026-11-08: next_id from tf-checklist-edit.py, called read-only on the P3 checklist (no FN rows), returned REQ-FN-072, one past the highest FN id across every checklist (REQ-FN-071); the no-FN-rows default prefix rule is in tf-triage.py
+
 - **Severity:** minor
 - **Blocks:** no — the row was renumbered by hand to REQ-RAG-128 and the run carried on.
 - **Repro:** in TechieRag (phase 3, whose checklist has no REQ-FN rows; phase 1's checklist has REQ-FN-001):
@@ -102,6 +107,8 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Suggested fix:** take the highest id with that prefix across `docs/{App}-Checklist.md` and every `docs/{App}-P*-Checklist.md`. On a project whose rows all use one prefix (here `RAG`), default to that prefix or refuse without `--prefix`.
 
 ### TF-006 — the verify boot picks a native MAUI sample as the Windows head and waits 300 s for a DevTools port it can never open
+
+> ✅ **Closed 2026-11-08** — re-checked here: 2026-11-08: tf-verify-boot.sh start returned at once with NONE head=windows kind=no-webview (samples/TechieRag.Probe has no BlazorWebView) in three verify runs; no 300 s wait
 
 - **Severity:** minor
 - **Blocks:** no — every row here has no screen, so the verdict graded them by their tests. All 15 passed.
@@ -119,6 +126,8 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 
 ### TF-007 — the Stop hook tells you to run a BRD-status command that does nothing for another phase
 
+> ✅ **Closed 2026-11-08** — re-checked here: 2026-11-08: read guard-status-html.sh section 3; a docs/<App>-P<n>-Checklist.md stem now gives 'tf-brd-status.sh <App> --phase <n>'. Re-checked by reading the code, not by ending a turn on a phase-2 change
+
 - **Severity:** minor
 - **Blocks:** no — `tf-brd-status.sh TechieRag --phase 2` worked, and the gate passed.
 - **Repro:** in a Large project, change a phase-2 checklist while `appPhase` is 3 (here a `tf-triage.sh note` on REQ-RAG-110), then end the turn. `guard-status-html.sh` says:
@@ -134,6 +143,8 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Seen again 2026-10-15:** same message after a `tf-triage.sh note` on REQ-FN-057 (P2 checklist) in `*fix-issues TechieRag`; same workaround worked.
 
 ### TF-008 — a new triage row takes an id that tests and source already carry, though no checklist row holds it
+
+> ✅ **Closed 2026-11-08** — re-checked here: 2026-11-08: next_id read-only with a source file carrying REQ-RAG-158 returned REQ-RAG-159, so an id the tests already carry is skipped
 
 - **Status:** fixed upstream 2026-10-29, ships in TechieFlow v1.2.2; not yet re-checked here.
 - **Severity:** minor
@@ -151,9 +162,57 @@ Nothing is blocked. TF-001 to TF-004 were re-checked here on 2026-10-06 and clos
 - **Suggested fix:** in `tf-triage.py` `new`, also scan `src/`, `source/` and `tests/` for `REQ-<prefix>-NNN` and start above the highest. In `tf-verify-tests.sh`, warn when a row's matching tests sit in files older than the row's "logged" date.
 - **Reply (TechieFlow team, 2026-10-29):** Fixed both ways you suggested. **`tf-triage new`** now takes the next id past the highest one in the checklists, the telemetry streams, and the source and test files under `src/`, `source/`, `tests/` and `test/` (code files only; `bin/`, `obj/`, `node_modules/` and test results are skipped). **`tf-verify-tests`** warns when a row that triage logged (`logged from UAT <date>` in its Remark) has tests that carried its id before that day: a `WARN` line, `tests_older_than_row` in `tests.json`, and a ⚠ note in the row's Remark from the verdict. The day an id first appeared comes from the history (the first commit that added it under those folders), else from the files' dates. It warns; it does not fail the row. Regression case `tr_008`. Miss `MISS-TechieFlow-20261029-04`. **Measured here:** `new --prefix RAG` on phase 3 gives REQ-RAG-139 with the old and the new script alike, because the two rows are already renamed to 137 and 138; the new scan reads 552 files and adds about 1.3 s. **Check it here:** with a test named `REQ-RAG-140 …` and no row, `bash .tfcore/utils/tf-triage.sh TechieRag new "<title>" "<acceptance>" --prefix RAG --phase 3` gives REQ-RAG-141.
 
+### TF-009 — the verifier writes Verified over a Blocked row when one test carrying its id passes
+
+> ✅ **Closed 2026-11-08** — re-checked here: 2026-11-08 after update-framework.sh: tf-verify-verdict.sh --apply kept REQ-RAG-146 Blocked (verdict BLOCKED-HELD) although its tests passed, and kept REQ-RAG-155 Blocked; no hand correction needed
+
+- **Status:** fixed upstream 2026-11-08, ships in TechieFlow v1.3.0; not yet re-checked here.
+- **Severity:** major
+- **Blocks:** no — the row was put back to Blocked by hand in the same run; the hook allows it, since only Verified is guarded.
+- **Repro:** in TechieRag phase 3, REQ-RAG-146 was `Blocked` (its GPU-load half waits on an owner decision; its refusal half is built and has the test `REQ-RAG-146 GpuModelRefusedBeforeDownload`). Then:
+  ```text
+  bash .tfcore/utils/tf-verify-verdict.sh TechieRag --apply --started 2026-11-05T13:34:06Z
+  | REQ-RAG-146 | PASS | - | Verified | test `REQ-RAG-146 GpuModelRefusedBeforeDownload` |
+  ```
+- **Expected:** a `Blocked` row stays `Blocked` (its passing test can go in the Remark), or the verdict asks for every clause of the acceptance line to have a test before it writes `Verified`.
+- **Actual:** the row became `Verified 100%` on a test of one of its two clauses, and `tf-verify-emit.sh` wrote a PASS gate record for it.
+- **Encountered in:** `*build-phase TechieRag`, the chained verify, 2026-11-05.
+- **Workaround:** REQ-RAG-146 set back to `Blocked 50%` with a Remark naming the passing half; the gate record for that run still reads PASS.
+- **Suggested fix:** in `tf-verify-verdict.sh`, never raise a row whose Status is `Blocked` above it; write the test result into its Remark instead.
+- **Seen again 2026-11-08:** the same row, the same run shape (`*build-phase TechieRag`, chained verify, `--started 2026-11-07T20:36:57Z`); it was put back to `Blocked` by hand again. The same run also raised REQ-RAG-155 to `Verified` from stand-in tests while its three live tests were skipped; that row was held back by hand.
+- **Reply (TechieFlow team, 2026-11-08):** Fixed both halves in `tf-verify-verdict.py`. **A `Blocked` row stays `Blocked`.** When every check passes on a row that reads `Blocked`, the verdict is the new `BLOCKED-HELD`: the Status and % are left as they were, the Remark says `tests pass, still Blocked` and names the passing test, and no gate record is written. The tests measure the part that is built, never what the row waits on. **A row with a skipped test is not measured.** When some tests carrying a row's id passed and others were skipped, the row is `NOT-TESTED`, not `Verified`; the Remark names how many passed and skipped, the first skipped test and its reason. This is the Sevak TF-004 rule (a unit pass does not stand in for a skipped on-app test), now for every test. A row that already reads `Verified` with an earlier PASS on record keeps it, marked not re-measured (Chatur TF-017); without one it goes to `Needs re-verify`. Regression case `tr_009`; both halves fail against the v1.2.4 script. **Measured on the latest test results of every project:** 20 rows pass with a test skipped and will read `NOT-TESTED` at their next verify: TechieRag 11 (REQ-RAG-155 among them), Chatur 6, AstroLyfe 2, Lekhak 1. **Check it here:** the next chained verify leaves REQ-RAG-146 at `Blocked` with no PASS gate record, and REQ-RAG-155 at `NOT-TESTED` while its live tests skip.
+
+### TF-010 — the verifier cannot run one memory-heavy test on its own, so a row whose test fits only alone is never measured
+
+> ✅ **Closed 2026-11-08** — re-checked here: 2026-11-08 after update-framework.sh: tf-verify-tests.sh --filter "DisplayName~REQ-RAG-150" ran the calendar test alone (1 passed), merged as a part; REQ-RAG-150 graded PASS and Verified. Same for REQ-RAG-145 and REQ-RAG-149
+
+- **Status:** fixed upstream 2026-11-08, ships in TechieFlow v1.3.0; not yet re-checked here.
+- **Severity:** minor
+- **Blocks:** no — the row stays `Implemented`, and the standalone pass is written in its Remark.
+- **Repro:** TechieRag REQ-RAG-150's only test, `REQ-RAG-150 LiveCalendarPageTitlesAndTimes`, loads a 4.7 GB local picture model. `tf-verify-tests.sh --no-browser --target tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj` runs the whole project, and the test skips itself for memory (3.0 GB free). Run alone, it passes:
+  ```text
+  bash .tfcore/utils/tf-build.sh test tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj -- --filter "DisplayName~REQ-RAG-150"
+  Passed!  - Failed: 0, Passed: 1, Skipped: 0, Total: 1, Duration: 5 m 17 s
+  ```
+- **Expected:** `tf-verify-tests.sh` takes a test filter (for example `--filter "DisplayName~REQ-RAG-150"` passed to `dotnet test`), so the run can grade that row from a part file merged with `--merge`.
+- **Actual:** no filter option exists; `tf-status-facts.sh` then names the row as "cannot be measured here" for the owner.
+- **Encountered in:** `*build-phase TechieRag`, the chained verify, 2026-11-08.
+- **Workaround:** none in the ledger; the standalone pass is recorded in the checklist Remark.
+- **Suggested fix:** pass `--filter <expr>` through to the unit `tf-build.sh test` call and write the result as a normal part file.
+- **Reply (TechieFlow team, 2026-11-08):** Done as you suggested. `tf-verify-tests.sh --filter "<dotnet test filter>"` passes the filter to `dotnet test` through `tf-build.sh test`, runs no browser tests, and writes `tests/.artifacts/verify/tests-filter-<filter>.json`. Merged with the full run, a test run alone stands over its earlier skip, so the row is graded normally. `--filter` with `--no-unit` or `--shard` is refused. verify-phase.md step 5 names it. Regression case `tr_010`; it fails against the v1.2.4 script. **Check it here:** `bash .tfcore/utils/tf-verify-tests.sh --filter "DisplayName~REQ-RAG-150" --target tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj`, then `bash .tfcore/utils/tf-verify-tests.sh --merge tests/.artifacts/verify/tests.json tests/.artifacts/verify/tests-filter-DisplayName-REQ-RAG-150.json`; the verdict then grades REQ-RAG-150 from its passing run.
+
 ## Replies from TechieFlow
 
 <!-- The upstream team's answers, newest block first. Left in full: this is the record. -->
+
+### Resolution status (TechieFlow team, 2026-11-08)
+
+Ships in **TechieFlow v1.3.0**, the next release after v1.2.4. It reaches this project's `.tfcore/` at its next framework update: none was run here on 2026-11-08, because a build was running.
+
+| ID | Fix | Check it here |
+|---|---|---|
+| TF-009 | Fixed upstream. The reply is under the entry. | the next chained verify leaves REQ-RAG-146 `Blocked` with no PASS gate record, and REQ-RAG-155 `NOT-TESTED` while its live tests skip. |
+| TF-010 | Fixed upstream. The reply is under the entry. | `tf-verify-tests.sh --filter "DisplayName~REQ-RAG-150" --target tests/TechieRag.Local.Tests/TechieRag.Local.Tests.csproj`, then `--merge` the part into tests.json. |
 
 ### Resolution status (TechieFlow team, 2026-10-29)
 

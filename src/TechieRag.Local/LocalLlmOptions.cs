@@ -11,8 +11,19 @@ public sealed class LocalLlmOptions
     /// <summary>Gets or sets the logger factory the provider logs loads through; null logs nothing.</summary>
     public ILoggerFactory? LoggerFactory { get; set; }
 
-    /// <summary>Gets or sets the model; null selects <see cref="LocalModel.PlatformDefault"/>.</summary>
+    /// <summary>
+    /// Gets or sets the model; null selects <see cref="LocalModel.PlatformDefault"/>, or
+    /// <see cref="LocalModel.Phi35VisionInstruct"/> on a desktop when <see cref="ReadsImages"/> is true.
+    /// </summary>
     public LocalModel? Model { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether the app asks for a model that reads pictures (owner decision 2026-11-05). With no
+    /// model named, the provider then runs <see cref="LocalModel.Phi35VisionInstruct"/> on a desktop; on Android
+    /// and iOS no picture model runs, and creating the provider throws <see cref="NotSupportedException"/>. With
+    /// a model named that does not read pictures, creating the provider throws as well.
+    /// </summary>
+    public bool ReadsImages { get; set; }
 
     /// <summary>
     /// Gets or sets the context size in tokens; null uses 2,048 on a phone and 4,096 elsewhere,

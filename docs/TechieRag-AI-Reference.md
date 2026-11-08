@@ -299,6 +299,7 @@ var response = await rag.AskAsync("What is quantum computing?");
 |--------|-------------|
 | `UseSqliteVec(connectionString)` | SQLite with vec extension; `UseSqliteVec()` with no path uses the per-app default database (`DataRoot.DefaultDatabasePath`) |
 | `UsePgVector(connectionString)` | PostgreSQL with pgvector extension |
+| `UsePostgres(connectionString, defaultUserId)` | Vectors, conversations and workspaces in one PostgreSQL database (REQ-RAG-152) |
 | `UseQdrant(endpoint, apiKey)` | Qdrant vector database |
 
 ### LLM Providers
@@ -1355,6 +1356,26 @@ var runner = new AgentLoopRunner(local, registry);
 var answer = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);
 ```
 
+### Local picture reading: `LocalModel.ReadsImages`, `Phi35VisionInstruct`, `IMultimodalLlmProvider`
+
+Package `TechieRag.Local`; namespace `TechieRag.Local` (owner, 2026-11-05; REQ-RAG-145 to REQ-RAG-151). A picture is read on the user's own machine with the same `ChatImage`, `ChatContentPart` and `ChatMessage.UserWithImages` code a hosted provider takes, so an app's code is the same for local and hosted. The model only turns the picture into text; checking dates, overlaps and duplicates is the app's job.
+
+- **Models.** `LocalModel.Phi35VisionInstruct` (`phi-3.5-vision-instruct`, Microsoft's processor build, about 3.2 GB, MIT) runs on a laptop's processor. `LocalModel.Phi4MultimodalInstruct` (`phi-4-multimodal-instruct`, about 5.1 GB) is a graphics-card build: `LocalModel.RequiresGpu` is true, and loading it throws `NotSupportedException` before its terms are asked and before any download, because this package ships the processor engine only. Neither runs on Android or iOS.
+- **Which models read pictures.** `LocalModel.ReadsImages` is true for the two picture models and false for Qwen2.5 0.5B and Phi-3 mini. For `FromHuggingFace` and `FromFolder` models it is read from the model's own `genai_config.json` (a `model.vision` section), so for a Hugging Face model it is known after the download. `LocalLlmProvider` implements `IMultimodalLlmProvider`; `SupportsInput(ChatContentKind.Image)` (and `SupportsVision()`) gives the same answer as `Model.ReadsImages`.
+- **Asking for pictures.** `LocalLlmOptions.ReadsImages = true` with no model named runs `Phi35VisionInstruct` on a desktop; on a phone, or with a text model named, creating the provider throws `NotSupportedException`.
+- **A text model given a picture** throws `LocalModelInputNotSupportedException` (a `NotSupportedException`) naming the model, before it is loaded or run; `ModelId`, `ModelName`, `InputKind` and `Count` say what was refused. A picture is never dropped without notice.
+- **Bytes only.** Give pictures with `ChatImage.FromBytes` or `FromBase64`. A `ChatImage.FromUrl` picture throws `NotSupportedException`: the local provider never fetches anything.
+- **Context.** A picture's tokens depend on its size: a 1200 × 900 calendar page took 1,960 tokens with its prompt. The engine counts them once it has read the picture; a prompt that does not fit throws `LocalPromptTooLongException` with that count. Keep `ContextSize` at 3,072 or more for a page-sized picture (the default is 4,096).
+
+```csharp
+using var llm = new LocalLlmProvider(new LocalLlmOptions { ReadsImages = true, TermsAccepted = true });
+var turn = ChatMessage.UserWithImages(
+    "Write one line for each meeting, in the form HH:MM - title.",
+    ChatImage.FromBytes(await File.ReadAllBytesAsync("calendar.png"), "image/png"));
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 200, Temperature = 0 });
+// reply.Content: "09:00 - Weekly planning\n10:30 - Budget review with Priya\n…"; the app parses and checks it.
+```
+
 ### Choosing a model for a piece of work: `ModelChooser`
 
 Package `TechieRag`; namespace `TechieRag.Llm` (REQ-RAG-128, Chatur TR-RAG-006). `ModelRouter` turns a model name into a service; `ModelChooser` decides which name. `new ModelChooser(smallModel, options?)` takes any `ILlmProvider`; a cheap or local one is enough. `ChooseAsync(request, candidates)` takes the request text and `ModelCandidate { ModelId, Tier?, Notes?, Cost? }` items, the free-text fields written in the host's own words. It returns a `ModelChoice` with `Candidate`, `ModelId`, `Reason` (one sentence to show and log), `Source` (`ModelChoiceSource.SmallModel`, `OnlyCandidate` or `Fallback`) and the small model's `Usage`. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to `ModelChooserOptions.MaxRequestCharacters` (default 4000). The reply's id is matched ignoring case. An id without its `connector/` prefix matches when exactly one candidate ends with it. **The answer is always a candidate:** a reply that is not JSON, or names a model that was not offered, gives `ModelChooserOptions.FallbackModelId` (else the first candidate) with `Source = Fallback`. **A failure of the small model is thrown** (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. `ModelChooserOptions.Guidance` adds the host's rule to the instructions. The interface `IModelChooser` lets a unit test pass a fixed choice.
@@ -1547,6 +1568,87 @@ var agentPath = Path.Combine(
     ".codex", "agents", "techierag.toml");
 Console.WriteLine(File.Exists(agentPath) ? "techierag agent ready" : "build to deploy");
 ```
+
+### One PostgreSQL database for everything (REQ-RAG-152)
+
+`UsePostgres(connectionString)` is `UsePgVector(connectionString)` plus `WithPersistence(StoreProvider.Postgres, connectionString)`. One call puts the vectors (`Documents`, `Chunks`), the conversations (`TrThread`, `TrMessage`) and the workspaces (`TrWorkspace`, `TrWorkspaceDocument`) in one database. The server needs pgvector. Proven on PostgreSQL 18 + pgvector in CI.
+
+```csharp
+var rag = new TechieRagBuilder()
+    .UsePostgres("Host=db;Database=app;Username=app;Password=...", defaultUserId: userId)
+    .UseEmbedding(EmbeddingSource.Ollama)
+    .Build();
+await rag.InitializeAsync();
+var threads = rag.GetConversationStore();      // PostgresConversationStore
+var workspaces = rag.GetWorkspaceManager();     // over PostgresWorkspaceStore
+```
+
+### Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)
+
+Namespace `TechieRag.Agentic.HostData`. A host registers its own entities. The agent gets ONE tool set for all of them: `host_data_list`, `host_data_read`, `host_data_create`, `host_data_update` and `host_data_delete`, each taking an `entity` argument. `HostDataSkill` is an `IToolHandler`: pass it to `AgentLoopRunner`, combine it with other tools in `CompositeToolHandler`, wrap it in `GuardedToolHandler`, or hand it to a `TechieRag.Agents` agent.
+
+```csharp
+var task = new HostEntity("task", "A to-do item of the user.",
+[
+    new HostEntityField("title", HostFieldType.Text, "What to do.", Required: true),
+    new HostEntityField("due", HostFieldType.DateTime, "When it is due, local time."),
+    new HostEntityField("priority", HostFieldType.Choice, "How important it is.") { Choices = ["low", "normal", "high"] }
+])
+{
+    List   = (query, ct) => repo.FindAsync(query.Text, query.Limit, ct),     // IReadOnlyList<HostEntityRecord>
+    Read   = (id, ct) => repo.ReadAsync(id, ct),                             // HostEntityRecord? (null = not found)
+    Create = (values, ct) => repo.CreateAsync(values, ct),                   // values: IReadOnlyDictionary<string, JsonElement>
+    Update = (id, values, ct) => repo.UpdateAsync(id, values, ct),           // only the named fields change
+    Delete = (id, ct) => repo.DeleteAsync(id, ct)
+};
+
+var skill = new HostDataSkill(new HostDataSkillOptions
+{
+    OnChangeAsync = (change, ct) => changeLog.SaveAsync(change, ct)          // awaited before the model sees the result
+}).Register(task);
+
+skill.BeginTurn(turnId);                                                     // each change carries this turn id
+var answer = await new AgentLoopRunner(llm, skill).RunAsync(messages);
+foreach (HostDataChange change in skill.TurnChanges) { /* show a card with Undo */ }
+
+HostDataChange reversal = await skill.UndoAsync(change);                     // through the host's own handlers
+```
+
+Rules:
+- A null handler is an operation the entity does not offer. A tool appears only when some entity offers it, and its `entity` enum names only those entities. An entity that offers update or delete must offer read, because the skill reads the "before" state first; `Register` refuses one that does not.
+- The model's `fields` are checked before any handler runs: the name must be known, the value must have the right type (`Date` is `yyyy-MM-dd`, `DateTime` is ISO 8601), a choice must be in `Choices`, and a create must name every required field. A mismatch goes back to the model as a failed `ToolResult` it can correct. `ToolResult.Message.Code` is one of `HostDataMessageCodes` for the trace. A handler that throws becomes `HostDataHandlerFailed`; the model is told, and the turn goes on.
+- `HostDataChange`: `ChangeId`, `Entity`, `EntityId`, `Kind` (`Created`/`Updated`/`Deleted`), `Before`, `After` (`HostEntityRecord`: `Id` + `Values`), `TurnId`, `ToolCallId`, `UndoOf`, `At`. It is plain data: store it as JSON and undo it later.
+- `UndoAsync`: Created → the delete handler; Updated → the update handler with `Before.Values`; Deleted → the create handler with `Before.Values` (the host may give a new id). It returns the reversal as a new change with `UndoOf` set, and raises it like any change. It throws `HostDataException` (`Code` `HostDataCannotUndo` or `HostDataUnknownEntity`) when the entity lacks the handler.
+- The delete tool has `RequiresConfirmation = true` by default (`HostDataSkillOptions.DeleteRequiresConfirmation`).
+
+### Image generation (REQ-RAG-155)
+
+Namespaces: the providers and `ImageGenerationProviderFactory` are in `TechieRag.ImageGeneration`, the interface in `TechieRag.Abstractions`, and `ImageSize`, `GeneratedImage`, `ImageGenerationOptions` and `ImageGenerationUsage` in `TechieRag.Models`. `IImageGenerationProvider.GenerateImageAsync(prompt, ImageSize size, ImageGenerationOptions? options)` returns `GeneratedImage(Bytes, MediaType, Size, Usage)`. `MediaType` and `Size` are read from the image bytes, so you can see when a service sent something other than what you asked for. Routes work like chat routes:
+
+```csharp
+var images = ImageGenerationProviderFactory.CreateForModel("openai/gpt-image-1", apiKey);   // also "gemini/...", "venice/..."
+GeneratedImage image = await images.GenerateImageAsync("a lighthouse at dawn", ImageSize.Square1024);
+await File.WriteAllBytesAsync("hero.png", image.Bytes);   // image.Usage.TotalTokens, image.Usage.Images
+```
+
+| Connector | Default model | Sizes | Usage |
+|---|---|---|---|
+| `openai` | `gpt-image-1` (PNG, `output_format`) | 1024x1024, 1536x1024, 1024x1536 (DALL·E 3/2 have their own lists) | input, output and total tokens |
+| `gemini` | `gemini-2.5-flash-image` (`generateContent`, image output) | by aspect ratio 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9; tier 1K/2K/4K from the long side; 1024x1024 exact | `usageMetadata` tokens |
+| `venice` | `venice-sd35` (PNG, width and height) | any up to 1280 a side | image count only (Venice reports no tokens) |
+| `openai-compatible` | none: name it, `openai-compatible/<model>` (REQ-RAG-156) | the service's; GPT Image and DALL·E names get OpenAI's lists | whatever the service returns in OpenAI's `usage` |
+| `azure-openai` | none: the deployment, `azure-openai/<deployment>` (REQ-RAG-157) | the service's; name `Model = "gpt-image-1"` in the options to check sizes first | OpenAI's `usage` |
+
+The last two need an endpoint, as an argument or an `@https://` suffix like the chat routes. Without one they are refused before any request:
+
+```csharp
+var compatible = ImageGenerationProviderFactory.CreateForModel("openai-compatible/flux-dev@https://images.example.com/v1", key);
+var azure = ImageGenerationProviderFactory.CreateForModel("azure-openai/hero-images", azureKey,
+    endpoint: "https://my-resource.openai.azure.com");   // api-key header, api-version 2025-04-01-preview
+// Or directly: new AzureOpenAIImageGenerationProvider(azureKey, "hero-images", endpoint, apiVersion: "…")
+```
+
+A bare model name resolves when it names one service: `gpt-image-*` and `dall-e-*` are OpenAI, `gemini-*` is Gemini. A size the model does not make throws `ArgumentException` before any request, and a refusal throws `LlmHttpException`. The key is held in memory and sent only in a header (`Authorization`, or `x-goog-api-key` for Gemini). It is never put in a URL, a log or a file. Options: `Model`, `Quality` (OpenAI, Venice), `NegativePrompt` and `Seed` (Venice), `Timeout` (default 120 s).
 
 ---
 

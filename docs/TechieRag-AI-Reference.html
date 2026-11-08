@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-10-29</div>
+    <div class="sub">Last rendered: 2026-11-08</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -155,6 +155,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#local-model-tool-calling">Local model tool calling</a></li>
+        <li class="h3"><a href="#local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider">Local picture reading: LocalModel.ReadsImages, Phi35VisionInstruct, IMultimodalLlmProvider</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
@@ -164,6 +165,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#thinking-text-from-reasoning-models">Thinking text from reasoning models</a></li>
         <li class="h3"><a href="#per-call-and-per-provider-request-timeout">Per-call and per-provider request timeout</a></li>
         <li class="h3"><a href="#codex-agent">Codex agent</a></li>
+        <li class="h3"><a href="#one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)</a></li>
+        <li class="h3"><a href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)</a></li>
+        <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -203,7 +207,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-10-29 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-11-08 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -254,6 +258,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#local-model-will-it-run-and-fit-before-the-download">Local model: will it run and fit, before the download</a></li>
         <li class="h3"><a href="#local-model-lifetime-dispose-while-calls-are-inside">Local model lifetime: dispose while calls are inside</a></li>
         <li class="h3"><a href="#local-model-tool-calling">Local model tool calling</a></li>
+        <li class="h3"><a href="#local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider">Local picture reading: LocalModel.ReadsImages, Phi35VisionInstruct, IMultimodalLlmProvider</a></li>
         <li class="h3"><a href="#choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: ModelChooser</a></li>
         <li class="h3"><a href="#any-service-by-route-and-venice-openai-compatible-anthropic-compatible-venice">Any service by route, and Venice: openai-compatible/, anthropic-compatible/, venice/</a></li>
         <li class="h3"><a href="#connector-list-for-app-screens-llmconnectorcatalog-describe">Connector list for app screens: LlmConnectorCatalog.Describe()</a></li>
@@ -263,6 +268,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#thinking-text-from-reasoning-models">Thinking text from reasoning models</a></li>
         <li class="h3"><a href="#per-call-and-per-provider-request-timeout">Per-call and per-provider request timeout</a></li>
         <li class="h3"><a href="#codex-agent">Codex agent</a></li>
+        <li class="h3"><a href="#one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)</a></li>
+        <li class="h3"><a href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)</a></li>
+        <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -570,6 +578,7 @@ var response = await rag.AskAsync("What is quantum computing?");</code></pre>
 <tbody>
 <tr><td><code>UseSqliteVec(connectionString)</code></td><td>SQLite with vec extension; <code>UseSqliteVec()</code> with no path uses the per-app default database (<code>DataRoot.DefaultDatabasePath</code>)</td></tr>
 <tr><td><code>UsePgVector(connectionString)</code></td><td>PostgreSQL with pgvector extension</td></tr>
+<tr><td><code>UsePostgres(connectionString, defaultUserId)</code></td><td>Vectors, conversations and workspaces in one PostgreSQL database (REQ-RAG-152)</td></tr>
 <tr><td><code>UseQdrant(endpoint, apiKey)</code></td><td>Qdrant vector database</td></tr>
 </tbody>
 </table>
@@ -1451,6 +1460,28 @@ using var local = new LocalLlmProvider(new LocalLlmOptions
 
 var runner = new AgentLoopRunner(local, registry);
 var answer = await runner.RunAsync([ChatMessage.User("What's the weather in Paris?")]);</code></pre>
+<h3 id="local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider"><a id="local-picture-reading-localmodelreadsimages-phi35visioninstruct-imultimodalllmprovider"></a>Local picture reading: <code>LocalModel.ReadsImages</code>, <code>Phi35VisionInstruct</code>, <code>IMultimodalLlmProvider</code><a class="anchor-link" href="#local-picture-reading-localmodel-readsimages-phi35visioninstruct-imultimodalllmprovider">#</a></h3>
+<p>Package <code>TechieRag.Local</code>; namespace <code>TechieRag.Local</code> (owner, 2026-11-05; REQ-RAG-145 to REQ-RAG-151). A picture is read on the user's own machine with the same <code>ChatImage</code>, <code>ChatContentPart</code> and <code>ChatMessage.UserWithImages</code> code a hosted provider takes, so an app's code is the same for local and hosted. The model only turns the picture into text; checking dates, overlaps and duplicates is the app's job.</p>
+<ul>
+<li><strong>Models.</strong> <code>LocalModel.Phi35VisionInstruct</code> (<code>phi-3.5-vision-instruct</code>, Microsoft's processor build, about 3.2 GB, MIT) runs on a laptop's processor. <code>LocalModel.Phi4MultimodalInstruct</code> (<code>phi-4-multimodal-instruct</code>, about 5.1 GB) is a graphics-card build: <code>LocalModel.RequiresGpu</code> is true, and loading it throws <code>NotSupportedException</code> before its terms are asked and before any download, because this package ships the processor engine only. Neither runs on Android or iOS.
+</li>
+<li><strong>Which models read pictures.</strong> <code>LocalModel.ReadsImages</code> is true for the two picture models and false for Qwen2.5 0.5B and Phi-3 mini. For <code>FromHuggingFace</code> and <code>FromFolder</code> models it is read from the model's own <code>genai_config.json</code> (a <code>model.vision</code> section), so for a Hugging Face model it is known after the download. <code>LocalLlmProvider</code> implements <code>IMultimodalLlmProvider</code>; <code>SupportsInput(ChatContentKind.Image)</code> (and <code>SupportsVision()</code>) gives the same answer as <code>Model.ReadsImages</code>.
+</li>
+<li><strong>Asking for pictures.</strong> <code>LocalLlmOptions.ReadsImages = true</code> with no model named runs <code>Phi35VisionInstruct</code> on a desktop; on a phone, or with a text model named, creating the provider throws <code>NotSupportedException</code>.
+</li>
+<li><strong>A text model given a picture</strong> throws <code>LocalModelInputNotSupportedException</code> (a <code>NotSupportedException</code>) naming the model, before it is loaded or run; <code>ModelId</code>, <code>ModelName</code>, <code>InputKind</code> and <code>Count</code> say what was refused. A picture is never dropped without notice.
+</li>
+<li><strong>Bytes only.</strong> Give pictures with <code>ChatImage.FromBytes</code> or <code>FromBase64</code>. A <code>ChatImage.FromUrl</code> picture throws <code>NotSupportedException</code>: the local provider never fetches anything.
+</li>
+<li><strong>Context.</strong> A picture's tokens depend on its size: a 1200 × 900 calendar page took 1,960 tokens with its prompt. The engine counts them once it has read the picture; a prompt that does not fit throws <code>LocalPromptTooLongException</code> with that count. Keep <code>ContextSize</code> at 3,072 or more for a page-sized picture (the default is 4,096).
+</li>
+</ul>
+<pre><code class="language-csharp">using var llm = new LocalLlmProvider(new LocalLlmOptions { ReadsImages = true, TermsAccepted = true });
+var turn = ChatMessage.UserWithImages(
+    "Write one line for each meeting, in the form HH:MM - title.",
+    ChatImage.FromBytes(await File.ReadAllBytesAsync("calendar.png"), "image/png"));
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 200, Temperature = 0 });
+// reply.Content: "09:00 - Weekly planning\n10:30 - Budget review with Priya\n…"; the app parses and checks it.</code></pre>
 <h3 id="choosing-a-model-for-a-piece-of-work-modelchooser">Choosing a model for a piece of work: <code>ModelChooser</code><a class="anchor-link" href="#choosing-a-model-for-a-piece-of-work-modelchooser">#</a></h3>
 <p>Package <code>TechieRag</code>; namespace <code>TechieRag.Llm</code> (REQ-RAG-128, Chatur TR-RAG-006). <code>ModelRouter</code> turns a model name into a service; <code>ModelChooser</code> decides which name. <code>new ModelChooser(smallModel, options?)</code> takes any <code>ILlmProvider</code>; a cheap or local one is enough. <code>ChooseAsync(request, candidates)</code> takes the request text and <code>ModelCandidate { ModelId, Tier?, Notes?, Cost? }</code> items, the free-text fields written in the host's own words. It returns a <code>ModelChoice</code> with <code>Candidate</code>, <code>ModelId</code>, <code>Reason</code> (one sentence to show and log), <code>Source</code> (<code>ModelChoiceSource.SmallModel</code>, <code>OnlyCandidate</code> or <code>Fallback</code>) and the small model's <code>Usage</code>. One candidate is returned without a model call. Otherwise the small model gets one chat call at temperature 0 in JSON mode, with the request cut to <code>ModelChooserOptions.MaxRequestCharacters</code> (default 4000). The reply's id is matched ignoring case. An id without its <code>connector/</code> prefix matches when exactly one candidate ends with it. <strong>The answer is always a candidate:</strong> a reply that is not JSON, or names a model that was not offered, gives <code>ModelChooserOptions.FallbackModelId</code> (else the first candidate) with <code>Source = Fallback</code>. <strong>A failure of the small model is thrown</strong> (unreachable, refused, cancelled), never turned into a choice; catch it to use the host's own rule. <code>ModelChooserOptions.Guidance</code> adds the host's rule to the instructions. The interface <code>IModelChooser</code> lets a unit test pass a fixed choice.</p>
 <pre><code class="language-csharp">var chooser = new ModelChooser(
@@ -1631,6 +1662,75 @@ var agentPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
     ".codex", "agents", "techierag.toml");
 Console.WriteLine(File.Exists(agentPath) ? "techierag agent ready" : "build to deploy");</code></pre>
+<h3 id="one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)<a class="anchor-link" href="#one-postgresql-database-for-everything-req-rag-152">#</a></h3>
+<p><code>UsePostgres(connectionString)</code> is <code>UsePgVector(connectionString)</code> plus <code>WithPersistence(StoreProvider.Postgres, connectionString)</code>. One call puts the vectors (<code>Documents</code>, <code>Chunks</code>), the conversations (<code>TrThread</code>, <code>TrMessage</code>) and the workspaces (<code>TrWorkspace</code>, <code>TrWorkspaceDocument</code>) in one database. The server needs pgvector. Proven on PostgreSQL 18 + pgvector in CI.</p>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UsePostgres("Host=db;Database=app;Username=app;Password=...", defaultUserId: userId)
+    .UseEmbedding(EmbeddingSource.Ollama)
+    .Build();
+await rag.InitializeAsync();
+var threads = rag.GetConversationStore();      // PostgresConversationStore
+var workspaces = rag.GetWorkspaceManager();     // over PostgresWorkspaceStore</code></pre>
+<h3 id="host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)<a class="anchor-link" href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">#</a></h3>
+<p>Namespace <code>TechieRag.Agentic.HostData</code>. A host registers its own entities. The agent gets ONE tool set for all of them: <code>host_data_list</code>, <code>host_data_read</code>, <code>host_data_create</code>, <code>host_data_update</code> and <code>host_data_delete</code>, each taking an <code>entity</code> argument. <code>HostDataSkill</code> is an <code>IToolHandler</code>: pass it to <code>AgentLoopRunner</code>, combine it with other tools in <code>CompositeToolHandler</code>, wrap it in <code>GuardedToolHandler</code>, or hand it to a <code>TechieRag.Agents</code> agent.</p>
+<pre><code class="language-csharp">var task = new HostEntity("task", "A to-do item of the user.",
+[
+    new HostEntityField("title", HostFieldType.Text, "What to do.", Required: true),
+    new HostEntityField("due", HostFieldType.DateTime, "When it is due, local time."),
+    new HostEntityField("priority", HostFieldType.Choice, "How important it is.") { Choices = ["low", "normal", "high"] }
+])
+{
+    List   = (query, ct) =&gt; repo.FindAsync(query.Text, query.Limit, ct),     // IReadOnlyList&lt;HostEntityRecord&gt;
+    Read   = (id, ct) =&gt; repo.ReadAsync(id, ct),                             // HostEntityRecord? (null = not found)
+    Create = (values, ct) =&gt; repo.CreateAsync(values, ct),                   // values: IReadOnlyDictionary&lt;string, JsonElement&gt;
+    Update = (id, values, ct) =&gt; repo.UpdateAsync(id, values, ct),           // only the named fields change
+    Delete = (id, ct) =&gt; repo.DeleteAsync(id, ct)
+};
+
+var skill = new HostDataSkill(new HostDataSkillOptions
+{
+    OnChangeAsync = (change, ct) =&gt; changeLog.SaveAsync(change, ct)          // awaited before the model sees the result
+}).Register(task);
+
+skill.BeginTurn(turnId);                                                     // each change carries this turn id
+var answer = await new AgentLoopRunner(llm, skill).RunAsync(messages);
+foreach (HostDataChange change in skill.TurnChanges) { /* show a card with Undo */ }
+
+HostDataChange reversal = await skill.UndoAsync(change);                     // through the host's own handlers</code></pre>
+<p>Rules:</p>
+<ul>
+<li>A null handler is an operation the entity does not offer. A tool appears only when some entity offers it, and its <code>entity</code> enum names only those entities. An entity that offers update or delete must offer read, because the skill reads the "before" state first; <code>Register</code> refuses one that does not.
+</li>
+<li>The model's <code>fields</code> are checked before any handler runs: the name must be known, the value must have the right type (<code>Date</code> is <code>yyyy-MM-dd</code>, <code>DateTime</code> is ISO 8601), a choice must be in <code>Choices</code>, and a create must name every required field. A mismatch goes back to the model as a failed <code>ToolResult</code> it can correct. <code>ToolResult.Message.Code</code> is one of <code>HostDataMessageCodes</code> for the trace. A handler that throws becomes <code>HostDataHandlerFailed</code>; the model is told, and the turn goes on.
+</li>
+<li><code>HostDataChange</code>: <code>ChangeId</code>, <code>Entity</code>, <code>EntityId</code>, <code>Kind</code> (<code>Created</code>/<code>Updated</code>/<code>Deleted</code>), <code>Before</code>, <code>After</code> (<code>HostEntityRecord</code>: <code>Id</code> + <code>Values</code>), <code>TurnId</code>, <code>ToolCallId</code>, <code>UndoOf</code>, <code>At</code>. It is plain data: store it as JSON and undo it later.
+</li>
+<li><code>UndoAsync</code>: Created → the delete handler; Updated → the update handler with <code>Before.Values</code>; Deleted → the create handler with <code>Before.Values</code> (the host may give a new id). It returns the reversal as a new change with <code>UndoOf</code> set, and raises it like any change. It throws <code>HostDataException</code> (<code>Code</code> <code>HostDataCannotUndo</code> or <code>HostDataUnknownEntity</code>) when the entity lacks the handler.
+</li>
+<li>The delete tool has <code>RequiresConfirmation = true</code> by default (<code>HostDataSkillOptions.DeleteRequiresConfirmation</code>).
+</li>
+</ul>
+<h3 id="image-generation-req-rag-155">Image generation (REQ-RAG-155)<a class="anchor-link" href="#image-generation-req-rag-155">#</a></h3>
+<p>Namespaces: the providers and <code>ImageGenerationProviderFactory</code> are in <code>TechieRag.ImageGeneration</code>, the interface in <code>TechieRag.Abstractions</code>, and <code>ImageSize</code>, <code>GeneratedImage</code>, <code>ImageGenerationOptions</code> and <code>ImageGenerationUsage</code> in <code>TechieRag.Models</code>. <code>IImageGenerationProvider.GenerateImageAsync(prompt, ImageSize size, ImageGenerationOptions? options)</code> returns <code>GeneratedImage(Bytes, MediaType, Size, Usage)</code>. <code>MediaType</code> and <code>Size</code> are read from the image bytes, so you can see when a service sent something other than what you asked for. Routes work like chat routes:</p>
+<pre><code class="language-csharp">var images = ImageGenerationProviderFactory.CreateForModel("openai/gpt-image-1", apiKey);   // also "gemini/...", "venice/..."
+GeneratedImage image = await images.GenerateImageAsync("a lighthouse at dawn", ImageSize.Square1024);
+await File.WriteAllBytesAsync("hero.png", image.Bytes);   // image.Usage.TotalTokens, image.Usage.Images</code></pre>
+<table>
+<thead><tr><th>Connector</th><th>Default model</th><th>Sizes</th><th>Usage</th></tr></thead>
+<tbody>
+<tr><td><code>openai</code></td><td><code>gpt-image-1</code> (PNG, <code>output_format</code>)</td><td>1024x1024, 1536x1024, 1024x1536 (DALL·E 3/2 have their own lists)</td><td>input, output and total tokens</td></tr>
+<tr><td><code>gemini</code></td><td><code>gemini-2.5-flash-image</code> (<code>generateContent</code>, image output)</td><td>by aspect ratio 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9; tier 1K/2K/4K from the long side; 1024x1024 exact</td><td><code>usageMetadata</code> tokens</td></tr>
+<tr><td><code>venice</code></td><td><code>venice-sd35</code> (PNG, width and height)</td><td>any up to 1280 a side</td><td>image count only (Venice reports no tokens)</td></tr>
+<tr><td><code>openai-compatible</code></td><td>none: name it, <code>openai-compatible/&lt;model&gt;</code> (REQ-RAG-156)</td><td>the service's; GPT Image and DALL·E names get OpenAI's lists</td><td>whatever the service returns in OpenAI's <code>usage</code></td></tr>
+<tr><td><code>azure-openai</code></td><td>none: the deployment, <code>azure-openai/&lt;deployment&gt;</code> (REQ-RAG-157)</td><td>the service's; name <code>Model = "gpt-image-1"</code> in the options to check sizes first</td><td>OpenAI's <code>usage</code></td></tr>
+</tbody>
+</table>
+<p>The last two need an endpoint, as an argument or an <code>@https://</code> suffix like the chat routes. Without one they are refused before any request:</p>
+<pre><code class="language-csharp">var compatible = ImageGenerationProviderFactory.CreateForModel("openai-compatible/flux-dev@https://images.example.com/v1", key);
+var azure = ImageGenerationProviderFactory.CreateForModel("azure-openai/hero-images", azureKey,
+    endpoint: "https://my-resource.openai.azure.com");   // api-key header, api-version 2025-04-01-preview
+// Or directly: new AzureOpenAIImageGenerationProvider(azureKey, "hero-images", endpoint, apiVersion: "…")</code></pre>
+<p>A bare model name resolves when it names one service: <code>gpt-image-*</code> and <code>dall-e-*</code> are OpenAI, <code>gemini-*</code> is Gemini. A size the model does not make throws <code>ArgumentException</code> before any request, and a refusal throws <code>LlmHttpException</code>. The key is held in memory and sent only in a header (<code>Authorization</code>, or <code>x-goog-api-key</code> for Gemini). It is never put in a URL, a log or a file. Options: <code>Model</code>, <code>Quality</code> (OpenAI, Venice), <code>NegativePrompt</code> and <code>Seed</code> (Venice), <code>Timeout</code> (default 120 s).</p>
 <hr>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>

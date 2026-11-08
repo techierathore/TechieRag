@@ -41,7 +41,7 @@ Rules that hold in this project only.
 | A read against an unreachable store throws; it never returns an empty list | A down database must not masquerade as an empty one (REQ-RAG-044) | 2026-08-04 |
 | Every outbound HTTP the library makes on a consumer's behalf goes through the connect-time SSRF guard (`HttpWebContentFetcher.CreateGuardedHandler`) | Redirects and DNS rebinding cannot reach private addresses (BRD-121, BRD-126) | 2026-08 |
 | Model weights are downloaded once to the model root and never packed into a NuGet package or an app bundle | Package size and licence terms (ADR-004, BRD-101) | 2026-06-25 |
-| A live test is gated by a `FactAttribute` subclass that sets `Skip` with a reason when its credential, server or model is absent; it never fails for a missing environment | The suite stays green on any machine; `TechieRagLiveNetworkTests`, `TechieRagTestPostgres`, staged weights | 2026-07 |
+| A live test is gated by a `FactAttribute` subclass that sets `Skip` with a reason when its credential, server or model is absent; it never fails for a missing environment | The suite stays green on any machine; `TechieRagLiveNetworkTests`, `livetests.settings.json` for PostgreSQL (REQ-RAG-152), staged weights | 2026-07 |
 | Download progress goes through `ModelDownloadService` events, never `Console.WriteLine` | A package must not write to a host's console (BRD-92; three legacy calls remain, Architecture open question 10) | 2026-09-24 |
 | No `git` or `gh` from an agent; the owner commits | Framework rule, enforced by hook | 2026-06-25 |
 

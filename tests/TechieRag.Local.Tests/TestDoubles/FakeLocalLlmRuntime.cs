@@ -31,7 +31,13 @@ internal sealed class FakeLocalLlmRuntime : ILocalLlmRuntime
     public string Name => "fake";
 
     /// <inheritdoc/>
-    public LocalModelFormat Format => LocalModelFormat.Test;
+    public LocalModelFormat Format { get; set; } = LocalModelFormat.Test;
+
+    /// <summary>Gets the pictures each generation with pictures received, in order (REQ-RAG-147).</summary>
+    public List<IReadOnlyList<LocalImage>> Images { get; } = [];
+
+    /// <summary>Gets or sets the prompt length a generation with pictures reports as too long for the context, or null.</summary>
+    public int? ImagePromptTooLong { get; set; }
 
     /// <inheritdoc/>
     public ILocalTokenizer LoadTokenizer(string modelDirectory) => new FakeLocalModel(this);

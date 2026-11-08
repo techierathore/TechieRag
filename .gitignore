@@ -74,3 +74,11 @@ playwright-report/
 
 # TechieFlow agent artifacts — machine-generated test harness & logs, never commit (managed by scaffold/update-framework.sh)
 test-results-*/
+
+# TechieFlow framework — deployed copies, never commit (managed by scaffold/update-framework.sh)
+tests/verify/testsettings.Local.json
+
+# REQ-RAG-152: the live tests' settings file holds the password the harness chose (start-postgres.sh);
+# never commit it. The example beside it is the committed shape (*.json above would hide it).
+livetests.settings.json
+!tests/TechieRag.Tests/livetests.settings.example.json

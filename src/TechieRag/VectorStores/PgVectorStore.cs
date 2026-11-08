@@ -92,6 +92,9 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
 
+        // REQ-RAG-152: stores starting together on a new database take turns creating the schema.
+        await using var schemaLock = await Persistence.PostgresSchemaLock.AcquireAsync(connection, cancellationToken).ConfigureAwait(false);
+
         // Try to create the pgvector extension
         try
         {

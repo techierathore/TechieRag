@@ -10,7 +10,8 @@ public static class LocalLlmBuilderExtensions
 {
     /// <summary>
     /// Uses this platform's default local model: Qwen2.5 0.5B Instruct on Android and iOS, Phi-3 mini
-    /// on desktops. Downloaded once into the model root after the user accepts its terms.
+    /// on desktops, or Phi-3.5 vision on desktops when <see cref="LocalLlmOptions.ReadsImages"/> is set.
+    /// Downloaded once into the model root after the user accepts its terms.
     /// </summary>
     /// <param name="builder">The builder.</param>
     /// <param name="configure">Optional settings, for example <see cref="LocalLlmOptions.ConfirmTermsAsync"/>.</param>
@@ -24,8 +25,13 @@ public static class LocalLlmBuilderExtensions
     ///     .Build();
     /// </code>
     /// </remarks>
-    public static TechieRagBuilder UseLocalLlm(this TechieRagBuilder builder, Action<LocalLlmOptions>? configure = null) =>
-        UseLocalLlm(builder, LocalModel.PlatformDefault, configure);
+    /// <exception cref="NotSupportedException">Pictures were asked for on Android or iOS.</exception>
+    public static TechieRagBuilder UseLocalLlm(this TechieRagBuilder builder, Action<LocalLlmOptions>? configure = null)
+    {
+        var asked = new LocalLlmOptions();
+        configure?.Invoke(asked);
+        return UseLocalLlm(builder, LocalModel.DefaultFor(LocalModel.IsPhonePlatform, asked.ReadsImages), configure);
+    }
 
     /// <summary>
     /// Uses a local model by id (see <see cref="LocalModel.All"/>).

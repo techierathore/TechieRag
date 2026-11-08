@@ -63,9 +63,14 @@ public sealed class RepositoryDocumentationTests
             for (var index = 0; index < lines.Length; index++)
             {
                 var line = lines[index];
-                if (line.StartsWith("#", StringComparison.Ordinal))
+                // A sub-heading inside an entry ("#### Detail", added to the feedback files on 2026-11-07)
+                // does not end it; only a heading of entry level or above does.
+                if (line.StartsWith("#", StringComparison.Ordinal) && !line.StartsWith("####", StringComparison.Ordinal))
                 {
-                    inClosedEntry = line.StartsWith("### TR-RAG-015", StringComparison.Ordinal);
+                    // A feedback entry marked fixed is a dated record of the past, not a description of
+                    // what the library does today (TR-RAG-038's July note on transcript sizes).
+                    inClosedEntry = line.StartsWith("### TR-RAG-015", StringComparison.Ordinal)
+                        || (line.StartsWith("### TR-", StringComparison.Ordinal) && line.Contains("FIXED", StringComparison.Ordinal));
                 }
 
                 if (!line.Contains("youtube", StringComparison.OrdinalIgnoreCase) || inClosedEntry || RecordsTheRemoval(line))

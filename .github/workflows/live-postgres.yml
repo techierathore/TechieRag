@@ -1,0 +1,57 @@
+# REQ-RAG-152 / BRD-210: the PostgreSQL path proven end to end in CI on a real PostgreSQL 18 with
+# pgvector. The test harness starts the server in Docker with its own password
+# (tests/TechieRag.Tests/livetests/start-postgres.sh), which writes the git-ignored
+# tests/TechieRag.Tests/livetests.settings.json the live tests read. No environment variable carries the
+# connection string (owner's rule, 2026-11-07).
+#
+# The run fails when any live test is skipped: a skip here means the harness did not give the tests a
+# server, which is exactly the gap this job exists to close.
+name: Live PostgreSQL
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  live-postgres:
+    name: PostgreSQL 18 + pgvector, end to end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Start PostgreSQL in Docker (harness)
+        run: bash tests/TechieRag.Tests/livetests/start-postgres.sh
+      - name: Run the live PostgreSQL tests
+        run: >
+          dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj
+          --filter "Category=LivePostgres"
+          --logger "trx;LogFileName=live-postgres.trx"
+          --results-directory live-postgres-results
+      - name: Fail on any skipped live test
+        shell: bash
+        run: |
+          trx=$(ls live-postgres-results/*.trx)
+          if grep -q 'outcome="NotExecuted"' "$trx"; then
+            echo "::error::a live PostgreSQL test was skipped; the harness did not give it a server"
+            exit 1
+          fi
+          grep -q 'outcome="Passed"' "$trx"
+      - name: Stop PostgreSQL
+        if: always()
+        run: bash tests/TechieRag.Tests/livetests/stop-postgres.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-postgres-results
+          path: live-postgres-results
+          if-no-files-found: ignore

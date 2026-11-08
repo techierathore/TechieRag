@@ -2,6 +2,26 @@
 
 Paste the section for a release into its GitHub Release when you publish it. All five packages (TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Local, TechieRag.Agents) ship together at one version. The newest release is first.
 
+## 1.1.9
+
+All five packages are set to 1.1.9 in their project files. The published version still comes from the tag (`publish-nuget.yml`).
+
+### New
+
+- **A host-data skill** (REQ-RAG-153, Sevak TR-RAG-056). `HostDataSkill` (namespace `TechieRag.Agentic.HostData`) lets a host register its own entities. Each entity has a name, fields (`HostEntityField`: text, number, true/false, date, date and time, or a choice) and handlers to list, read, create, update and delete. You can implement `IHostEntity`, or build one from delegates with `HostEntity`. The agent gets one tool set for all entities, whatever their number: `host_data_list`, `_read`, `_create`, `_update` and `_delete`. Each tool takes an `entity` argument. The skill checks the model's fields against the entity before a host handler runs, and sends a mismatch back to the model as a failed tool result it can fix. Each failure also carries a `HostDataMessageCodes` code for the trace. The skill is an `IToolHandler`, so it works with `AgentLoopRunner`, flows, `CompositeToolHandler`, guardrails and, through `TechieRag.Agents`, a Microsoft Agent Framework agent.
+- **Typed change records with Undo** (REQ-RAG-154, Sevak TR-RAG-057). Every create, update and delete the skill makes returns a `HostDataChange`: entity, id, kind, `Before`, `After`, the turn that caused it (`BeginTurn(turnId)`) and the tool call. The host gets each record in three places: the awaited `HostDataSkillOptions.OnChangeAsync` (store it before the turn goes on), the `ChangeRecorded` event, and `TurnChanges`. `UndoAsync(change)` reverses a record through the host's own handlers. An update gets its "before" values back through the update handler, a create is deleted, and a delete is created again. The record is plain data, so a host can store it as JSON and undo it later.
+- **Image generation** (REQ-RAG-155, Sevak TR-RAG-058; re-scopes BRD-161 for images only). `IImageGenerationProvider.GenerateImageAsync(prompt, size, options)` returns `GeneratedImage`: the bytes, the media type and the pixel size (both read from the bytes) and `ImageGenerationUsage`. Shipped for OpenAI (`gpt-image-1` by default, PNG, token usage), Gemini (`gemini-2.5-flash-image` through `generateContent`, token usage) and Venice (`venice-sd35` by default, PNG at the asked width and height, image count only because Venice reports no tokens). The providers are in the namespace `TechieRag.ImageGeneration`. Create one from a route the way chat providers are created: `ImageGenerationProviderFactory.CreateForModel("openai/gpt-image-1", apiKey)`. The provider holds the key in memory and sends it only in a request header, never in a URL, a log or a file. A size the model does not make is refused before any request.
+- **Two more image routes** (REQ-RAG-156, REQ-RAG-157). `openai-compatible/<model>` reaches any service that speaks OpenAI's image format, and `azure-openai/<deployment>` (`AzureOpenAIImageGenerationProvider`) reaches an Azure OpenAI deployment, sending the key in the `api-key` header with `api-version` 2025-04-01-preview by default. Both need an endpoint, given as the `endpoint` argument or an `@https://` suffix on the route, and are refused without one.
+- **One call for a PostgreSQL database of your own** (REQ-RAG-152, Sevak TR-RAG-055). `TechieRagBuilder.UsePostgres(connectionString)` puts the vectors (`PgVectorStore`), the conversations and the workspaces in one PostgreSQL database. It is proven end to end on a real PostgreSQL 18 with pgvector, in CI too (`.github/workflows/live-postgres.yml`).
+
+### Fixed
+
+- **PostgreSQL stores starting together on a new database no longer fail.** Before, two `PgVectorStore`s (or the PostgreSQL conversation and workspace stores) initialising at the same moment could fail with `23505 duplicate key value violates unique constraint "pg_type_typname_nsp_index"`. This happened in one process or across several, for example two copies of an app starting together. Each store now holds a PostgreSQL advisory lock while it creates its tables.
+
+### For maintainers
+
+- **The live PostgreSQL tests read a settings file, never an environment variable.** `bash tests/TechieRag.Tests/livetests/start-postgres.sh` starts PostgreSQL 18 + pgvector in Docker with a new password each time. It writes the connection string into the git-ignored `tests/TechieRag.Tests/livetests.settings.json`, and `stop-postgres.sh` removes it again. `TechieRagTestPostgres` is no longer read. The live image tests read their keys from the same file (`ImageGeneration:OpenAIKey`, `GeminiKey`, `VeniceKey`; see `livetests.settings.example.json`) and skip when a key is absent.
+
 ## Next release after 1.1.7
 
 ### Behaviour, stated plainly

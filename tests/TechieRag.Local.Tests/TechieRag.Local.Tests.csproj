@@ -33,4 +33,9 @@
     <Compile Include="..\TechieRag.Tests\PublicApi\OverloadShapeCheck.cs" Link="PublicApi\OverloadShapeCheck.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- REQ-RAG-150 / BRD-208: the fixed calendar page the live picture test reads. -->
+    <None Include="Fixtures\calendar-page.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

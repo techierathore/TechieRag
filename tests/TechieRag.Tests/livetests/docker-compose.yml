@@ -1,0 +1,25 @@
+# REQ-RAG-152 / BRD-210: the PostgreSQL 18 + pgvector server the live tests run against.
+#
+# Started only by start-postgres.sh beside this file, which picks a fresh password, passes it in
+# LIVETESTS_PG_PASSWORD and writes tests/TechieRag.Tests/livetests.settings.json (git-ignored) for the
+# tests to read. No volume: every start is an empty database with the password of that start, and
+# stop-postgres.sh leaves nothing behind.
+name: techierag-livetests
+
+services:
+  livetests-postgres:
+    image: pgvector/pgvector:0.8.6-pg18-trixie
+    container_name: techierag-livetests-postgres
+    environment:
+      POSTGRES_USER: techierag
+      POSTGRES_PASSWORD: ${LIVETESTS_PG_PASSWORD:?start-postgres.sh sets the password}
+      POSTGRES_DB: techierag_live
+    ports:
+      - "${LIVETESTS_PG_PORT:-5551}:5432"
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U techierag -d techierag_live"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

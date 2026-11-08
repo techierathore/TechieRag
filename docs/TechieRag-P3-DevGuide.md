@@ -6,10 +6,10 @@
 | Kind | library |
 | Size | Small |
 | Phase | 3 of 3 |
-| Verified on | 2026-10-08 |
-| Date | 2026-10-08 |
+| Verified on | 2026-11-08 |
+| Date | 2026-11-08 |
 
-This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Phase-1 services are in `docs/TechieRag-DevGuide.md`, phase-2 services in `docs/TechieRag-P2-DevGuide.md`.
+This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Added 2026-11-08: PostgreSQL end to end, the host data skill and image generation (REQ-RAG-152 to REQ-RAG-157). Phase-1 services are in `docs/TechieRag-DevGuide.md`, phase-2 services in `docs/TechieRag-P2-DevGuide.md`.
 
 No sample calls any phase-3 surface: the probe (`samples/TechieRag.Probe`) only embeds, stores, searches and generates. So every entry is `static-only (unconfirmed)` at runtime. What was run on 2026-10-06 is the build (`bash .tfcore/utils/tf-build.sh`: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (`~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-<id>"`): 53 tests, 0 failed. On 2026-10-07 the Sevak fixes (TR-RAG-049 in storage defaults, TR-RAG-047 as the new local model entry) were built and verified: build PASS, every test project run on its own, 0 failed. The other entries' file and line references were re-checked against the code that day and still hold. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.
 
@@ -229,6 +229,50 @@ The reads are the ones the load uses, so a host's answer and the load agree. Wit
 
 **Calculations on this service:** required bytes = weight bytes + `KvBytesPerToken` × context size + 256 MB (`LocalModel.cs:348`); context size = the asked size, else 2,048 on a phone and 4,096 elsewhere, never above `ContextLength` (`LocalModel.cs:385`).
 
+### Local picture reading: `LocalModel.ReadsImages`, `LocalLlmProvider` as `IMultimodalLlmProvider` (`TechieRag.Local`)
+
+![The fixed calendar page the live tests send to Phi-3.5 vision on this laptop, 2026-11-05; the model returned each meeting as "HH:MM - title"](screenshots/TechieRag/local-picture-calendar-page.png)
+
+REQ-RAG-145 to REQ-RAG-151 (owner, 2026-11-05). Covered by `tests/TechieRag.Local.Tests/LocalPictureReadingTests.cs` and the live `tests/TechieRag.Local.Tests/Live/LiveVisionTests.cs`.
+
+**Runtime:** live on this laptop's processor (WSL, Linux x64), 2026-11-05. The library downloaded Phi-3.5 vision (3.2 GB), checked every file and loaded it in 3 min 45 s. The calendar page in `tests/TechieRag.Local.Tests/Fixtures/calendar-page.png` came back as every meeting's time and title, in about 6 minutes.
+
+**Sample: a picture in, text out, on the local provider.** The same `ChatImage` and `ChatMessage.UserWithImages` code goes to a hosted provider unchanged. The test `REQ-RAG-149 LiveDevGuideSamplePictureInTextOut` runs these lines.
+
+```csharp
+using var llm = new LocalLlmProvider(new LocalLlmOptions
+{
+    ReadsImages = true,   // no model named: Phi-3.5 vision on a desktop
+    TermsAccepted = true, // the user accepted the model's MIT licence earlier
+    ContextSize = 3072    // a page-sized picture takes about 2,000 tokens
+});
+
+var picture = await File.ReadAllBytesAsync(CalendarPicturePath());
+var turn = ChatMessage.UserWithImages(
+    "Describe this picture in two sentences.",
+    ChatImage.FromBytes(picture, "image/png"));
+
+var reply = await llm.ChatAsync([turn], new LlmCompletionOptions { MaxTokens = 120 });
+Console.WriteLine(reply.Content);
+```
+
+**Call chain:** `ChatAsync` → `StreamCoreAsync` → `CollectImages` → `RefuseImagesIfUnreadable` (before the load) → `LoadCoreAsync` (a `RequiresGpu` model is refused here, before any download) → `RefuseImagesIfUnreadable` (again, for a model read from disk) → `ChatTemplateFormatter.Format` with `ImagePromptMarker` → `OnnxGenAiModel.GenerateAsync(prompt, images, …)` → `MultiModalProcessor.ProcessImages` → `Generator.SetInputs`.
+
+A picture's tokens depend on its size, so the engine counts them after it has read the picture. The provider's check before that counts each picture at its fewest tokens. A prompt the engine finds too long comes back as `LocalPromptTooLongException`. Several pictures are written to a private temporary folder and deleted at once, because the engine's managed API loads only one picture from memory. A picture given as a web address is refused, because nothing is fetched.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag.Local/LocalModel.cs:336` | `ReadsImages` | the return | true for Phi-3.5 vision and Phi-4 multimodal; from `genai_config.json` for folder and Hugging Face models |
+| `src/TechieRag.Local/LocalModel.cs:519` | `DefaultFor(isPhone, readsImages)` | the return | `Phi35VisionInstruct` on a desktop; throws on a phone |
+| `src/TechieRag.Local/LocalLlmProvider.cs:174` | `SupportsInput` | `Model.ReadsImages` | the same answer as the catalogue |
+| `src/TechieRag.Local/LocalLlmProvider.cs:257` | `LoadCoreAsync` | `variant.RequiresGpu` | true for Phi-4 multimodal, which throws before the terms and the download |
+| `src/TechieRag.Local/LocalLlmProvider.cs:596` | `StreamCoreAsync` | `promptTokens` | text tokens + 145 per picture (the lower bound) |
+| `src/TechieRag.Local/LocalLlmProvider.cs:790` | `RefuseImagesIfUnreadable` | `Model.ReadsImages` | false throws `LocalModelInputNotSupportedException` naming the model |
+| `src/TechieRag.Local/Runtime/OnnxGenAiModel.cs:140` | `GenerateAsync` (pictures) | `lastImagePromptTokens` | the engine's count, 1,975 for the calendar page with the live prompt |
+| `src/TechieRag.Local/ChatTemplateFormatter.cs:171` | `TextOf` | the marker | `<|image_1|>` where the first picture sat |
+
+**Calculations on this service:** memory for Phi-3.5 vision = 3,220,612,860 bytes of weights + 393,216 × context + 256 MB. That is about 4.7 GB at a 3,072-token context.
+
 ### Local model lifetime: `LocalLlmProvider.Dispose`, `DisposeAsync` (`TechieRag.Local`)
 
 ![The probe's local-model screen on Mac Catalyst, September 2026: the generate path a dispose now cancels safely; it predates this change](screenshots/TechieRag/probe-maccatalyst-generate.png)
@@ -393,6 +437,65 @@ The small model's failure is not caught: an exception from `ChatAsync` reaches t
 | `src/TechieRag/Llm/ModelChooser.cs:137` | `MatchCandidate` | the return | null when two candidates end with the same model name |
 
 **Calculations on this service:** the request is cut to `MaxRequestCharacters` (default 4000), with a note giving how many characters were cut.
+
+### PostgreSQL end to end: `UsePostgres`, `PostgresSchemaLock` (`TechieRag`)
+
+![Sevak's settings screen, July 2026: where a host would let a user name a PostgreSQL server of their own; it predates this change](screenshots/TechieRag/settings.png)
+
+REQ-RAG-152 (Sevak TR-RAG-055, added 2026-11-07). Covered by `tests/TechieRag.Tests/VectorStores/Live/LivePostgresEndToEndTests.cs`, `LivePostgresConcurrentStartTests.cs`, `LivePgVectorStoreTests.cs` and `UsePostgresTests.cs`.
+
+**Runtime:** `confirmed`: the live tests ran on 2026-11-08 against PostgreSQL 18 + pgvector started by `tests/TechieRag.Tests/livetests/start-postgres.sh` (port 5551), connection string read from the git-ignored `livetests.settings.json`. 14 passed, none skipped.
+
+**Call chain:** `UsePostgres` → `UsePgVector` + `WithPersistence(StoreProvider.Postgres, …)` → `Build()` → `CreatePgVectorStore`, `PostgresConversationStore`, `PostgresWorkspaceStore` on one connection string → `InitializeAsync` → each store takes `PostgresSchemaLock` (advisory lock `0x5465636869655261`) → `CREATE … IF NOT EXISTS` → unlock.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/TechieRagBuilder.cs:291` | `UsePostgres` | `config.VectorStore.ConnectionString`, `config.Persistence.ConnectionString` | the same string |
+| `src/TechieRag/VectorStores/PgVectorStore.cs:96` | `InitializeAsync` | `schemaLock` | held before `CREATE EXTENSION`; a second store waits here |
+| `src/TechieRag/Persistence/PostgresSchemaLock.cs:23` | `AcquireAsync` | the command | `SELECT pg_advisory_lock(…)` returns once no other session holds it |
+| `src/TechieRag/Persistence/RelationalConversationStore.cs:61` | `InitializeAsync` | `schemaLock` | null on SQLite, held on PostgreSQL |
+
+**Calculations on this service:** none.
+
+### Host data skill: `HostDataSkill`, `IHostEntity`, `HostDataChange` (`TechieRag`)
+
+![Sevak's tool demo screen, July 2026: a tool-calling loop the host-data tools join; it predates this change](screenshots/TechieRag/tool-demo.png)
+
+REQ-RAG-153 and REQ-RAG-154 (Sevak TR-RAG-056, TR-RAG-057, added 2026-11-07). Covered by `tests/TechieRag.Tests/Agentic/HostDataSkillTests.cs`.
+
+**Runtime:** `static-only (unconfirmed)`: no sample registers an entity. The tests drive the skill through `AgentLoopRunner` with a scripted model and an in-memory task store. Tests run 2026-11-08: 10 passed.
+
+**Call chain:** `Register` → `Validate` (lower-case name, unique fields, update or delete needs read) → `ToolDefinitions` → `BuildDefinitions` (five tools, `entity` enum per tool) → `ExecuteToolAsync` → `OperationOf` → `CheckFields` → the host's handler (update and delete `ReadAsync` first for "before") → `RecordAsync` → `PublishAsync` (awaits `OnChangeAsync`, then raises `ChangeRecorded`). `UndoAsync` → delete, update with `Before.Values`, or create → `PublishAsync` with `UndoOf`.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:146` | `ExecuteToolAsync` | `operation`, `entity` | the tool's operation; null entity gives `HostDataUnknownEntity` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:438` | `CheckFields` | the return | null when the fields fit; else the problems sent to the model |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:387` | `RecordAsync` | `change` | entity, id, kind, before, after, `TurnId` from `BeginTurn` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:423` | `PublishAsync` | `options.OnChangeAsync` | awaited before the tool result goes back |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:223` | `UndoAsync` | `reversal` | the reversing change, `UndoOf` = the original `ChangeId` |
+
+**Calculations on this service:** a list returns at most `MaxListResults` (default 50) whatever the model asks.
+
+### Image generation: `IImageGenerationProvider`, `ImageGenerationProviderFactory` (`TechieRag`)
+
+![Sevak's LLM settings screen, July 2026: where a host would pick an image route and key; it predates this change](screenshots/TechieRag/llm-settings.png)
+
+REQ-RAG-155 to REQ-RAG-157 (Sevak TR-RAG-058, added 2026-11-07; the two extra routes added 2026-11-08). Covered by `tests/TechieRag.Tests/ImageGeneration/ImageGenerationTests.cs`, `ImageRouteTests.cs` and `Live/LiveImageGenerationTests.cs`.
+
+**Runtime:** `confirmed` for Venice only: the live test returned a 1024x1024 PNG on 2026-11-08. OpenAI, Gemini, openai-compatible and Azure are checked against a loopback stand-in in each service's shape.
+
+**Call chain:** `CreateForModel` → split an `@https://` suffix into the endpoint → `Resolve` (connector/model, or a bare `gpt-image-*`, `dall-e-*`, `gemini-*`) → `Create` → the provider → `GenerateImageAsync` → `ImageHttp.CheckArguments` (sizes) → `PostJsonAsync` (key in a header only) → `OpenAIImageFormat.Result` or the provider's own reader → `ImageBytes.Result` (media type and pixel size from the bytes).
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/ImageGeneration/ImageGenerationProviderFactory.cs:59` | `CreateForModel` | `endpoint`, `trimmed` | the suffix moved into `endpoint` |
+| `src/TechieRag/ImageGeneration/ImageGenerationProviderFactory.cs:88` | `Create` | the connector switch | `openai-compatible` and `azure-openai` throw without an endpoint |
+| `src/TechieRag/ImageGeneration/ImageHttp.cs:53` | `PostJsonAsync` | `url` | never contains the key |
+| `src/TechieRag/ImageGeneration/GeminiImageGenerationProvider.cs:137` | `RatioOf` | the return | `1:1` for 1024x1024; null for a ratio Gemini lacks |
+| `src/TechieRag/ImageGeneration/ImageBytes.cs:60` | `Result` | `MediaType`, `Size` | `image/png` and the header's width and height |
+
+**Calculations on this service:** Gemini's tier is 1K up to a 1024 long side, 2K up to 2048, else 4K.
 
 ## Cross-cutting flows
 

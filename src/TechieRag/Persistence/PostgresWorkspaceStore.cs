@@ -32,4 +32,8 @@ public class PostgresWorkspaceStore : RelationalWorkspaceStore
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         return connection;
     }
+
+    /// <inheritdoc/>
+    protected override async Task<IAsyncDisposable?> LockSchemaAsync(DbConnection connection, CancellationToken cancellationToken) =>
+        await PostgresSchemaLock.AcquireAsync(connection, cancellationToken).ConfigureAwait(false);
 }

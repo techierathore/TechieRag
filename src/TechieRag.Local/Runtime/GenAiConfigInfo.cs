@@ -19,7 +19,17 @@ namespace TechieRag.Local.Runtime;
 /// <param name="ContextLength">The longest context the model supports, in tokens (<c>model.context_length</c>).</param>
 /// <param name="KvBytesPerToken">The context cache's size per token, in bytes.</param>
 /// <param name="FileNames">Every <c>filename</c> the configuration names, which must be in the model folder.</param>
-internal sealed record GenAiConfigInfo(int ContextLength, long KvBytesPerToken, IReadOnlyList<string> FileNames)
+/// <param name="ModelType">The engine's model type (<c>model.type</c>), for example <c>phi3v</c>; null when absent.</param>
+/// <param name="ReadsImages">
+/// Whether the model reads pictures: its configuration has a <c>model.vision</c> section, the part ONNX Runtime
+/// GenAI's multimodal processor runs (REQ-RAG-148 / BRD-206).
+/// </param>
+internal sealed record GenAiConfigInfo(
+    int ContextLength,
+    long KvBytesPerToken,
+    IReadOnlyList<string> FileNames,
+    string? ModelType = null,
+    bool ReadsImages = false)
 {
     /// <summary>The configuration file's name.</summary>
     internal const string FileName = "genai_config.json";
@@ -58,7 +68,9 @@ internal sealed record GenAiConfigInfo(int ContextLength, long KvBytesPerToken, 
             ?? throw new InvalidOperationException($"{FileName} has neither 'head_size' nor 'hidden_size' with 'num_attention_heads'.");
 
         var kvBytes = (long)layers * kvHeads * headSize * 2 * ElementBytes(decoder);
-        return new GenAiConfigInfo((int)contextLength, kvBytes, CollectFileNames(model));
+        var modelType = Property(model, "type") is { ValueKind: JsonValueKind.String } type ? type.GetString() : null;
+        var readsImages = Property(model, "vision") is { ValueKind: JsonValueKind.Object };
+        return new GenAiConfigInfo((int)contextLength, kvBytes, CollectFileNames(model), modelType, readsImages);
     }
 
     private static int ElementBytes(JsonElement decoder)
