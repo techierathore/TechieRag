@@ -8,6 +8,9 @@
 
 ## Summary
 
+- 0 blockers, 1 major, 0 minors, 0 nice-to-haves
+- Last consolidated: 2026-11-08
+
 1 entry: 0 blocking now, 1 open and not blocking, 0 fixed upstream.
 
 Nothing is blocked; a workaround is in place. We do not maintain ONNX Runtime, so each entry ends with a GitHub issue to post as written at https://github.com/microsoft/onnxruntime/issues/new/choose. The issue text uses only the public package and a minimal stand-alone project. It names none of our code, packages or requirement ids.

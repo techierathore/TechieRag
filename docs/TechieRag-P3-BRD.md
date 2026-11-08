@@ -11,7 +11,7 @@
 
 ## 1. Summary
 
-Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase because phase 2, at 90 verified items and waiting for UAT, would be reopened and taken past the 100-item limit. The items make workspaces testable and faster, make connector runs survive a cancel, let re-syncs replace a document, report what the mail parser drops, stop duplicate tool definitions, answer two flow-builder questions, and give an app that names no database folder a stable per-app location without moving existing data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider), BRD-203 to 209 (owner, local picture reading), BRD-210 to BRD-213 (owner, 2026-11-07: what Sevak's assistant phases need: PostgreSQL end to end, the host-data skill, image generation). Each item names the Sevak feedback entry or requirement it answers.
+Phase 3 takes the defects Sevak reported against the library that are still unfixed on 2026-10-06. Each one was checked against the source that day. They sit in their own phase because phase 2, at 90 verified items and waiting for UAT, would be reopened and taken past the 100-item limit. The items make workspaces testable and faster, make connector runs survive a cancel, let re-syncs replace a document, report what the mail parser drops, stop duplicate tool definitions, answer two flow-builder questions, and give an app that names no database folder a stable per-app location without moving existing data. Ids run on from phase 2: BRD-174 to BRD-193. Added later: BRD-185 (fit check), BRD-186 and 187 (Lekhak), BRD-188 (Chatur), BRD-189 (Sevak), BRD-190 to 193 (routes, from Lekhak's page), BRD-194 (Lekhak, provider error text), BRD-195 and 196 (Chatur, thinking text), BRD-197 to 202 (owner, thinking text for every provider), BRD-203 to 209 (owner, local picture reading), BRD-210 to BRD-213 (owner, 2026-11-07: what Sevak's assistant phases need: PostgreSQL end to end, the host-data skill, image generation), BRD-214 and 215 (owner, 2026-11-08: openai-compatible and Azure OpenAI image routes). Each item names the Sevak feedback entry or requirement it answers.
 
 ## 2. Screens and flow
 
@@ -187,23 +187,27 @@ Images from a prompt, through the same routing as the chat providers.
 
 - **BRD-213** — The library shall generate images: an `IImageGenerationProvider` with `GenerateImageAsync(prompt, size, options)` returning the image bytes, its media type and the usage, for OpenAI, Gemini and Venice, routed like the chat providers, with no key ever persisted; this re-scopes BRD-161 for images only *(Sevak feedback TR-RAG-058; Sevak BRD-127 and BRD-281; owner, 2026-11-07)* *Screen:* Image generation
   - *Acceptance:* When a developer calls GenerateImageAsync on Image generation with a prompt, a size and a keyed provider, then PNG bytes of that size and the usage come back.
+- **BRD-214** — Image generation shall take an `openai-compatible/<model>` route that reaches any service speaking OpenAI's image format at an endpoint the app gives (its Base URL or an `@https://` suffix on the route, as the chat route does), and refuse it with a clear message when no endpoint is given *(owner, 2026-11-08)* *Screen:* Image generation
+  - *Acceptance:* When a developer creates openai-compatible/<model> on Image generation with an endpoint and key, then requests reach that endpoint; without an endpoint, it is refused.
+- **BRD-215** — Image generation shall take an `azure-openai/<deployment>` route to an Azure OpenAI resource: the resource endpoint is required, the key goes in the `api-key` header, and the library sets the `api-version` *(owner, 2026-11-08)* *Screen:* Image generation
+  - *Acceptance:* When a developer creates azure-openai/<deployment> on Image generation with an endpoint and key, then the request reaches that deployment with the api-key header.
 
 ## 5. Development status
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-11-07.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-11-08.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
-| RAG / AI requirements | 12 | 11 | 1 | Partial |
+| RAG / AI requirements | 12 | 12 | 0 | Done |
 | Local model fit check | 1 | 1 | 0 | Done |
 | Model routing | 8 | 8 | 0 | Done |
 | Local model lifetime | 1 | 1 | 0 | Done |
 | LLM streaming | 8 | 8 | 0 | Done |
-| Local picture reading (`LocalModel`, `LocalLlmProvider` as `IMultimodalLlmProvider`, `ChatImage`, `ChatContentPart`) | 7 | 5 | 2 | Partial |
-| Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`) | 2 | 0 | 2 | Planned |
-| Image generation (`IImageGenerationProvider`, `GenerateImageAsync`) | 1 | 0 | 1 | Planned |
+| Local picture reading (`LocalModel`, `LocalLlmProvider` as `IMultimodalLlmProvider`, `ChatImage`, `ChatContentPart`) | 7 | 6 | 1 | Partial |
+| Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`) | 2 | 2 | 0 | Done |
+| Image generation (`IImageGenerationProvider`, `GenerateImageAsync`) | 3 | 2 | 1 | Partial |
 
 ## 6. Where the rest lives
 

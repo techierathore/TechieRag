@@ -81,6 +81,19 @@ public sealed class PhaseThreeReferenceTests
         { "REQ-RAG-148", "LocalModel.ReadsImages" },
         { "REQ-RAG-148", "SupportsInput(ChatContentKind.Image)" },
         { "REQ-RAG-151", "LocalModelInputNotSupportedException" },
+        { "REQ-RAG-152", "UsePostgres(connectionString)" },
+        { "REQ-RAG-153", "HostDataSkill" },
+        { "REQ-RAG-153", "HostEntityField" },
+        { "REQ-RAG-153", "host_data_create" },
+        { "REQ-RAG-154", "HostDataChange" },
+        { "REQ-RAG-154", "UndoAsync" },
+        { "REQ-RAG-154", "OnChangeAsync" },
+        { "REQ-RAG-155", "IImageGenerationProvider" },
+        { "REQ-RAG-155", "ImageGenerationProviderFactory.CreateForModel" },
+        { "REQ-RAG-155", "GenerateImageAsync" },
+        { "REQ-RAG-156", "openai-compatible/flux-dev@https://" },
+        { "REQ-RAG-157", "AzureOpenAIImageGenerationProvider" },
+        { "REQ-RAG-157", "azure-openai/<deployment>" },
     };
 
     /// <summary>
@@ -104,7 +117,7 @@ public sealed class PhaseThreeReferenceTests
     {
         var sections = PhaseThreeSection().Split("\n### ").Skip(1).ToList();
 
-        Assert.Equal(21, sections.Count);  // local picture reading (owner 2026-11-05, REQ-RAG-145…151) + 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007) + TR-RAG-052 (Sevak local tool calling) + consumption monitoring / reasoning controls / timeout / codex agent (feedback sweep 2026-10-16) + REQ-RAG-137/138 thinking text (Chatur TR-RAG-008/009)
+        Assert.Equal(24, sections.Count);  // + 3 for 1.1.9 (owner, 2026-11-07: REQ-RAG-152 PostgreSQL, REQ-RAG-153/154 host data, REQ-RAG-155 images) + local picture reading (owner 2026-11-05, REQ-RAG-145…151) + 7 from the phase-3 build + REQ-RAG-125 (Sevak TR-RAG-047) + REQ-RAG-126/127 (Lekhak TR-RAG-004/005) + REQ-RAG-128 (Chatur TR-RAG-006) + REQ-RAG-129 (Sevak TR-RAG-053) + REQ-RAG-130/131/133 + REQ-RAG-132 (owner, 2026-10-11) + REQ-RAG-134 (Lekhak TR-RAG-007) + TR-RAG-052 (Sevak local tool calling) + consumption monitoring / reasoning controls / timeout / codex agent (feedback sweep 2026-10-16) + REQ-RAG-137/138 thinking text (Chatur TR-RAG-008/009)
         Assert.All(sections, section => Assert.Contains("```csharp", section, StringComparison.Ordinal));
     }
 

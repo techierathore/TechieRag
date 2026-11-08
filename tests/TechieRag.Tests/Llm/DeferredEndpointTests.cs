@@ -5,8 +5,9 @@ using Xunit;
 namespace TechieRag.Tests.Llm;
 
 /// <summary>
-/// REQ-RAG-046 / BRD-161: image generation, realtime audio, batch, fine-tuning, moderation and OCR
-/// endpoints are deferred, so no public type or member of the shipped packages claims them.
+/// REQ-RAG-046 / BRD-161: realtime audio, batch, fine-tuning, moderation and OCR endpoints are deferred,
+/// so no public type or member of the shipped packages claims them. Image generation left this list on
+/// 2026-11-07: BRD-213 / REQ-RAG-155 re-scoped BRD-161 and ships <c>IImageGenerationProvider</c>.
 /// </summary>
 /// <remarks>
 /// The BRD row says "deferred"; this test is the code half of the acceptance. It reads the public
@@ -17,7 +18,7 @@ namespace TechieRag.Tests.Llm;
 public sealed class DeferredEndpointTests
 {
     private static readonly Regex DeferredName = new(
-        "ImageGenerat|GenerateImage|Realtime|RealTime|BatchJob|CreateBatch|FineTun|Finetun|Moderat|Ocr(?![a-z])|OpticalCharacter",
+        "Realtime|RealTime|BatchJob|CreateBatch|FineTun|Finetun|Moderat|Ocr(?![a-z])|OpticalCharacter",
         RegexOptions.CultureInvariant);
 
     /// <summary>No public type or public member in the three packages names a deferred endpoint.</summary>

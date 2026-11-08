@@ -1,0 +1,10 @@
+{
+  "Postgres": {
+    "ConnectionString": "Host=localhost;Port=5551;Database=techierag_live;Username=techierag;Password=written-by-start-postgres.sh"
+  },
+  "ImageGeneration": {
+    "OpenAIKey": "",
+    "GeminiKey": "",
+    "VeniceKey": ""
+  }
+}

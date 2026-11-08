@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-11-07</div>
+    <div class="sub">Last rendered: 2026-11-08</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,18 +121,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-11-07 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-11-08 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
-      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">/TechieFlow:agents:flow-master *build-phase TechieRag</div>
+      <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, then build and publish the package — its shipped documents are current; no agent command</div>
     </div>
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-11-07</td></tr>
-<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Build — 4 not built, 34 of 40 verified</td></tr>
+<tr><th>last_updated</th><td>2026-11-08</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 42 verified</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-11-05</td></tr>
+<tr><th>last_verified_date</th><td>2026-11-08</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,45 +149,37 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3 (Consumer feedback from Sevak). Local picture reading is built; 34 of 40 items are Verified. Four rows were added on 2026-11-07 for Sevak's assistant phases and are not built: PostgreSQL proven end to end, the host-data skill with undo, image generation (REQ-RAG-152 to REQ-RAG-155). The calendar test passed alone but was skipped in the verify run for memory; the graphics-card picture model is refused but not loaded (DirectML engine too old).</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak), handed off for UAT. 40 of 42 items are Verified; the other two wait on you (keys and a GPU runtime choice). The UsageGuide has the walkthroughs for PostgreSQL end to end, the host data skill and image generation, and the P3 DevGuide maps their code. Packages are set to 1.1.9; nothing is tagged, published or committed.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
-<pre><code>/TechieFlow:agents:flow-master *build-phase TechieRag</code></pre>
+<pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
 <p>OpenCode:</p>
-<pre><code>/flow-master *build-phase TechieRag</code></pre>
-<p>Why: REQ-RAG-152 to REQ-RAG-155 ship as a package before Sevak's phase 4 build; REQ-RAG-150 still needs the owner's measurement decision.</p>
+<pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
+<p>Why: every phase-3 row is Verified or waits on an owner item, and the shipped documents are current. Tag <code>v1.1.9</code>.</p>
 <h2 id="open-requirements">Open requirements<a class="anchor-link" href="#open-requirements">#</a></h2>
 <table>
 <thead><tr><th>Status</th><th>Count</th></tr></thead>
 <tbody>
-<tr><td>Not Started</td><td>4</td></tr>
+<tr><td>Not Started</td><td>0</td></tr>
 <tr><td>In Progress</td><td>0</td></tr>
-<tr><td>Implemented</td><td>1</td></tr>
+<tr><td>Implemented</td><td>0</td></tr>
 <tr><td>Needs re-verify</td><td>0</td></tr>
-<tr><td>Blocked</td><td>1</td></tr>
+<tr><td>Blocked</td><td>2</td></tr>
 </tbody>
 </table>
 <ul>
-<li>[ ] REQ-RAG-152 — PostgreSQL end to end: vectors, conversations and workspaces in one harness-started PostgreSQL 18 with pgvector (Not Started)
-</li>
-<li>[ ] REQ-RAG-153 — Host-data skill: a host registers its entities and the agent gets tools for them (Not Started)
-</li>
-<li>[ ] REQ-RAG-154 — Every host-data change comes back as a typed record and can be undone (Not Started)
-</li>
-<li>[ ] REQ-RAG-155 — Image generation through <code>IImageGenerationProvider</code> for OpenAI, Gemini and Venice (Not Started)
-</li>
-<li>[ ] REQ-RAG-150 — Calendar-page test: every meeting title and time appears in the local model's text (Implemented)
-</li>
 <li>[ ] REQ-RAG-146 — Graphics-card picture model (Phi-4 multimodal) loads through a GPU runtime (Blocked)
+</li>
+<li>[ ] REQ-RAG-155 — Image generation: OpenAI and Gemini real-service checks wait on keys (Blocked)
 </li>
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>Sevak's phase 4 build waits for BRD-210 to BRD-213 (REQ-RAG-152 to REQ-RAG-155) as a package.
+<li>REQ-RAG-155: add <code>OpenAIKey</code> and <code>GeminiKey</code> under <code>ImageGeneration</code> in <code>tests/TechieRag.Tests/livetests.settings.json</code> (git-ignored), then run <code>dotnet test tests/TechieRag.Tests --filter "Category=LiveImages"</code>. Venice passed.
 </li>
-<li>REQ-RAG-146: the DirectML engine package you chose stops at 0.14.1, below this library's engine 0.16.0 (ORTGENAI-003). Loading on a graphics card needs a new choice: WinML or CUDA, both from engine 0.17.0. The refusal before download is built and verified.
+<li>REQ-RAG-146: the DirectML engine package stops at 0.14.1, below this library's engine 0.16.0 (ORTGENAI-003). Loading on a graphics card needs your choice of WinML or CUDA (Decision Request).
 </li>
-<li>REQ-RAG-150: the calendar test passed on this laptop when run alone (13:13), but in the verify run, with every suite running, only 2.9 GB of the 4.7 GB it needs was free, so it was skipped.
+<li>REQ-RAG-157 (Azure image route) was checked against a stand-in; no Azure OpenAI resource is available here.
 </li>
 </ul>
 <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
@@ -195,11 +187,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-10-29</td><td>amend-docs</td><td>23/29 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-10-29</td><td>build-phase</td><td>29/29 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-11-05</td><td>amend-docs</td><td>29/36 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-11-05</td><td>build-phase</td><td>34/36 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-11-07</td><td>amend-docs</td><td>34/40 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-08</td><td>amend-docs</td><td>37/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-08</td><td>build-phase</td><td>39/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-08</td><td>build-phase</td><td>39/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-08</td><td>verify-phase</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-08</td><td>handoff-phase</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -208,27 +200,27 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>OnnxRuntimeGenAI: 3 open · 0 closed — docs/TechieRag-OnnxRuntimeGenAI-Feedback.md
 </li>
-<li>TechieFlow: 1 open · 4 fixed upstream, not yet re-checked (TF-005, TF-006, TF-007 …) · 4 closed — docs/TechieRag-TechieFlow-Feedback.md
+<li>TechieFlow: 0 open · 10 closed — docs/TechieRag-TechieFlow-Feedback.md
 </li>
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
 <ul>
-<li>Last check 2026-11-05: 0 findings, see the checklist Remarks. No code changed on 2026-11-07.
+<li>Last check 2026-11-08: 0 findings in the new files, see the checklist Remarks.
 </li>
 </ul>
 <h2 id="deferred-future"><a id="deferred--future"></a>Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
 <li>Gemini thought signatures on function calls (newer Gemini models may ask for them back); not sent today.
 </li>
-<li>Checklist rows for the 1.1.7 Lekhak work whose tests carry REQ-RAG-135 and REQ-RAG-136 (TF-008).
+<li>Gemini's docs now lead with a newer "interactions" API; image generation uses <code>generateContent</code>, which still serves.
+</li>
+<li>Image generation through the builder, <code>ITechieRag</code> and dependency injection; today only the factory route.
+</li>
+<li>Checklist rows for the 1.1.7 Lekhak work whose tests carry REQ-RAG-135 and REQ-RAG-136.
 </li>
 <li>Open consumer feedback entries (TR-RAG-020/021/022/026/035, etc.) for a future release.
 </li>
-<li>OS built-in models as a later <code>ILocalLlmRuntime</code>.
-</li>
 <li>Picture reading on phones: out of this phase (owner, 2026-11-05).
-</li>
-<li>Picture reading takes about 6 minutes per page on this laptop's processor; shrinking a large picture before it is sent would cut that.
 </li>
 </ul>
   </main>

@@ -30,6 +30,16 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
     /// <returns>An open connection owned by the caller.</returns>
     protected abstract Task<DbConnection> OpenConnectionAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Takes a cross-process lock while the tables are created, or returns null when the engine needs none
+    /// (REQ-RAG-152: PostgreSQL takes an advisory lock; SQLite serializes writers itself).
+    /// </summary>
+    /// <param name="connection">The open connection the tables are created on.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The held lock, released when disposed, or null.</returns>
+    protected virtual Task<IAsyncDisposable?> LockSchemaAsync(DbConnection connection, CancellationToken cancellationToken) =>
+        Task.FromResult<IAsyncDisposable?>(null);
+
     /// <inheritdoc/>
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -41,6 +51,7 @@ public abstract class RelationalWorkspaceStore : IWorkspaceStore
             if (initialized) return;
 
             await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var schemaLock = await LockSchemaAsync(connection, cancellationToken).ConfigureAwait(false);
             await connection.ExecuteAsync("""
                 CREATE TABLE IF NOT EXISTS TrWorkspace (
                     WorkspaceId TEXT PRIMARY KEY,

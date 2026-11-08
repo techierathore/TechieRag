@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Developer Guide</h1>
-    <div class="subtitle">Rendered 2026-11-05 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-11-08 &middot; source <code>TechieRag-P3-DevGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -128,6 +128,9 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#thinking-on-every-provider-anthropicthinking-chatmessage-providerstate-techierag-techierag-local">Thinking on every provider: AnthropicThinking, ChatMessage.ProviderState (TechieRag, TechieRag.Local)</a></li>
         <li class="h3"><a href="#provider-error-text-llmhttpexception-techierag">Provider error text: LlmHttpException (TechieRag)</a></li>
         <li class="h3"><a href="#model-choice-modelchooser-imodelchooser-techierag">Model choice: ModelChooser, IModelChooser (TechieRag)</a></li>
+        <li class="h3"><a href="#postgresql-end-to-end-usepostgres-postgresschemalock-techierag">PostgreSQL end to end: UsePostgres, PostgresSchemaLock (TechieRag)</a></li>
+        <li class="h3"><a href="#host-data-skill-hostdataskill-ihostentity-hostdatachange-techierag">Host data skill: HostDataSkill, IHostEntity, HostDataChange (TechieRag)</a></li>
+        <li class="h3"><a href="#image-generation-iimagegenerationprovider-imagegenerationproviderfactory-techierag">Image generation: IImageGenerationProvider, ImageGenerationProviderFactory (TechieRag)</a></li>
         <li><a href="#cross-cutting-flows">Cross-cutting flows</a></li>
         <li class="h3"><a href="#configuration">Configuration</a></li>
         <li class="h3"><a href="#logging-and-errors">Logging and errors</a></li>
@@ -141,11 +144,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Kind</td><td>library</td></tr>
 <tr><td>Size</td><td>Small</td></tr>
 <tr><td>Phase</td><td>3 of 3</td></tr>
-<tr><td>Verified on</td><td>2026-10-08</td></tr>
-<tr><td>Date</td><td>2026-10-08</td></tr>
+<tr><td>Verified on</td><td>2026-11-08</td></tr>
+<tr><td>Date</td><td>2026-11-08</td></tr>
 </tbody>
 </table>
-<p>This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Phase-1 services are in <code>docs/TechieRag-DevGuide.md</code>, phase-2 services in <code>docs/TechieRag-P2-DevGuide.md</code>.</p>
+<p>This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Added 2026-11-08: PostgreSQL end to end, the host data skill and image generation (REQ-RAG-152 to REQ-RAG-157). Phase-1 services are in <code>docs/TechieRag-DevGuide.md</code>, phase-2 services in <code>docs/TechieRag-P2-DevGuide.md</code>.</p>
 <p>No sample calls any phase-3 surface: the probe (<code>samples/TechieRag.Probe</code>) only embeds, stores, searches and generates. So every entry is <code>static-only (unconfirmed)</code> at runtime. What was run on 2026-10-06 is the build (<code>bash .tfcore/utils/tf-build.sh</code>: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (<code>~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-&lt;id&gt;"</code>): 53 tests, 0 failed. On 2026-10-07 the Sevak fixes (TR-RAG-049 in storage defaults, TR-RAG-047 as the new local model entry) were built and verified: build PASS, every test project run on its own, 0 failed. The other entries' file and line references were re-checked against the code that day and still hold. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.</p>
 <h2 id="architecture-cheat-sheet">Architecture cheat-sheet<a class="anchor-link" href="#architecture-cheat-sheet">#</a></h2>
 <div class="diagram">
@@ -491,6 +494,53 @@ Console.WriteLine(reply.Content);</code></pre>
 </tbody>
 </table>
 <p><strong>Calculations on this service:</strong> the request is cut to <code>MaxRequestCharacters</code> (default 4000), with a note giving how many characters were cut.</p>
+<h3 id="postgresql-end-to-end-usepostgres-postgresschemalock-techierag">PostgreSQL end to end: <code>UsePostgres</code>, <code>PostgresSchemaLock</code> (<code>TechieRag</code>)<a class="anchor-link" href="#postgresql-end-to-end-usepostgres-postgresschemalock-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/settings.png" alt="Sevak's settings screen, July 2026: where a host would let a user name a PostgreSQL server of their own; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-152 (Sevak TR-RAG-055, added 2026-11-07). Covered by <code>tests/TechieRag.Tests/VectorStores/Live/LivePostgresEndToEndTests.cs</code>, <code>LivePostgresConcurrentStartTests.cs</code>, <code>LivePgVectorStoreTests.cs</code> and <code>UsePostgresTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>confirmed</code>: the live tests ran on 2026-11-08 against PostgreSQL 18 + pgvector started by <code>tests/TechieRag.Tests/livetests/start-postgres.sh</code> (port 5551), connection string read from the git-ignored <code>livetests.settings.json</code>. 14 passed, none skipped.</p>
+<p><strong>Call chain:</strong> <code>UsePostgres</code> → <code>UsePgVector</code> + <code>WithPersistence(StoreProvider.Postgres, …)</code> → <code>Build()</code> → <code>CreatePgVectorStore</code>, <code>PostgresConversationStore</code>, <code>PostgresWorkspaceStore</code> on one connection string → <code>InitializeAsync</code> → each store takes <code>PostgresSchemaLock</code> (advisory lock <code>0x5465636869655261</code>) → <code>CREATE … IF NOT EXISTS</code> → unlock.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/TechieRagBuilder.cs:291</code></td><td><code>UsePostgres</code></td><td><code>config.VectorStore.ConnectionString</code>, <code>config.Persistence.ConnectionString</code></td><td>the same string</td></tr>
+<tr><td><code>src/TechieRag/VectorStores/PgVectorStore.cs:96</code></td><td><code>InitializeAsync</code></td><td><code>schemaLock</code></td><td>held before <code>CREATE EXTENSION</code>; a second store waits here</td></tr>
+<tr><td><code>src/TechieRag/Persistence/PostgresSchemaLock.cs:23</code></td><td><code>AcquireAsync</code></td><td>the command</td><td><code>SELECT pg_advisory_lock(…)</code> returns once no other session holds it</td></tr>
+<tr><td><code>src/TechieRag/Persistence/RelationalConversationStore.cs:61</code></td><td><code>InitializeAsync</code></td><td><code>schemaLock</code></td><td>null on SQLite, held on PostgreSQL</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> none.</p>
+<h3 id="host-data-skill-hostdataskill-ihostentity-hostdatachange-techierag">Host data skill: <code>HostDataSkill</code>, <code>IHostEntity</code>, <code>HostDataChange</code> (<code>TechieRag</code>)<a class="anchor-link" href="#host-data-skill-hostdataskill-ihostentity-hostdatachange-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/tool-demo.png" alt="Sevak's tool demo screen, July 2026: a tool-calling loop the host-data tools join; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-153 and REQ-RAG-154 (Sevak TR-RAG-056, TR-RAG-057, added 2026-11-07). Covered by <code>tests/TechieRag.Tests/Agentic/HostDataSkillTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>static-only (unconfirmed)</code>: no sample registers an entity. The tests drive the skill through <code>AgentLoopRunner</code> with a scripted model and an in-memory task store. Tests run 2026-11-08: 10 passed.</p>
+<p><strong>Call chain:</strong> <code>Register</code> → <code>Validate</code> (lower-case name, unique fields, update or delete needs read) → <code>ToolDefinitions</code> → <code>BuildDefinitions</code> (five tools, <code>entity</code> enum per tool) → <code>ExecuteToolAsync</code> → <code>OperationOf</code> → <code>CheckFields</code> → the host's handler (update and delete <code>ReadAsync</code> first for "before") → <code>RecordAsync</code> → <code>PublishAsync</code> (awaits <code>OnChangeAsync</code>, then raises <code>ChangeRecorded</code>). <code>UndoAsync</code> → delete, update with <code>Before.Values</code>, or create → <code>PublishAsync</code> with <code>UndoOf</code>.</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/Agentic/HostData/HostDataSkill.cs:146</code></td><td><code>ExecuteToolAsync</code></td><td><code>operation</code>, <code>entity</code></td><td>the tool's operation; null entity gives <code>HostDataUnknownEntity</code></td></tr>
+<tr><td><code>src/TechieRag/Agentic/HostData/HostDataSkill.cs:438</code></td><td><code>CheckFields</code></td><td>the return</td><td>null when the fields fit; else the problems sent to the model</td></tr>
+<tr><td><code>src/TechieRag/Agentic/HostData/HostDataSkill.cs:387</code></td><td><code>RecordAsync</code></td><td><code>change</code></td><td>entity, id, kind, before, after, <code>TurnId</code> from <code>BeginTurn</code></td></tr>
+<tr><td><code>src/TechieRag/Agentic/HostData/HostDataSkill.cs:423</code></td><td><code>PublishAsync</code></td><td><code>options.OnChangeAsync</code></td><td>awaited before the tool result goes back</td></tr>
+<tr><td><code>src/TechieRag/Agentic/HostData/HostDataSkill.cs:223</code></td><td><code>UndoAsync</code></td><td><code>reversal</code></td><td>the reversing change, <code>UndoOf</code> = the original <code>ChangeId</code></td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> a list returns at most <code>MaxListResults</code> (default 50) whatever the model asks.</p>
+<h3 id="image-generation-iimagegenerationprovider-imagegenerationproviderfactory-techierag">Image generation: <code>IImageGenerationProvider</code>, <code>ImageGenerationProviderFactory</code> (<code>TechieRag</code>)<a class="anchor-link" href="#image-generation-iimagegenerationprovider-imagegenerationproviderfactory-techierag">#</a></h3>
+<p><img src="screenshots/TechieRag/llm-settings.png" alt="Sevak's LLM settings screen, July 2026: where a host would pick an image route and key; it predates this change" style="max-width:100%"></p>
+<p>REQ-RAG-155 to REQ-RAG-157 (Sevak TR-RAG-058, added 2026-11-07; the two extra routes added 2026-11-08). Covered by <code>tests/TechieRag.Tests/ImageGeneration/ImageGenerationTests.cs</code>, <code>ImageRouteTests.cs</code> and <code>Live/LiveImageGenerationTests.cs</code>.</p>
+<p><strong>Runtime:</strong> <code>confirmed</code> for Venice only: the live test returned a 1024x1024 PNG on 2026-11-08. OpenAI, Gemini, openai-compatible and Azure are checked against a loopback stand-in in each service's shape.</p>
+<p><strong>Call chain:</strong> <code>CreateForModel</code> → split an <code>@https://</code> suffix into the endpoint → <code>Resolve</code> (connector/model, or a bare <code>gpt-image-*</code>, <code>dall-e-*</code>, <code>gemini-*</code>) → <code>Create</code> → the provider → <code>GenerateImageAsync</code> → <code>ImageHttp.CheckArguments</code> (sizes) → <code>PostJsonAsync</code> (key in a header only) → <code>OpenAIImageFormat.Result</code> or the provider's own reader → <code>ImageBytes.Result</code> (media type and pixel size from the bytes).</p>
+<table>
+<thead><tr><th>File and line</th><th>Function</th><th>Watch</th><th>Expected value</th></tr></thead>
+<tbody>
+<tr><td><code>src/TechieRag/ImageGeneration/ImageGenerationProviderFactory.cs:59</code></td><td><code>CreateForModel</code></td><td><code>endpoint</code>, <code>trimmed</code></td><td>the suffix moved into <code>endpoint</code></td></tr>
+<tr><td><code>src/TechieRag/ImageGeneration/ImageGenerationProviderFactory.cs:88</code></td><td><code>Create</code></td><td>the connector switch</td><td><code>openai-compatible</code> and <code>azure-openai</code> throw without an endpoint</td></tr>
+<tr><td><code>src/TechieRag/ImageGeneration/ImageHttp.cs:53</code></td><td><code>PostJsonAsync</code></td><td><code>url</code></td><td>never contains the key</td></tr>
+<tr><td><code>src/TechieRag/ImageGeneration/GeminiImageGenerationProvider.cs:137</code></td><td><code>RatioOf</code></td><td>the return</td><td><code>1:1</code> for 1024x1024; null for a ratio Gemini lacks</td></tr>
+<tr><td><code>src/TechieRag/ImageGeneration/ImageBytes.cs:60</code></td><td><code>Result</code></td><td><code>MediaType</code>, <code>Size</code></td><td><code>image/png</code> and the header's width and height</td></tr>
+</tbody>
+</table>
+<p><strong>Calculations on this service:</strong> Gemini's tier is 1K up to a 1024 long side, 2K up to 2048, else 4K.</p>
 <h2 id="cross-cutting-flows">Cross-cutting flows<a class="anchor-link" href="#cross-cutting-flows">#</a></h2>
 <p>Phase 1's flows are in <code>docs/TechieRag-DevGuide.md</code> and phase 2's changes in <code>docs/TechieRag-P2-DevGuide.md</code>. Phase 3 changed two; the local model's load order changed in its own entry above.</p>
 <h3 id="configuration">Configuration<a class="anchor-link" href="#configuration">#</a></h3>

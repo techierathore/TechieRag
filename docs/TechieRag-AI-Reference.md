@@ -299,6 +299,7 @@ var response = await rag.AskAsync("What is quantum computing?");
 |--------|-------------|
 | `UseSqliteVec(connectionString)` | SQLite with vec extension; `UseSqliteVec()` with no path uses the per-app default database (`DataRoot.DefaultDatabasePath`) |
 | `UsePgVector(connectionString)` | PostgreSQL with pgvector extension |
+| `UsePostgres(connectionString, defaultUserId)` | Vectors, conversations and workspaces in one PostgreSQL database (REQ-RAG-152) |
 | `UseQdrant(endpoint, apiKey)` | Qdrant vector database |
 
 ### LLM Providers
@@ -1567,6 +1568,87 @@ var agentPath = Path.Combine(
     ".codex", "agents", "techierag.toml");
 Console.WriteLine(File.Exists(agentPath) ? "techierag agent ready" : "build to deploy");
 ```
+
+### One PostgreSQL database for everything (REQ-RAG-152)
+
+`UsePostgres(connectionString)` is `UsePgVector(connectionString)` plus `WithPersistence(StoreProvider.Postgres, connectionString)`. One call puts the vectors (`Documents`, `Chunks`), the conversations (`TrThread`, `TrMessage`) and the workspaces (`TrWorkspace`, `TrWorkspaceDocument`) in one database. The server needs pgvector. Proven on PostgreSQL 18 + pgvector in CI.
+
+```csharp
+var rag = new TechieRagBuilder()
+    .UsePostgres("Host=db;Database=app;Username=app;Password=...", defaultUserId: userId)
+    .UseEmbedding(EmbeddingSource.Ollama)
+    .Build();
+await rag.InitializeAsync();
+var threads = rag.GetConversationStore();      // PostgresConversationStore
+var workspaces = rag.GetWorkspaceManager();     // over PostgresWorkspaceStore
+```
+
+### Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)
+
+Namespace `TechieRag.Agentic.HostData`. A host registers its own entities. The agent gets ONE tool set for all of them: `host_data_list`, `host_data_read`, `host_data_create`, `host_data_update` and `host_data_delete`, each taking an `entity` argument. `HostDataSkill` is an `IToolHandler`: pass it to `AgentLoopRunner`, combine it with other tools in `CompositeToolHandler`, wrap it in `GuardedToolHandler`, or hand it to a `TechieRag.Agents` agent.
+
+```csharp
+var task = new HostEntity("task", "A to-do item of the user.",
+[
+    new HostEntityField("title", HostFieldType.Text, "What to do.", Required: true),
+    new HostEntityField("due", HostFieldType.DateTime, "When it is due, local time."),
+    new HostEntityField("priority", HostFieldType.Choice, "How important it is.") { Choices = ["low", "normal", "high"] }
+])
+{
+    List   = (query, ct) => repo.FindAsync(query.Text, query.Limit, ct),     // IReadOnlyList<HostEntityRecord>
+    Read   = (id, ct) => repo.ReadAsync(id, ct),                             // HostEntityRecord? (null = not found)
+    Create = (values, ct) => repo.CreateAsync(values, ct),                   // values: IReadOnlyDictionary<string, JsonElement>
+    Update = (id, values, ct) => repo.UpdateAsync(id, values, ct),           // only the named fields change
+    Delete = (id, ct) => repo.DeleteAsync(id, ct)
+};
+
+var skill = new HostDataSkill(new HostDataSkillOptions
+{
+    OnChangeAsync = (change, ct) => changeLog.SaveAsync(change, ct)          // awaited before the model sees the result
+}).Register(task);
+
+skill.BeginTurn(turnId);                                                     // each change carries this turn id
+var answer = await new AgentLoopRunner(llm, skill).RunAsync(messages);
+foreach (HostDataChange change in skill.TurnChanges) { /* show a card with Undo */ }
+
+HostDataChange reversal = await skill.UndoAsync(change);                     // through the host's own handlers
+```
+
+Rules:
+- A null handler is an operation the entity does not offer. A tool appears only when some entity offers it, and its `entity` enum names only those entities. An entity that offers update or delete must offer read, because the skill reads the "before" state first; `Register` refuses one that does not.
+- The model's `fields` are checked before any handler runs: the name must be known, the value must have the right type (`Date` is `yyyy-MM-dd`, `DateTime` is ISO 8601), a choice must be in `Choices`, and a create must name every required field. A mismatch goes back to the model as a failed `ToolResult` it can correct. `ToolResult.Message.Code` is one of `HostDataMessageCodes` for the trace. A handler that throws becomes `HostDataHandlerFailed`; the model is told, and the turn goes on.
+- `HostDataChange`: `ChangeId`, `Entity`, `EntityId`, `Kind` (`Created`/`Updated`/`Deleted`), `Before`, `After` (`HostEntityRecord`: `Id` + `Values`), `TurnId`, `ToolCallId`, `UndoOf`, `At`. It is plain data: store it as JSON and undo it later.
+- `UndoAsync`: Created → the delete handler; Updated → the update handler with `Before.Values`; Deleted → the create handler with `Before.Values` (the host may give a new id). It returns the reversal as a new change with `UndoOf` set, and raises it like any change. It throws `HostDataException` (`Code` `HostDataCannotUndo` or `HostDataUnknownEntity`) when the entity lacks the handler.
+- The delete tool has `RequiresConfirmation = true` by default (`HostDataSkillOptions.DeleteRequiresConfirmation`).
+
+### Image generation (REQ-RAG-155)
+
+Namespaces: the providers and `ImageGenerationProviderFactory` are in `TechieRag.ImageGeneration`, the interface in `TechieRag.Abstractions`, and `ImageSize`, `GeneratedImage`, `ImageGenerationOptions` and `ImageGenerationUsage` in `TechieRag.Models`. `IImageGenerationProvider.GenerateImageAsync(prompt, ImageSize size, ImageGenerationOptions? options)` returns `GeneratedImage(Bytes, MediaType, Size, Usage)`. `MediaType` and `Size` are read from the image bytes, so you can see when a service sent something other than what you asked for. Routes work like chat routes:
+
+```csharp
+var images = ImageGenerationProviderFactory.CreateForModel("openai/gpt-image-1", apiKey);   // also "gemini/...", "venice/..."
+GeneratedImage image = await images.GenerateImageAsync("a lighthouse at dawn", ImageSize.Square1024);
+await File.WriteAllBytesAsync("hero.png", image.Bytes);   // image.Usage.TotalTokens, image.Usage.Images
+```
+
+| Connector | Default model | Sizes | Usage |
+|---|---|---|---|
+| `openai` | `gpt-image-1` (PNG, `output_format`) | 1024x1024, 1536x1024, 1024x1536 (DALL·E 3/2 have their own lists) | input, output and total tokens |
+| `gemini` | `gemini-2.5-flash-image` (`generateContent`, image output) | by aspect ratio 1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9; tier 1K/2K/4K from the long side; 1024x1024 exact | `usageMetadata` tokens |
+| `venice` | `venice-sd35` (PNG, width and height) | any up to 1280 a side | image count only (Venice reports no tokens) |
+| `openai-compatible` | none: name it, `openai-compatible/<model>` (REQ-RAG-156) | the service's; GPT Image and DALL·E names get OpenAI's lists | whatever the service returns in OpenAI's `usage` |
+| `azure-openai` | none: the deployment, `azure-openai/<deployment>` (REQ-RAG-157) | the service's; name `Model = "gpt-image-1"` in the options to check sizes first | OpenAI's `usage` |
+
+The last two need an endpoint, as an argument or an `@https://` suffix like the chat routes. Without one they are refused before any request:
+
+```csharp
+var compatible = ImageGenerationProviderFactory.CreateForModel("openai-compatible/flux-dev@https://images.example.com/v1", key);
+var azure = ImageGenerationProviderFactory.CreateForModel("azure-openai/hero-images", azureKey,
+    endpoint: "https://my-resource.openai.azure.com");   // api-key header, api-version 2025-04-01-preview
+// Or directly: new AzureOpenAIImageGenerationProvider(azureKey, "hero-images", endpoint, apiVersion: "…")
+```
+
+A bare model name resolves when it names one service: `gpt-image-*` and `dall-e-*` are OpenAI, `gemini-*` is Gemini. A size the model does not make throws `ArgumentException` before any request, and a refusal throws `LlmHttpException`. The key is held in memory and sent only in a header (`Authorization`, or `x-goog-api-key` for Gemini). It is never put in a URL, a log or a file. Options: `Model`, `Quality` (OpenAI, Venice), `NegativePrompt` and `Seed` (Venice), `Timeout` (default 120 s).
 
 ---
 

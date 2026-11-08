@@ -8,7 +8,7 @@
 
 ## Summary
 
-Two requests are blocking right now: TR-RAG-056 and TR-RAG-057 hold Sevak's REQ-RAG-116 and REQ-UI-087 until TechieRag BRD-211 and BRD-212 ship in package 1.1.9, so the TechieRag build runs before Sevak's phase 4 build. 55 entries: 4 open requests, none a defect (TR-RAG-055 to TR-RAG-058, 2026-11-07), written in TechieRag as BRD-210 to BRD-213 (REQ-RAG-152 to REQ-RAG-155). REQ-RAG-109 is not blocked: the PostgreSQL stores are in TechieRag 1.1.8. 36 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-053 (2026-10-10): disposing a `LocalLlmProvider` while a call waits crashes the process; worked around in Sevak. TR-RAG-052: `TechieRag.Local` cannot call tools. TR-RAG-051: a model folder from an earlier conversion counts as almost downloaded. TR-RAG-048 is closed: Sevak moved to TechieRag 1.1.2 on 2026-10-07; the move found TR-RAG-049, worked around in Sevak.
+TR-RAG-055 to TR-RAG-058 were built upstream on 2026-11-08 for TechieRag 1.1.9 (not yet published); TR-RAG-056 and TR-RAG-057, which hold Sevak's REQ-RAG-116 and REQ-UI-087, are unblocked once 1.1.9 is on the feed. 55 entries: 4 open requests, none a defect (TR-RAG-055 to TR-RAG-058, 2026-11-07), written in TechieRag as BRD-210 to BRD-213 (REQ-RAG-152 to REQ-RAG-155). REQ-RAG-109 is not blocked: the PostgreSQL stores are in TechieRag 1.1.8. 36 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-053 (2026-10-10): disposing a `LocalLlmProvider` while a call waits crashes the process; worked around in Sevak. TR-RAG-052: `TechieRag.Local` cannot call tools. TR-RAG-051: a model folder from an earlier conversion counts as almost downloaded. TR-RAG-048 is closed: Sevak moved to TechieRag 1.1.2 on 2026-10-07; the move found TR-RAG-049, worked around in Sevak.
 
 These are the application's findings against `src/TechieRag`, filed while it lived in this repository (TechieRagWeb, then TechieDesk, now Sevak), restructured 2026-09-24 into the feedback template with the original text unchanged; the earlier summary is under "Replies from TechieRag". Accepted items are ledgered as TechieRag requirements (BRD-121, 126, 127, 142, 143, 148, 158; phase 3; BRD-210 to 213).
 
@@ -1234,9 +1234,9 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** none in Sevak. The app sends one call per file, and the time is spent inside the library.
 - **Suggested fix:** an 8-bit (int8) BGE-M3, batching several chunks per run, and a thread-count setting.
 
-### TR-RAG-055 — request: the PostgreSQL path proven end to end on a real PostgreSQL 18 with pgvector (major, asked 2026-11-07 for Sevak phase 4)
+### TR-RAG-055 — request: the PostgreSQL path proven end to end on a real PostgreSQL 18 with pgvector (major, asked 2026-11-07 for Sevak phase 4) — **fixed upstream 2026-11-08, ships in TechieRag 1.1.9 (not yet published), not yet re-checked here**
 
-- **Status:** open — written as TechieRag BRD-210 / REQ-RAG-152 on 2026-11-07, not built.
+- **Status:** fixed upstream 2026-11-08 — TechieRag REQ-RAG-152 Verified; ships in 1.1.9, not yet published.
 - **Severity:** minor (a proof in CI, not new code; owner, 2026-11-07 evening)
 - **Blocks:** no — `Sevak#REQ-RAG-109` builds now: `PgVectorStore`, `PostgresConversationStore` and `PostgresWorkspaceStore` are in TechieRag 1.1.8.
 - **Repro:** Sevak lets a user choose a PostgreSQL server of their own at first setup (owner, 5 and 7 November 2026). The three stores exist, but BRD-157 (`LivePgVectorStoreTests` against a real PostgreSQL) is Implemented 85%, and nothing proves them together in one database.
@@ -1246,9 +1246,9 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** none; Sevak's SQLite path is unaffected.
 - **Suggested fix:** TechieRag BRD-210 as written, with one change: `LivePostgresFactAttribute` reads the connection string from the environment variable `TechieRagTestPostgres` today. The owner's rule is a settings file beside the tests, never an environment variable: a git-ignored `tests/TechieRag.Tests/livetests.settings.json`, with a committed example beside it, read at discovery time and written by the harness-started server; absent, the tests skip with the reason.
 
-### TR-RAG-056 — request: a host-data skill, so a host's assistant reads and changes the host's own data in plain words (major, asked 2026-11-07 for Sevak phase 4)
+### TR-RAG-056 — request: a host-data skill, so a host's assistant reads and changes the host's own data in plain words (major, asked 2026-11-07 for Sevak phase 4) — **fixed upstream 2026-11-08, ships in TechieRag 1.1.9 (not yet published), not yet re-checked here**
 
-- **Status:** open — written as TechieRag BRD-211 / REQ-RAG-153 on 2026-11-07, not built.
+- **Status:** fixed upstream 2026-11-08 — TechieRag REQ-RAG-153 Verified; ships in 1.1.9, not yet published.
 - **Severity:** major
 - **Blocks:** yes — `Sevak#REQ-RAG-116` (the assistant reads and changes Sevak's data: tasks, the plan, projects, milestones, goals, areas, people, places, routines, memory, settings) waits for TechieRag BRD-211 (REQ-RAG-153) in package 1.1.9; the TechieRag build runs before the Sevak phase 4 build.
 - **Repro:** a host registers its own entities (name, fields, and handlers to list, read, create, update and delete) and the agent gets one tool set for them, built once in the library rather than hand-written tool by tool in every host. Sevak's agent (`Sevak#BRD-138`) is the first consumer; every entity above is a Dapper repository in `apps/Sevak.Core`.
@@ -1258,9 +1258,9 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** none accepted; hand-writing one tool per entity in Sevak would be the private loop ADR-015 forbids.
 - **Suggested fix:** TechieRag BRD-211 as written.
 
-### TR-RAG-057 — request: every host-data change comes back as a typed change record the host can undo (major, asked 2026-11-07 for Sevak phase 4)
+### TR-RAG-057 — request: every host-data change comes back as a typed change record the host can undo (major, asked 2026-11-07 for Sevak phase 4) — **fixed upstream 2026-11-08, ships in TechieRag 1.1.9 (not yet published), not yet re-checked here**
 
-- **Status:** open — written as TechieRag BRD-212 / REQ-RAG-154 on 2026-11-07, not built.
+- **Status:** fixed upstream 2026-11-08 — TechieRag REQ-RAG-154 Verified; ships in 1.1.9, not yet published.
 - **Severity:** major
 - **Blocks:** yes — `Sevak#REQ-UI-087` (every change is a card with Undo) waits for TechieRag BRD-212 (REQ-RAG-154) in package 1.1.9; Sevak stores the record in `AssistantChange`; the TechieRag build runs before the Sevak phase 4 build.
 - **Repro:** each change the skill of TR-RAG-056 makes returns (entity, id, before, after, the turn that caused it), and the skill reverses a record on request through the host's own handlers, so the host shows a card with Undo and never guesses what the model changed.
@@ -1270,9 +1270,9 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** none.
 - **Suggested fix:** TechieRag BRD-212 as written.
 
-### TR-RAG-058 — request: image generation through the library for OpenAI, Gemini and Venice (minor, asked 2026-11-07 for Sevak phase 5)
+### TR-RAG-058 — request: image generation through the library for OpenAI, Gemini and Venice (minor, asked 2026-11-07 for Sevak phase 5) — **fixed upstream 2026-11-08, ships in TechieRag 1.1.9 (not yet published), not yet re-checked here**
 
-- **Status:** open — written as TechieRag BRD-213 / REQ-RAG-155 on 2026-11-07, not built; re-scopes BRD-161 (deferred since 2026-09-03) for images only.
+- **Status:** built upstream 2026-11-08 — TechieRag REQ-RAG-155 PARTIAL: checked against a local stand-in, not yet against the real services (no keys on the TechieRag machine); ships in 1.1.9, not yet published.
 - **Severity:** minor
 - **Blocks:** no for phase 4; `Sevak#BRD-281` (hero images and thumbnails, phase 5) can start with Canva and Venice through their own APIs and gains the library route when this ships.
 - **Repro:** `IImageGenerationProvider` with `GenerateImageAsync(prompt, size, options)` returning the image bytes, its media type and the usage, routed like the chat providers, no key ever persisted (TechieRag ADR-003).
@@ -1285,6 +1285,17 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 ## Replies from TechieRag
 
 <!-- The upstream team's answers, newest block first. -->
+
+### 2026-11-08 — TR-RAG-055 to TR-RAG-058 built for 1.1.9
+
+All four are in TechieRag 1.1.9. The project files and the release notes carry that version; the package is not published yet (the owner tags and publishes). TR-RAG-056 and TR-RAG-057 are built, so Sevak's phase 4 build can start once 1.1.9 is on the feed.
+
+- **TR-RAG-055 → `TechieRag#REQ-RAG-152`, Verified 2026-11-08.** `UsePostgres(connectionString, defaultUserId)` puts vectors, conversations and workspaces in one database. `bash tests/TechieRag.Tests/livetests/start-postgres.sh` starts PostgreSQL 18 + pgvector in Docker with a new password and writes the git-ignored `tests/TechieRag.Tests/livetests.settings.json`; no environment variable is read. 13 live and builder tests passed against it, none skipped. The CI job `.github/workflows/live-postgres.yml` has not run yet because nothing is pushed.
+- **TR-RAG-056 → `TechieRag#REQ-RAG-153`, Verified 2026-11-08.** `HostDataSkill` with `IHostEntity` (or `HostEntity` from delegates) in `TechieRag.Agentic.HostData`. One tool set (`host_data_list`, `_read`, `_create`, `_update`, `_delete`) covers every entity. It is an `IToolHandler`, so it works with the catalogue, guardrails and the trace. "add task call the bank at 3" runs the task's create handler with the fields the model extracted.
+- **TR-RAG-057 → `TechieRag#REQ-RAG-154`, Verified 2026-11-08.** Every change returns a `HostDataChange` (entity, id, kind, before, after, turn id, tool call id). Store it from `HostDataSkillOptions.OnChangeAsync`, which is awaited before the model sees the result, in `AssistantChange`. `UndoAsync(change)` restores "before" through your update handler, and deletes or re-creates through your handlers. The record is plain data, so it can be stored as JSON and undone later.
+- **TR-RAG-058 → `TechieRag#REQ-RAG-155`, PARTIAL 2026-11-08.** `IImageGenerationProvider.GenerateImageAsync(prompt, size, options)` for OpenAI, Gemini and Venice, created with `ImageGenerationProviderFactory.CreateForModel("venice/venice-sd35", key)`. It is checked against a stand-in in each service's shape; the real services were not called, because the TechieRag machine has no keys for them.
+
+**Verify from here:** move Sevak to TechieRag 1.1.9. Register the task entity with `HostEntity` over the Dapper repository, give the skill to the agent, and ask "add task call the bank at 3". The create handler should run with title and due. Then call `UndoAsync` on the stored `HostDataChange`, and the task should be gone. For REQ-RAG-109, `UsePostgres(connectionString)` against the user's own server needs no other store call. For BRD-281, one `GenerateImageAsync` with a real Venice key should return PNG bytes of the asked size.
 
 ### 2026-10-11 — TR-RAG-053 fixed
 
