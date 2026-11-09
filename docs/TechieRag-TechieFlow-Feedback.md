@@ -207,7 +207,7 @@ Nothing is blocked. Every entry was re-checked here and closed; TF-007 was re-ch
 
 ### Resolution status (TechieFlow team, 2026-11-08)
 
-Ships in **TechieFlow v1.3.0**, the next release after v1.2.4. It reaches this project's `.tfcore/` at its next framework update: none was run here on 2026-11-08, because a build was running.
+Ships in **TechieFlow v1.3.0**, the next release after v1.2.4. Already in this project's `.tfcore/` through the framework update of 2026-11-08, run after the build finished.
 
 | ID | Fix | Check it here |
 |---|---|---|
