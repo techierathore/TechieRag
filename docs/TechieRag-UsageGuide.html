@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Usage Guide</h1>
-    <div class="sub">Last rendered: 2026-11-08</div>
+    <div class="sub">Last rendered: 2026-11-12</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#test-users">Test users</a></li>
@@ -145,6 +145,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#provider-error-text-phase-3">Provider error text (phase 3)</a></li>
         <li class="h3"><a href="#postgresql-end-to-end-phase-3">PostgreSQL end to end (phase 3)</a></li>
         <li class="h3"><a href="#host-data-skill-and-undo-phase-3">Host data skill and Undo (phase 3)</a></li>
+        <li class="h3"><a href="#sevak-fixes-for-1-1-10">Sevak fixes for 1.1.10</a></li>
         <li class="h3"><a href="#image-generation-phase-3">Image generation (phase 3)</a></li>
         <li><a href="#automated-tests">Automated tests</a></li>
         <li><a href="#known-limitations">Known limitations</a></li>
@@ -160,7 +161,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Usage Guide</h1>
-    <div class="subtitle">Rendered 2026-11-08 &middot; source <code>TechieRag-UsageGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-11-12 &middot; source <code>TechieRag-UsageGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -201,6 +202,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#provider-error-text-phase-3">Provider error text (phase 3)</a></li>
         <li class="h3"><a href="#postgresql-end-to-end-phase-3">PostgreSQL end to end (phase 3)</a></li>
         <li class="h3"><a href="#host-data-skill-and-undo-phase-3">Host data skill and Undo (phase 3)</a></li>
+        <li class="h3"><a href="#sevak-fixes-for-1-1-10">Sevak fixes for 1.1.10</a></li>
         <li class="h3"><a href="#image-generation-phase-3">Image generation (phase 3)</a></li>
         <li><a href="#automated-tests">Automated tests</a></li>
         <li><a href="#known-limitations">Known limitations</a></li>
@@ -230,7 +232,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tbody>
 <tr><td>1</td><td>none (library; no sign-in)</td><td>—</td><td>Developer running the test project</td><td>n/a</td></tr>
 <tr><td>2</td><td><code>TechieRagLiveNetworkTests=1</code></td><td>environment variable, enables the live web tests</td><td>Maintainer</td><td>set per machine</td></tr>
-<tr><td>3</td><td><code>tests/TechieRag.Tests/livetests.settings.json</code></td><td>git-ignored settings file holding <code>Postgres:ConnectionString</code>; written by <code>tests/TechieRag.Tests/livetests/start-postgres.sh</code>, which starts PostgreSQL 18 + pgvector in Docker with its own password; enables the <code>LivePostgres</code> tests (REQ-RAG-152). Never an environment variable</td><td>Maintainer</td><td>per start</td></tr>
+<tr><td>3</td><td><code>tests/TechieRag.Tests/livetests.settings.json</code></td><td>git-ignored settings file holding <code>Postgres:ConnectionString</code>; written by <code>tests/TechieRag.Tests/livetests/start-postgres.sh</code>, which starts PostgreSQL 18 + pgvector in Docker with its own password; enables the <code>LivePostgres</code> tests (REQ-RAG-152). Also holds <code>ImageGeneration:*Key</code> and <code>Anthropic:ApiKey</code> (the <code>LiveImages</code> and <code>LiveAnthropic</code> tests, REQ-RAG-155, REQ-RAG-158). Never an environment variable</td><td>Maintainer</td><td>yes (Anthropic key added 2026-11-12)</td></tr>
 <tr><td>4</td><td>staged weights under <code>~/.cache/techierag-models/bge-reranker-v2-m3</code> and <code>bge-m3</code></td><td>files on disk; enable the live reranker and embedder tests</td><td>Maintainer</td><td>ask owner</td></tr>
 <tr><td>5</td><td><code>TechieRagLiveLocalModel</code> (optional model id) and a local model downloaded under the model root</td><td>environment variable plus files on disk; enable the live <code>TechieRag.Local</code> tests once a runtime is chosen for the platform</td><td>Maintainer</td><td>set per machine</td></tr>
 <tr><td>6</td><td><code>TechieRagOpenCodeGoKey</code></td><td>environment variable holding an OpenCode Go key; enables <code>LiveOpenCodeGoTests</code> (test-only: apps pass keys in code)</td><td>Maintainer</td><td>set per machine</td></tr>
@@ -609,6 +611,17 @@ dotnet pack src/TechieRag/TechieRag.csproj -o ./local-feed -p:Version=1.0.8-loca
 <li><strong>Covers:</strong> REQ-RAG-153, REQ-RAG-154
 </li>
 </ul>
+<h3 id="sevak-fixes-for-1-1-10"><a id="sevak-fixes-for-1110"></a>Sevak fixes for 1.1.10<a class="anchor-link" href="#sevak-fixes-for-1-1-10">#</a></h3>
+<ul>
+<li><strong>Sign in as:</strong> user 1
+</li>
+<li><strong>Steps:</strong> 1) with <code>Anthropic:ApiKey</code> in <code>livetests.settings.json</code>, <code>dotnet test tests/TechieRag.Tests --filter "Category=LiveAnthropic"</code> 2) <code>AgentLoopRunner</code> with a <code>rag-search</code> tool on Phi-3 mini, a question that needs a search 3) 15 entities on a <code>HostDataSkill</code>, one agent call on Qwen 2.5 0.5B 4) <code>skill.BeginTurn("t2", ["task"])</code>, then ask to list people
+</li>
+<li><strong>Expected:</strong> 1) <code>claude-sonnet-5-5</code> answers with <code>Temperature = 0.3f</code> set 2) a <code>rag-search</code> step, then a real answer 3) an answer, no <code>LocalPromptTooLongException</code> 4) the tools name only <code>task</code>; the call for <code>person</code> is refused with <code>HostDataEntityNotOffered</code>.
+</li>
+<li><strong>Covers:</strong> REQ-RAG-158, REQ-RAG-159, REQ-RAG-160
+</li>
+</ul>
 <h3 id="image-generation-phase-3">Image generation (phase 3)<a class="anchor-link" href="#image-generation-phase-3">#</a></h3>
 <ul>
 <li><strong>Sign in as:</strong> user 1
@@ -664,6 +677,8 @@ dotnet test tests/TechieRag.Tests --filter "Category=LiveImages"   # keys in liv
 <li>An app that names no SQLite folder and has no <code>techierag.db</code> in its running folder starts with an empty database under <code>&lt;LocalApplicationData&gt;/TechieRag/data/&lt;app name&gt;/</code> after upgrading; give a full path to keep the old location (REQ-RAG-122).
 </li>
 <li>Registering a tool name twice keeps the last definition; it used to list both (REQ-RAG-121).
+</li>
+<li>From 1.1.10 the host-data tools other than the first no longer list the entities' fields; they point to the first tool (REQ-RAG-160).
 </li>
 <li>Image generation is reached only through <code>ImageGenerationProviderFactory</code>, not the builder or <code>ITechieRag</code>; one image per call, no editing. Gemini returns an exact size only for 1024x1024 (REQ-RAG-155). OpenAI and Gemini have not been called live yet (keys).
 </li>

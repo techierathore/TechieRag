@@ -1620,6 +1620,29 @@ Rules:
 - `HostDataChange`: `ChangeId`, `Entity`, `EntityId`, `Kind` (`Created`/`Updated`/`Deleted`), `Before`, `After` (`HostEntityRecord`: `Id` + `Values`), `TurnId`, `ToolCallId`, `UndoOf`, `At`. It is plain data: store it as JSON and undo it later.
 - `UndoAsync`: Created → the delete handler; Updated → the update handler with `Before.Values`; Deleted → the create handler with `Before.Values` (the host may give a new id). It returns the reversal as a new change with `UndoOf` set, and raises it like any change. It throws `HostDataException` (`Code` `HostDataCannotUndo` or `HostDataUnknownEntity`) when the entity lacks the handler.
 - The delete tool has `RequiresConfirmation = true` by default (`HostDataSkillOptions.DeleteRequiresConfirmation`).
+- Each entity is described ONCE (REQ-RAG-160, Sevak TR-RAG-061): its description, its fields and, when it offers only some operations, `Can: list, read.` are written in the first tool's description (`host_data_list` when any entity offers list); the other four say "The entities and their fields are listed on host_data_list." Fifteen entities with 2 to 9 fields are about 7,100 characters of tool definitions, and a 4,096-token local model (Qwen 2.5 0.5B) has room for them. Before 1.1.10 every tool repeated every entity.
+- Offer only the entities a turn needs, so a small model's prompt stays short: `skill.BeginTurn(turnId, ["task", "project"])` or `skill.OfferEntities(["task", "project"])`; `OfferEntities(null)` offers all again. Read `ToolDefinitions` after the call: the tools and their `entity` enums then name only those entities, and a call naming another is refused with `HostDataEntityNotOffered`. `OfferedEntities` lists them. A name that is not registered throws `ArgumentException`. `UndoAsync` still reaches every registered entity.
+
+```csharp
+skill.BeginTurn(turnId, router.EntitiesFor(userText));   // e.g. ["task", "project"] for "move my bank task to Friday"
+var answer = await new AgentLoopRunner(localLlm, skill).RunAsync(messages);
+```
+
+### One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)
+
+**Sampling options on Claude models (REQ-RAG-158, Sevak TR-RAG-063).** Claude Fable and Mythos, Claude Opus 4.7 and later, and every Claude model of generation 5 (`claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`, …) answer `temperature`, `top_p` or `top_k` with HTTP 400 ("temperature is deprecated for this model"). `AnthropicLlmProvider` leaves `Temperature` and `TopP` out of the request for those models and still sends them to Claude Opus 4.6, Sonnet 4.6, Haiku 4.5, older models and non-Claude models behind an Anthropic-compatible endpoint. A model the rule does not know that refuses one anyway gets the call sent again once without them, and is remembered for the rest of the process. So a host passes one `LlmCompletionOptions` to every provider:
+
+```csharp
+var claude = new AnthropicLlmProvider(apiKey, "claude-sonnet-5-5");
+var reply = await claude.ChatAsync(messages, new LlmCompletionOptions { Temperature = 0.3f });   // temperature not sent; no 400
+```
+
+**Tool requests a model writes as text (REQ-RAG-159, Sevak TR-RAG-062).** Small local models (Phi-3 mini, Qwen 2.5 0.5B) often write the tool request in the answer instead of as a structured call. `AgentLoopRunner` (`RunAsync` and `RunStreamAsync`) reads three forms when they name one of the loop's tools: a bare JSON object `{"name": "rag-search", "arguments": {"query": "…"}}`, the same in a code fence, and `<tool_call>…</tool_call>` tags (several per turn). `{"tool_calls": [...]}`, an array, the OpenAI `{"function": {...}}` shape, `parameters` for `arguments` and arguments written as a JSON string are read too. The request runs through the loop's own `IToolHandler` (so `GuardedToolHandler`, the egress gate and every guardrail apply) and counts against `maxIterations`, exactly as a structured call; its result is fed back and the request text is never the final answer. JSON naming no offered tool stays the answer. While streaming, text that starts like a request (`{`, `[`, a fence or `<tool_call>`) is held back until the turn ends, then either run as a call or sent as one text delta.
+
+```csharp
+var answer = await new AgentLoopRunner(new LocalLlmProvider(LocalModel.Phi3Mini4kInstruct), tools).RunAsync(messages);
+// The model wrote {"name": "rag-search", ...}; the loop ran rag-search and answer.Content is the model's next reply.
+```
 
 ### Image generation (REQ-RAG-155)
 

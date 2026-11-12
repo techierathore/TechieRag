@@ -31,6 +31,8 @@
   <ItemGroup>
     <!-- Sevak TR-RAG-049: the shared public-overload release check, run against this package's assembly. -->
     <Compile Include="..\TechieRag.Tests\PublicApi\OverloadShapeCheck.cs" Link="PublicApi\OverloadShapeCheck.cs" />
+    <!-- Sevak TR-RAG-061 / REQ-RAG-160: the fifteen-entity host-data setup, run here against a 4,096-token local model. -->
+    <Compile Include="..\TechieRag.Tests\Agentic\SevakEntities.cs" Link="Agentic\SevakEntities.cs" />
   </ItemGroup>
 
   <ItemGroup>

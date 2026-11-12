@@ -3,9 +3,9 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 41 logged: 2 open, 39 fixed, 0 will not fix |
+| Count | 44 logged: 2 open, 42 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
-| Updated | 2026-11-07 |
+| Updated | 2026-11-11 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
@@ -16,10 +16,13 @@
 | MISS-TechieRag-20261107-01 (REQ-RAG-155) | 2026-11-07 by agent-review | not sorted | BRD-213 asks for PNG bytes of the asked size from all three services, but Gemini sizes images by aspect ratio and tier, so only 1024x1024 comes back exact. |
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 
-## Fixed (39)
+## Fixed (42)
 
 | Miss | Found | Closed | Whose gap | What went wrong |
 |---|---|---|---|---|
+| MISS-TechieRag-20261111-03 (REQ-RAG-160) | 2026-11-11 by production | 2026-11-11 by triage-and-fix | the app's spec | Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061) |
+| MISS-TechieRag-20261111-02 (REQ-RAG-159) | 2026-11-11 by production | 2026-11-11 by triage-and-fix | the app's spec | Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062) |
+| MISS-TechieRag-20261111-01 (REQ-RAG-158) | 2026-11-11 by production | 2026-11-11 by triage-and-fix | the app's spec | Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063) |
 | MISS-TechieRag-20261029-03 (REQ-RAG-137) | 2026-10-29 by owner | 2026-10-29 by log-miss | the check was too weak | The 29 Oct thinking fix did not update the streaming contract in the Architecture (section 3.1 still listed three event kinds) |
 | MISS-TechieRag-20261029-02 (REQ-RAG-138) | 2026-10-29 by production | 2026-10-29 by fix-issues | the app's spec | A leading <think> block in the answer shall be split into the thinking stream (Chatur feedback TR-RAG-009) |
 | MISS-TechieRag-20261029-01 (REQ-RAG-137) | 2026-10-29 by production | 2026-10-29 by fix-issues | the app's spec | Streamed thinking text shall reach the host as its own event (Chatur feedback TR-RAG-008) |

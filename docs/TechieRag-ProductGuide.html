@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Product Guide</h1>
-    <div class="subtitle">Rendered 2026-10-11 &middot; source <code>TechieRag-ProductGuide.md</code></div>
+    <div class="subtitle">Rendered 2026-11-12 &middot; source <code>TechieRag-ProductGuide.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -230,6 +230,8 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 <li>Switch without a code change: alter the model settings in your configuration section and rebuild.
 </li>
+<li>Keep one set of options for every model. Newer Claude models (Sonnet 5.5, Opus 5.5, Fable) refuse a temperature setting; TechieRag leaves it out for them and still sends it to models that take it, so the same options work everywhere (from 1.1.10).
+</li>
 </ol>
 <p><img src="screenshots/TechieRag/llm-settings.png" alt="Choose or switch a language model" style="max-width:100%"></p>
 <p>Tips: Start with Ollama or LM Studio on your own machine while you shape prompts; it costs nothing and nothing leaves the room. Then keep the local server as the fallback when you move to a hosted model. A ChatGPT subscription can be used through <code>UseChatGptSubscriptionLlm</code> with a device-code sign-in; other vendors' subscription terms do not allow it, and the catalogue records each vendor's terms and the date they were checked so you can show them before sign-in.</p>
@@ -278,7 +280,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ol>
 <p><img src="screenshots/TechieRag/tool-demo.png" alt="Give the model tools and let it act" style="max-width:100%"></p>
-<p><strong>Tips.</strong> Pick a model that supports tool calling; one that does not will answer in prose and never call anything. Keep tool names short and descriptions honest, because the model chooses from the description alone.</p>
+<p><strong>Tips.</strong> Pick a model that supports tool calling; one that does not will answer in prose and never call anything. Small local models such as Phi-3 mini sometimes write their tool request as plain text instead of calling the tool; from 1.1.10 the loop recognises that and runs the tool anyway. When you give the model your own app's data through <code>HostDataSkill</code>, offer only the kinds of records a turn needs with <code>BeginTurn(turnId, ["task", "project"])</code>, so a small model's prompt stays short. Keep tool names short and descriptions honest, because the model chooses from the description alone.</p>
 <h3 id="use-the-microsoft-agent-framework-with-your-documents">Use the Microsoft Agent Framework with your documents<a class="anchor-link" href="#use-the-microsoft-agent-framework-with-your-documents">#</a></h3>
 <p>The <code>TechieRag.Agents</code> package builds a ready-made agent on Microsoft's Agent Framework that knows how to search your documents, decide whether the results are strong enough, and cite what it used.</p>
 <ol>

@@ -2,6 +2,24 @@
 
 Paste the section for a release into its GitHub Release when you publish it. All five packages (TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Local, TechieRag.Agents) ship together at one version. The newest release is first.
 
+## 1.1.10
+
+All five packages are set to 1.1.10 in their project files. 1.1.9 was never published, but Sevak already built against it, so these fixes take a new number: a package cache never mixes up the two. The published version still comes from the tag (`publish-nuget.yml`).
+
+### Fixed
+
+- **Claude models that refuse sampling options no longer fail** (REQ-RAG-158, Sevak TR-RAG-063). `AnthropicLlmProvider` sent `temperature` and `top_p` whenever they were set, and current Claude models (Fable, Mythos, Opus 4.7 and later, every generation-5 model such as `claude-sonnet-5-5`) answered with HTTP 400 "temperature is deprecated for this model", alone or inside `AgentLoopRunner`. The provider now leaves them out for those models and still sends them to models that take them. A model the rule does not know that refuses one anyway gets the call sent once more without them, and is remembered. One `LlmCompletionOptions` now works for every provider.
+- **A tool request a model writes as text is run, not returned as the answer** (REQ-RAG-159, Sevak TR-RAG-062). A local model such as Phi-3 mini that wrote `{"name": "rag-search", "arguments": {...}}` as its answer ended `AgentLoopRunner` after one turn, with the request as `Content`. The loop now reads a request written as bare JSON, in a code fence or in `<tool_call>` tags, when it names one of the loop's tools, and runs it through the same tool handler, iteration limit and guardrails as a structured call. The streaming loop holds such text back, so it is never shown as answer text.
+- **The host-data tools describe each entity once** (REQ-RAG-160, Sevak TR-RAG-061). Every one of the five tools repeated every entity and its fields, so 15 entities made a 7,805-token prompt that a 4,096-token local model refused (`LocalPromptTooLongException`). The entities are now described in the first tool only: the same 15 entities take about a third of the space and fit.
+
+### New
+
+- **`HostDataSkill.OfferEntities(names)` and `BeginTurn(turnId, names)`** (REQ-RAG-160) offer only the entities a turn needs; the tools then name only those, a call naming another is refused with the new code `HostDataMessageCodes.EntityNotOffered`, and `OfferedEntities` lists them. `null` offers all of them again.
+
+### Behaviour, stated plainly
+
+- **`host_data_create`, `_read`, `_update` and `_delete` no longer list the entities' fields in their own descriptions**; they point to the first tool (`host_data_list` when any entity offers list). Code that read a field list from one of those descriptions should read the first tool's.
+
 ## 1.1.9
 
 All five packages are set to 1.1.9 in their project files. The published version still comes from the tag (`publish-nuget.yml`).

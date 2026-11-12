@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-11-08</div>
+    <div class="sub">Last rendered: 2026-11-12</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -167,6 +167,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#codex-agent">Codex agent</a></li>
         <li class="h3"><a href="#one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)</a></li>
         <li class="h3"><a href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)</a></li>
+        <li class="h3"><a href="#one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)</a></li>
         <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
@@ -207,7 +208,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-11-08 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-11-12 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -270,6 +271,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#codex-agent">Codex agent</a></li>
         <li class="h3"><a href="#one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)</a></li>
         <li class="h3"><a href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)</a></li>
+        <li class="h3"><a href="#one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)</a></li>
         <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
@@ -1709,7 +1711,20 @@ HostDataChange reversal = await skill.UndoAsync(change);                     // 
 </li>
 <li>The delete tool has <code>RequiresConfirmation = true</code> by default (<code>HostDataSkillOptions.DeleteRequiresConfirmation</code>).
 </li>
+<li>Each entity is described ONCE (REQ-RAG-160, Sevak TR-RAG-061): its description, its fields and, when it offers only some operations, <code>Can: list, read.</code> are written in the first tool's description (<code>host_data_list</code> when any entity offers list); the other four say "The entities and their fields are listed on host_data_list." Fifteen entities with 2 to 9 fields are about 7,100 characters of tool definitions, and a 4,096-token local model (Qwen 2.5 0.5B) has room for them. Before 1.1.10 every tool repeated every entity.
+</li>
+<li>Offer only the entities a turn needs, so a small model's prompt stays short: <code>skill.BeginTurn(turnId, ["task", "project"])</code> or <code>skill.OfferEntities(["task", "project"])</code>; <code>OfferEntities(null)</code> offers all again. Read <code>ToolDefinitions</code> after the call: the tools and their <code>entity</code> enums then name only those entities, and a call naming another is refused with <code>HostDataEntityNotOffered</code>. <code>OfferedEntities</code> lists them. A name that is not registered throws <code>ArgumentException</code>. <code>UndoAsync</code> still reaches every registered entity.
+</li>
 </ul>
+<pre><code class="language-csharp">skill.BeginTurn(turnId, router.EntitiesFor(userText));   // e.g. ["task", "project"] for "move my bank task to Friday"
+var answer = await new AgentLoopRunner(localLlm, skill).RunAsync(messages);</code></pre>
+<h3 id="one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)<a class="anchor-link" href="#one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">#</a></h3>
+<p><strong>Sampling options on Claude models (REQ-RAG-158, Sevak TR-RAG-063).</strong> Claude Fable and Mythos, Claude Opus 4.7 and later, and every Claude model of generation 5 (<code>claude-sonnet-5-5</code>, <code>claude-opus-5-5</code>, <code>claude-haiku-5-5</code>, …) answer <code>temperature</code>, <code>top_p</code> or <code>top_k</code> with HTTP 400 ("temperature is deprecated for this model"). <code>AnthropicLlmProvider</code> leaves <code>Temperature</code> and <code>TopP</code> out of the request for those models and still sends them to Claude Opus 4.6, Sonnet 4.6, Haiku 4.5, older models and non-Claude models behind an Anthropic-compatible endpoint. A model the rule does not know that refuses one anyway gets the call sent again once without them, and is remembered for the rest of the process. So a host passes one <code>LlmCompletionOptions</code> to every provider:</p>
+<pre><code class="language-csharp">var claude = new AnthropicLlmProvider(apiKey, "claude-sonnet-5-5");
+var reply = await claude.ChatAsync(messages, new LlmCompletionOptions { Temperature = 0.3f });   // temperature not sent; no 400</code></pre>
+<p><strong>Tool requests a model writes as text (REQ-RAG-159, Sevak TR-RAG-062).</strong> Small local models (Phi-3 mini, Qwen 2.5 0.5B) often write the tool request in the answer instead of as a structured call. <code>AgentLoopRunner</code> (<code>RunAsync</code> and <code>RunStreamAsync</code>) reads three forms when they name one of the loop's tools: a bare JSON object <code>{"name": "rag-search", "arguments": {"query": "…"}}</code>, the same in a code fence, and <code>&lt;tool_call&gt;…&lt;/tool_call&gt;</code> tags (several per turn). <code>{"tool_calls": [...]}</code>, an array, the OpenAI <code>{"function": {...}}</code> shape, <code>parameters</code> for <code>arguments</code> and arguments written as a JSON string are read too. The request runs through the loop's own <code>IToolHandler</code> (so <code>GuardedToolHandler</code>, the egress gate and every guardrail apply) and counts against <code>maxIterations</code>, exactly as a structured call; its result is fed back and the request text is never the final answer. JSON naming no offered tool stays the answer. While streaming, text that starts like a request (<code>{</code>, <code>[</code>, a fence or <code>&lt;tool_call&gt;</code>) is held back until the turn ends, then either run as a call or sent as one text delta.</p>
+<pre><code class="language-csharp">var answer = await new AgentLoopRunner(new LocalLlmProvider(LocalModel.Phi3Mini4kInstruct), tools).RunAsync(messages);
+// The model wrote {"name": "rag-search", ...}; the loop ran rag-search and answer.Content is the model's next reply.</code></pre>
 <h3 id="image-generation-req-rag-155">Image generation (REQ-RAG-155)<a class="anchor-link" href="#image-generation-req-rag-155">#</a></h3>
 <p>Namespaces: the providers and <code>ImageGenerationProviderFactory</code> are in <code>TechieRag.ImageGeneration</code>, the interface in <code>TechieRag.Abstractions</code>, and <code>ImageSize</code>, <code>GeneratedImage</code>, <code>ImageGenerationOptions</code> and <code>ImageGenerationUsage</code> in <code>TechieRag.Models</code>. <code>IImageGenerationProvider.GenerateImageAsync(prompt, ImageSize size, ImageGenerationOptions? options)</code> returns <code>GeneratedImage(Bytes, MediaType, Size, Usage)</code>. <code>MediaType</code> and <code>Size</code> are read from the image bytes, so you can see when a service sent something other than what you asked for. Routes work like chat routes:</p>
 <pre><code class="language-csharp">var images = ImageGenerationProviderFactory.CreateForModel("openai/gpt-image-1", apiKey);   // also "gemini/...", "venice/..."

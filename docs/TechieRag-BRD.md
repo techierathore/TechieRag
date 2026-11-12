@@ -337,7 +337,7 @@ No `perf-budget:` line is written: the owner has stated no numeric budget. The l
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-10-01.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
+**Snapshot as of 2026-11-12.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -360,6 +360,9 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: Fallback provider | 1 | 1 | 0 | Done |
 | Surface: Prompt templates | 1 | 1 | 0 | Done |
 | Surface: Sevak application (moved) | 0 | 0 | 0 | Not applicable |
+| Model routing | 1 | 1 | 0 | Done |
+| LLM streaming | 1 | 1 | 0 | Done |
+| Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`) | 1 | 1 | 0 | Done |
 
 ## 8. Context diagram
 

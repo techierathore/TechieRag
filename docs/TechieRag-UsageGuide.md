@@ -15,7 +15,7 @@ The library has no users of its own; tests use credentials from the environment.
 |---|---|---|---|---|
 | 1 | none (library; no sign-in) | — | Developer running the test project | n/a |
 | 2 | `TechieRagLiveNetworkTests=1` | environment variable, enables the live web tests | Maintainer | set per machine |
-| 3 | `tests/TechieRag.Tests/livetests.settings.json` | git-ignored settings file holding `Postgres:ConnectionString`; written by `tests/TechieRag.Tests/livetests/start-postgres.sh`, which starts PostgreSQL 18 + pgvector in Docker with its own password; enables the `LivePostgres` tests (REQ-RAG-152). Never an environment variable | Maintainer | per start |
+| 3 | `tests/TechieRag.Tests/livetests.settings.json` | git-ignored settings file holding `Postgres:ConnectionString`; written by `tests/TechieRag.Tests/livetests/start-postgres.sh`, which starts PostgreSQL 18 + pgvector in Docker with its own password; enables the `LivePostgres` tests (REQ-RAG-152). Also holds `ImageGeneration:*Key` and `Anthropic:ApiKey` (the `LiveImages` and `LiveAnthropic` tests, REQ-RAG-155, REQ-RAG-158). Never an environment variable | Maintainer | yes (Anthropic key added 2026-11-12) |
 | 4 | staged weights under `~/.cache/techierag-models/bge-reranker-v2-m3` and `bge-m3` | files on disk; enable the live reranker and embedder tests | Maintainer | ask owner |
 | 5 | `TechieRagLiveLocalModel` (optional model id) and a local model downloaded under the model root | environment variable plus files on disk; enable the live `TechieRag.Local` tests once a runtime is chosen for the platform | Maintainer | set per machine |
 | 6 | `TechieRagOpenCodeGoKey` | environment variable holding an OpenCode Go key; enables `LiveOpenCodeGoTests` (test-only: apps pass keys in code) | Maintainer | set per machine |
@@ -235,6 +235,12 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** 2) the create handler runs with the title and time 3) one `Created` change, `TurnId` "t1" 4) the task is gone 5) the old title is back 6) a failed tool result naming `colour`; the handler never runs.
 - **Covers:** REQ-RAG-153, REQ-RAG-154
 
+### Sevak fixes for 1.1.10
+- **Sign in as:** user 1
+- **Steps:** 1) with `Anthropic:ApiKey` in `livetests.settings.json`, `dotnet test tests/TechieRag.Tests --filter "Category=LiveAnthropic"` 2) `AgentLoopRunner` with a `rag-search` tool on Phi-3 mini, a question that needs a search 3) 15 entities on a `HostDataSkill`, one agent call on Qwen 2.5 0.5B 4) `skill.BeginTurn("t2", ["task"])`, then ask to list people
+- **Expected:** 1) `claude-sonnet-5-5` answers with `Temperature = 0.3f` set 2) a `rag-search` step, then a real answer 3) an answer, no `LocalPromptTooLongException` 4) the tools name only `task`; the call for `person` is refused with `HostDataEntityNotOffered`.
+- **Covers:** REQ-RAG-158, REQ-RAG-159, REQ-RAG-160
+
 ### Image generation (phase 3)
 - **Sign in as:** user 1
 - **Steps:** 1) `ImageGenerationProviderFactory.CreateForModel("venice/venice-sd35", "<Venice key>").GenerateImageAsync("a lighthouse", ImageSize.Square1024)` 2) the same with `openai/gpt-image-1` and `gemini/gemini-2.5-flash-image` 3) `openai/gpt-image-1` with size 800x600 4) `openai-compatible/<model>@https://<service>/v1` 5) `azure-openai/<deployment>` with your resource endpoint 6) `openai-compatible/<model>` with no endpoint
@@ -275,6 +281,7 @@ Local-model live tests skip until a model is downloaded and never download; agen
 - `LlmConfig.MaxContextTokens` is `int?`, unset by default (was `int`, 128000); code that reads it into an `int` stops compiling after upgrading (REQ-RAG-113).
 - An app that names no SQLite folder and has no `techierag.db` in its running folder starts with an empty database under `<LocalApplicationData>/TechieRag/data/<app name>/` after upgrading; give a full path to keep the old location (REQ-RAG-122).
 - Registering a tool name twice keeps the last definition; it used to list both (REQ-RAG-121).
+- From 1.1.10 the host-data tools other than the first no longer list the entities' fields; they point to the first tool (REQ-RAG-160).
 - Image generation is reached only through `ImageGenerationProviderFactory`, not the builder or `ITechieRag`; one image per call, no editing. Gemini returns an exact size only for 1024x1024 (REQ-RAG-155). OpenAI and Gemini have not been called live yet (keys).
 - The `azure-openai` image route has only run against a stand-in, not a real Azure resource (REQ-RAG-157).
 - The graphics-card picture model (Phi-4 multimodal) is refused, not loaded: no GPU runtime is chosen (REQ-RAG-146, ORTGENAI-003).

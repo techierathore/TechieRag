@@ -1,28 +1,28 @@
 ---
 project: TechieRag
-last_updated: 2026-11-08
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 42 verified
+last_updated: 2026-11-12
+current_phase: Phase 1 of 3 (Shipped core library (v1.1 to v3)) · Handoff — 27 of 27 verified, 14 not applicable
 last_verified_build: PASS
-last_verified_date: 2026-11-08
+last_verified_date: 2026-11-12
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak), handed off for UAT. 40 of 42 items are Verified; the other two wait on you (keys and a GPU runtime choice). The UsageGuide has the walkthroughs for PostgreSQL end to end, the host data skill and image generation, and the P3 DevGuide maps their code. Packages are set to 1.1.9; nothing is tagged, published or committed.
+Phase 1 of 3 (Shipped core library (v1.1 to v3)) is handed off: all 27 rows are Verified, including Sevak's three 9 November fixes (REQ-RAG-158 to REQ-RAG-160, live Claude call passed). The packages are set to 1.1.10. The release notes, AI reference, UsageGuide, ProductGuide, DevGuides, Sevak feedback replies and metrics report describe the fixes. Nothing is tagged, published or committed.
 
 ## Next command to run
 
 Claude Code:
 ```
-(owner) commit, then build and publish the package — its shipped documents are current; no agent command
+(owner) set current_phase to Released after UAT — no agent command
 ```
 OpenCode:
 ```
-(owner) commit, then build and publish the package — its shipped documents are current; no agent command
+(owner) set current_phase to Released after UAT — no agent command
 ```
-Why: every phase-3 row is Verified or waits on an owner item, and the shipped documents are current. Tag `v1.1.9`.
+Why: every row in this phase's scope is terminal and handoff has run; waiting on the owner; working docs/TechieRag-Checklist.md. Commit, tag `v1.1.10` and publish first.
 
 ## Open requirements
 
@@ -32,16 +32,15 @@ Why: every phase-3 row is Verified or waits on an owner item, and the shipped do
 | In Progress | 0 |
 | Implemented | 0 |
 | Needs re-verify | 0 |
-| Blocked | 2 |
+| Blocked | 0 |
 
-- [ ] REQ-RAG-146 — Graphics-card picture model (Phi-4 multimodal) loads through a GPU runtime (Blocked)
-- [ ] REQ-RAG-155 — Image generation: OpenAI and Gemini real-service checks wait on keys (Blocked)
+- None
 
 ## Known blockers
 
-- REQ-RAG-155: add `OpenAIKey` and `GeminiKey` under `ImageGeneration` in `tests/TechieRag.Tests/livetests.settings.json` (git-ignored), then run `dotnet test tests/TechieRag.Tests --filter "Category=LiveImages"`. Venice passed.
-- REQ-RAG-146: the DirectML engine package stops at 0.14.1, below this library's engine 0.16.0 (ORTGENAI-003). Loading on a graphics card needs your choice of WinML or CUDA (Decision Request).
-- REQ-RAG-157 (Azure image route) was checked against a stand-in; no Azure OpenAI resource is available here.
+- REQ-FN-006 (Verified 2026-10-06) now fails its test: `apps/` still holds TechieDesk build output, logs and two `.db` files from 25 September. Not touched; delete `apps/` if nothing there is wanted.
+- Phase 3 is unchanged: REQ-RAG-146 (GPU runtime choice) and REQ-RAG-155 (OpenAI and Gemini keys) wait on you.
+- TR-RAG-059, TR-RAG-060 and AstroLyfe's entry are left for Thursday on Windows.
 
 ## Verification log
 
@@ -49,11 +48,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-11-08 | amend-docs | 37/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | build-phase | 39/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | build-phase | 39/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | verify-phase | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | handoff-phase | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-11 | triage-and-fix | 26/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
+| 2026-11-11 | devguide | 26/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
+| 2026-11-12 | verify-phase | 26/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
+| 2026-11-12 | verify-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
+| 2026-11-12 | handoff-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -63,12 +62,12 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 ## Standards compliance
 
-- Last check 2026-11-08: 0 findings in the new files, see the checklist Remarks.
+- Last check 2026-11-11: 0 findings in the files the fix run wrote, see the checklist Remarks.
 
 ## Deferred / future
 
+- Anthropic still sends `budget_tokens` for thinking and `tool_choice` `any` for `ToolChoice = "required"`; Claude Opus 5.5 and Sonnet 5.5 refuse both with a 400. Not in Sevak's report.
 - Gemini thought signatures on function calls (newer Gemini models may ask for them back); not sent today.
-- Gemini's docs now lead with a newer "interactions" API; image generation uses `generateContent`, which still serves.
 - Image generation through the builder, `ITechieRag` and dependency injection; today only the factory route.
 - Checklist rows for the 1.1.7 Lekhak work whose tests carry REQ-RAG-135 and REQ-RAG-136.
 - Open consumer feedback entries (TR-RAG-020/021/022/026/035, etc.) for a future release.

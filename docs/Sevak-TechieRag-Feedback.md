@@ -4,11 +4,11 @@
 |---|---|
 | App | Sevak |
 | Upstream | TechieRag |
-| Updated | 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
+| Updated | 2026-11-11 (TR-RAG-061 to TR-RAG-063 added from Sevak's 9 November report, relayed by the owner, and answered: fixed for TechieRag 1.1.10); 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
 
 ## Summary
 
-TR-RAG-055 to TR-RAG-058 were built upstream on 2026-11-08 for TechieRag 1.1.9 (not yet published); TR-RAG-056 and TR-RAG-057, which hold Sevak's REQ-RAG-116 and REQ-UI-087, are unblocked once 1.1.9 is on the feed. 55 entries: 4 open requests, none a defect (TR-RAG-055 to TR-RAG-058, 2026-11-07), written in TechieRag as BRD-210 to BRD-213 (REQ-RAG-152 to REQ-RAG-155). REQ-RAG-109 is not blocked: the PostgreSQL stores are in TechieRag 1.1.8. 36 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-053 (2026-10-10): disposing a `LocalLlmProvider` while a call waits crashes the process; worked around in Sevak. TR-RAG-052: `TechieRag.Local` cannot call tools. TR-RAG-051: a model folder from an earlier conversion counts as almost downloaded. TR-RAG-048 is closed: Sevak moved to TechieRag 1.1.2 on 2026-10-07; the move found TR-RAG-049, worked around in Sevak.
+Nothing is blocked: no entry is open. 58 entries: 0 open, 43 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-061 to TR-RAG-063 (found 2026-11-09 on 1.1.9) were fixed upstream on 2026-11-11 for TechieRag 1.1.10 (not yet published); TR-RAG-063 is proven against Anthropic's recorded 400 and, on 2026-11-12, by a live call. TR-RAG-059 and TR-RAG-060 are not in this copy yet. TR-RAG-055 to TR-RAG-058 (Sevak's phase 4 and 5 requests) were built for 1.1.9 on 2026-11-08 and ship with 1.1.10; TR-RAG-056 and TR-RAG-057 hold Sevak's REQ-RAG-116 and REQ-UI-087 until that package is on the feed. TR-RAG-053 and TR-RAG-049 are worked around in Sevak until it moves to the new package.
 
 These are the application's findings against `src/TechieRag`, filed while it lived in this repository (TechieRagWeb, then TechieDesk, now Sevak), restructured 2026-09-24 into the feedback template with the original text unchanged; the earlier summary is under "Replies from TechieRag". Accepted items are ledgered as TechieRag requirements (BRD-121, 126, 127, 142, 143, 148, 158; phase 3; BRD-210 to 213).
 
@@ -1282,9 +1282,55 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** Canva and Venice called directly from Sevak until the library route exists.
 - **Suggested fix:** TechieRag BRD-213 as written.
 
+### TR-RAG-061 — the host-data tool definitions repeat every entity's fields in each of the five tools (minor, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-160 Verified; ships in 1.1.10, not yet published.
+- **Severity:** minor
+- **Blocks:** not stated in the copy relayed to TechieRag on 2026-11-11; Sevak's own entry holds the answer.
+- **Repro:** 15 entities with 2 to 9 fields each on a `HostDataSkill` over `LocalLlmProvider` with `LocalModel.Qwen25Instruct05B`.
+- **Expected:** the entities are described once, and a host can pick the entities for a turn.
+- **Actual:** the first call throws `LocalPromptTooLongException`: 7,805 tokens against a 4,096-token context.
+- **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (entry relayed in full by the owner on 2026-11-11; this copy did not have it).
+- **Workaround:** none relayed.
+- **Suggested fix:** as Expected.
+
+### TR-RAG-062 — `AgentLoopRunner` takes a tool request that a local model writes as text for the final answer (major, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-159 Verified; ships in 1.1.10, not yet published.
+- **Severity:** major
+- **Blocks:** not stated in the copy relayed to TechieRag on 2026-11-11; Sevak's own entry holds the answer.
+- **Repro:** `TechieRag.Local`, Phi-3 mini, a question that needs a search.
+- **Expected:** a tool request written in the text, bare, in a code fence or in `<tool_call>` tags, is read as a tool call, run under the loop's own guardrails (max tool calls, egress gate) and its result fed back, as a structured call is since 1.1.7.
+- **Actual:** the loop ends after one iteration and `AgentResponse.Content` is `{"name": "rag-search", "arguments": {"query": "…"}}`.
+- **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (relayed by the owner on 2026-11-11).
+- **Workaround:** none relayed.
+- **Suggested fix:** as Expected.
+
+### TR-RAG-063 — `AnthropicLlmProvider` always sends temperature when `LlmCompletionOptions.Temperature` is set, and current Claude models refuse it (major, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-158 Verified 2026-11-12, including a live call to `claude-sonnet-5-5` with temperature set. Ships in 1.1.10, not yet published.
+- **Severity:** major
+- **Blocks:** not stated in the copy relayed to TechieRag on 2026-11-11; Sevak's own entry holds the answer.
+- **Repro:** `AnthropicLlmProvider` with model `claude-sonnet-5-5`, `ChatAsync(messages, new LlmCompletionOptions { Temperature = 0.3f })`, alone or inside `AgentLoopRunner`.
+- **Expected:** the provider knows which models take a sampling temperature and leaves it out for those that do not, or retries once without it on that 400, so a host can pass one option set to every provider; the same for any other sampling option a model rejects.
+- **Actual:** the API answers 400 "temperature is deprecated for this model".
+- **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (relayed by the owner on 2026-11-11).
+- **Workaround:** none relayed.
+- **Suggested fix:** as Expected.
+
 ## Replies from TechieRag
 
 <!-- The upstream team's answers, newest block first. -->
+
+### 2026-11-11 — TR-RAG-061, TR-RAG-062 and TR-RAG-063 fixed for 1.1.10
+
+All three are fixed in TechieRag 1.1.10. The packages now carry 1.1.10, not 1.1.9: Sevak already built against 1.1.9, and a second 1.1.9 with other contents would stay hidden behind the copy in Sevak's package cache. Nothing is published yet; the owner tags and publishes. TR-RAG-059 and TR-RAG-060 are not in this copy and are not part of this release; they are planned for Thursday on Windows.
+
+- **TR-RAG-063 → `TechieRag#REQ-RAG-158`, Verified 2026-11-12 (live call made).** `AnthropicLlmProvider` leaves `temperature` and `top_p` out for Claude Fable and Mythos, Opus 4.7 and later, and every generation-5 model (`claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`). It still sends them to Opus 4.6, Sonnet 4.6, Haiku 4.5, older models and non-Claude models. A model the rule does not know that answers 400 naming a sampling option gets the call sent once more without them, and is remembered for the rest of the process. Proven by `REQ-RAG-158 SonnetFiveFiveChatWithTemperatureSucceeds`, against a stand-in that answers with your recorded 400 (`{"type":"error","error":{"type":"invalid_request_error","message":"temperature is deprecated for this model."}}`). It fails on 1.1.9 with `LlmHttpException … 400 (Bad Request). Provider message: temperature is deprecated for this model.` and passes now. The same holds inside `AgentLoopRunner` and while streaming. **Live call made 2026-11-12:** `REQ-RAG-158 LiveSonnetFiveFiveAnswersWithTemperatureSet` sent `Temperature = 0.3f` and `TopP = 0.9f` to the real `claude-sonnet-5-5` and got an answer (passed, 3 s).
+- **TR-RAG-062 → `TechieRag#REQ-RAG-159`, Verified 2026-11-11.** `AgentLoopRunner.RunAsync` and `RunStreamAsync` read a tool request written as text when it names one of the loop's tools: bare JSON, a code fence, or `<tool_call>` tags (several per turn). It runs through the loop's own tool handler, so `GuardedToolHandler` and your egress gate apply, and it counts against the iteration limit. Its result is fed back, and the request is never the final answer. While streaming, such text is held back, not shown. Proven by `REQ-RAG-159 BareJsonRequestRunsAsToolCall` (your exact shape), which fails on 1.1.9 (the answer was the request) and passes now. Also covered by `WrittenRequestGoesThroughTheGuard`, `WrittenRequestsObeyTheIterationLimit`, and `LocalModelWrittenRequestIsRun` through `LocalLlmProvider` with the Phi-3 template.
+- **TR-RAG-061 → `TechieRag#REQ-RAG-160`, Verified 2026-11-11.** Each entity and its fields are written once, in the first tool's description; the other four tools point to it. A host picks a turn's entities with `skill.BeginTurn(turnId, ["task", "project"])` or `skill.OfferEntities(...)`. A call naming another entity is refused with `HostDataEntityNotOffered`. Proven by `REQ-RAG-160 FifteenEntitiesFitAFourThousandTokenModel`: 15 entities with 2 to 9 fields, one agent call to a 4,096-token ChatML model through `LocalLlmProvider`. On 1.1.9 it throws `LocalPromptTooLongException` at 7,214 tokens (the test's word counter; your real tokenizer counted 7,805). Now the prompt is 2,458 tokens and the call answers. The Qwen weights are not on this machine, so the real tokenizer was not run.
+
+**Verify from here:** move Sevak to TechieRag 1.1.10. (1) Run the agent on `claude-sonnet-5-5` with `Temperature = 0.3f`; it should answer, and no 400 should appear in the log. (2) Ask Phi-3 mini a question that needs `rag-search`; the trace should show a `rag-search` tool step and then a real answer. (3) Register the 15 entities on Qwen 2.5 0.5B; the first call should answer with no `LocalPromptTooLongException`. Then try `BeginTurn(turnId, <the turn's entities>)` to shorten the prompt further.
 
 ### 2026-11-08 — TR-RAG-055 to TR-RAG-058 built for 1.1.9
 

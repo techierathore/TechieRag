@@ -52,6 +52,9 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 | REQ-FN-018 | Sevak (formerly TechieDesk): Qdrant Admin: collection CRUD; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-012, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-018) |
 | REQ-FN-019 | Sevak (formerly TechieDesk): Qdrant Admin: vector browse / search / detail / bulk delete; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-013, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-019) |
 | REQ-FN-020 | Sevak (formerly TechieDesk): Rename app TechieRagWeb → TechieDesk; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-014, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-020) |
+| REQ-RAG-158 | Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063) | Verified | 100% | 2026-11-12 verify: PASS — test `REQ-RAG-158 SamplingRuleKnowsEachModel(model: "claude-opus-5` | [d](#d-req-rag-158) |
+| REQ-RAG-159 | Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062) | Verified | 100% | 2026-11-11 verify: PASS — test `REQ-RAG-159 JsonNamingNoOfferedToolStaysTheAnswer` | [d](#d-req-rag-159) |
+| REQ-RAG-160 | Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061) | Verified | 100% | 2026-11-11 verify: PASS — test `REQ-RAG-160 PartialEntityNamesItsOperations` | [d](#d-req-rag-160) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`. `Owner-UAT` marks a row only the owner can close, by following the UsageGuide test plan; the verifier cannot reach it from this machine.
 
@@ -245,3 +248,21 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-FN-020** — Sevak (formerly TechieDesk): Rename app TechieRagWeb → TechieDesk; screen moved to the Sevak repository 2026-09-24. *BRD:* BRD-81, BRD-82. *Phase 1.*
   - *Acceptance:* When a reader opens the product statement on Sevak, then Sevak is the application showing the full capabilities of TechieRag, freemium, limited not gated.
 
+
+
+## Model routing
+
+- <a id="d-req-rag-158"></a> **REQ-RAG-158** (BRD-pending) Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063)
+  - *Acceptance:* When a host calls AnthropicLlmProvider.ChatAsync with Temperature or TopP set on a Claude model that refuses sampling options (claude-sonnet-5-5, claude-opus-5-5, Fable), alone or inside AgentLoopRunner, then the request leaves them out and the call succeeds; on a model that takes them they are sent; a 400 naming one of them is retried once without them
+
+
+## LLM streaming
+
+- <a id="d-req-rag-159"></a> **REQ-RAG-159** (BRD-pending) Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062)
+  - *Acceptance:* When a model answers AgentLoopRunner with a tool request written as text (a bare JSON object, a code fence or <tool_call> tags) naming one of the loop's tools, then the loop runs it as a tool call through the same handler, iteration limit and guardrails as a structured call and feeds the result back, and the request text never becomes the final answer
+
+
+## Page: Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`)
+
+- <a id="d-req-rag-160"></a> **REQ-RAG-160** (BRD-pending) Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061)
+  - *Acceptance:* When a host registers 15 entities on HostDataSkill, then each entity and its fields appear once across the five tool definitions, and when the host picks some entities for a turn, then only those are offered and a call to another is refused

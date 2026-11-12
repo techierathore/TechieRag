@@ -10,7 +10,7 @@
 
     <!-- Package Metadata -->
     <PackageId>TechieRag.Embedded</PackageId>
-    <Version>1.1.9</Version>
+    <Version>1.1.10</Version>
     <Authors>Techie Rathor</Authors>
     <Company>TechieRathor</Company>
     <Description>Offline embeddings and reranking for TechieRag on ONNX Runtime: BGE-M3 (1024 dimensions, multilingual) on desktops, all-MiniLM-L6-v2 (384 dimensions) on Android and iOS, downloaded once into the per-user application data folder. Ships the native ONNX Runtime wiring for .NET MAUI heads (Windows, Mac Catalyst, Android, iOS).</Description>

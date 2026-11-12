@@ -21,6 +21,9 @@ namespace TechieRag.Services;
 /// <item>Send updated messages back to LLM</item>
 /// <item>Repeat until LLM returns text (no tool calls) or max iterations reached</item>
 /// </list>
+/// <para><b>Tool requests written as text.</b> A model that writes its tool request in the answer text (bare JSON,
+/// a code fence or <c>&lt;tool_call&gt;</c> tags) naming an offered tool gets it run as a tool call, exactly as a
+/// structured call (REQ-RAG-159).</para>
 /// <para><b>Safety:</b> Configurable max iterations to prevent infinite loops.</para>
 /// </remarks>
 public class AgentLoopRunner
@@ -81,6 +84,7 @@ public class AgentLoopRunner
 
             logger.LogDebug("Agent loop iteration {Iteration}/{MaxIterations}", iteration + 1, maxIterations);
             var response = await llmProvider.ChatAsync(messages, toolOptions, cancellationToken).ConfigureAwait(false);
+            ReadWrittenToolCalls(response, toolOptions);
 
             if (!response.HasToolCalls)
             {
@@ -161,18 +165,42 @@ public class AgentLoopRunner
             cancellationToken.ThrowIfCancellationRequested();
             logger.LogDebug("Streaming agent loop iteration {Iteration}/{MaxIterations}", iteration, maxIterations);
 
+            // Text that may be a tool request written as text is held back until the turn ends, so a request the
+            // loop then runs is never shown as answer text (REQ-RAG-159, Sevak TR-RAG-062).
             var turn = new StreamedTurn();
+            var held = new System.Text.StringBuilder();
+            var holding = true;
             await foreach (var streamEvent in llmProvider.ChatStreamEventsAsync(messages, toolOptions, cancellationToken).ConfigureAwait(false))
             {
                 var text = turn.Apply(streamEvent);
-                if (text is not null)
+                if (text is null)
                 {
-                    yield return new AgentStreamEvent { Kind = AgentStreamEventKind.TextDelta, Iteration = iteration, Text = text };
+                    continue;
                 }
+
+                if (holding)
+                {
+                    held.Append(text);
+                    if (TextToolCallReader.MayBeToolCall(held.ToString()))
+                    {
+                        continue;
+                    }
+
+                    holding = false;
+                    text = held.ToString();
+                    held.Clear();
+                }
+
+                yield return new AgentStreamEvent { Kind = AgentStreamEventKind.TextDelta, Iteration = iteration, Text = text };
             }
 
             var response = turn.ToResponse(llmProvider);
             AddUsage(totalUsage, response.Usage);
+            ReadWrittenToolCalls(response, toolOptions);
+            if (held.Length > 0 && !response.HasToolCalls)
+            {
+                yield return new AgentStreamEvent { Kind = AgentStreamEventKind.TextDelta, Iteration = iteration, Text = held.ToString() };
+            }
 
             if (!response.HasToolCalls)
             {
@@ -212,6 +240,28 @@ public class AgentLoopRunner
         AddUsage(totalUsage, finalResponse.Usage);
         progress?.Report(new AgentStep { Iteration = maxIterations, Kind = AgentStepKind.MaxIterationsReached, Content = finalResponse.Content });
         yield return Completed(maxIterations, finalResponse, totalUsage, maxIterationsReached: true);
+    }
+
+    /// <summary>
+    /// Turns a tool request the model wrote as text (bare JSON, a code fence or <c>&lt;tool_call&gt;</c> tags) into
+    /// structured calls, so it runs through the same handler, iteration limit and guardrails as a structured call
+    /// instead of ending the loop as the answer (REQ-RAG-159, Sevak TR-RAG-062). A response that already has
+    /// structured calls, or whose text names no offered tool, is left as it is.
+    /// </summary>
+    /// <param name="response">The model's response; its tool calls are set and its text cleared when a request is read.</param>
+    /// <param name="toolOptions">The options the call was made with, which name the offered tools.</param>
+    private void ReadWrittenToolCalls(LlmResponse response, LlmCompletionOptions toolOptions)
+    {
+        if (response.HasToolCalls || TextToolCallReader.Read(response.Content, toolOptions.Tools) is not { } written)
+        {
+            return;
+        }
+
+        logger.LogDebug("The model wrote {Count} tool request(s) as text; running them as tool calls: {Tools}",
+            written.Count, string.Join(", ", written.Select(call => call.Name)));
+        response.ToolCalls = written;
+        response.Content = null;
+        response.FinishReason = "tool_calls";
     }
 
     private LlmCompletionOptions BuildToolOptions(LlmCompletionOptions options) => new()

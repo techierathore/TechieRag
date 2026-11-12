@@ -6,5 +6,8 @@
     "OpenAIKey": "",
     "GeminiKey": "",
     "VeniceKey": ""
+  },
+  "Anthropic": {
+    "ApiKey": ""
   }
 }
