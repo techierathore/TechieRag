@@ -34,6 +34,11 @@ public class ModelRootTests
     public void UseEmbeddedModelsLandUnderApplicationData()
     {
         ModelRoot.Set(null);
+
+        // REQ-RAG-163: once a model is loaded from another folder the provider's folder is that one. This test
+        // is about where models go with nothing loaded, so it reads a record of its own that a live test
+        // loading bge-m3 in parallel cannot write into.
+        using var isolated = EmbeddedModel.IsolateLoadedFolders();
         var root = ModelRoot.DefaultPath;
 
         Assert.Equal(Path.Combine(root, "bge-m3"), EmbeddedModel.BgeM3.GetModelDirectory());

@@ -123,6 +123,8 @@ Persists and searches embeddings in SQLite, PostgreSQL with pgvector or Qdrant.
   - *Acceptance:* When a developer calls `UseQdrant`, then the two collections are created on initialise and searches run against `techierag_chunks`.
 - **BRD-15** — The system shall provide full CRUD, batch upsert, document-filtered search, and statistics across all vector stores *(F-VEC)* *Screen:* Vector stores
   - *Acceptance:* When a developer upserts, batch-upserts, searches with a document filter, deletes and reads stats on each store, then every operation behaves the same.
+- **BRD-219** — The PostgreSQL store shall return every stored chunk a search asks for, in cosine order, whatever plan PostgreSQL picks, on a new database or one an older version created *(REQ-RAG-161, added 2026-11-13)* *Screen:* Vector stores
+  - *Acceptance:* When a developer stores N chunks and searches with topK of N or more, then all N come back in cosine order.
 
 ### Semantic search
 
@@ -160,6 +162,8 @@ Gives a fully offline embedding path with a model downloaded once.
   - *Acceptance:* When the model is absent on first `InitializeAsync`, then it downloads once to the model folder and a second run makes no network call.
 - **BRD-26** — A developer can monitor model-download progress via `ModelDownloadService.ProgressChanged` *(F-EMBEDDED)* *Screen:* Embedded package
   - *Acceptance:* When a developer subscribes to `ModelDownloadService.ProgressChanged` during a download, then progress events with bytes and percentage arrive.
+- **BRD-221** — The embedded package shall report the model as downloaded, and name its folder, from the folder the model actually loaded from *(REQ-RAG-163, added 2026-11-13)* *Screen:* Embedded package
+  - *Acceptance:* When a provider has loaded the model from any folder, then IsModelDownloaded() is true and GetModelDirectory() names that folder.
 
 ### LLM providers
 
@@ -179,6 +183,8 @@ One `ILlmProvider` contract over six hosted or local model servers, plus custom 
   - *Acceptance:* When a developer calls `UseAnthropicLlm` with a key, then a completion reaches the Anthropic API.
 - **BRD-33** — A developer can supply a custom LLM provider via factory, and read provider capability flags *(F-LLM)* *Screen:* LLM providers
   - *Acceptance:* When a developer passes a factory to `UseCustomLlmProvider`, then `Build()` uses it and its capability flags are readable.
+- **BRD-216** — The Anthropic provider shall leave out sampling options (temperature, top_p) for a Claude model that refuses them, send them to models that take them, and retry once without them on a refusal *(REQ-RAG-158, added 2026-11-13)* *Screen:* LLM providers
+  - *Acceptance:* When a developer sets Temperature on a Claude model that refuses it, then the call succeeds without it; a model that takes it still gets it.
 
 ### RAG generation
 
@@ -214,6 +220,10 @@ Lets a model call registered tools and iterate to an answer under an iteration c
   - *Acceptance:* When a developer runs the agent loop on a tool-using prompt, then tools execute and a final answer returns.
 - **BRD-43** — The system shall cap agent-loop iterations (default 10) to prevent infinite loops *(F-AGENT)* *Screen:* Agent loop
   - *Acceptance:* When a model keeps calling tools past the iteration cap, then the loop stops at the cap with a clear result.
+- **BRD-217** — The agent loop shall run a tool request a model writes as text (bare JSON, a code fence or tool_call tags) naming an offered tool, under the same handler, limit and guardrails as a structured call *(REQ-RAG-159, added 2026-11-13)* *Screen:* Agent loop
+  - *Acceptance:* When a model writes a tool request as text naming an offered tool, then the loop runs it and the request text is never the answer.
+- **BRD-218** — The host data skill (phase-3 BRD-211) shall describe each entity once across its tools and let a host offer only some entities for a turn, refusing a call to another *(REQ-RAG-160, added 2026-11-13)* *Screen:* Agent loop
+  - *Acceptance:* When a host registers 15 entities, then each appears once; when it offers some for a turn, then a call to another is refused.
 
 ### Conversation memory
 
@@ -238,6 +248,10 @@ Counts tokens and cost per operation and enforces budgets.
   - *Acceptance:* When a developer sets `MaxTotalTokens`, `MaxCostUsd` and `AlertThreshold`, then usage is checked against them on every operation.
 - **BRD-50** — The system shall fire budget-alert and usage-recorded events, and optionally block on exceed *(F-TOKEN)* *Screen:* Token tracking
   - *Acceptance:* When usage passes the alert threshold, then `OnBudgetAlert` fires; with `BlockOnExceeded` set, the next call is refused.
+- **BRD-220** — The system shall keep every token usage in a durable log (with persistence, in the same database) and report usage by day and by month in a chosen time zone *(REQ-RAG-162, added 2026-11-13)* *Screen:* Token tracking
+  - *Acceptance:* When a host restarts and asks for today's or this month's usage, then usage recorded before the restart is counted.
+- **BRD-222** — The pricing table shall carry Anthropic's list price for every current Claude model, and a usage on a model with no price shall be marked price not known, never costed at $0 *(REQ-RAG-164, added 2026-11-13)* *Screen:* Token tracking
+  - *Acceptance:* When a host records usage on a current Claude model, then it costs the list price; on an unpriced model, it says price not known.
 
 ### Resilience
 
@@ -337,7 +351,7 @@ No `perf-budget:` line is written: the owner has stated no numeric budget. The l
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-11-12.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
+**Snapshot as of 2026-11-13.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -347,22 +361,19 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Non-functional | 7 | 7 | 0 | Done |
 | Surface: Ingestion | 1 | 1 | 0 | Done |
 | Surface: Embedding providers | 1 | 1 | 0 | Done |
-| Surface: Vector stores | 1 | 1 | 0 | Done |
+| Surface: Vector stores | 2 | 2 | 0 | Done |
 | Surface: Semantic search | 1 | 1 | 0 | Done |
-| Surface: Embedded package | 1 | 1 | 0 | Done |
-| Surface: LLM providers | 1 | 1 | 0 | Done |
+| Surface: Embedded package | 2 | 2 | 0 | Done |
+| Surface: LLM providers | 2 | 2 | 0 | Done |
 | Surface: RAG generation | 1 | 1 | 0 | Done |
 | Surface: Structured output | 1 | 1 | 0 | Done |
-| Surface: Agent loop | 1 | 1 | 0 | Done |
+| Surface: Agent loop | 3 | 3 | 0 | Done |
 | Surface: Conversation memory | 1 | 1 | 0 | Done |
-| Surface: Token tracking | 1 | 1 | 0 | Done |
+| Surface: Token tracking | 3 | 3 | 0 | Done |
 | Surface: Resilience | 1 | 1 | 0 | Done |
 | Surface: Fallback provider | 1 | 1 | 0 | Done |
 | Surface: Prompt templates | 1 | 1 | 0 | Done |
 | Surface: Sevak application (moved) | 0 | 0 | 0 | Not applicable |
-| Model routing | 1 | 1 | 0 | Done |
-| LLM streaming | 1 | 1 | 0 | Done |
-| Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`) | 1 | 1 | 0 | Done |
 
 ## 8. Context diagram
 

@@ -135,16 +135,34 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
     }
 
     /// <summary>
-    /// Checks if this platform's default model is already downloaded and ready.
+    /// Checks if this platform's default model is already downloaded and ready: complete under the model
+    /// root or in an older version's folder, or loaded by a provider in this process from any folder
+    /// (REQ-RAG-163, AstroLyfe TR-RAG-001).
     /// </summary>
     /// <returns><see langword="true"/> when no download is needed.</returns>
     public static bool IsModelDownloaded() => EmbeddedModel.PlatformDefault.IsDownloaded();
 
     /// <summary>
-    /// Gets the folder this platform's default model lives in: <c>&lt;ModelRoot&gt;/&lt;model name&gt;</c>.
+    /// Gets the folder this platform's default model runs from: the folder a provider in this process loaded
+    /// it from, else the folder one would load it from now (<c>&lt;ModelRoot&gt;/&lt;model name&gt;</c>, or a
+    /// complete copy an older version left next to the assembly) (REQ-RAG-163, AstroLyfe TR-RAG-001).
     /// </summary>
     /// <returns>The absolute folder path.</returns>
-    public static string GetModelDirectory() => EmbeddedModel.PlatformDefault.GetModelDirectory();
+    /// <remarks>
+    /// Before 1.1.10 this always returned <c>&lt;ModelRoot&gt;/&lt;model name&gt;</c>, which named an empty
+    /// folder while the model ran from elsewhere. The folder a download writes to is
+    /// <see cref="EmbeddedModel.GetModelDirectory"/>.
+    /// </remarks>
+    public static string GetModelDirectory() => EmbeddedModel.PlatformDefault.GetLoadDirectory();
+
+    /// <summary>
+    /// Gets the folder this provider loaded its model from, or <see langword="null"/> before it has loaded
+    /// (REQ-RAG-163).
+    /// </summary>
+    public string? ModelDirectory { get; private set; }
+
+    /// <summary>Gets whether this provider has loaded its model and can embed without a download (REQ-RAG-163).</summary>
+    public bool IsLoaded => initialized;
 
     /// <summary>
     /// Creates a lazy-initializing provider for a downloadable model.
@@ -223,6 +241,10 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
         session = new InferenceSession(modelPath, sessionOptions);
         feedsTokenTypeIds = session.InputMetadata.ContainsKey("token_type_ids");
         tokenizer = LoadTokenizer(tokenizerPath, modelDirectory);
+        ModelDirectory = Path.GetFullPath(modelDirectory);
+
+        // REQ-RAG-163: the static flag and folder answer for the folder the model really runs from.
+        (Model ?? EmbeddedModel.FromName(ModelName))?.NoteLoaded(modelDirectory);
         initialized = true;
     }
 

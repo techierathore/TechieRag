@@ -241,6 +241,18 @@ There is no URL to open: the library is exercised through its tests, `samples/Te
 - **Expected:** 1) `claude-sonnet-5-5` answers with `Temperature = 0.3f` set 2) a `rag-search` step, then a real answer 3) an answer, no `LocalPromptTooLongException` 4) the tools name only `task`; the call for `person` is refused with `HostDataEntityNotOffered`.
 - **Covers:** REQ-RAG-158, REQ-RAG-159, REQ-RAG-160
 
+### Sevak and AstroLyfe fixes of 13 November for 1.1.10
+- **Sign in as:** user 1
+- **Steps:** 1) `bash tests/TechieRag.Tests/livetests/start-postgres.sh`, then `dotnet test tests/TechieRag.Tests --filter "Category=LivePostgres"` 2) build with `.UsePgVector(cs).WithPersistence(StoreProvider.Postgres, cs)` on a new database, `InitializeAsync`, ingest two short texts, `SearchAsync(question, 2)` five times 3) open a database an older version created, with its IVFFlat index, and call `InitializeAsync` 4) build with `.WithPersistence(StoreProvider.Sqlite, "Data Source=usage.db")`, make one model call, build a second client on the same file and call `GetTokenTracker().GetUsageByDay(today, today)` and `GetUsageByMonth(today, today)` 5) with bge-m3 staged in a folder of your own, `new EmbeddedEmbeddingProvider(folder)`, embed one text, then `EmbeddedEmbeddingProvider.IsModelDownloaded()` and `GetModelDirectory()`
+- **Expected:** 1) every LivePostgres test passes 2) two results every time 3) a warning that the IVFFlat index is replaced; `IdxChunksEmbedding` is now `hnsw` 4) the first client's call is in today's and this month's totals 5) `true`, and your folder.
+- **Covers:** REQ-RAG-161, REQ-RAG-162, REQ-RAG-163
+
+### Claude prices for 1.1.10
+- **Sign in as:** user 1
+- **Steps:** 1) `new TokenUsageTracker()`, record 1,000,000 input and 100,000 output tokens on `claude-sonnet-5-5` 2) record 1,000 tokens on a model the table does not know, for example `claude-opus-6`, with `OnPriceNotKnown` subscribed 3) read `GetSessionUsage()` 4) `SetModelPricing("claude-opus-6", 4m, 20m)` and record it again
+- **Expected:** 1) `EstimatedCostUsd` 3.00 2) `IsPriceKnown` false, cost 0, the event fires 3) `UnpricedOperationCount` 1, `IsCostComplete` false, the cost total holds only step 1 4) priced, `IsPriceKnown` true.
+- **Covers:** REQ-RAG-164
+
 ### Image generation (phase 3)
 - **Sign in as:** user 1
 - **Steps:** 1) `ImageGenerationProviderFactory.CreateForModel("venice/venice-sd35", "<Venice key>").GenerateImageAsync("a lighthouse", ImageSize.Square1024)` 2) the same with `openai/gpt-image-1` and `gemini/gemini-2.5-flash-image` 3) `openai/gpt-image-1` with size 800x600 4) `openai-compatible/<model>@https://<service>/v1` 5) `azure-openai/<deployment>` with your resource endpoint 6) `openai-compatible/<model>` with no endpoint
@@ -262,7 +274,7 @@ TechieRagOpenCodeGoKey=... dotnet test tests/TechieRag.Tests --filter "Category=
 dotnet test tests/TechieRag.Tests --filter "Category=LiveImages"   # keys in livetests.settings.json, ImageGeneration section; billed
 ```
 Local-model live tests skip until a model is downloaded and never download; agents' LM Studio tests skip unless `TechieRagLiveLmStudioModel` is set.
-1,423 xUnit tests across the three test projects (1,208 core, 182 local model, 33 agents); live tests skip with a reason when their environment is absent. All three PASS on 2026-11-08, each project run on its own. The local-model conformance and live tests need about 4.6 GB of free memory for phi-3-mini; below that they are skipped with the memory gate's message, not failed.
+1,534 xUnit tests across the three test projects (1,317 core, 184 local model, 33 agents); live tests skip with a reason when their environment is absent. All three PASS on 2026-11-13, each project run on its own, with the LivePostgres tests against PostgreSQL 18 + pgvector 0.8.6 and the live bge-m3 tests on the staged weights. The local-model conformance and live tests need about 4.6 GB of free memory for phi-3-mini; below that they are skipped with the memory gate's message, not failed.
 
 ## Known limitations
 
@@ -282,6 +294,10 @@ Local-model live tests skip until a model is downloaded and never download; agen
 - An app that names no SQLite folder and has no `techierag.db` in its running folder starts with an empty database under `<LocalApplicationData>/TechieRag/data/<app name>/` after upgrading; give a full path to keep the old location (REQ-RAG-122).
 - Registering a tool name twice keeps the last definition; it used to list both (REQ-RAG-121).
 - From 1.1.10 the host-data tools other than the first no longer list the entities' fields; they point to the first tool (REQ-RAG-160).
+- From 1.1.10 `PgVectorStore` uses an HNSW index. The first start on a database an older version created drops its IVFFlat index and builds the HNSW one, which takes time on a large table (REQ-RAG-161). A pgvector older than 0.8.0 answers a filtered search, or one for more than 1,000 results, by an exact scan; older than 0.5.0, or a vector wider than 2,000 dimensions, has no vector index and every search is exact.
+- From 1.1.10 `WithPersistence` also writes every token usage to a `TrTokenUsage` table in the same database; `UsageTracking.PersistUsage = false` turns it off. Usage from before 1.1.10 was never kept, so ranges start at the upgrade. A custom `ITokenTracker` throws `NotSupportedException` from the new range methods (REQ-RAG-162).
+- From 1.1.10 a model with no price in the token tracker's table is "price not known" (`TokenUsage.IsPriceKnown` false, counted in `UnpricedOperationCount`), not $0, and a price key no longer prices another version of the model (`claude-opus-5` does not price `claude-opus-5-7`). Claude prices were read on 2026-11-13; a model Anthropic adds later needs `SetModelPricing` or a newer package. Cache reads and writes are not priced (REQ-RAG-164).
+- From 1.1.10 `EmbeddedEmbeddingProvider.GetModelDirectory()` names the folder the model runs from (the folder a provider loaded it from, or an older version's complete copy), not always `<ModelRoot>/<model>`; the download folder is `EmbeddedModel.GetModelDirectory()` (REQ-RAG-163).
 - Image generation is reached only through `ImageGenerationProviderFactory`, not the builder or `ITechieRag`; one image per call, no editing. Gemini returns an exact size only for 1024x1024 (REQ-RAG-155). OpenAI and Gemini have not been called live yet (keys).
 - The `azure-openai` image route has only run against a stand-in, not a real Azure resource (REQ-RAG-157).
 - The graphics-card picture model (Phi-4 multimodal) is refused, not loaded: no GPU runtime is chosen (REQ-RAG-146, ORTGENAI-003).

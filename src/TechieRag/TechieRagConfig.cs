@@ -603,6 +603,13 @@ public class UsageTrackingConfig
     public bool BlockOnExceeded { get; set; }
 
     /// <summary>
+    /// Gets or sets whether every usage is also written to the persistence database's <c>TrTokenUsage</c>
+    /// table when <c>WithPersistence</c> is set, so usage by day and by month survives a restart
+    /// (REQ-RAG-162, Sevak TR-RAG-059). Default true; it has no effect without persistence.
+    /// </summary>
+    public bool PersistUsage { get; set; } = true;
+
+    /// <summary>
     /// Gets or sets the per-model pricing table used for cost estimation, keyed by model name.
     /// </summary>
     /// <remarks>

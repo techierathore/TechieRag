@@ -48,7 +48,20 @@ public class TokenUsage
     public string? CallerTag { get; set; }
 
     /// <summary>Gets or sets the estimated cost in USD.</summary>
+    /// <remarks>Read it together with <see cref="IsPriceKnown"/>: 0 with <see cref="IsPriceKnown"/> false means
+    /// the price is not known, not that the call was free (REQ-RAG-164).</remarks>
     public decimal EstimatedCostUsd { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether <see cref="EstimatedCostUsd"/> comes from a known price (REQ-RAG-164, Sevak TR-RAG-064).
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Services.TokenUsageTracker.RecordUsage"/> sets it to <see langword="false"/> when the usage
+    /// carried no cost and the tracker has no price for <see cref="ModelName"/>; the cost then stays 0 and is
+    /// counted in <see cref="TokenUsageSummary.UnpricedOperationCount"/>, never as a free call. A usage the
+    /// host priced itself (a cost above 0) is known.
+    /// </remarks>
+    public bool IsPriceKnown { get; set; } = true;
 
     /// <summary>Gets or sets the model name.</summary>
     public string ModelName { get; set; } = string.Empty;
@@ -79,11 +92,27 @@ public class TokenUsageSummary
     /// <summary>Gets the total visible completion tokens (output minus reasoning).</summary>
     public long TotalCompletionTokens => TotalOutputTokens - TotalReasoningTokens;
 
-    /// <summary>Gets or sets the total estimated cost in USD.</summary>
+    /// <summary>Gets or sets the total estimated cost in USD of the operations whose price is known.</summary>
+    /// <remarks>Incomplete when <see cref="UnpricedOperationCount"/> is above 0 (REQ-RAG-164).</remarks>
     public decimal TotalEstimatedCostUsd { get; set; }
 
     /// <summary>Gets or sets the number of operations.</summary>
     public int OperationCount { get; set; }
+
+    /// <summary>
+    /// Gets or sets how many operations had no known price, so are missing from
+    /// <see cref="TotalEstimatedCostUsd"/> (REQ-RAG-164, Sevak TR-RAG-064).
+    /// </summary>
+    public int UnpricedOperationCount { get; set; }
+
+    /// <summary>Gets or sets the input plus output tokens of the operations with no known price.</summary>
+    public long UnpricedTokens { get; set; }
+
+    /// <summary>Gets whether every operation was priced, so <see cref="TotalEstimatedCostUsd"/> is the whole cost.</summary>
+    public bool IsCostComplete => UnpricedOperationCount == 0;
+
+    /// <summary>Gets or sets the names of the models that had no known price.</summary>
+    public IReadOnlyList<string> UnpricedModels { get; set; } = [];
 
     /// <summary>Gets or sets the timestamp of the first operation.</summary>
     public DateTime? FirstOperationAt { get; set; }
@@ -131,6 +160,12 @@ public class BudgetStatus
     public bool IsExceeded =>
         (Budget.MaxTotalTokens > 0 && CurrentUsage.TotalTokens >= Budget.MaxTotalTokens) ||
         (Budget.MaxCostUsd > 0 && CurrentUsage.TotalEstimatedCostUsd >= Budget.MaxCostUsd);
+
+    /// <summary>
+    /// Gets whether some usage had no known price, so the cost side of this budget can be under-counted
+    /// (REQ-RAG-164); the tracker raises <c>OnPriceNotKnown</c> for each such usage.
+    /// </summary>
+    public bool IsCostIncomplete => !CurrentUsage.IsCostComplete;
 
     /// <summary>Gets whether the alert threshold has been reached.</summary>
     public bool IsAlertTriggered => TokenUtilization >= Budget.AlertThreshold || CostUtilization >= Budget.AlertThreshold;

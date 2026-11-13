@@ -4,11 +4,11 @@
 |---|---|
 | App | Sevak |
 | Upstream | TechieRag |
-| Updated | 2026-11-11 (TR-RAG-061 to TR-RAG-063 added from Sevak's 9 November report, relayed by the owner, and answered: fixed for TechieRag 1.1.10); 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
+| Updated | 2026-11-13, later (TR-RAG-064 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-13 (TR-RAG-059 and TR-RAG-060 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-11 (TR-RAG-061 to TR-RAG-063 added from Sevak's 9 November report, relayed by the owner, and answered: fixed for TechieRag 1.1.10); 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
 
 ## Summary
 
-Nothing is blocked: no entry is open. 58 entries: 0 open, 43 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-061 to TR-RAG-063 (found 2026-11-09 on 1.1.9) were fixed upstream on 2026-11-11 for TechieRag 1.1.10 (not yet published); TR-RAG-063 is proven against Anthropic's recorded 400 and, on 2026-11-12, by a live call. TR-RAG-059 and TR-RAG-060 are not in this copy yet. TR-RAG-055 to TR-RAG-058 (Sevak's phase 4 and 5 requests) were built for 1.1.9 on 2026-11-08 and ship with 1.1.10; TR-RAG-056 and TR-RAG-057 hold Sevak's REQ-RAG-116 and REQ-UI-087 until that package is on the feed. TR-RAG-053 and TR-RAG-049 are worked around in Sevak until it moves to the new package.
+Nothing is blocked: no entry is open. 61 entries: 0 open, 46 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-059 to TR-RAG-064 are fixed upstream for TechieRag 1.1.10, not yet published: 059, 060 and 064 on 2026-11-13 (060 proven on a real PostgreSQL 18 with pgvector 0.8.6; 064 against Anthropic's pricing page of that day), 061 to 063 on 2026-11-11. TR-RAG-055 to TR-RAG-058 (Sevak's phase 4 and 5 requests) were built for 1.1.9 on 2026-11-08 and ship with 1.1.10; TR-RAG-056 and TR-RAG-057 hold Sevak's REQ-RAG-116 and REQ-UI-087 until that package is on the feed. TR-RAG-053 and TR-RAG-049 are worked around in Sevak until it moves to the new package.
 
 These are the application's findings against `src/TechieRag`, filed while it lived in this repository (TechieRagWeb, then TechieDesk, now Sevak), restructured 2026-09-24 into the feedback template with the original text unchanged; the earlier summary is under "Replies from TechieRag". Accepted items are ledgered as TechieRag requirements (BRD-121, 126, 127, 142, 143, 148, 158; phase 3; BRD-210 to 213).
 
@@ -1282,6 +1282,30 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** Canva and Venice called directly from Sevak until the library route exists.
 - **Suggested fix:** TechieRag BRD-213 as written.
 
+### TR-RAG-059 — request: token usage by day and by month, not only since the app started (minor, found 2026-11-08 building Sevak phase 4 group L) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-162 Verified; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
+- **Severity:** minor
+- **Blocks:** no — `Sevak#REQ-UI-089` (the pane header shows the model and today's spend) shows the `ITokenTracker.GetSessionUsage()` cost, the figure the Token Usage screen shows; it equals today's spend only while the app has not run past midnight, and the mockup's "this month" figure is left out.
+- **Repro:** ask `ITokenTracker` for the cost of today, or of the current month, after a restart.
+- **Expected:** `GetUsageBetween(fromUtc, toUtc)` (or by day) from a persisted usage log, so a host can show "today" and "this month".
+- **Actual:** `ITokenTracker` keeps an in-memory session only (`GetSessionUsage`, `GetUsageByModel`); a restart starts it at zero and nothing is kept per day.
+- **Encountered in:** `apps/Sevak/Components/Assistant/ChatPane.razor` `RefreshSpend`, docs/mockups/assistant.html `assistant-header-spend` ("₹41 today · ₹1,240 this month").
+- **Workaround:** none taken beyond showing the session figure labelled "today".
+- **Suggested fix:** persist each `TokenUsage` with its timestamp (the record already carries `Timestamp`) and add a ranged query.
+
+### TR-RAG-060 — PgVectorStore builds its IVFFlat index on an empty table, so a search returns some, one or none of the stored chunks (major, found 2026-11-09 in Sevak phase 4 fix cycle 1) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-161 Verified against PostgreSQL 18 + pgvector 0.8.6; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
+- **Severity:** major
+- **Blocks:** no — Sevak passes `Options=-c ivfflat.probes=32768` on the server connection string (`TechieRagManager.WithExactVectorSearch`), which makes every search scan all lists; `Sevak#REQ-RAG-109` then passed three runs in a row.
+- **Repro:** `new TechieRagBuilder().UsePgVector(cs).WithPersistence(StoreProvider.Postgres, connectionString: cs)`, `InitializeAsync`, ingest two short texts, `SearchAsync(question, 2)`. Run it a few times: the result count is 0, 1 or 2 depending on the plan PostgreSQL picks (an extra query on the connection beforehand was enough to change it). `tests/Sevak.Tests/Storage/PgVectorRagTests.cs` against `pgvector/pgvector:0.8.6-pg18-trixie` failed every run before the workaround.
+- **Expected:** a search over N chunks with `topK >= N` returns all N, ordered by cosine similarity.
+- **Actual:** `PgVectorStore.InitializeAsync` runs `CREATE INDEX IF NOT EXISTS IdxChunksEmbedding ON Chunks USING ivfflat (Embedding vector_cosine_ops)` at start-up, when Chunks is empty. IVFFlat trains its list centres from the rows present at build time, so the 100 lists have no meaningful centres, and with pgvector's default `ivfflat.probes = 1` an index scan reads one list and misses the rest.
+- **Encountered in:** `Sevak#REQ-RAG-109` (BRD-185), `apps/Sevak.Core/Services/TechieRagManager.cs` `ServerStoreConnectionString`.
+- **Workaround:** the session option above, documented at `WithExactVectorSearch`; remove it once a release fixes the index.
+- **Suggested fix:** use an HNSW index (`USING hnsw (Embedding vector_cosine_ops)`), which needs no training and works from an empty table; or build the IVFFlat index only after enough rows exist and set `ivfflat.probes` (or `ivfflat.iterative_scan`) on the store's own connections.
+
 ### TR-RAG-061 — the host-data tool definitions repeat every entity's fields in each of the five tools (minor, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
 - **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-160 Verified; ships in 1.1.10, not yet published.
@@ -1318,9 +1342,51 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** none relayed.
 - **Suggested fix:** as Expected.
 
+### TR-RAG-064 — TokenUsageTracker prices a model it does not know at $0, and its table lacks every current Claude model, so spend reads $0.00 (major, found 2026-11-13 in Sevak triage-and-fix) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-164 Verified; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
+- **Severity:** major
+- **Blocks:** no — Sevak adds the current prices to every tracker it builds (`TechieRagManager.SeedCurrentModelPrices`, through `TokenUsageTracker.SetModelPricing`); the Assistant header now shows the day's spend.
+- **Repro:** TechieRag 1.1.9. `var tracker = new TokenUsageTracker(); var usage = new TokenUsage { InputTokens = 1_000_000, OutputTokens = 100_000, ModelName = "claude-sonnet-5-5", ProviderName = "Anthropic" }; tracker.RecordUsage(usage);` gives `usage.EstimatedCostUsd == 0m`. `InitializeDefaultPricing` knew gpt-4o, gpt-4o-mini, gpt-4-turbo, claude-opus-4-6, claude-sonnet-4-5 and claude-haiku-4-5 only; `CalculateCost` returned 0 when `FindPricing` found nothing.
+- **Expected:** the default table carries the current models (claude-fable-5-2, claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5 at $8/$40, $4/$20, $2/$10, $0.10/$0.50 per million input/output tokens), and a model with no price is reported as "not priced" (a flag on `TokenUsage`, or a log line), never as a cost of $0, so a budget check does not pass silently.
+- **Actual:** every claude-sonnet-5-5 call costs $0; Sevak's budget question (spend above the warning share) can never fire on a current Claude model.
+- **Encountered in:** `Sevak#REQ-UI-089` and `Sevak#REQ-RAG-118`, phase 4 verify of 13 Nov 2026: the Assistant header said "$0.00 today" after 73 answers on claude-sonnet-5-5.
+- **Workaround:** above.
+- **Suggested fix:** add the current models to `InitializeDefaultPricing`, and mark an unpriced usage instead of pricing it at zero.
+
 ## Replies from TechieRag
 
 <!-- The upstream team's answers, newest block first. -->
+
+### 2026-11-13 (later) — TR-RAG-064 fixed for 1.1.10
+
+TR-RAG-064 → `TechieRag#REQ-RAG-164`, Verified 2026-11-13, in the same unpublished 1.1.10 as TR-RAG-059 to TR-RAG-063; the owner tags and publishes. This copy did not have the entry; it was copied in from Sevak's file, unchanged apart from its status.
+
+- **Prices.** The table now has every model on Anthropic's pricing page, read on 2026-11-13 at https://platform.claude.com/docs/en/about-claude/pricing, per million input / output tokens:
+  - Fable 5.2 and Mythos 5.2: $8 / $40.
+  - Fable 5.1, Mythos 5.1, Fable 5 and Mythos 5: $10 / $50.
+  - Opus 5.5: $4 / $20. Opus 5, 4.8, 4.7, 4.6 and 4.5: $5 / $25. Opus 4.1 and 4: $15 / $75.
+  - Sonnet 5.5 and Sonnet 5: $2 / $10. Sonnet 4.6, 4.5 and 4: $3 / $15.
+  - Haiku 5.5: $0.10 / $0.50, or $0.50 / $2.50 when the prompt is over 100,000 tokens. Haiku 4.5: $1 / $5.
+  - Your four figures match the page. Two old entries were wrong and are corrected: Opus 4.6 was $15 / $75, Haiku 4.5 was $0.80 / $4.
+  - Dated, Vertex (`@date`) and Bedrock ids are priced too. Cache reads and writes are not priced.
+- **"Price not known", never $0.** A model with no price keeps a cost of 0, but `usage.IsPriceKnown` is false. That is how a host tells the two apart: a priced call that came to $0 keeps `IsPriceKnown` true. The summaries count unpriced calls apart from the cost: `UnpricedOperationCount`, `UnpricedTokens`, `UnpricedModels`, and `IsCostComplete` false. `BudgetStatus.IsCostIncomplete` is true, `TokenUsageTracker.OnPriceNotKnown` fires for each such call, and `TryGetPricing(model, out _)` answers before a call. A price key also no longer prices another version of the model: `claude-opus-5` does not price `claude-opus-5-7`, which stays "price not known" until it is added.
+- **Proof.** `REQ-RAG-164 SevakReproCostsThreeDollars` (your repro) cost $0 on 1.1.9 and costs $3.00 now. `REQ-RAG-164 CurrentClaudeModelsCostTheirListPrice` checks every model on the page; 25 of its 27 cases failed before. `REQ-RAG-164 UnknownModelIsPriceNotKnownNeverZero`, `NewerVersionIsNotPricedAsOlder`, `HaikuFiveFiveLongPromptCostsMore` and `UsageLogKeepsPriceNotKnown` cover the rest. 36 tests pass.
+
+**Verify from here:** move Sevak to TechieRag 1.1.10.
+1. Remove `TechieRagManager.SeedCurrentModelPrices`, or keep only prices the library does not have.
+2. Ask the Assistant one question on claude-sonnet-5-5. The header should show a cost above $0.00 for today.
+3. Point the Assistant at a model the table does not know. The header should say the price is not known: read `IsCostComplete` or `UnpricedTokens` from the day's summary. It should never show $0.00.
+4. Set a cost budget with a small `MaxCostUsd` and run until the warning share is passed. `OnBudgetAlert` should fire.
+
+### 2026-11-13 — TR-RAG-059 and TR-RAG-060 fixed for 1.1.10
+
+Both are fixed in TechieRag 1.1.10, the same unpublished release as TR-RAG-061 to TR-RAG-063; the owner tags and publishes. This copy did not have either entry; both were copied in today from Sevak's file, unchanged apart from their status.
+
+- **TR-RAG-060 → `TechieRag#REQ-RAG-161`, Verified 2026-11-13, against a real PostgreSQL 18 with pgvector 0.8.6** (TechieRag's own test container, `pgvector/pgvector:0.8.6-pg18-trixie`). `PgVectorStore` now builds an HNSW index, which needs no training, so it is correct when built on the empty table. On start-up it drops an existing IVFFlat `IdxChunksEmbedding` and builds the HNSW one, with a logged warning; that happens once, on Sevak's existing database too. Each search runs in its own transaction with `hnsw.ef_search` raised to topK (40 to 1,000). On pgvector 0.8.0 and later it also uses `hnsw.iterative_scan = strict_order`, so a search filtered to one document still finds that document's chunks. Proven by `REQ-RAG-161 SearchOnNewDatabaseReturnsEveryChunk` (50 chunks, topK 50, with the planner held to the index): on 1.1.9 it returned **2 of 50**, now 50, in cosine order. Your repro, `REQ-RAG-161 TwoChunksComeBackEveryRun` (two texts, a search for two, five times), returned **0** on 1.1.9 and now returns 2 every time. Also covered: `REQ-RAG-161 EarlierIvfFlatIndexIsReplaced` ("ivfflat" on 1.1.9, now "hnsw") and `REQ-RAG-161 FilteredSearchFindsFarDocument`. Each test builds its tables in a new schema, so the index is always built on an empty table, as on a new database.
+- **TR-RAG-059 → `TechieRag#REQ-RAG-162`, Verified 2026-11-13.** `ITokenTracker` has `GetUsageBetween(fromUtc, toUtc)`, `GetUsageByDay(firstDay, lastDay, timeZone)` and `GetUsageByMonth(firstDay, lastDay, timeZone)`. Days and months are counted in the time zone you pass, so "today" is India's today. With `WithPersistence` (Sevak's server path included), every usage is also written to a `TrTokenUsage` table in the same database, so both figures include usage from before a restart. `UsageTracking.PersistUsage = false` turns this off; `WithTokenUsageLog(log)` takes another store. Proven by `REQ-RAG-162 RestartKeepsTodayAndThisMonth` (SQLite: a second tracker on the same file sees the first one's usage by day and by month, in UTC+05:30) and `REQ-RAG-162 PostgresLogKeepsUsageAcrossRestart` (the same on the real PostgreSQL). On 1.1.9 these methods did not exist, so the tests could not be built, and a restart started usage at zero. Usage from before the upgrade was never stored, so on the first day Sevak runs 1.1.10, "this month" starts from that day.
+
+**Verify from here:** move Sevak to TechieRag 1.1.10. (1) Remove `WithExactVectorSearch`'s `ivfflat.probes` option, start Sevak once on its existing database (the log should say the IVFFlat index is replaced), then run `Sevak#REQ-RAG-109` three times; it should pass each time. (2) In `ChatPane.RefreshSpend`, read `GetUsageByDay(today, today, india)[today]` and `GetUsageByMonth(today, today, india)[firstOfMonth]`. Make a call, restart Sevak, and check that both figures still include it.
 
 ### 2026-11-11 — TR-RAG-061, TR-RAG-062 and TR-RAG-063 fixed for 1.1.10
 

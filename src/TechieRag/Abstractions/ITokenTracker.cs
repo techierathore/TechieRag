@@ -34,6 +34,41 @@ public interface ITokenTracker
     /// <summary>Resets all tracked usage.</summary>
     void Reset();
 
+    /// <summary>
+    /// Gets the usage recorded from <paramref name="fromUtc"/> (inclusive) to <paramref name="toUtc"/> (exclusive)
+    /// (REQ-RAG-162, Sevak TR-RAG-059).
+    /// </summary>
+    /// <param name="fromUtc">The start, in UTC.</param>
+    /// <param name="toUtc">The end, in UTC.</param>
+    /// <returns>The summary of that range; with a usage log it includes usage from before a restart.</returns>
+    /// <exception cref="NotSupportedException">This tracker does not keep usage by time.</exception>
+    TokenUsageSummary GetUsageBetween(DateTime fromUtc, DateTime toUtc) =>
+        throw new NotSupportedException($"{GetType().Name} does not keep usage by time; use TokenUsageTracker.");
+
+    /// <summary>
+    /// Gets the usage of each calendar day from <paramref name="firstDay"/> to <paramref name="lastDay"/>, both
+    /// included, with days counted in <paramref name="timeZone"/> (REQ-RAG-162).
+    /// </summary>
+    /// <param name="firstDay">The first day.</param>
+    /// <param name="lastDay">The last day.</param>
+    /// <param name="timeZone">The time zone a day is counted in; null for this machine's.</param>
+    /// <returns>One entry per day, days without usage included with zero totals.</returns>
+    /// <exception cref="NotSupportedException">This tracker does not keep usage by time.</exception>
+    IReadOnlyDictionary<DateOnly, TokenUsageSummary> GetUsageByDay(DateOnly firstDay, DateOnly lastDay, TimeZoneInfo? timeZone = null) =>
+        throw new NotSupportedException($"{GetType().Name} does not keep usage by time; use TokenUsageTracker.");
+
+    /// <summary>
+    /// Gets the usage of each calendar month from the month of <paramref name="firstDay"/> to the month of
+    /// <paramref name="lastDay"/>, with days counted in <paramref name="timeZone"/> (REQ-RAG-162).
+    /// </summary>
+    /// <param name="firstDay">A day in the first month.</param>
+    /// <param name="lastDay">A day in the last month.</param>
+    /// <param name="timeZone">The time zone a day is counted in; null for this machine's.</param>
+    /// <returns>One entry per month, keyed by its first day, months without usage included.</returns>
+    /// <exception cref="NotSupportedException">This tracker does not keep usage by time.</exception>
+    IReadOnlyDictionary<DateOnly, TokenUsageSummary> GetUsageByMonth(DateOnly firstDay, DateOnly lastDay, TimeZoneInfo? timeZone = null) =>
+        throw new NotSupportedException($"{GetType().Name} does not keep usage by time; use TokenUsageTracker.");
+
     /// <summary>Event raised when usage exceeds the configured budget alert threshold.</summary>
     event EventHandler<BudgetAlertEventArgs>? OnBudgetAlert;
 
