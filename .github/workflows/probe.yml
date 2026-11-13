@@ -31,6 +31,13 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   PROBE: samples/TechieRag.Probe/TechieRag.Probe.csproj
+  # The Apple heads install this workload set, not the newest: .NET for iOS and Mac Catalyst 27.2.10000
+  # (10 Nov 2026) need Xcode 27.2, which the macos-26 image does not carry (it tops out at 26.6), and run
+  # 43448574999 failed the iOS build that way ("Optimizing assemblies for size failed"). Workload set
+  # 10.0.401 is .NET for iOS 26.5.10318, whose Versions.plist asks for Xcode 26.6, the image's default.
+  # Raise it when GitHub's macOS image carries the Xcode a newer set needs (dotnet/macios release notes
+  # name both).
+  APPLE_WORKLOAD_SET: 10.0.401
 
 jobs:
   windows:
@@ -117,10 +124,14 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Install MAUI workload
-        run: dotnet workload install maui-maccatalyst
+        run: dotnet workload install maui-maccatalyst --version ${{ env.APPLE_WORKLOAD_SET }}
       - name: Select the Xcode this .NET for Mac Catalyst asks for
         run: bash samples/TechieRag.Probe/scripts/select-xcode.sh maccatalyst
       - name: Build Mac Catalyst head
+        # shell: bash runs the step with -o pipefail, so a failed dotnet build fails the step even though
+        # its output is piped through tee. Without it the step took tee's exit code (0), and run
+        # 43448574999 reported a failed iOS build ("Optimizing assemblies for size failed") as built.
+        shell: bash
         run: dotnet build ${{ env.PROBE }} -f net10.0-maccatalyst -p:ProbeHead=net10.0-maccatalyst -c Debug $PROBE_BUILD_FLAGS 2>&1 | tee build-maccatalyst.log
       - name: Show the build errors on the run page
         if: failure()
@@ -135,10 +146,14 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Install MAUI workload
-        run: dotnet workload install maui-ios
+        run: dotnet workload install maui-ios --version ${{ env.APPLE_WORKLOAD_SET }}
       - name: Select the Xcode this .NET for iOS asks for
         run: bash samples/TechieRag.Probe/scripts/select-xcode.sh ios
       - name: Build iOS head for the simulator
+        # shell: bash runs the step with -o pipefail, so a failed dotnet build fails the step even though
+        # its output is piped through tee. Without it the step took tee's exit code (0), and run
+        # 43448574999 reported a failed iOS build ("Optimizing assemblies for size failed") as built.
+        shell: bash
         run: dotnet build ${{ env.PROBE }} -f net10.0-ios -p:ProbeHead=net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64 $PROBE_BUILD_FLAGS 2>&1 | tee build-ios.log
       - name: Show the build errors on the run page
         if: failure()
@@ -151,6 +166,7 @@ jobs:
     if: always()
     steps:
       - name: Write the head table
+        shell: bash
         env:
           WINDOWS: ${{ needs.windows.result }}
           WINDOWS_RUN: ${{ needs.windows.outputs.run }}

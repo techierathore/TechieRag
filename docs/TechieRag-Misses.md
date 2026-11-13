@@ -3,16 +3,17 @@
 | | |
 |---|---|
 | App | TechieRag |
-| Count | 48 logged: 2 open, 46 fixed, 0 will not fix |
+| Count | 49 logged: 3 open, 46 fixed, 0 will not fix |
 | Source | `docs/metrics/misses.jsonl`, one row per miss record. Rewritten by `tf-misses-md.sh` on every new record. Never edit it: a wrong row is corrected by a new record. |
 | Updated | 2026-11-13 |
 
 **Whose gap** answers the four questions of the miss protocol: **the app's spec** did not say it, so the checklist line is fixed; **the framework never said it**, so one requirement line and a check are added; **the check was too weak** (a review, or a script that did not fire), so the check is fixed; **said and ignored**, so the rule becomes a hook or is deleted. **not sorted** means the record predates the sort or nobody has answered yet; `bash .tfcore/utils/tf-emit.sh --amend <miss> sort <spec|unsaid|weak-check|ignored>` completes it.
 
-## Open (2)
+## Open (3)
 
 | Miss | Found | Whose gap | What went wrong |
 |---|---|---|---|
+| MISS-TechieRag-20261113-05 (REQ-FN-057) | 2026-11-13 by production | the check was too weak | CI run 43448574999 (PR #22): the iOS head reported built while its build failed ('Optimizing assemblies for size failed'): the tee pipe hid the exit code, and the unpinned workload took .NET for iOS 27.2, which needs Xcode 27.2 that the macos-26 image lacks; Mac Catalyst was never given a runner (Gi |
 | MISS-TechieRag-20261107-01 (REQ-RAG-155) | 2026-11-07 by agent-review | not sorted | BRD-213 asks for PNG bytes of the asked size from all three services, but Gemini sizes images by aspect ratio and tier, so only 1024x1024 comes back exact. |
 | MISS-TechieRag-20260924-06 (REQ-RAG-016) | 2026-09-24 by agent-review | not sorted | The Agents proposal gives UseLmStudio a default endpoint before a required model, which C# cannot express, so both arguments are now required. |
 

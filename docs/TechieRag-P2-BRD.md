@@ -309,7 +309,7 @@ Only what this phase adds. The ones that apply to the whole library are in the p
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-11-12.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
+**Snapshot as of 2026-11-14.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P2-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -318,7 +318,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Surface: Repository separation | 1 | 1 | 0 | Done |
 | Surface: Flow orchestration | 6 | 6 | 0 | Done |
 | Surface: Provider breadth | 10 | 10 | 0 | Done |
-| Surface: Platform groundwork | 9 | 9 | 0 | Done |
+| Surface: Platform groundwork | 9 | 8 | 1 | Partial |
 | Surface: Local model | 15 | 15 | 0 | Done |
 | Surface: Typed streaming | 2 | 2 | 0 | Done |
 | Surface: Subscription sign-in | 3 | 3 | 0 | Done |

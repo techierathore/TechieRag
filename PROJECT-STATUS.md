@@ -1,16 +1,16 @@
 ---
 project: TechieRag
-last_updated: 2026-11-13
+last_updated: 2026-11-14
 current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 42 verified
 last_verified_build: PASS
-last_verified_date: 2026-11-13
+last_verified_date: 2026-11-14
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak): ready to release 1.1.10. Today's second run fixed Sevak TR-RAG-064 (REQ-RAG-164: current Claude prices, unknown models read "price not known", never $0), Verified. REQ-RAG-158 to REQ-RAG-164 are now BRD-216 to BRD-222 in the phase-1 BRD; phase 1 is 31 of 31 Verified. Shipped documents describe every fix. The live-test PostgreSQL is stopped. Nothing is committed, tagged or published.
+Phase 3 of 3 (Consumer feedback from Sevak): 1.1.10 is committed on dev; PR #22's probe run failed. Fixed in the workflow, not yet committed: Apple builds no longer hide a failure, both Apple heads pin workload set 10.0.401 (Xcode 26.6, which the runner has), and the Android press waits for the emulator's network. The Android failure and its fix were reproduced on an API 34 emulator here. REQ-FN-057 stays open until the next CI run passes.
 
 ## Next command to run
 
@@ -39,8 +39,9 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 
 ## Known blockers
 
-- The Gmail test account has one message left in Trash: the live Gmail test lost the network during its restore step at about 09:28 UTC. It passed on a rerun; move that message back to INBOX, or Gmail deletes it after 30 days.
-- REQ-FN-006 (Verified 2026-10-06) still fails its test: `apps/` holds TechieDesk build output, logs and two `.db` files from 25 September. Not touched.
+- REQ-FN-057 (phase 2) is Needs re-verify until a GitHub run of the probe workflow passes; the Apple heads cannot be built off a Mac. Run 43448574999 also got no Mac runner from GitHub (capacity), which no code change prevents; re-run if that happens again.
+- REQ-FN-057: one Android press crashed natively (signal 11) after downloading the model on a freshly wiped emulator; five other presses passed. Not reproduced on demand.
+- The Gmail test account has one message in Trash from the 13 Nov live test; move it back to INBOX.
 - REQ-RAG-146 (GPU runtime choice) and REQ-RAG-155 (OpenAI and Gemini keys) wait on you.
 
 ## Verification log
@@ -49,11 +50,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-11-12 | verify-phase | 26/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
 | 2026-11-12 | verify-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
 | 2026-11-12 | handoff-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
 | 2026-11-13 | triage-and-fix + handoff | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-11-13 | triage-and-fix + handoff + amend-docs | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-14 | fix-issues | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -70,6 +71,5 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 - Anthropic still sends `budget_tokens` for thinking and `tool_choice` `any`; Opus 5.5 and Sonnet 5.5 refuse both.
 - The default Anthropic model is still `claude-sonnet-4-5-20250929`, which the pricing page marks deprecated.
 - Cache reads and writes are not priced by the token tracker.
-- Image generation through the builder and dependency injection; today only the factory route.
+- Raise `APPLE_WORKLOAD_SET` in the probe workflow when GitHub's macOS image carries Xcode 27.
 - Open consumer feedback entries (TR-RAG-020/021/022/026/035) for a future release.
-- Picture reading on phones: out of this phase (owner, 2026-11-05).
