@@ -12,6 +12,7 @@ public class TechieRagBuilder
     private Func<Abstractions.IEmbeddingProvider>? customEmbeddingProviderFactory;
     private Func<ILlmProvider>? customLlmProviderFactory;
     private Func<IPromptTemplate>? customPromptTemplateFactory;
+    private ITokenUsageLog? customTokenUsageLog;
     private Func<IReranker>? customRerankerFactory;
     private Func<IChunker>? customChunkerFactory;
     private IToolHandler? toolHandler;
@@ -808,6 +809,20 @@ public class TechieRagBuilder
     public TechieRagBuilder WithPersistence(StoreProvider provider) => WithPersistence(provider, connectionString: null);
 
     /// <summary>
+    /// Writes every token usage to <paramref name="usageLog"/>, so <c>GetUsageByDay</c> and
+    /// <c>GetUsageByMonth</c> include usage from before a restart (REQ-RAG-162, Sevak TR-RAG-059).
+    /// </summary>
+    /// <param name="usageLog">The log, for example a <see cref="Persistence.SqliteTokenUsageLog"/>.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>Not needed with <c>WithPersistence</c>, which keeps usage in the same database by default.</remarks>
+    public TechieRagBuilder WithTokenUsageLog(ITokenUsageLog usageLog)
+    {
+        ArgumentNullException.ThrowIfNull(usageLog);
+        customTokenUsageLog = usageLog;
+        return this;
+    }
+
+    /// <summary>
     /// Sets or overrides the cost-estimation pricing for a model.
     /// </summary>
     /// <param name="modelName">The model name (matched case-insensitively and by substring).</param>
@@ -859,7 +874,7 @@ public class TechieRagBuilder
         ITokenTracker? tokenTracker = null;
         if (config.UsageTracking.Enabled)
         {
-            tokenTracker = new TokenUsageTracker(config.UsageTracking);
+            tokenTracker = new TokenUsageTracker(config.UsageTracking, CreateTokenUsageLog());
             if (llmProvider != null)
             {
                 llmProvider.OnCompletionCompleted += (_, args) => tokenTracker.RecordUsage(new Models.TokenUsage
@@ -983,6 +998,31 @@ public class TechieRagBuilder
         StoreProvider.Postgres => new Persistence.PostgresConversationStore(RequirePersistenceConnectionString()),
         _ => throw new InvalidOperationException($"Unsupported persistence provider: {config.Persistence.Provider}")
     };
+
+    /// <summary>
+    /// The durable usage log: the one a host supplied, else the persistence database's <c>TrTokenUsage</c>
+    /// table when persistence is set and <see cref="UsageTrackingConfig.PersistUsage"/> is on (REQ-RAG-162).
+    /// </summary>
+    /// <returns>The log, or null when usage stays in the session.</returns>
+    private ITokenUsageLog? CreateTokenUsageLog()
+    {
+        if (customTokenUsageLog is not null)
+        {
+            return customTokenUsageLog;
+        }
+
+        if (!config.UsageTracking.PersistUsage)
+        {
+            return null;
+        }
+
+        return config.Persistence.Provider switch
+        {
+            StoreProvider.Sqlite => new Persistence.SqliteTokenUsageLog(RequirePersistenceConnectionString()),
+            StoreProvider.Postgres => new Persistence.PostgresTokenUsageLog(RequirePersistenceConnectionString()),
+            _ => null
+        };
+    }
 
     private IWorkspaceStore? CreateWorkspaceStore() => config.Persistence.Provider switch
     {

@@ -79,13 +79,18 @@ public class TokenUsageTrackerTests
         Assert.Equal(4.00m, tracker.GetEstimatedCost());
     }
 
-    /// <summary>An unknown model yields zero cost rather than throwing.</summary>
+    /// <summary>
+    /// An unknown model adds nothing to the cost and does not throw, and from REQ-RAG-164 it is marked
+    /// "price not known" rather than read as free.
+    /// </summary>
     [Fact]
-    public void UnknownModelCostsZero()
+    public void UnknownModelAddsNoCostAndIsMarkedUnpriced()
     {
         var tracker = new TokenUsageTracker();
-        tracker.RecordUsage(new TokenUsage { ModelName = "totally-unknown", InputTokens = 1000, OutputTokens = 1000 });
+        var usage = new TokenUsage { ModelName = "totally-unknown", InputTokens = 1000, OutputTokens = 1000 };
+        tracker.RecordUsage(usage);
         Assert.Equal(0m, tracker.GetEstimatedCost());
+        Assert.False(usage.IsPriceKnown);
     }
 
     /// <summary>

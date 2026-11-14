@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-11-08</div>
+    <div class="sub">Last rendered: 2026-11-13</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -167,6 +167,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#codex-agent">Codex agent</a></li>
         <li class="h3"><a href="#one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)</a></li>
         <li class="h3"><a href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)</a></li>
+        <li class="h3"><a href="#one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)</a></li>
+        <li class="h3"><a href="#postgresql-search-returns-every-chunk-req-rag-161">PostgreSQL search returns every chunk (REQ-RAG-161)</a></li>
+        <li class="h3"><a href="#token-usage-by-day-and-by-month-req-rag-162">Token usage by day and by month (REQ-RAG-162)</a></li>
+        <li class="h3"><a href="#embedded-model-downloaded-flag-and-folder-req-rag-163">Embedded model: downloaded flag and folder (REQ-RAG-163)</a></li>
+        <li class="h3"><a href="#claude-prices-and-price-not-known-req-rag-164">Claude prices and &quot;price not known&quot; (REQ-RAG-164)</a></li>
         <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
@@ -207,7 +212,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-11-08 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-11-13 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -270,6 +275,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#codex-agent">Codex agent</a></li>
         <li class="h3"><a href="#one-postgresql-database-for-everything-req-rag-152">One PostgreSQL database for everything (REQ-RAG-152)</a></li>
         <li class="h3"><a href="#host-data-skill-req-rag-153-and-change-records-with-undo-req-rag-154">Host data skill (REQ-RAG-153) and change records with Undo (REQ-RAG-154)</a></li>
+        <li class="h3"><a href="#one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)</a></li>
+        <li class="h3"><a href="#postgresql-search-returns-every-chunk-req-rag-161">PostgreSQL search returns every chunk (REQ-RAG-161)</a></li>
+        <li class="h3"><a href="#token-usage-by-day-and-by-month-req-rag-162">Token usage by day and by month (REQ-RAG-162)</a></li>
+        <li class="h3"><a href="#embedded-model-downloaded-flag-and-folder-req-rag-163">Embedded model: downloaded flag and folder (REQ-RAG-163)</a></li>
+        <li class="h3"><a href="#claude-prices-and-price-not-known-req-rag-164">Claude prices and &quot;price not known&quot; (REQ-RAG-164)</a></li>
         <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
@@ -1709,7 +1719,105 @@ HostDataChange reversal = await skill.UndoAsync(change);                     // 
 </li>
 <li>The delete tool has <code>RequiresConfirmation = true</code> by default (<code>HostDataSkillOptions.DeleteRequiresConfirmation</code>).
 </li>
+<li>Each entity is described ONCE (REQ-RAG-160, Sevak TR-RAG-061): its description, its fields and, when it offers only some operations, <code>Can: list, read.</code> are written in the first tool's description (<code>host_data_list</code> when any entity offers list); the other four say "The entities and their fields are listed on host_data_list." Fifteen entities with 2 to 9 fields are about 7,100 characters of tool definitions, and a 4,096-token local model (Qwen 2.5 0.5B) has room for them. Before 1.1.10 every tool repeated every entity.
+</li>
+<li>Offer only the entities a turn needs, so a small model's prompt stays short: <code>skill.BeginTurn(turnId, ["task", "project"])</code> or <code>skill.OfferEntities(["task", "project"])</code>; <code>OfferEntities(null)</code> offers all again. Read <code>ToolDefinitions</code> after the call: the tools and their <code>entity</code> enums then name only those entities, and a call naming another is refused with <code>HostDataEntityNotOffered</code>. <code>OfferedEntities</code> lists them. A name that is not registered throws <code>ArgumentException</code>. <code>UndoAsync</code> still reaches every registered entity.
+</li>
 </ul>
+<pre><code class="language-csharp">skill.BeginTurn(turnId, router.EntitiesFor(userText));   // e.g. ["task", "project"] for "move my bank task to Friday"
+var answer = await new AgentLoopRunner(localLlm, skill).RunAsync(messages);</code></pre>
+<h3 id="one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)<a class="anchor-link" href="#one-option-set-for-every-provider-req-rag-158-and-tool-requests-written-as-text-req-rag-159">#</a></h3>
+<p><strong>Sampling options on Claude models (REQ-RAG-158, Sevak TR-RAG-063).</strong> Claude Fable and Mythos, Claude Opus 4.7 and later, and every Claude model of generation 5 (<code>claude-sonnet-5-5</code>, <code>claude-opus-5-5</code>, <code>claude-haiku-5-5</code>, …) answer <code>temperature</code>, <code>top_p</code> or <code>top_k</code> with HTTP 400 ("temperature is deprecated for this model"). <code>AnthropicLlmProvider</code> leaves <code>Temperature</code> and <code>TopP</code> out of the request for those models and still sends them to Claude Opus 4.6, Sonnet 4.6, Haiku 4.5, older models and non-Claude models behind an Anthropic-compatible endpoint. A model the rule does not know that refuses one anyway gets the call sent again once without them, and is remembered for the rest of the process. So a host passes one <code>LlmCompletionOptions</code> to every provider:</p>
+<pre><code class="language-csharp">var claude = new AnthropicLlmProvider(apiKey, "claude-sonnet-5-5");
+var reply = await claude.ChatAsync(messages, new LlmCompletionOptions { Temperature = 0.3f });   // temperature not sent; no 400</code></pre>
+<p><strong>Tool requests a model writes as text (REQ-RAG-159, Sevak TR-RAG-062).</strong> Small local models (Phi-3 mini, Qwen 2.5 0.5B) often write the tool request in the answer instead of as a structured call. <code>AgentLoopRunner</code> (<code>RunAsync</code> and <code>RunStreamAsync</code>) reads three forms when they name one of the loop's tools: a bare JSON object <code>{"name": "rag-search", "arguments": {"query": "…"}}</code>, the same in a code fence, and <code>&lt;tool_call&gt;…&lt;/tool_call&gt;</code> tags (several per turn). <code>{"tool_calls": [...]}</code>, an array, the OpenAI <code>{"function": {...}}</code> shape, <code>parameters</code> for <code>arguments</code> and arguments written as a JSON string are read too. The request runs through the loop's own <code>IToolHandler</code> (so <code>GuardedToolHandler</code>, the egress gate and every guardrail apply) and counts against <code>maxIterations</code>, exactly as a structured call; its result is fed back and the request text is never the final answer. JSON naming no offered tool stays the answer. While streaming, text that starts like a request (<code>{</code>, <code>[</code>, a fence or <code>&lt;tool_call&gt;</code>) is held back until the turn ends, then either run as a call or sent as one text delta.</p>
+<pre><code class="language-csharp">var answer = await new AgentLoopRunner(new LocalLlmProvider(LocalModel.Phi3Mini4kInstruct), tools).RunAsync(messages);
+// The model wrote {"name": "rag-search", ...}; the loop ran rag-search and answer.Content is the model's next reply.</code></pre>
+<h3 id="postgresql-search-returns-every-chunk-req-rag-161">PostgreSQL search returns every chunk (REQ-RAG-161)<a class="anchor-link" href="#postgresql-search-returns-every-chunk-req-rag-161">#</a></h3>
+<p><strong>Sevak TR-RAG-060.</strong> Before 1.1.10 <code>PgVectorStore.InitializeAsync</code> built an IVFFlat index on the empty <code>Chunks</code> table. IVFFlat trains its lists from the rows present when it is built, so with <code>ivfflat.probes = 1</code> a search over N chunks returned some, one or none of them. From 1.1.10:</p>
+<ul>
+<li>The index is HNSW (<code>CREATE INDEX IdxChunksEmbedding ON Chunks USING hnsw (Embedding vector_cosine_ops)</code>), which needs no training. On start-up an existing IVFFlat <code>IdxChunksEmbedding</code> is dropped and rebuilt as HNSW, with a logged warning.
+</li>
+<li>Each search runs in its own transaction with <code>SET LOCAL hnsw.ef_search = topK</code> (at least 40, at most 1,000) and, on pgvector 0.8.0 or later, <code>SET LOCAL hnsw.iterative_scan = strict_order</code>, so a search with topK of N or more returns all N in cosine order, with or without a document filter.
+</li>
+<li>On pgvector before 0.8.0 a filtered search, or one for more than 1,000 results, is answered by an exact scan. When HNSW cannot be built (pgvector before 0.5.0, or a vector wider than 2,000 dimensions) the store has no vector index and every search is exact.
+</li>
+</ul>
+<p>A host that set <code>Options=-c ivfflat.probes=…</code> on its connection string can remove it; it does no harm if kept.</p>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder().UseEmbedded().UsePostgres(connectionString).Build();
+await rag.InitializeAsync();                       // an older IVFFlat index is replaced by HNSW here, once
+await rag.IngestTextAsync("The ledger closes on Friday.", "ledger.txt");
+await rag.IngestTextAsync("The van is serviced in March.", "van.txt");
+var results = await rag.SearchAsync("When is the van serviced?", topK: 2);   // both chunks, every time</code></pre>
+<h3 id="token-usage-by-day-and-by-month-req-rag-162">Token usage by day and by month (REQ-RAG-162)<a class="anchor-link" href="#token-usage-by-day-and-by-month-req-rag-162">#</a></h3>
+<p><strong>Sevak TR-RAG-059.</strong> <code>ITokenTracker</code> kept the session only. From 1.1.10 every usage can also go to a durable <code>ITokenUsageLog</code>, and the tracker answers ranges:</p>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseSqliteVec()
+    .WithPersistence(StoreProvider.Sqlite)          // also keeps usage in TrTokenUsage (UsageTracking.PersistUsage, default true)
+    .Build();
+
+var tracker = rag.GetTokenTracker();
+var today = DateOnly.FromDateTime(DateTime.Now);
+var india = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+var spentToday = tracker.GetUsageByDay(today, today, india)[today].TotalEstimatedCostUsd;
+var spentThisMonth = tracker.GetUsageByMonth(today, today, india)[new DateOnly(today.Year, today.Month, 1)].TotalEstimatedCostUsd;
+var lastHour = tracker.GetUsageBetween(DateTime.UtcNow.AddHours(-1), DateTime.UtcNow);</code></pre>
+<ul>
+<li><code>GetUsageBetween(fromUtc, toUtc)</code>: half-open UTC range. <code>GetUsageByDay(firstDay, lastDay, timeZone)</code> and <code>GetUsageByMonth(firstDay, lastDay, timeZone)</code>: one entry per day (or per month, keyed by its first day), empty ones at zero; <code>timeZone</code> null means this machine's.
+</li>
+<li>With a log the ranges include usage from before a restart; without one, only this session's.
+</li>
+<li>Built-in logs: <code>SqliteTokenUsageLog(connectionString)</code>, <code>PostgresTokenUsageLog(connectionString)</code> (table <code>TrTokenUsage</code>, created on first use). Any other: implement <code>ITokenUsageLog</code> (<code>Append</code>, <code>Read</code>) and pass it with <code>WithTokenUsageLog(log)</code>. Writes are synchronous on purpose, so a UI thread never waits on an asynchronous write.
+</li>
+<li>A log write that fails raises <code>TokenUsageTracker.OnUsageLogFailed</code>; the model call is not failed and the usage still counts in the session.
+</li>
+<li>A custom <code>ITokenTracker</code> gets the three methods as default members that throw <code>NotSupportedException</code>.
+</li>
+</ul>
+<h3 id="embedded-model-downloaded-flag-and-folder-req-rag-163">Embedded model: downloaded flag and folder (REQ-RAG-163)<a class="anchor-link" href="#embedded-model-downloaded-flag-and-folder-req-rag-163">#</a></h3>
+<p><strong>AstroLyfe TR-RAG-001.</strong> <code>EmbeddedEmbeddingProvider.IsModelDownloaded()</code> said false, and <code>GetModelDirectory()</code> named an empty folder, while the model ran from another folder. From 1.1.10 both answer for the folder the model runs from:</p>
+<ul>
+<li><code>IsModelDownloaded()</code> is true when the default model is complete under the model root, complete in an older version's folder next to the assembly, or loaded by a provider in this process from any folder (including <code>new EmbeddedEmbeddingProvider(folder)</code>), as long as that folder still holds the model file.
+</li>
+<li><code>GetModelDirectory()</code> returns the folder a provider loaded the model from, else the folder one would load it from now. The folder a download writes to is <code>EmbeddedModel.GetModelDirectory()</code>; <code>EmbeddedModel.GetLoadDirectory()</code> is the per-model form of the new rule.
+</li>
+<li>New on the provider: <code>ModelDirectory</code> (the folder this provider loaded from, null before) and <code>IsLoaded</code>.
+</li>
+</ul>
+<pre><code class="language-csharp">using var embedder = new EmbeddedEmbeddingProvider("/srv/models/bge-m3");
+await embedder.EmbedAsync("warm-up");
+var health = new { Downloaded = EmbeddedEmbeddingProvider.IsModelDownloaded(), Folder = embedder.ModelDirectory }; // true, /srv/models/bge-m3</code></pre>
+<h3 id="claude-prices-and-price-not-known-req-rag-164">Claude prices and "price not known" (REQ-RAG-164)<a class="anchor-link" href="#claude-prices-and-price-not-known-req-rag-164">#</a></h3>
+<p><strong>Sevak TR-RAG-064.</strong> The built-in price table had no current Claude model, and a model it did not know cost $0, so a host's spend read $0.00 and a cost budget never warned. From 1.1.10 the table carries Anthropic's list prices per million input and output tokens, read on 2026-11-13 from https://platform.claude.com/docs/en/about-claude/pricing:</p>
+<table>
+<thead><tr><th>Model id</th><th>Input</th><th>Output</th></tr></thead>
+<tbody>
+<tr><td><code>claude-fable-5-2</code>, <code>claude-mythos-5-2</code></td><td>$8</td><td>$40</td></tr>
+<tr><td><code>claude-fable-5-1</code>, <code>claude-mythos-5-1</code>, <code>claude-fable-5</code>, <code>claude-mythos-5</code></td><td>$10</td><td>$50</td></tr>
+<tr><td><code>claude-opus-5-5</code></td><td>$4</td><td>$20</td></tr>
+<tr><td><code>claude-opus-5</code>, <code>claude-opus-4-8</code>, <code>claude-opus-4-7</code>, <code>claude-opus-4-6</code>, <code>claude-opus-4-5</code></td><td>$5</td><td>$25</td></tr>
+<tr><td><code>claude-opus-4-1</code>, <code>claude-opus-4</code> (retired except on Bedrock and Google Cloud)</td><td>$15</td><td>$75</td></tr>
+<tr><td><code>claude-sonnet-5-5</code>, <code>claude-sonnet-5</code></td><td>$2</td><td>$10</td></tr>
+<tr><td><code>claude-sonnet-4-6</code>, <code>claude-sonnet-4-5</code>, <code>claude-sonnet-4</code></td><td>$3</td><td>$15</td></tr>
+<tr><td><code>claude-haiku-5-5</code> (prompt up to 100,000 tokens / above)</td><td>$0.10 / $0.50</td><td>$0.50 / $2.50</td></tr>
+<tr><td><code>claude-haiku-4-5</code></td><td>$1</td><td>$5</td></tr>
+</tbody>
+</table>
+<ul>
+<li>A key prices the plain id, a dated id (<code>claude-opus-4-5-20251101</code>), a Vertex id (<code>claude-haiku-4-5@20251001</code>) and a Bedrock id (<code>us.anthropic.claude-sonnet-4-5-20250929-v1:0</code>). It never prices another version: <code>claude-opus-5</code> does not price <code>claude-opus-5-7</code>, which stays "price not known" until it is added. The longest fitting key wins.
+</li>
+<li>Claude Haiku 5.5's prompt length counts input, cache read and cache write tokens. Cache reads and writes themselves are not priced by the table.
+</li>
+<li><strong>Telling "price not known" from $0:</strong> <code>TokenUsage.IsPriceKnown</code> is false (a known price that came to $0 stays true); <code>TokenUsageSummary.UnpricedOperationCount</code>, <code>UnpricedTokens</code> and <code>UnpricedModels</code> count them apart from <code>TotalEstimatedCostUsd</code>, and <code>IsCostComplete</code> is false; <code>BudgetStatus.IsCostIncomplete</code> is true; <code>TokenUsageTracker.OnPriceNotKnown</code> fires for each one; <code>TryGetPricing(model, out pricing)</code> asks before a call. The usage log keeps the mark.
+</li>
+</ul>
+<pre><code class="language-csharp">var tracker = (TokenUsageTracker)rag.GetTokenTracker();
+tracker.OnPriceNotKnown += (_, usage) =&gt; logger.LogWarning("No price for {Model}; add it with SetModelPricing", usage.ModelName);
+var today = tracker.GetUsageByDay(day, day)[day];
+var label = today.IsCostComplete
+    ? $"${today.TotalEstimatedCostUsd:F2} today"
+    : $"${today.TotalEstimatedCostUsd:F2} today + {today.UnpricedTokens:N0} tokens with no price";
+tracker.SetModelPricing("claude-opus-5-7", 4m, 20m);   // a model the table does not know yet</code></pre>
 <h3 id="image-generation-req-rag-155">Image generation (REQ-RAG-155)<a class="anchor-link" href="#image-generation-req-rag-155">#</a></h3>
 <p>Namespaces: the providers and <code>ImageGenerationProviderFactory</code> are in <code>TechieRag.ImageGeneration</code>, the interface in <code>TechieRag.Abstractions</code>, and <code>ImageSize</code>, <code>GeneratedImage</code>, <code>ImageGenerationOptions</code> and <code>ImageGenerationUsage</code> in <code>TechieRag.Models</code>. <code>IImageGenerationProvider.GenerateImageAsync(prompt, ImageSize size, ImageGenerationOptions? options)</code> returns <code>GeneratedImage(Bytes, MediaType, Size, Usage)</code>. <code>MediaType</code> and <code>Size</code> are read from the image bytes, so you can see when a service sent something other than what you asked for. Routes work like chat routes:</p>
 <pre><code class="language-csharp">var images = ImageGenerationProviderFactory.CreateForModel("openai/gpt-image-1", apiKey);   // also "gemini/...", "venice/..."
@@ -1914,6 +2022,7 @@ Task&lt;ConnectorIngestionResult&gt; IngestConnectorAsync(IDataConnector connect
     public int CacheReadTokens { get; set; }
     public int CacheWriteTokens { get; set; }
     public decimal EstimatedCostUsd { get; set; }
+    public bool IsPriceKnown { get; set; }            // false: no price for the model, cost 0 is NOT "free" (1.1.10)
     public string ModelName { get; set; }
     public string ProviderName { get; set; }
     public DateTime Timestamp { get; set; }
@@ -1926,8 +2035,12 @@ public class TokenUsageSummary
     public long TotalTokens { get; }
     public long TotalReasoningTokens { get; set; }
     public long TotalCompletionTokens { get; }        // output minus reasoning
-    public decimal TotalEstimatedCostUsd { get; set; }
+    public decimal TotalEstimatedCostUsd { get; set; } // priced operations only
     public int OperationCount { get; set; }
+    public int UnpricedOperationCount { get; set; }   // 1.1.10: operations with no known price
+    public long UnpricedTokens { get; set; }
+    public IReadOnlyList&lt;string&gt; UnpricedModels { get; set; }
+    public bool IsCostComplete { get; }               // UnpricedOperationCount == 0
 }
 
 public class UsageBudget

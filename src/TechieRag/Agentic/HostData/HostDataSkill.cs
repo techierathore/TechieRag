@@ -28,7 +28,11 @@ namespace TechieRag.Agentic.HostData;
 /// entity's <see cref="HostEntityField"/>s (known name, value type, choice, required on create) first; a
 /// mismatch goes back to the model as a failed tool result it can correct, with a
 /// <see cref="HostDataMessageCodes"/> code for the person reading the trace.</para>
-/// <para><b>Turns.</b> Call <see cref="BeginTurn"/> with the host's turn id at the start of each user turn; each
+/// <para><b>Each entity is described once</b> (REQ-RAG-160, Sevak TR-RAG-061): its description and fields are written in
+/// the first tool's description only, and the other tools refer to it, so fifteen entities fit a small local model's
+/// context. A host can offer only the entities a turn needs with <see cref="OfferEntities"/> or
+/// <see cref="BeginTurn(string?, IEnumerable{string}?)"/>; the tools then name only those, and a call naming another is refused.</para>
+/// <para><b>Turns.</b> Call <see cref="BeginTurn(string?)"/> with the host's turn id at the start of each user turn; each
 /// change carries it, and <see cref="TurnChanges"/> lists the changes since. Thread-safe: a model may issue
 /// parallel tool calls.</para>
 /// </remarks>
@@ -48,6 +52,7 @@ public sealed partial class HostDataSkill : IToolHandler
     private readonly object gate = new();
     private readonly List<HostDataChange> turnChanges = [];
     private IReadOnlyList<ToolDefinition>? definitions;
+    private HashSet<string>? offered;
     private string? turnId;
 
     /// <summary>Initializes a new instance of the <see cref="HostDataSkill"/> class.</summary>
@@ -82,7 +87,7 @@ public sealed partial class HostDataSkill : IToolHandler
         }
     }
 
-    /// <summary>Gets the changes made since the last <see cref="BeginTurn"/>, oldest first.</summary>
+    /// <summary>Gets the changes made since the last <see cref="BeginTurn(string?)"/>, oldest first.</summary>
     public IReadOnlyList<HostDataChange> TurnChanges
     {
         get
@@ -132,6 +137,7 @@ public sealed partial class HostDataSkill : IToolHandler
     }
 
     /// <summary>Starts a user turn: later changes carry <paramref name="turnId"/> and <see cref="TurnChanges"/> is cleared.</summary>
+    /// <remarks>The entities offered stay as the last <see cref="OfferEntities"/> set them.</remarks>
     /// <param name="turnId">The host's id for the turn; null for none.</param>
     public void BeginTurn(string? turnId)
     {
@@ -139,6 +145,67 @@ public sealed partial class HostDataSkill : IToolHandler
         {
             this.turnId = turnId;
             turnChanges.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Starts a user turn that offers only some entities (REQ-RAG-160): later changes carry <paramref name="turnId"/>,
+    /// <see cref="TurnChanges"/> is cleared, and the tools name only <paramref name="entityNames"/>.
+    /// </summary>
+    /// <param name="turnId">The host's id for the turn; null for none.</param>
+    /// <param name="entityNames">The entities to offer this turn; null offers every registered entity.</param>
+    /// <exception cref="ArgumentException">A name is not a registered entity.</exception>
+    public void BeginTurn(string? turnId, IEnumerable<string>? entityNames)
+    {
+        OfferEntities(entityNames);
+        BeginTurn(turnId);
+    }
+
+    /// <summary>
+    /// Offers only the named entities from now on (REQ-RAG-160, Sevak TR-RAG-061): <see cref="ToolDefinitions"/> name
+    /// only these, and a tool call naming another entity is refused with <see cref="HostDataMessageCodes.EntityNotOffered"/>.
+    /// A host picks the entities a turn needs so a small model's prompt stays short. <see cref="UndoAsync"/> still
+    /// reaches every registered entity.
+    /// </summary>
+    /// <remarks>Read <see cref="ToolDefinitions"/> again after calling this: the set it returns changes.</remarks>
+    /// <param name="entityNames">The entities to offer; null offers every registered entity again.</param>
+    /// <returns>This skill, for chaining.</returns>
+    /// <exception cref="ArgumentException">A name is not a registered entity.</exception>
+    public HostDataSkill OfferEntities(IEnumerable<string>? entityNames)
+    {
+        lock (gate)
+        {
+            HashSet<string>? chosen = null;
+            if (entityNames is not null)
+            {
+                chosen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var name in entityNames)
+                {
+                    if (name is null || !entities.ContainsKey(name))
+                    {
+                        throw new ArgumentException($"No entity named '{name}' is registered.", nameof(entityNames));
+                    }
+
+                    chosen.Add(name);
+                }
+            }
+
+            offered = chosen;
+            definitions = null;
+        }
+
+        return this;
+    }
+
+    /// <summary>Gets the entities the tools offer now, in registration order: all of them unless <see cref="OfferEntities"/> narrowed them.</summary>
+    public IReadOnlyList<IHostEntity> OfferedEntities
+    {
+        get
+        {
+            lock (gate)
+            {
+                return Offered().ToArray();
+            }
         }
     }
 
@@ -168,16 +235,25 @@ public sealed partial class HostDataSkill : IToolHandler
 
         var entityName = (arguments["entity"] as JsonValue)?.TryGetValue<string>(out var named) == true ? named : null;
         IHostEntity? entity;
+        bool isOffered;
         lock (gate)
         {
             entity = entityName is null ? null : entities.GetValueOrDefault(entityName);
+            isOffered = entity is not null && (offered is null || offered.Contains(entity.Name));
         }
 
         if (entity is null)
         {
             return Failure(toolCall,
-                $"error: unknown entity '{entityName}'. Known entities: {string.Join(", ", Entities.Select(e => e.Name))}.",
+                $"error: unknown entity '{entityName}'. Known entities: {string.Join(", ", OfferedEntities.Select(e => e.Name))}.",
                 FlowMessage.Create(HostDataMessageCodes.UnknownEntity, "No entity named '{0}' is registered.", entityName ?? string.Empty));
+        }
+
+        if (!isOffered)
+        {
+            return Failure(toolCall,
+                $"error: the '{entity.Name}' entity is not available now. Available entities: {string.Join(", ", OfferedEntities.Select(e => e.Name))}.",
+                FlowMessage.Create(HostDataMessageCodes.EntityNotOffered, "The '{0}' entity is not offered in this turn.", entity.Name));
         }
 
         if (!entity.Operations.HasFlag(operation))
@@ -547,6 +623,8 @@ public sealed partial class HostDataSkill : IToolHandler
     {
         var list = new List<ToolDefinition>();
         var prefix = options.ToolPrefix;
+        var active = Offered().ToArray();
+        string? catalogueTool = null;
 
         Add(HostEntityOperations.List, ListSuffix,
             "Lists or finds records of the user's own data in this app. Use it before reading, changing or deleting a record whose id you do not know.",
@@ -575,31 +653,56 @@ public sealed partial class HostDataSkill : IToolHandler
 
         return list;
 
+        // Every entity and its fields are written once, in the first tool's description; the other tools refer to
+        // it. Repeating them in all five tools made 15 entities 7,805 tokens, past a 4,096-token local model
+        // (REQ-RAG-160, Sevak TR-RAG-061).
         void Add(HostEntityOperations operation, string suffix, string purpose, Func<string[], string> schema, bool confirm = false)
         {
-            var offering = ordered.Where(entity => entity.Operations.HasFlag(operation)).ToArray();
+            var offering = active.Where(entity => entity.Operations.HasFlag(operation)).ToArray();
             if (offering.Length == 0)
             {
                 return;
             }
 
+            string description;
+            if (catalogueTool is null)
+            {
+                catalogueTool = prefix + suffix;
+                description = purpose + " The user's data in this app holds these entities (the same for every " + prefix
+                    + " tool):" + Environment.NewLine + Describe(active);
+            }
+            else
+            {
+                description = purpose + " The entities and their fields are listed on " + catalogueTool + ".";
+            }
+
             list.Add(new ToolDefinition
             {
                 Name = prefix + suffix,
-                Description = purpose + " Entities:" + Environment.NewLine + Describe(offering),
+                Description = description,
                 ParametersSchema = schema(offering.Select(entity => entity.Name).ToArray()),
                 RequiresConfirmation = confirm
             });
         }
     }
 
-    /// <summary>Describes entities and their fields for a tool description.</summary>
+    /// <summary>The entities offered now, in registration order. Call under <see cref="gate"/>.</summary>
+    private IEnumerable<IHostEntity> Offered() =>
+        offered is null ? ordered : ordered.Where(entity => offered.Contains(entity.Name));
+
+    /// <summary>Describes entities and their fields once, for the first tool's description.</summary>
     private static string Describe(IEnumerable<IHostEntity> offering)
     {
         var text = new StringBuilder();
         foreach (var entity in offering)
         {
-            text.Append("- ").Append(entity.Name).Append(": ").Append(entity.Description.Trim()).Append(" Fields: ");
+            text.Append("- ").Append(entity.Name).Append(": ").Append(entity.Description.Trim());
+            if (entity.Operations != AllOperations)
+            {
+                text.Append(" Can: ").AppendJoin(", ", OperationNames(entity.Operations)).Append('.');
+            }
+
+            text.Append(" Fields: ");
             text.AppendJoin("; ", entity.Fields.Select(field =>
                 $"{field.Name} ({TypeText(field)}{(field.Required ? ", required" : string.Empty)}) {field.Description.Trim()}".TrimEnd()));
             text.AppendLine(".");
@@ -607,6 +710,16 @@ public sealed partial class HostDataSkill : IToolHandler
 
         return text.ToString().TrimEnd();
     }
+
+    /// <summary>Every operation an entity can offer.</summary>
+    private const HostEntityOperations AllOperations =
+        HostEntityOperations.List | HostEntityOperations.Read | HostEntityOperations.Create | HostEntityOperations.Update | HostEntityOperations.Delete;
+
+    /// <summary>The operations an entity offers, as the model reads them.</summary>
+    private static IEnumerable<string> OperationNames(HostEntityOperations operations) =>
+        new[] { HostEntityOperations.List, HostEntityOperations.Read, HostEntityOperations.Create, HostEntityOperations.Update, HostEntityOperations.Delete }
+            .Where(operation => operations.HasFlag(operation))
+            .Select(operation => operation.ToString().ToLowerInvariant());
 
     /// <summary>The type of a field as the model reads it.</summary>
     private static string TypeText(HostEntityField field) => field.Type switch
@@ -650,7 +763,7 @@ public sealed partial class HostDataSkill : IToolHandler
     private static JsonObject IdProperty() => new() { ["type"] = "string", ["description"] = "The record's id, as a list or read returned it." };
 
     /// <summary>The <c>fields</c> property schema.</summary>
-    private static JsonObject FieldsProperty(string description) => new() { ["type"] = "object", ["description"] = description + " Field names and types are listed per entity above." };
+    private static JsonObject FieldsProperty(string description) => new() { ["type"] = "object", ["description"] = description + " Field names and types are listed per entity." };
 
     /// <summary>Maps a tool name to its operation.</summary>
     private HostEntityOperations OperationOf(string toolName)

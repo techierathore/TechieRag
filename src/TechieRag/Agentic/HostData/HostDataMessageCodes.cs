@@ -10,6 +10,9 @@ public static class HostDataMessageCodes
     /// <summary>No entity of that name is registered. <c>{0}</c> entity name.</summary>
     public const string UnknownEntity = "HostDataUnknownEntity";
 
+    /// <summary>The entity is registered but the host did not offer it for this turn (REQ-RAG-160). <c>{0}</c> entity name.</summary>
+    public const string EntityNotOffered = "HostDataEntityNotOffered";
+
     /// <summary>The entity does not offer that operation. <c>{0}</c> entity name, <c>{1}</c> operation.</summary>
     public const string OperationNotOffered = "HostDataOperationNotOffered";
 

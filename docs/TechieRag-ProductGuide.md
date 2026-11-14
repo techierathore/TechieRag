@@ -82,6 +82,7 @@ Tips: Name the fields in your prompt exactly as they are named in the class, and
 4. Add a fallback with `WithFallbackLlm(f => f.Source = LlmSource.Ollama)`. When the primary provider fails after its retries, the same request is answered by the fallback and your code never notices.
 5. Handle rate limits with `WithResilience`. Transient failures are retried with growing delays; a "too many requests" reply that names a wait time is honoured exactly; after five failures in a row the provider is paused for a recovery window so your app fails fast instead of hanging.
 6. Switch without a code change: alter the model settings in your configuration section and rebuild.
+7. Keep one set of options for every model. Newer Claude models (Sonnet 5.5, Opus 5.5, Fable) refuse a temperature setting; TechieRag leaves it out for them and still sends it to models that take it, so the same options work everywhere (from 1.1.10).
 
 ![Choose or switch a language model](screenshots/TechieRag/llm-settings.png)
 
@@ -122,7 +123,7 @@ A tool is a small function you own that the model may call on its own initiative
 
 ![Give the model tools and let it act](screenshots/TechieRag/tool-demo.png)
 
-**Tips.** Pick a model that supports tool calling; one that does not will answer in prose and never call anything. Keep tool names short and descriptions honest, because the model chooses from the description alone.
+**Tips.** Pick a model that supports tool calling; one that does not will answer in prose and never call anything. Small local models such as Phi-3 mini sometimes write their tool request as plain text instead of calling the tool; from 1.1.10 the loop recognises that and runs the tool anyway. When you give the model your own app's data through `HostDataSkill`, offer only the kinds of records a turn needs with `BeginTurn(turnId, ["task", "project"])`, so a small model's prompt stays short. Keep tool names short and descriptions honest, because the model chooses from the description alone.
 
 ### Use the Microsoft Agent Framework with your documents
 

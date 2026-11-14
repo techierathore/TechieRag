@@ -30,7 +30,7 @@ public sealed record HostDataChange
     /// <summary>Gets the record as it is after the change; null for <see cref="HostDataChangeKind.Deleted"/>.</summary>
     public HostEntityRecord? After { get; init; }
 
-    /// <summary>Gets the turn that caused the change (<see cref="HostDataSkill.BeginTurn"/>); null for an undo.</summary>
+    /// <summary>Gets the turn that caused the change (<see cref="HostDataSkill.BeginTurn(string?)"/>); null for an undo.</summary>
     public string? TurnId { get; init; }
 
     /// <summary>Gets the model's tool call that made the change; null for an undo.</summary>

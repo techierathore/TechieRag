@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Selects the Xcode that the installed .NET for iOS or Mac Catalyst SDK asks for (REQ-FN-057).
+# Selects the Xcode that the installed .NET for iOS or Mac Catalyst SDK asks for (REQ-FN-057), as the
+# SDK pack's own Versions.plist names it (RecommendedXcodeVersion).
 #
 # .NET for iOS 26.5 refuses to build under any other Xcode major.minor (error E0191, "requires
 # Xcode 26.5"), so "select the newest Xcode" is wrong whenever the runner is ahead or behind: the
@@ -24,11 +25,23 @@ esac
 major_minor() { awk -F. '{ printf "%s.%s", $1, ($2 == "" ? 0 : $2) }' <<< "$1"; }
 
 DOTNET_ROOT_DIR="$(dirname "$(dirname "$(dotnet --info | sed -n 's/^ *Base Path: *//p' | head -1)")")"
-WANT="$(ls -d "$DOTNET_ROOT_DIR"/packs/"$PACK".net10.0_* 2>/dev/null | sed 's/.*_//' | sort -V | tail -1)"
-if [[ -z "$WANT" ]]; then
+PACK_DIR="$(ls -d "$DOTNET_ROOT_DIR"/packs/"$PACK".net10.0_* 2>/dev/null | sort -V | tail -1)"
+if [[ -z "$PACK_DIR" ]]; then
   echo "::error::No $PACK pack under $DOTNET_ROOT_DIR/packs; install the workload before selecting Xcode"
   exit 1
 fi
+# The pack's folder names the SDK, not the Xcode it needs: Microsoft.iOS.Sdk.net10.0_26.5 version
+# 26.5.10318 requires Xcode 26.6. The pack's Versions.plist says which (RecommendedXcodeVersion);
+# the folder version is the fallback for a pack without one.
+PLIST="$(ls -d "$PACK_DIR"/*/Versions.plist 2>/dev/null | sort -V | tail -1)"
+WANT=""
+if [[ -n "$PLIST" ]]; then
+  WANT="$(grep -A1 '<key>RecommendedXcodeVersion</key>' "$PLIST" | sed -n 's:.*<string>\(.*\)</string>.*:\1:p' | head -1)"
+fi
+if [[ -z "$WANT" ]]; then
+  WANT="$(basename "$PACK_DIR" | sed 's/.*_//')"
+fi
+WANT="$(major_minor "$WANT")"
 
 CURRENT="$(xcodebuild -version 2>/dev/null | sed -n 's/^Xcode //p')"
 FLAGS=""

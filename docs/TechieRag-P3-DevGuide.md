@@ -6,10 +6,10 @@
 | Kind | library |
 | Size | Small |
 | Phase | 3 of 3 |
-| Verified on | 2026-11-08 |
-| Date | 2026-11-08 |
+| Verified on | 2026-11-13 |
+| Date | 2026-11-13 |
 
-This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Added 2026-11-08: PostgreSQL end to end, the host data skill and image generation (REQ-RAG-152 to REQ-RAG-157). Phase-1 services are in `docs/TechieRag-DevGuide.md`, phase-2 services in `docs/TechieRag-P2-DevGuide.md`.
+This guide maps the eight public surfaces phase 3 changed to the code that serves them, read at file and line on 2026-10-06 and re-read on 2026-10-07 and 2026-10-08: workspace pinning and testing, connector run results, document replace on re-ingest, the tool registry, storage defaults, flow step names and model use, the local model fit check, and model routing (REQ-RAG-114 to REQ-RAG-127, BRD-174 to BRD-187; routing extended 2026-10-11 by REQ-RAG-130 to REQ-RAG-133). Added 2026-11-08: PostgreSQL end to end, the host data skill and image generation (REQ-RAG-152 to REQ-RAG-157). Updated 2026-11-11 for Sevak's 9 November report (TechieRag 1.1.10): the host data skill entry, and a new entry for Claude sampling options and tool requests written as text (REQ-RAG-158 to REQ-RAG-160, whose rows are in the phase-1 checklist); the Anthropic and agent-loop line numbers in other entries were re-read. Updated 2026-11-13 for Sevak's TR-RAG-059 and TR-RAG-060 and AstroLyfe's TR-RAG-001 (still TechieRag 1.1.10): a new entry for the vector index, usage by day and the model folder (REQ-RAG-161 to REQ-RAG-163, rows in the phase-1 checklist), and the PostgreSQL entry re-read. Later the same day: a new entry for Claude prices (REQ-RAG-164, Sevak TR-RAG-064). The other entries' files did not change that day except `TechieRagBuilder.cs`, whose lines moved by one or two; search for the function named. Phase-1 services are in `docs/TechieRag-DevGuide.md`, phase-2 services in `docs/TechieRag-P2-DevGuide.md`.
 
 No sample calls any phase-3 surface: the probe (`samples/TechieRag.Probe`) only embeds, stores, searches and generates. So every entry is `static-only (unconfirmed)` at runtime. What was run on 2026-10-06 is the build (`bash .tfcore/utils/tf-build.sh`: PASS, rung 2, 0 warnings) and each requirement's tests, one filter per id (`~/.dotnet/dotnet test tests/TechieRag.Tests/TechieRag.Tests.csproj --no-build --filter "DisplayName~REQ-RAG-<id>"`): 53 tests, 0 failed. On 2026-10-07 the Sevak fixes (TR-RAG-049 in storage defaults, TR-RAG-047 as the new local model entry) were built and verified: build PASS, every test project run on its own, 0 failed. The other entries' file and line references were re-checked against the code that day and still hold. Each entry gives its counts. The images are the July 2026 screens of the sample application of that time (TechieDesk, now Sevak, in its own repository); they predate phase 3 and show where a host would use the surface, not the change itself. Line numbers are as of "Verified on"; when a line has moved, search for the function named in the same row.
 
@@ -145,7 +145,7 @@ Before phase 3 a second registration replaced the handler but appended a second 
 | `src/TechieRag/Services/ToolRegistry.cs:57` | `Register` | `existing` | −1 on the first registration; the earlier index on a repeat, any case |
 | `src/TechieRag/Services/ToolRegistry.cs:60` | `Register` | `definitions[existing]` | the new description and schema |
 | `src/TechieRag/Services/ToolRegistry.cs:67` | `Register` | `handlers.Count` | unchanged on a repeat (case-insensitive key) |
-| `src/TechieRag/Services/AgentLoopRunner.cs:227` | `BuildToolOptions` | `Tools` | each registered name once |
+| `src/TechieRag/Services/AgentLoopRunner.cs:267` | `BuildToolOptions` | `Tools` | each registered name once |
 | `src/TechieRag/Services/ToolRegistry.cs:90` | `ExecuteToolAsync` | `handler` | the last registered delegate for that name |
 
 **Calculations on this service:** none.
@@ -339,7 +339,7 @@ REQ-RAG-130, REQ-RAG-131, REQ-RAG-132, REQ-RAG-133 (owner report from Lekhak's p
 | `src/TechieRag/Llm/LlmProviderFactory.cs:52` | `Create` | `connector.Endpoint` | non-empty for `openai-compatible` and `anthropic-compatible`, else `InvalidOperationException` |
 | `src/TechieRag/Llm/LlmProviderFactory.cs:89` | `Create` | `connector.RequestBodyFields` | `venice_parameters` for `venice`; null for every other connector |
 | `src/TechieRag/Llm/OpenAICompatibleLlmProvider.cs:386` | `BuildRequest` | `request` | carries `venice_parameters.include_venice_system_prompt: false` for Venice |
-| `src/TechieRag/Llm/AnthropicLlmProvider.cs:74` | constructor | `messagesUri` | `{endpoint}/v1/messages`, path kept |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:80` | constructor | `messagesUri` | `{endpoint}/v1/messages`, path kept |
 | `src/TechieRag/Llm/LlmModelLister.cs:49` | `ListAsync` | `path` | `models` under the `v1/` base for Anthropic-compatible |
 | `src/TechieRag/TechieRagBuilder.cs:1010` | `CreateLlmProviderFromConfig` | `llmConfig.Endpoint` | non-empty for a generic connector, else the same refusal |
 | `src/TechieRag/Llm/LlmConnectorCatalog.cs:268` | `Describe` | the return | every row's `ExampleRoute` resolves to its own `Name` |
@@ -386,13 +386,13 @@ REQ-RAG-139 to REQ-RAG-144 (owner request), added 2026-10-29. Covered by `tests/
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
 | `src/TechieRag/Llm/AnthropicStreamState.cs:131` | `ApplyDelta` | `fragment` | each thinking fragment, never appended to `OutputText` |
-| `src/TechieRag/Llm/AnthropicLlmProvider.cs:352` | `BuildAnthropicRequest` | `thinkingBlocks` | the earlier turn's blocks, `thinking` before `tool_use` |
-| `src/TechieRag/Llm/AnthropicLlmProvider.cs:398` | `BuildAnthropicRequest` | `budget` | null unless `MaxReasoningTokens` or `ReasoningEffort` is set |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:404` | `BuildAnthropicRequest` | `thinkingBlocks` | the earlier turn's blocks, `thinking` before `tool_use` |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:450` | `BuildAnthropicRequest` | `budget` | null unless `MaxReasoningTokens` or `ReasoningEffort` is set |
 | `src/TechieRag/Llm/GoogleGeminiLlmProvider.cs:236` | `ChatStreamEventsAsync` | `thought` | thought text only; `text` never holds it |
 | `src/TechieRag/Llm/OllamaLlmProvider.cs:228` | `ChatStreamEventsAsync` | `chunk.Message.Thinking` | set only when `think` is on |
 | `src/TechieRag.Local/LocalLlmProvider.cs:608` | `StreamCoreAsync` | `rawOutput` | starts at `<tool_call>`, the block removed |
 | `src/TechieRag/Llm/OpenAIResponsesStreamReader.cs:88` | `Apply` | the return | `(delta, true)` |
-| `src/TechieRag/Services/AgentLoopRunner.cs:330` | `ToResponse` | `ProviderState` | the `Completed` event's state |
+| `src/TechieRag/Services/AgentLoopRunner.cs:380` | `ToResponse` | `ProviderState` | the `Completed` event's state |
 
 **Calculations on this service:** Anthropic reports no separate thinking count, so its `ReasoningTokens` is 0; the local count uses the model's tokenizer, capped at the tokens produced.
 
@@ -444,14 +444,14 @@ The small model's failure is not caught: an exception from `ChatAsync` reaches t
 
 REQ-RAG-152 (Sevak TR-RAG-055, added 2026-11-07). Covered by `tests/TechieRag.Tests/VectorStores/Live/LivePostgresEndToEndTests.cs`, `LivePostgresConcurrentStartTests.cs`, `LivePgVectorStoreTests.cs` and `UsePostgresTests.cs`.
 
-**Runtime:** `confirmed`: the live tests ran on 2026-11-08 against PostgreSQL 18 + pgvector started by `tests/TechieRag.Tests/livetests/start-postgres.sh` (port 5551), connection string read from the git-ignored `livetests.settings.json`. 14 passed, none skipped.
+**Runtime:** `confirmed`: the live tests ran on 2026-11-08 against PostgreSQL 18 + pgvector started by `tests/TechieRag.Tests/livetests/start-postgres.sh` (port 5551), connection string read from the git-ignored `livetests.settings.json`. 14 passed, none skipped. Re-run 2026-11-13 on pgvector 0.8.6 with the HNSW index (next entries): every LivePostgres test passed, none skipped.
 
-**Call chain:** `UsePostgres` → `UsePgVector` + `WithPersistence(StoreProvider.Postgres, …)` → `Build()` → `CreatePgVectorStore`, `PostgresConversationStore`, `PostgresWorkspaceStore` on one connection string → `InitializeAsync` → each store takes `PostgresSchemaLock` (advisory lock `0x5465636869655261`) → `CREATE … IF NOT EXISTS` → unlock.
+**Call chain:** `UsePostgres` → `UsePgVector` + `WithPersistence(StoreProvider.Postgres, …)` → `Build()` → `CreatePgVectorStore`, `PostgresConversationStore`, `PostgresWorkspaceStore` (and, from 1.1.10, `PostgresTokenUsageLog`) on one connection string → `InitializeAsync` → each store takes `PostgresSchemaLock` (advisory lock `0x5465636869655261`) → `CREATE … IF NOT EXISTS` → unlock.
 
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
-| `src/TechieRag/TechieRagBuilder.cs:291` | `UsePostgres` | `config.VectorStore.ConnectionString`, `config.Persistence.ConnectionString` | the same string |
-| `src/TechieRag/VectorStores/PgVectorStore.cs:96` | `InitializeAsync` | `schemaLock` | held before `CREATE EXTENSION`; a second store waits here |
+| `src/TechieRag/TechieRagBuilder.cs:292` | `UsePostgres` | `config.VectorStore.ConnectionString`, `config.Persistence.ConnectionString` | the same string |
+| `src/TechieRag/VectorStores/PgVectorStore.cs:146` | `InitializeAsync` | `schemaLock` | held before `CREATE EXTENSION`; a second store waits here |
 | `src/TechieRag/Persistence/PostgresSchemaLock.cs:23` | `AcquireAsync` | the command | `SELECT pg_advisory_lock(…)` returns once no other session holds it |
 | `src/TechieRag/Persistence/RelationalConversationStore.cs:61` | `InitializeAsync` | `schemaLock` | null on SQLite, held on PostgreSQL |
 
@@ -461,21 +461,92 @@ REQ-RAG-152 (Sevak TR-RAG-055, added 2026-11-07). Covered by `tests/TechieRag.Te
 
 ![Sevak's tool demo screen, July 2026: a tool-calling loop the host-data tools join; it predates this change](screenshots/TechieRag/tool-demo.png)
 
-REQ-RAG-153 and REQ-RAG-154 (Sevak TR-RAG-056, TR-RAG-057, added 2026-11-07). Covered by `tests/TechieRag.Tests/Agentic/HostDataSkillTests.cs`.
+REQ-RAG-153 and REQ-RAG-154 (Sevak TR-RAG-056, TR-RAG-057, added 2026-11-07); REQ-RAG-160 (Sevak TR-RAG-061, 2026-11-11). Covered by `tests/TechieRag.Tests/Agentic/HostDataSkillTests.cs`, `HostDataCatalogueTests.cs` and, through `LocalLlmProvider`, `tests/TechieRag.Local.Tests/LocalAgentPromptTests.cs`.
 
-**Runtime:** `static-only (unconfirmed)`: no sample registers an entity. The tests drive the skill through `AgentLoopRunner` with a scripted model and an in-memory task store. Tests run 2026-11-08: 10 passed.
+**Runtime:** `static-only (unconfirmed)`: no sample registers an entity. The tests drive the skill through `AgentLoopRunner` with a scripted model and an in-memory task store. Tests run 2026-11-11: `HostDataSkillTests` 10 passed, `HostDataCatalogueTests` 5 passed, `FifteenEntitiesFitAFourThousandTokenModel` passed (15 entities: 2,458 prompt tokens of 4,096; 7,214 before).
 
-**Call chain:** `Register` → `Validate` (lower-case name, unique fields, update or delete needs read) → `ToolDefinitions` → `BuildDefinitions` (five tools, `entity` enum per tool) → `ExecuteToolAsync` → `OperationOf` → `CheckFields` → the host's handler (update and delete `ReadAsync` first for "before") → `RecordAsync` → `PublishAsync` (awaits `OnChangeAsync`, then raises `ChangeRecorded`). `UndoAsync` → delete, update with `Before.Values`, or create → `PublishAsync` with `UndoOf`.
+**Call chain:** `Register` → `Validate` (lower-case name, unique fields, update or delete needs read) → `OfferEntities` / `BeginTurn(turnId, names)` (optional: `offered`, null for all) → `ToolDefinitions` → `BuildDefinitions` (five tools, `entity` enum per tool over the offered entities; `Describe` writes every offered entity once, into the first tool's description, and the other tools point to it) → `ExecuteToolAsync` → `OperationOf` → `isOffered` (else `HostDataEntityNotOffered`) → `CheckFields` → the host's handler (update and delete `ReadAsync` first for "before") → `RecordAsync` → `PublishAsync` (awaits `OnChangeAsync`, then raises `ChangeRecorded`). `UndoAsync` → delete, update with `Before.Values`, or create → `PublishAsync` with `UndoOf`.
 
 | File and line | Function | Watch | Expected value |
 |---|---|---|---|
-| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:146` | `ExecuteToolAsync` | `operation`, `entity` | the tool's operation; null entity gives `HostDataUnknownEntity` |
-| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:438` | `CheckFields` | the return | null when the fields fit; else the problems sent to the model |
-| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:387` | `RecordAsync` | `change` | entity, id, kind, before, after, `TurnId` from `BeginTurn` |
-| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:423` | `PublishAsync` | `options.OnChangeAsync` | awaited before the tool result goes back |
-| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:223` | `UndoAsync` | `reversal` | the reversing change, `UndoOf` = the original `ChangeId` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:174` | `OfferEntities` | `chosen` | the named entities; an unregistered name throws `ArgumentException` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:670` | `BuildDefinitions` | `catalogueTool` | the first tool built, usually `host_data_list`; it alone carries the entity list |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:213` | `ExecuteToolAsync` | `operation`, `entity` | the tool's operation; null entity gives `HostDataUnknownEntity` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:252` | `ExecuteToolAsync` | `isOffered` | false for an entity outside `OfferEntities`, giving `HostDataEntityNotOffered` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:514` | `CheckFields` | the return | null when the fields fit; else the problems sent to the model |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:463` | `RecordAsync` | `change` | entity, id, kind, before, after, `TurnId` from `BeginTurn` |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:499` | `PublishAsync` | `options.OnChangeAsync` | awaited before the tool result goes back |
+| `src/TechieRag/Agentic/HostData/HostDataSkill.cs:314` | `UndoAsync` | `reversal` | the reversing change, `UndoOf` = the original `ChangeId` |
 
-**Calculations on this service:** a list returns at most `MaxListResults` (default 50) whatever the model asks.
+**Calculations on this service:** a list returns at most `MaxListResults` (default 50) whatever the model asks. The tool definitions grow with the offered entities only once each: 15 entities with 2 to 9 fields are about 7,100 characters (23,527 when every tool repeated them).
+
+### Claude sampling options and tool requests written as text: `AnthropicSamplingSupport`, `TextToolCallReader` (`TechieRag`)
+
+![Sevak's tool demo screen, July 2026: a tool-calling loop like the one both fixes run in; it predates this change](screenshots/TechieRag/tool-demo.png)
+
+REQ-RAG-158 (Sevak TR-RAG-063) and REQ-RAG-159 (Sevak TR-RAG-062), added 2026-11-11; rows in `docs/TechieRag-Checklist.md`. Covered by `tests/TechieRag.Tests/Llm/AnthropicSamplingTests.cs`, `tests/TechieRag.Tests/Services/AgentLoopWrittenToolCallTests.cs`, `LocalModelWrittenRequestIsRun` in `tests/TechieRag.Local.Tests/LocalAgentPromptTests.cs`, and the live `LiveSonnetFiveFiveAnswersWithTemperatureSet` (passed 2026-11-12).
+
+**Runtime:** `static-only (unconfirmed)`: no sample calls Anthropic or runs the agent loop; the probe app booted on this Mac (Mac Catalyst head) on 2026-11-11 with the changed library. Anthropic is a stand-in replying with Sevak's recorded 400 in the unit tests; the live test called the real `claude-sonnet-5-5` on 2026-11-12 and passed. Tests run 2026-11-11 and 2026-11-12: REQ-RAG-158 26 passed (live included), REQ-RAG-159 9 passed.
+
+**Call chains:** `ChatAsync` / `ChatStreamEventsAsync` → `BuildAnthropicRequest` → `AnthropicSamplingSupport.TakesSampling(model)` (false: no `temperature`, `top_p`) → `SendAsync` → `SendOnceAsync` → `LlmHttpGuard.EnsureSuccessAsync` → on a 400 naming a sampling field: `IsSamplingRefusal` → `Learn(model)` → `RemoveSampling` → one more `SendOnceAsync`. Agent loop: `RunAsync` → `ChatAsync` → `ReadWrittenToolCalls` → `TextToolCallReader.Read` (`<tool_call>` blocks, else code fences, else the whole text; only offered tool names) → `ToolCalls` set, `Content` cleared → the usual `ExecuteToolAsync` through the handler. `RunStreamAsync` holds deltas while `MayBeToolCall` is true and flushes them when the turn is not a request.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Llm/AnthropicSamplingSupport.cs:33` | `TakesSampling` | the return | false for Fable, Mythos, Opus 4.7+ and generation 5; true for Opus 4.6, Sonnet 4.6, Haiku 4.5, older and non-Claude names |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:456` | `BuildAnthropicRequest` | `request["temperature"]` | absent for a refusing model, the option's value otherwise |
+| `src/TechieRag/Llm/AnthropicLlmProvider.cs:307` | `SendAsync` | `exception.ProviderMessage` | "temperature is deprecated for this model." on a refusal; one retry follows |
+| `src/TechieRag/Services/AgentLoopRunner.cs:87` | `RunAsync` | `response.ToolCalls` | the written request as calls with `text_` ids; `Content` null |
+| `src/TechieRag/Services/TextToolCallReader.cs:139` | `ReadCall` | `tool` | the offered tool by name, any case; null leaves the text as the answer |
+| `src/TechieRag/Services/AgentLoopRunner.cs:184` | `RunStreamAsync` | `holding` | true while the turn starts with `{`, `[`, a fence or `<tool_call>` |
+
+**Calculations on this service:** the model rule reads `claude-{family}-{major}[-{minor}]` anywhere in the id, so Bedrock prefixes and Vertex `@date` suffixes pass.
+
+### Vector index, usage by day, model folder: `PgVectorStore`, `TokenUsageTracker`, `EmbeddedModel` (`TechieRag`, `TechieRag.Embedded`)
+
+![Sevak's token usage screen, July 2026: where a host shows spend; it predates the by-day and by-month figures](screenshots/TechieRag/token-usage.png)
+
+REQ-RAG-161 (Sevak TR-RAG-060), REQ-RAG-162 (Sevak TR-RAG-059) and REQ-RAG-163 (AstroLyfe TR-RAG-001), added 2026-11-13; rows in `docs/TechieRag-Checklist.md`. Covered by `tests/TechieRag.Tests/VectorStores/Live/LivePgVectorIndexTests.cs`, `VectorStores/PgVectorSearchSettingsTests.cs`, `Services/TokenUsageByDayTests.cs`, `VectorStores/Live/LivePostgresTokenUsageLogTests.cs` and `Embedding/ModelDownloadedFlagTests.cs`.
+
+**Runtime:** `confirmed` through the tests, `static-only (unconfirmed)` in a sample: no sample searches PostgreSQL, reads usage by day or shows the model folder. The live tests ran on 2026-11-13 against PostgreSQL 18 + pgvector 0.8.6 (`techierag-livetests-postgres`, port 5551), and the live bge-m3 test loaded the real weights from `~/.cache/techierag-models/bge-m3`. Before the fix: 2 of 50 chunks returned, 0 of 2 in Sevak's repro, the index read `ivfflat`; the model embedded while `GetModelDirectory()` named the empty root. Tests run 2026-11-13: REQ-RAG-161 18 passed, REQ-RAG-162 8 passed, REQ-RAG-163 3 passed; none skipped.
+
+**Call chains:** Index: `InitializeAsync` → `EnsureVectorIndexAsync` → `ReadVectorIndexMethodAsync` (`pg_am.amname` of `IdxChunksEmbedding`) → `hnsw`: keep; `ivfflat`: warn, `DROP INDEX` → `VectorIndexSql` (HNSW) → `ReadIterativeScanSupportAsync` (`extversion` ≥ 0.8.0). Search: `SearchAsync` / `SearchDocumentsAsync` → `SearchCoreAsync` → `BeginTransactionAsync` → `SearchSettingsSql(topK, iterativeScan, filtered)` (`SET LOCAL hnsw.ef_search`, `hnsw.iterative_scan = strict_order`, or `enable_indexscan = off` on older pgvector) → the `ORDER BY Embedding <=> @QueryVector` query → `ReadResultsAsync` → commit. Usage: `Build()` → `CreateTokenUsageLog` (custom, else `SqliteTokenUsageLog` / `PostgresTokenUsageLog` when persistence is set and `PersistUsage`) → `RecordUsage` → `AppendToLog` → `RelationalTokenUsageLog.Append` (`EnsureSchema` creates `TrTokenUsage` once); `GetUsageByDay` / `GetUsageByMonth` → `StartOfDayUtc` → `ReadRange` → `Read` (`RecordedAt` text range) → group by `LocalDay` → `Summarize`. Model folder: `InitializeFromDirectory` → `ModelDirectory` → `EmbeddedModel.NoteLoaded`; `IsModelDownloaded` → `EmbeddedModel.IsDownloaded` → `LoadedFolderStillThere` or `ModelDownloadService.IsComplete(ResolveDirectory())`; `GetModelDirectory` → `GetLoadDirectory`.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/VectorStores/PgVectorStore.cs:565` | `EnsureVectorIndexAsync` | `existing` | `hnsw` after the first 1.1.10 start; `ivfflat` once on an older database, then dropped (`:578`) |
+| `src/TechieRag/VectorStores/PgVectorStore.cs:588` | `EnsureVectorIndexAsync` | `hasVectorIndex` | true; false only when HNSW cannot be built, and every search is then exact |
+| `src/TechieRag/VectorStores/PgVectorStore.cs:192` | `InitializeAsync` | `supportsIterativeScan` | true on pgvector 0.8.0 or later |
+| `src/TechieRag/VectorStores/PgVectorStore.cs:459` | `SearchCoreAsync` | `settingsCmd.CommandText` | `SET LOCAL hnsw.ef_search = <topK, 40..1000>; SET LOCAL hnsw.iterative_scan = strict_order` |
+| `src/TechieRag/Services/TokenUsageTracker.cs:106` | `RecordUsage` | `usageLog` | the persistence database's log when `WithPersistence` is set |
+| `src/TechieRag/Services/TokenUsageTracker.cs:212` | `AppendToLog` | `ex` | a refused write; `OnUsageLogFailed` is raised and the call goes on |
+| `src/TechieRag/Services/TokenUsageTracker.cs:181` | `ReadRange` | `fromUtc`, `toUtc` | the day's or month's start and end in UTC for the zone asked |
+| `src/TechieRag/Persistence/RelationalTokenUsageLog.cs:74` | `Read` | `@FromUtc`, `@ToUtc` | fixed-width UTC text, e.g. `2026-11-12T18:30:00.0000000Z` for 13 Nov in India |
+| `src/TechieRag.Embedded/EmbeddedEmbeddingProvider.cs:247` | `InitializeFromDirectory` | `modelDirectory` | the folder the model loaded from, recorded for the static flag |
+| `src/TechieRag.Embedded/EmbeddedModel.cs:150` | `GetLoadDirectory` | the return | the loaded folder, else the model root or a complete older copy |
+| `src/TechieRag.Embedded/EmbeddedModel.cs:160` | `LoadedFolders` | the dictionary | the process-wide record, or a test's own one inside `IsolateLoadedFolders` (`:173`) |
+
+**Calculations on this service:** `hnsw.ef_search = clamp(topK, 40, 1000)`. A day in a zone runs from `StartOfDayUtc(day)` to `StartOfDayUtc(day + 1)`, half-open; a midnight skipped by a clock change moves the start forward in 30-minute steps. Cost is summed as `decimal` from invariant text, so no rounding is added.
+
+### Claude prices and "price not known": `TokenUsageTracker`, `ModelPricing` (`TechieRag`)
+
+![Sevak's token usage screen, July 2026: where a host shows spend; it predates the price table and the "not priced" count](screenshots/TechieRag/token-usage.png)
+
+REQ-RAG-164 (Sevak TR-RAG-064), added 2026-11-13; row in `docs/TechieRag-Checklist.md`. Covered by `tests/TechieRag.Tests/Services/ClaudePricingTests.cs` and `TokenUsageTrackerTests.UnknownModelAddsNoCostAndIsMarkedUnpriced`. Prices read on 2026-11-13 from https://platform.claude.com/docs/en/about-claude/pricing.
+
+**Runtime:** `static-only (unconfirmed)`: no sample shows spend. Tests run 2026-11-13: 36 passed. Before the fix 25 of the 27 price cases failed (Sevak's repro cost $0 instead of $3.00; Opus 4.6 and Haiku 4.5 had wrong prices).
+
+**Call chain:** `TokenUsageTracker` constructor → `InitializeDefaultPricing` → `SetModelPricing` per key, Haiku 5.5 with its long-prompt price → config `Pricing` overrides. `RecordUsage` → cost 0? → `FindPricing` (exact key, else the longest contained key whose remainder `ContinuesVersion` does not reject) → `CalculateCost` (long-prompt price when input + cache tokens pass the threshold) or `IsPriceKnown = false` → `AppendToLog` (stores `PriceKnown`) → `OnUsageRecorded` → `OnPriceNotKnown` → `CheckBudget`. `Summarize` counts the unpriced operations apart.
+
+| File and line | Function | Watch | Expected value |
+|---|---|---|---|
+| `src/TechieRag/Services/TokenUsageTracker.cs:100` | `RecordUsage` | `pricing` | the model's `ModelPricing`; null for a model with no price |
+| `src/TechieRag/Services/TokenUsageTracker.cs:101` | `RecordUsage` | `usage.IsPriceKnown` | false only when there is no price and some tokens were used |
+| `src/TechieRag/Services/TokenUsageTracker.cs:432` | `FindPricing` | `kvp.Key` | `claude-opus-4-5` for `claude-opus-4-5-20251101`; `claude-opus-5` is skipped for `claude-opus-5-7` |
+| `src/TechieRag/Services/TokenUsageTracker.cs:445` | `ContinuesVersion` | `digits` | 1 or 2 after a hyphen is another version; 3 (a revision) or 4+ (a date) is not |
+| `src/TechieRag/Services/TokenUsageTracker.cs:398` | `CalculateCost` | `longPrompt` | true for Haiku 5.5 above 100,000 prompt tokens |
+| `src/TechieRag/Services/TokenUsageTracker.cs:257` | `Summarize` | `UnpricedOperationCount` | the usages with `IsPriceKnown` false |
+
+**Calculations on this service:** cost = input tokens / 1,000,000 × input price + output tokens / 1,000,000 × output price, in `decimal`; cache reads and writes are not priced. Haiku 5.5's prompt length is input + cache read + cache write tokens.
 
 ### Image generation: `IImageGenerationProvider`, `ImageGenerationProviderFactory` (`TechieRag`)
 

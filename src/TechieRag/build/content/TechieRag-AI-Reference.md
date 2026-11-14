@@ -1620,6 +1620,115 @@ Rules:
 - `HostDataChange`: `ChangeId`, `Entity`, `EntityId`, `Kind` (`Created`/`Updated`/`Deleted`), `Before`, `After` (`HostEntityRecord`: `Id` + `Values`), `TurnId`, `ToolCallId`, `UndoOf`, `At`. It is plain data: store it as JSON and undo it later.
 - `UndoAsync`: Created → the delete handler; Updated → the update handler with `Before.Values`; Deleted → the create handler with `Before.Values` (the host may give a new id). It returns the reversal as a new change with `UndoOf` set, and raises it like any change. It throws `HostDataException` (`Code` `HostDataCannotUndo` or `HostDataUnknownEntity`) when the entity lacks the handler.
 - The delete tool has `RequiresConfirmation = true` by default (`HostDataSkillOptions.DeleteRequiresConfirmation`).
+- Each entity is described ONCE (REQ-RAG-160, Sevak TR-RAG-061): its description, its fields and, when it offers only some operations, `Can: list, read.` are written in the first tool's description (`host_data_list` when any entity offers list); the other four say "The entities and their fields are listed on host_data_list." Fifteen entities with 2 to 9 fields are about 7,100 characters of tool definitions, and a 4,096-token local model (Qwen 2.5 0.5B) has room for them. Before 1.1.10 every tool repeated every entity.
+- Offer only the entities a turn needs, so a small model's prompt stays short: `skill.BeginTurn(turnId, ["task", "project"])` or `skill.OfferEntities(["task", "project"])`; `OfferEntities(null)` offers all again. Read `ToolDefinitions` after the call: the tools and their `entity` enums then name only those entities, and a call naming another is refused with `HostDataEntityNotOffered`. `OfferedEntities` lists them. A name that is not registered throws `ArgumentException`. `UndoAsync` still reaches every registered entity.
+
+```csharp
+skill.BeginTurn(turnId, router.EntitiesFor(userText));   // e.g. ["task", "project"] for "move my bank task to Friday"
+var answer = await new AgentLoopRunner(localLlm, skill).RunAsync(messages);
+```
+
+### One option set for every provider (REQ-RAG-158) and tool requests written as text (REQ-RAG-159)
+
+**Sampling options on Claude models (REQ-RAG-158, Sevak TR-RAG-063).** Claude Fable and Mythos, Claude Opus 4.7 and later, and every Claude model of generation 5 (`claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`, …) answer `temperature`, `top_p` or `top_k` with HTTP 400 ("temperature is deprecated for this model"). `AnthropicLlmProvider` leaves `Temperature` and `TopP` out of the request for those models and still sends them to Claude Opus 4.6, Sonnet 4.6, Haiku 4.5, older models and non-Claude models behind an Anthropic-compatible endpoint. A model the rule does not know that refuses one anyway gets the call sent again once without them, and is remembered for the rest of the process. So a host passes one `LlmCompletionOptions` to every provider:
+
+```csharp
+var claude = new AnthropicLlmProvider(apiKey, "claude-sonnet-5-5");
+var reply = await claude.ChatAsync(messages, new LlmCompletionOptions { Temperature = 0.3f });   // temperature not sent; no 400
+```
+
+**Tool requests a model writes as text (REQ-RAG-159, Sevak TR-RAG-062).** Small local models (Phi-3 mini, Qwen 2.5 0.5B) often write the tool request in the answer instead of as a structured call. `AgentLoopRunner` (`RunAsync` and `RunStreamAsync`) reads three forms when they name one of the loop's tools: a bare JSON object `{"name": "rag-search", "arguments": {"query": "…"}}`, the same in a code fence, and `<tool_call>…</tool_call>` tags (several per turn). `{"tool_calls": [...]}`, an array, the OpenAI `{"function": {...}}` shape, `parameters` for `arguments` and arguments written as a JSON string are read too. The request runs through the loop's own `IToolHandler` (so `GuardedToolHandler`, the egress gate and every guardrail apply) and counts against `maxIterations`, exactly as a structured call; its result is fed back and the request text is never the final answer. JSON naming no offered tool stays the answer. While streaming, text that starts like a request (`{`, `[`, a fence or `<tool_call>`) is held back until the turn ends, then either run as a call or sent as one text delta.
+
+```csharp
+var answer = await new AgentLoopRunner(new LocalLlmProvider(LocalModel.Phi3Mini4kInstruct), tools).RunAsync(messages);
+// The model wrote {"name": "rag-search", ...}; the loop ran rag-search and answer.Content is the model's next reply.
+```
+
+### PostgreSQL search returns every chunk (REQ-RAG-161)
+
+**Sevak TR-RAG-060.** Before 1.1.10 `PgVectorStore.InitializeAsync` built an IVFFlat index on the empty `Chunks` table. IVFFlat trains its lists from the rows present when it is built, so with `ivfflat.probes = 1` a search over N chunks returned some, one or none of them. From 1.1.10:
+
+- The index is HNSW (`CREATE INDEX IdxChunksEmbedding ON Chunks USING hnsw (Embedding vector_cosine_ops)`), which needs no training. On start-up an existing IVFFlat `IdxChunksEmbedding` is dropped and rebuilt as HNSW, with a logged warning.
+- Each search runs in its own transaction with `SET LOCAL hnsw.ef_search = topK` (at least 40, at most 1,000) and, on pgvector 0.8.0 or later, `SET LOCAL hnsw.iterative_scan = strict_order`, so a search with topK of N or more returns all N in cosine order, with or without a document filter.
+- On pgvector before 0.8.0 a filtered search, or one for more than 1,000 results, is answered by an exact scan. When HNSW cannot be built (pgvector before 0.5.0, or a vector wider than 2,000 dimensions) the store has no vector index and every search is exact.
+
+A host that set `Options=-c ivfflat.probes=…` on its connection string can remove it; it does no harm if kept.
+
+```csharp
+var rag = new TechieRagBuilder().UseEmbedded().UsePostgres(connectionString).Build();
+await rag.InitializeAsync();                       // an older IVFFlat index is replaced by HNSW here, once
+await rag.IngestTextAsync("The ledger closes on Friday.", "ledger.txt");
+await rag.IngestTextAsync("The van is serviced in March.", "van.txt");
+var results = await rag.SearchAsync("When is the van serviced?", topK: 2);   // both chunks, every time
+```
+
+### Token usage by day and by month (REQ-RAG-162)
+
+**Sevak TR-RAG-059.** `ITokenTracker` kept the session only. From 1.1.10 every usage can also go to a durable `ITokenUsageLog`, and the tracker answers ranges:
+
+```csharp
+var rag = new TechieRagBuilder()
+    .UseSqliteVec()
+    .WithPersistence(StoreProvider.Sqlite)          // also keeps usage in TrTokenUsage (UsageTracking.PersistUsage, default true)
+    .Build();
+
+var tracker = rag.GetTokenTracker();
+var today = DateOnly.FromDateTime(DateTime.Now);
+var india = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+var spentToday = tracker.GetUsageByDay(today, today, india)[today].TotalEstimatedCostUsd;
+var spentThisMonth = tracker.GetUsageByMonth(today, today, india)[new DateOnly(today.Year, today.Month, 1)].TotalEstimatedCostUsd;
+var lastHour = tracker.GetUsageBetween(DateTime.UtcNow.AddHours(-1), DateTime.UtcNow);
+```
+
+- `GetUsageBetween(fromUtc, toUtc)`: half-open UTC range. `GetUsageByDay(firstDay, lastDay, timeZone)` and `GetUsageByMonth(firstDay, lastDay, timeZone)`: one entry per day (or per month, keyed by its first day), empty ones at zero; `timeZone` null means this machine's.
+- With a log the ranges include usage from before a restart; without one, only this session's.
+- Built-in logs: `SqliteTokenUsageLog(connectionString)`, `PostgresTokenUsageLog(connectionString)` (table `TrTokenUsage`, created on first use). Any other: implement `ITokenUsageLog` (`Append`, `Read`) and pass it with `WithTokenUsageLog(log)`. Writes are synchronous on purpose, so a UI thread never waits on an asynchronous write.
+- A log write that fails raises `TokenUsageTracker.OnUsageLogFailed`; the model call is not failed and the usage still counts in the session.
+- A custom `ITokenTracker` gets the three methods as default members that throw `NotSupportedException`.
+
+### Embedded model: downloaded flag and folder (REQ-RAG-163)
+
+**AstroLyfe TR-RAG-001.** `EmbeddedEmbeddingProvider.IsModelDownloaded()` said false, and `GetModelDirectory()` named an empty folder, while the model ran from another folder. From 1.1.10 both answer for the folder the model runs from:
+
+- `IsModelDownloaded()` is true when the default model is complete under the model root, complete in an older version's folder next to the assembly, or loaded by a provider in this process from any folder (including `new EmbeddedEmbeddingProvider(folder)`), as long as that folder still holds the model file.
+- `GetModelDirectory()` returns the folder a provider loaded the model from, else the folder one would load it from now. The folder a download writes to is `EmbeddedModel.GetModelDirectory()`; `EmbeddedModel.GetLoadDirectory()` is the per-model form of the new rule.
+- New on the provider: `ModelDirectory` (the folder this provider loaded from, null before) and `IsLoaded`.
+
+```csharp
+using var embedder = new EmbeddedEmbeddingProvider("/srv/models/bge-m3");
+await embedder.EmbedAsync("warm-up");
+var health = new { Downloaded = EmbeddedEmbeddingProvider.IsModelDownloaded(), Folder = embedder.ModelDirectory }; // true, /srv/models/bge-m3
+```
+
+### Claude prices and "price not known" (REQ-RAG-164)
+
+**Sevak TR-RAG-064.** The built-in price table had no current Claude model, and a model it did not know cost $0, so a host's spend read $0.00 and a cost budget never warned. From 1.1.10 the table carries Anthropic's list prices per million input and output tokens, read on 2026-11-13 from https://platform.claude.com/docs/en/about-claude/pricing:
+
+| Model id | Input | Output |
+|---|---|---|
+| `claude-fable-5-2`, `claude-mythos-5-2` | $8 | $40 |
+| `claude-fable-5-1`, `claude-mythos-5-1`, `claude-fable-5`, `claude-mythos-5` | $10 | $50 |
+| `claude-opus-5-5` | $4 | $20 |
+| `claude-opus-5`, `claude-opus-4-8`, `claude-opus-4-7`, `claude-opus-4-6`, `claude-opus-4-5` | $5 | $25 |
+| `claude-opus-4-1`, `claude-opus-4` (retired except on Bedrock and Google Cloud) | $15 | $75 |
+| `claude-sonnet-5-5`, `claude-sonnet-5` | $2 | $10 |
+| `claude-sonnet-4-6`, `claude-sonnet-4-5`, `claude-sonnet-4` | $3 | $15 |
+| `claude-haiku-5-5` (prompt up to 100,000 tokens / above) | $0.10 / $0.50 | $0.50 / $2.50 |
+| `claude-haiku-4-5` | $1 | $5 |
+
+- A key prices the plain id, a dated id (`claude-opus-4-5-20251101`), a Vertex id (`claude-haiku-4-5@20251001`) and a Bedrock id (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`). It never prices another version: `claude-opus-5` does not price `claude-opus-5-7`, which stays "price not known" until it is added. The longest fitting key wins.
+- Claude Haiku 5.5's prompt length counts input, cache read and cache write tokens. Cache reads and writes themselves are not priced by the table.
+- **Telling "price not known" from $0:** `TokenUsage.IsPriceKnown` is false (a known price that came to $0 stays true); `TokenUsageSummary.UnpricedOperationCount`, `UnpricedTokens` and `UnpricedModels` count them apart from `TotalEstimatedCostUsd`, and `IsCostComplete` is false; `BudgetStatus.IsCostIncomplete` is true; `TokenUsageTracker.OnPriceNotKnown` fires for each one; `TryGetPricing(model, out pricing)` asks before a call. The usage log keeps the mark.
+
+```csharp
+var tracker = (TokenUsageTracker)rag.GetTokenTracker();
+tracker.OnPriceNotKnown += (_, usage) => logger.LogWarning("No price for {Model}; add it with SetModelPricing", usage.ModelName);
+var today = tracker.GetUsageByDay(day, day)[day];
+var label = today.IsCostComplete
+    ? $"${today.TotalEstimatedCostUsd:F2} today"
+    : $"${today.TotalEstimatedCostUsd:F2} today + {today.UnpricedTokens:N0} tokens with no price";
+tracker.SetModelPricing("claude-opus-5-7", 4m, 20m);   // a model the table does not know yet
+```
 
 ### Image generation (REQ-RAG-155)
 
@@ -1877,6 +1986,7 @@ public class TokenUsage
     public int CacheReadTokens { get; set; }
     public int CacheWriteTokens { get; set; }
     public decimal EstimatedCostUsd { get; set; }
+    public bool IsPriceKnown { get; set; }            // false: no price for the model, cost 0 is NOT "free" (1.1.10)
     public string ModelName { get; set; }
     public string ProviderName { get; set; }
     public DateTime Timestamp { get; set; }
@@ -1889,8 +1999,12 @@ public class TokenUsageSummary
     public long TotalTokens { get; }
     public long TotalReasoningTokens { get; set; }
     public long TotalCompletionTokens { get; }        // output minus reasoning
-    public decimal TotalEstimatedCostUsd { get; set; }
+    public decimal TotalEstimatedCostUsd { get; set; } // priced operations only
     public int OperationCount { get; set; }
+    public int UnpricedOperationCount { get; set; }   // 1.1.10: operations with no known price
+    public long UnpricedTokens { get; set; }
+    public IReadOnlyList<string> UnpricedModels { get; set; }
+    public bool IsCostComplete { get; }               // UnpricedOperationCount == 0
 }
 
 public class UsageBudget

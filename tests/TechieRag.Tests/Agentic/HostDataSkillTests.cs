@@ -38,7 +38,7 @@ public sealed class HostDataSkillTests
 
     /// <summary>
     /// The tools are one set for every entity: five tools whatever the entity count, each naming only the
-    /// entities that offer its operation, with each entity's fields in the description.
+    /// entities that offer its operation, with each entity's fields in the first tool's description.
     /// </summary>
     [Fact(DisplayName = "REQ-RAG-153 EntitiesShareOneToolSetNamingTheirFields")]
     public void EntitiesShareOneToolSet()
@@ -59,7 +59,9 @@ public sealed class HostDataSkillTests
         Assert.Contains("\"place\"", list.ParametersSchema, StringComparison.Ordinal);
         var create = skill.ToolDefinitions[2];
         Assert.DoesNotContain("\"place\"", create.ParametersSchema, StringComparison.Ordinal);
-        Assert.Contains("title (text, required)", create.Description, StringComparison.Ordinal);
+        // Fields are written once, on the first tool, since REQ-RAG-160 (Sevak TR-RAG-061).
+        Assert.Contains("title (text, required)", list.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("title (text, required)", create.Description, StringComparison.Ordinal);
         Assert.True(skill.ToolDefinitions[4].RequiresConfirmation);
     }
 

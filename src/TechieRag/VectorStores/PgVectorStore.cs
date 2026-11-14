@@ -17,8 +17,11 @@ namespace TechieRag.VectorStores;
 /// <para><b>Code Flow:</b> Instantiated by TechieRagBuilder when PostgreSQL is configured
 /// as the vector store. Uses NpgsqlDataSource for efficient connection pooling.</para>
 /// <para><b>Design:</b> Implements IVectorStore using parameterized queries for security.
-/// Uses JSONB columns for flexible metadata storage and IVFFlat indexing for fast
-/// approximate nearest neighbor searches.</para>
+/// Uses JSONB columns for flexible metadata storage and an HNSW index for fast nearest neighbor
+/// searches. Each search widens <c>hnsw.ef_search</c> to topK and, on pgvector 0.8.0 or later, turns on
+/// the strict-order iterative scan, so a search over N chunks with topK of N or more returns all N
+/// (REQ-RAG-161, Sevak TR-RAG-060; before 1.1.10 an IVFFlat index built on the empty table missed most
+/// of them).</para>
 /// </remarks>
 public class PgVectorStore : IVectorStore, IAsyncDisposable
 {
@@ -26,6 +29,53 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
     private readonly ILogger<PgVectorStore> logger;
     private readonly int vectorDimension;
     private bool isInitialized;
+    private bool hasVectorIndex;
+    private bool supportsIterativeScan;
+
+    /// <summary>HNSW's default candidate list (<c>hnsw.ef_search</c>); a search for more widens it to topK.</summary>
+    internal const int DefaultEfSearch = 40;
+
+    /// <summary>The largest <c>hnsw.ef_search</c> pgvector accepts.</summary>
+    internal const int MaxEfSearch = 1000;
+
+    /// <summary>
+    /// Gets the DDL for the vector index: HNSW with cosine distance (REQ-RAG-161, Sevak TR-RAG-060).
+    /// </summary>
+    /// <remarks>
+    /// HNSW needs no training, so it is correct when built on the empty table at start-up. The IVFFlat
+    /// index used before 1.1.10 trained its list centres from the rows present when it was built, which
+    /// at start-up was none, so a search read one list and missed the rest.
+    /// </remarks>
+    internal const string VectorIndexSql =
+        "CREATE INDEX IF NOT EXISTS IdxChunksEmbedding ON Chunks USING hnsw (Embedding vector_cosine_ops)";
+
+    /// <summary>
+    /// Gets the session settings one search runs with, so an index scan returns as many rows as asked
+    /// (REQ-RAG-161).
+    /// </summary>
+    /// <param name="topK">How many results the search asks for.</param>
+    /// <param name="iterativeScan">Whether the server's pgvector has <c>hnsw.iterative_scan</c> (0.8.0 and later).</param>
+    /// <param name="filtered">Whether the search is restricted to some documents.</param>
+    /// <returns><c>SET LOCAL</c> statements, joined with semicolons.</returns>
+    /// <remarks>
+    /// <para><c>hnsw.ef_search</c> caps how many rows an HNSW scan can return (40 by default), so it is
+    /// raised to topK, up to pgvector's limit of 1,000.</para>
+    /// <para><c>hnsw.iterative_scan = strict_order</c> keeps scanning when a document filter drops the
+    /// nearest candidates, so a filtered search still finds the document's chunks, in exact order.</para>
+    /// <para>On a pgvector older than 0.8.0, which has no iterative scan, a filtered search or one for
+    /// more than 1,000 results turns the index scan off and is answered exactly instead.</para>
+    /// </remarks>
+    internal static string SearchSettingsSql(int topK, bool iterativeScan, bool filtered)
+    {
+        var efSearch = Math.Clamp(topK, DefaultEfSearch, MaxEfSearch);
+        var settings = $"SET LOCAL hnsw.ef_search = {efSearch}";
+        if (iterativeScan)
+        {
+            return settings + "; SET LOCAL hnsw.iterative_scan = strict_order";
+        }
+
+        return filtered || topK > MaxEfSearch ? settings + "; SET LOCAL enable_indexscan = off" : settings;
+    }
 
     /// <summary>
     /// Gets the display name of this vector store implementation.
@@ -138,20 +188,8 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         idxDocCmd.CommandText = "CREATE INDEX IF NOT EXISTS IdxChunksDocument ON Chunks(DocumentId)";
         await idxDocCmd.ExecuteNonQueryAsync(cancellationToken);
 
-        // Create IVFFlat index for vector similarity search
-        // Note: IVFFlat requires data to build the index, so we use CREATE INDEX IF NOT EXISTS
-        // which will be a no-op if index already exists
-        try
-        {
-            await using var idxVecCmd = connection.CreateCommand();
-            idxVecCmd.CommandText = "CREATE INDEX IF NOT EXISTS IdxChunksEmbedding ON Chunks USING ivfflat (Embedding vector_cosine_ops)";
-            await idxVecCmd.ExecuteNonQueryAsync(cancellationToken);
-        }
-        catch (PostgresException ex) when (ex.Message.Contains("ivfflat"))
-        {
-            // IVFFlat may not be available in all pgvector installations
-            logger.LogWarning("IVFFlat index creation failed. Falling back to no index for vector column: {Message}", ex.Message);
-        }
+        await EnsureVectorIndexAsync(connection, cancellationToken).ConfigureAwait(false);
+        supportsIterativeScan = await ReadIterativeScanSupportAsync(connection, cancellationToken).ConfigureAwait(false);
 
         isInitialized = true;
         logger.LogInformation("PGVector store initialized successfully");
@@ -411,7 +449,19 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         logger.LogDebug("Searching for top {TopK} results, documentFilter: {Filter}", topK, documentFilter ?? "(none)");
 
         await using var connection = await dataSource.OpenConnectionAsync(cancellationToken);
+
+        // REQ-RAG-161: the settings are local to this transaction, so a pooled connection goes back clean.
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        if (hasVectorIndex)
+        {
+            await using var settingsCmd = connection.CreateCommand();
+            settingsCmd.Transaction = transaction;
+            settingsCmd.CommandText = SearchSettingsSql(topK, supportsIterativeScan, documentIds is not null || documentFilter is not null);
+            await settingsCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await using var cmd = connection.CreateCommand();
+        cmd.Transaction = transaction;
 
         // Use <=> operator for cosine distance (lower is more similar)
         // Convert to similarity score: 1 - distance
@@ -455,9 +505,25 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         cmd.Parameters.AddWithValue("TopK", topK);
 
         var results = new List<SearchResult>();
-        await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+        await using (var reader = await cmd.ExecuteReaderAsync(cancellationToken))
+        {
+            await ReadResultsAsync(reader, results, cancellationToken).ConfigureAwait(false);
+        }
 
-        while (await reader.ReadAsync(cancellationToken))
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        logger.LogDebug("Search returned {Count} results", results.Count);
+        return results;
+    }
+
+    /// <summary>Reads the rows of a search into results.</summary>
+    /// <param name="reader">The open reader.</param>
+    /// <param name="results">The list the results are added to.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task.</returns>
+    private static async Task ReadResultsAsync(NpgsqlDataReader reader, List<SearchResult> results, CancellationToken cancellationToken)
+    {
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             var chunk = new TextChunk
             {
@@ -481,10 +547,87 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
                 Score = score
             });
         }
-
-        logger.LogDebug("Search returned {Count} results", results.Count);
-        return results;
     }
+
+    /// <summary>
+    /// Creates the HNSW vector index, replacing the IVFFlat index versions before 1.1.10 built on the
+    /// empty table (REQ-RAG-161, Sevak TR-RAG-060).
+    /// </summary>
+    /// <param name="connection">The open connection holding the schema lock.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task.</returns>
+    /// <remarks>
+    /// When the server cannot build HNSW (pgvector older than 0.5.0, or a vector wider than 2,000
+    /// dimensions), the store runs without a vector index and every search is exact.
+    /// </remarks>
+    private async Task EnsureVectorIndexAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        var existing = await ReadVectorIndexMethodAsync(connection, cancellationToken).ConfigureAwait(false);
+        if (string.Equals(existing, "hnsw", StringComparison.Ordinal))
+        {
+            hasVectorIndex = true;
+            return;
+        }
+
+        if (existing is not null)
+        {
+            logger.LogWarning(
+                "Replacing the {Method} index IdxChunksEmbedding with an HNSW index; an IVFFlat index built on an empty table misses stored chunks (TR-RAG-060)",
+                existing);
+            await using var dropCmd = connection.CreateCommand();
+            dropCmd.CommandText = "DROP INDEX IdxChunksEmbedding";
+            await dropCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        try
+        {
+            await using var idxVecCmd = connection.CreateCommand();
+            idxVecCmd.CommandText = VectorIndexSql;
+            idxVecCmd.CommandTimeout = 0;
+            await idxVecCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+            hasVectorIndex = true;
+        }
+        catch (PostgresException ex)
+        {
+            hasVectorIndex = false;
+            logger.LogWarning("HNSW index creation failed; searches run without a vector index and are exact: {Message}", ex.MessageText);
+        }
+    }
+
+    /// <summary>Reads the access method of the existing vector index, in the schema the Chunks table lives in.</summary>
+    /// <param name="connection">The open connection.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>For example <c>hnsw</c> or <c>ivfflat</c>; null when there is no such index.</returns>
+    private static async Task<string?> ReadVectorIndexMethodAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = """
+            SELECT am.amname
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indexrelid
+            JOIN pg_am am ON am.oid = c.relam
+            WHERE i.indrelid = 'chunks'::regclass AND c.relname = 'idxchunksembedding'
+            """;
+        return await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+    }
+
+    /// <summary>Reads whether the server's pgvector has <c>hnsw.iterative_scan</c> (0.8.0 and later).</summary>
+    /// <param name="connection">The open connection.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> on pgvector 0.8.0 or later.</returns>
+    private static async Task<bool> ReadIterativeScanSupportAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT extversion FROM pg_extension WHERE extname = 'vector'";
+        var version = await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as string;
+        return SupportsIterativeScan(version);
+    }
+
+    /// <summary>Whether a pgvector version has <c>hnsw.iterative_scan</c>.</summary>
+    /// <param name="extensionVersion">The <c>extversion</c> text, for example <c>0.8.1</c>.</param>
+    /// <returns><see langword="true"/> for 0.8.0 and later.</returns>
+    internal static bool SupportsIterativeScan(string? extensionVersion) =>
+        Version.TryParse(extensionVersion, out var version) && version >= new Version(0, 8, 0);
 
     /// <summary>
     /// Deletes a specific chunk by its ID.

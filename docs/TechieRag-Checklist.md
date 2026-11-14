@@ -52,6 +52,13 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 | REQ-FN-018 | Sevak (formerly TechieDesk): Qdrant Admin: collection CRUD; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-012, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-018) |
 | REQ-FN-019 | Sevak (formerly TechieDesk): Qdrant Admin: vector browse / search / detail / bulk delete; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-013, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-019) |
 | REQ-FN-020 | Sevak (formerly TechieDesk): Rename app TechieRagWeb → TechieDesk; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-014, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-020) |
+| REQ-RAG-158 | Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063) | Verified | 100% | 2026-11-12 verify: PASS — test `REQ-RAG-158 SamplingRuleKnowsEachModel(model: "claude-opus-5` | [d](#d-req-rag-158) |
+| REQ-RAG-159 | Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062) | Verified | 100% | 2026-11-11 verify: PASS — test `REQ-RAG-159 JsonNamingNoOfferedToolStaysTheAnswer` | [d](#d-req-rag-159) |
+| REQ-RAG-160 | Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061) | Verified | 100% | 2026-11-11 verify: PASS — test `REQ-RAG-160 PartialEntityNamesItsOperations` | [d](#d-req-rag-160) |
+| REQ-RAG-161 | PgVectorStore search returns every stored chunk, whatever plan PostgreSQL picks (Sevak TR-RAG-060) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-161 IterativeScanOnWhenSupported` | [d](#d-req-rag-161) |
+| REQ-RAG-162 | Token usage by day and by month, kept across restarts (Sevak TR-RAG-059) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-162 LogFailureIsReportedNotThrown` | [d](#d-req-rag-162) |
+| REQ-RAG-163 | The embedding model's downloaded flag and folder name the folder the model loads from (AstroLyfe TR-RAG-001) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-163 FolderNamesOlderCopyWhenOnlyItIsComplete` | [d](#d-req-rag-163) |
+| REQ-RAG-164 | Current Claude models are priced, and a model with no price reads as not priced, never $0 (Sevak TR-RAG-064) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-164 CurrentClaudeModelsCostTheirListPrice(model: "cl` | [d](#d-req-rag-164) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`. `Owner-UAT` marks a row only the owner can close, by following the UsageGuide test plan; the verifier cannot reach it from this machine.
 
@@ -121,6 +128,10 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-RAG-003** — Vector stores (SQLite-vec / pgvector / Qdrant). *BRD:* BRD-12, BRD-13, BRD-14, BRD-15. *Phase 1.*
   - *Acceptance:* When a developer upserts, batch-upserts, searches with a document filter, deletes and reads stats on each store, then every operation behaves the same.
 
+<a id="d-req-rag-161"></a>
+- **REQ-RAG-161** — PgVectorStore search returns every stored chunk, whatever plan PostgreSQL picks (Sevak TR-RAG-060). *BRD:* BRD-219. *Phase 1.*
+  - *Acceptance:* When a developer stores N chunks and searches with topK of N or more, then all N come back in cosine order.
+
 ## Surface: Semantic search
 
 <a id="d-req-rag-004"></a>
@@ -133,11 +144,19 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-RAG-005** — Offline embedded embedding (BGE-M3 ONNX). *BRD:* BRD-24, BRD-25, BRD-26. *Phase 1.*
   - *Acceptance:* When a developer calls `UseEmbedded()` on the Embedded package and embeds text, then a 1024-dimension vector returns with no network after the first run.
 
+<a id="d-req-rag-163"></a>
+- **REQ-RAG-163** — The embedding model's downloaded flag and folder name the folder the model loads from (AstroLyfe TR-RAG-001). *BRD:* BRD-221. *Phase 1.*
+  - *Acceptance:* When a provider has loaded the model from any folder, then IsModelDownloaded() is true and GetModelDirectory() names that folder.
+
 ## Surface: LLM providers
 
 <a id="d-req-rag-006"></a>
 - **REQ-RAG-006** — LLM provider integration (6 providers). *BRD:* BRD-27, BRD-28, BRD-29, BRD-30, BRD-31, BRD-32, BRD-33. *Phase 1.*
   - *Acceptance:* When a developer calls complete, chat, stream and tool-calling members on any `ILlmProvider`, then each behaves per the contract and capability flags.
+
+<a id="d-req-rag-158"></a>
+- **REQ-RAG-158** — Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063). *BRD:* BRD-216. *Phase 1.*
+  - *Acceptance:* When a developer sets Temperature on a Claude model that refuses it, then the call succeeds without it; a model that takes it still gets it.
 
 ## Surface: RAG generation
 
@@ -157,6 +176,14 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-RAG-009** — Tool calling & agent loop. *BRD:* BRD-40, BRD-41, BRD-42, BRD-43. *Phase 1.*
   - *Acceptance:* When a developer runs the agent loop on a tool-using prompt, then tools execute and a final answer returns.
 
+<a id="d-req-rag-159"></a>
+- **REQ-RAG-159** — Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062). *BRD:* BRD-217. *Phase 1.*
+  - *Acceptance:* When a model writes a tool request as text naming an offered tool, then the loop runs it and the request text is never the answer.
+
+<a id="d-req-rag-160"></a>
+- **REQ-RAG-160** — Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061). *BRD:* BRD-218. *Phase 1.*
+  - *Acceptance:* When a host registers 15 entities, then each appears once; when it offers some for a turn, then a call to another is refused.
+
 ## Surface: Conversation memory
 
 <a id="d-req-rag-010"></a>
@@ -168,6 +195,14 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 <a id="d-req-rag-011"></a>
 - **REQ-RAG-011** — Token tracking & budgets. *BRD:* BRD-47, BRD-48, BRD-49, BRD-50. *Phase 1.*
   - *Acceptance:* When a developer completes a prompt with tracking on, then `ITokenTracker` records tokens and estimated cost for the operation and the session.
+
+<a id="d-req-rag-162"></a>
+- **REQ-RAG-162** — Token usage by day and by month, kept across restarts (Sevak TR-RAG-059). *BRD:* BRD-220. *Phase 1.*
+  - *Acceptance:* When a host restarts and asks for today's or this month's usage, then usage recorded before the restart is counted.
+
+<a id="d-req-rag-164"></a>
+- **REQ-RAG-164** — Current Claude models are priced, and a model with no price reads as not priced, never $0 (Sevak TR-RAG-064). *BRD:* BRD-222. *Phase 1.*
+  - *Acceptance:* When a host records usage on a current Claude model, then it costs the list price; on an unpriced model, it says price not known.
 
 ## Surface: Resilience
 

@@ -11,7 +11,7 @@
 
     <!-- Package Metadata -->
     <PackageId>TechieRag.Local</PackageId>
-    <Version>1.1.9</Version>
+    <Version>1.1.10</Version>
     <Authors>Techie Rathor</Authors>
     <Company>TechieRathor</Company>
     <Description>An in-process local language model for TechieRag: UseLocalLlm() gives an ILlmProvider that runs a small open-weight model inside the app (a small model on Android and iOS, a larger one on desktops). The weights download once, after the host accepts the model's terms, into the per-user application data folder, SHA-256 verified and resumable; after that the model works offline. Memory is checked before loading, over-long prompts are refused before inference, and typed streaming, JSON output and the model's real tokenizer are supported. A model that reads pictures (Phi-3.5 vision on a laptop's processor) takes ChatImage parts through IMultimodalLlmProvider, the same code a hosted provider takes.</Description>

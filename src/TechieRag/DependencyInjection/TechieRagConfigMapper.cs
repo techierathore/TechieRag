@@ -111,6 +111,7 @@ internal static class TechieRagConfigMapper
         target.MaxCostUsd = source.MaxCostUsd;
         target.AlertThreshold = source.AlertThreshold;
         target.BlockOnExceeded = source.BlockOnExceeded;
+        target.PersistUsage = source.PersistUsage;
         target.Pricing = new Dictionary<string, Models.ModelPricing>(source.Pricing, StringComparer.OrdinalIgnoreCase);
     }
 

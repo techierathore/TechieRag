@@ -4,11 +4,11 @@
 |---|---|
 | App | Sevak |
 | Upstream | TechieRag |
-| Updated | 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
+| Updated | 2026-11-13, later (TR-RAG-064 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-13 (TR-RAG-059 and TR-RAG-060 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-11 (TR-RAG-061 to TR-RAG-063 added from Sevak's 9 November report, relayed by the owner, and answered: fixed for TechieRag 1.1.10); 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
 
 ## Summary
 
-TR-RAG-055 to TR-RAG-058 were built upstream on 2026-11-08 for TechieRag 1.1.9 (not yet published); TR-RAG-056 and TR-RAG-057, which hold Sevak's REQ-RAG-116 and REQ-UI-087, are unblocked once 1.1.9 is on the feed. 55 entries: 4 open requests, none a defect (TR-RAG-055 to TR-RAG-058, 2026-11-07), written in TechieRag as BRD-210 to BRD-213 (REQ-RAG-152 to REQ-RAG-155). REQ-RAG-109 is not blocked: the PostgreSQL stores are in TechieRag 1.1.8. 36 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-053 (2026-10-10): disposing a `LocalLlmProvider` while a call waits crashes the process; worked around in Sevak. TR-RAG-052: `TechieRag.Local` cannot call tools. TR-RAG-051: a model folder from an earlier conversion counts as almost downloaded. TR-RAG-048 is closed: Sevak moved to TechieRag 1.1.2 on 2026-10-07; the move found TR-RAG-049, worked around in Sevak.
+Nothing is blocked: no entry is open. 61 entries: 0 open, 46 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-059 to TR-RAG-064 are fixed upstream for TechieRag 1.1.10, not yet published: 059, 060 and 064 on 2026-11-13 (060 proven on a real PostgreSQL 18 with pgvector 0.8.6; 064 against Anthropic's pricing page of that day), 061 to 063 on 2026-11-11. TR-RAG-055 to TR-RAG-058 (Sevak's phase 4 and 5 requests) were built for 1.1.9 on 2026-11-08 and ship with 1.1.10; TR-RAG-056 and TR-RAG-057 hold Sevak's REQ-RAG-116 and REQ-UI-087 until that package is on the feed. TR-RAG-053 and TR-RAG-049 are worked around in Sevak until it moves to the new package.
 
 These are the application's findings against `src/TechieRag`, filed while it lived in this repository (TechieRagWeb, then TechieDesk, now Sevak), restructured 2026-09-24 into the feedback template with the original text unchanged; the earlier summary is under "Replies from TechieRag". Accepted items are ledgered as TechieRag requirements (BRD-121, 126, 127, 142, 143, 148, 158; phase 3; BRD-210 to 213).
 
@@ -1282,9 +1282,121 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** Canva and Venice called directly from Sevak until the library route exists.
 - **Suggested fix:** TechieRag BRD-213 as written.
 
+### TR-RAG-059 — request: token usage by day and by month, not only since the app started (minor, found 2026-11-08 building Sevak phase 4 group L) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-162 Verified; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
+- **Severity:** minor
+- **Blocks:** no — `Sevak#REQ-UI-089` (the pane header shows the model and today's spend) shows the `ITokenTracker.GetSessionUsage()` cost, the figure the Token Usage screen shows; it equals today's spend only while the app has not run past midnight, and the mockup's "this month" figure is left out.
+- **Repro:** ask `ITokenTracker` for the cost of today, or of the current month, after a restart.
+- **Expected:** `GetUsageBetween(fromUtc, toUtc)` (or by day) from a persisted usage log, so a host can show "today" and "this month".
+- **Actual:** `ITokenTracker` keeps an in-memory session only (`GetSessionUsage`, `GetUsageByModel`); a restart starts it at zero and nothing is kept per day.
+- **Encountered in:** `apps/Sevak/Components/Assistant/ChatPane.razor` `RefreshSpend`, docs/mockups/assistant.html `assistant-header-spend` ("₹41 today · ₹1,240 this month").
+- **Workaround:** none taken beyond showing the session figure labelled "today".
+- **Suggested fix:** persist each `TokenUsage` with its timestamp (the record already carries `Timestamp`) and add a ranged query.
+
+### TR-RAG-060 — PgVectorStore builds its IVFFlat index on an empty table, so a search returns some, one or none of the stored chunks (major, found 2026-11-09 in Sevak phase 4 fix cycle 1) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-161 Verified against PostgreSQL 18 + pgvector 0.8.6; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
+- **Severity:** major
+- **Blocks:** no — Sevak passes `Options=-c ivfflat.probes=32768` on the server connection string (`TechieRagManager.WithExactVectorSearch`), which makes every search scan all lists; `Sevak#REQ-RAG-109` then passed three runs in a row.
+- **Repro:** `new TechieRagBuilder().UsePgVector(cs).WithPersistence(StoreProvider.Postgres, connectionString: cs)`, `InitializeAsync`, ingest two short texts, `SearchAsync(question, 2)`. Run it a few times: the result count is 0, 1 or 2 depending on the plan PostgreSQL picks (an extra query on the connection beforehand was enough to change it). `tests/Sevak.Tests/Storage/PgVectorRagTests.cs` against `pgvector/pgvector:0.8.6-pg18-trixie` failed every run before the workaround.
+- **Expected:** a search over N chunks with `topK >= N` returns all N, ordered by cosine similarity.
+- **Actual:** `PgVectorStore.InitializeAsync` runs `CREATE INDEX IF NOT EXISTS IdxChunksEmbedding ON Chunks USING ivfflat (Embedding vector_cosine_ops)` at start-up, when Chunks is empty. IVFFlat trains its list centres from the rows present at build time, so the 100 lists have no meaningful centres, and with pgvector's default `ivfflat.probes = 1` an index scan reads one list and misses the rest.
+- **Encountered in:** `Sevak#REQ-RAG-109` (BRD-185), `apps/Sevak.Core/Services/TechieRagManager.cs` `ServerStoreConnectionString`.
+- **Workaround:** the session option above, documented at `WithExactVectorSearch`; remove it once a release fixes the index.
+- **Suggested fix:** use an HNSW index (`USING hnsw (Embedding vector_cosine_ops)`), which needs no training and works from an empty table; or build the IVFFlat index only after enough rows exist and set `ivfflat.probes` (or `ivfflat.iterative_scan`) on the store's own connections.
+
+### TR-RAG-061 — the host-data tool definitions repeat every entity's fields in each of the five tools (minor, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-160 Verified; ships in 1.1.10, not yet published.
+- **Severity:** minor
+- **Blocks:** not stated in the copy relayed to TechieRag on 2026-11-11; Sevak's own entry holds the answer.
+- **Repro:** 15 entities with 2 to 9 fields each on a `HostDataSkill` over `LocalLlmProvider` with `LocalModel.Qwen25Instruct05B`.
+- **Expected:** the entities are described once, and a host can pick the entities for a turn.
+- **Actual:** the first call throws `LocalPromptTooLongException`: 7,805 tokens against a 4,096-token context.
+- **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (entry relayed in full by the owner on 2026-11-11; this copy did not have it).
+- **Workaround:** none relayed.
+- **Suggested fix:** as Expected.
+
+### TR-RAG-062 — `AgentLoopRunner` takes a tool request that a local model writes as text for the final answer (major, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-159 Verified; ships in 1.1.10, not yet published.
+- **Severity:** major
+- **Blocks:** not stated in the copy relayed to TechieRag on 2026-11-11; Sevak's own entry holds the answer.
+- **Repro:** `TechieRag.Local`, Phi-3 mini, a question that needs a search.
+- **Expected:** a tool request written in the text, bare, in a code fence or in `<tool_call>` tags, is read as a tool call, run under the loop's own guardrails (max tool calls, egress gate) and its result fed back, as a structured call is since 1.1.7.
+- **Actual:** the loop ends after one iteration and `AgentResponse.Content` is `{"name": "rag-search", "arguments": {"query": "…"}}`.
+- **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (relayed by the owner on 2026-11-11).
+- **Workaround:** none relayed.
+- **Suggested fix:** as Expected.
+
+### TR-RAG-063 — `AnthropicLlmProvider` always sends temperature when `LlmCompletionOptions.Temperature` is set, and current Claude models refuse it (major, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-158 Verified 2026-11-12, including a live call to `claude-sonnet-5-5` with temperature set. Ships in 1.1.10, not yet published.
+- **Severity:** major
+- **Blocks:** not stated in the copy relayed to TechieRag on 2026-11-11; Sevak's own entry holds the answer.
+- **Repro:** `AnthropicLlmProvider` with model `claude-sonnet-5-5`, `ChatAsync(messages, new LlmCompletionOptions { Temperature = 0.3f })`, alone or inside `AgentLoopRunner`.
+- **Expected:** the provider knows which models take a sampling temperature and leaves it out for those that do not, or retries once without it on that 400, so a host can pass one option set to every provider; the same for any other sampling option a model rejects.
+- **Actual:** the API answers 400 "temperature is deprecated for this model".
+- **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (relayed by the owner on 2026-11-11).
+- **Workaround:** none relayed.
+- **Suggested fix:** as Expected.
+
+### TR-RAG-064 — TokenUsageTracker prices a model it does not know at $0, and its table lacks every current Claude model, so spend reads $0.00 (major, found 2026-11-13 in Sevak triage-and-fix) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-164 Verified; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
+- **Severity:** major
+- **Blocks:** no — Sevak adds the current prices to every tracker it builds (`TechieRagManager.SeedCurrentModelPrices`, through `TokenUsageTracker.SetModelPricing`); the Assistant header now shows the day's spend.
+- **Repro:** TechieRag 1.1.9. `var tracker = new TokenUsageTracker(); var usage = new TokenUsage { InputTokens = 1_000_000, OutputTokens = 100_000, ModelName = "claude-sonnet-5-5", ProviderName = "Anthropic" }; tracker.RecordUsage(usage);` gives `usage.EstimatedCostUsd == 0m`. `InitializeDefaultPricing` knew gpt-4o, gpt-4o-mini, gpt-4-turbo, claude-opus-4-6, claude-sonnet-4-5 and claude-haiku-4-5 only; `CalculateCost` returned 0 when `FindPricing` found nothing.
+- **Expected:** the default table carries the current models (claude-fable-5-2, claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5 at $8/$40, $4/$20, $2/$10, $0.10/$0.50 per million input/output tokens), and a model with no price is reported as "not priced" (a flag on `TokenUsage`, or a log line), never as a cost of $0, so a budget check does not pass silently.
+- **Actual:** every claude-sonnet-5-5 call costs $0; Sevak's budget question (spend above the warning share) can never fire on a current Claude model.
+- **Encountered in:** `Sevak#REQ-UI-089` and `Sevak#REQ-RAG-118`, phase 4 verify of 13 Nov 2026: the Assistant header said "$0.00 today" after 73 answers on claude-sonnet-5-5.
+- **Workaround:** above.
+- **Suggested fix:** add the current models to `InitializeDefaultPricing`, and mark an unpriced usage instead of pricing it at zero.
+
 ## Replies from TechieRag
 
 <!-- The upstream team's answers, newest block first. -->
+
+### 2026-11-13 (later) — TR-RAG-064 fixed for 1.1.10
+
+TR-RAG-064 → `TechieRag#REQ-RAG-164`, Verified 2026-11-13, in the same unpublished 1.1.10 as TR-RAG-059 to TR-RAG-063; the owner tags and publishes. This copy did not have the entry; it was copied in from Sevak's file, unchanged apart from its status.
+
+- **Prices.** The table now has every model on Anthropic's pricing page, read on 2026-11-13 at https://platform.claude.com/docs/en/about-claude/pricing, per million input / output tokens:
+  - Fable 5.2 and Mythos 5.2: $8 / $40.
+  - Fable 5.1, Mythos 5.1, Fable 5 and Mythos 5: $10 / $50.
+  - Opus 5.5: $4 / $20. Opus 5, 4.8, 4.7, 4.6 and 4.5: $5 / $25. Opus 4.1 and 4: $15 / $75.
+  - Sonnet 5.5 and Sonnet 5: $2 / $10. Sonnet 4.6, 4.5 and 4: $3 / $15.
+  - Haiku 5.5: $0.10 / $0.50, or $0.50 / $2.50 when the prompt is over 100,000 tokens. Haiku 4.5: $1 / $5.
+  - Your four figures match the page. Two old entries were wrong and are corrected: Opus 4.6 was $15 / $75, Haiku 4.5 was $0.80 / $4.
+  - Dated, Vertex (`@date`) and Bedrock ids are priced too. Cache reads and writes are not priced.
+- **"Price not known", never $0.** A model with no price keeps a cost of 0, but `usage.IsPriceKnown` is false. That is how a host tells the two apart: a priced call that came to $0 keeps `IsPriceKnown` true. The summaries count unpriced calls apart from the cost: `UnpricedOperationCount`, `UnpricedTokens`, `UnpricedModels`, and `IsCostComplete` false. `BudgetStatus.IsCostIncomplete` is true, `TokenUsageTracker.OnPriceNotKnown` fires for each such call, and `TryGetPricing(model, out _)` answers before a call. A price key also no longer prices another version of the model: `claude-opus-5` does not price `claude-opus-5-7`, which stays "price not known" until it is added.
+- **Proof.** `REQ-RAG-164 SevakReproCostsThreeDollars` (your repro) cost $0 on 1.1.9 and costs $3.00 now. `REQ-RAG-164 CurrentClaudeModelsCostTheirListPrice` checks every model on the page; 25 of its 27 cases failed before. `REQ-RAG-164 UnknownModelIsPriceNotKnownNeverZero`, `NewerVersionIsNotPricedAsOlder`, `HaikuFiveFiveLongPromptCostsMore` and `UsageLogKeepsPriceNotKnown` cover the rest. 36 tests pass.
+
+**Verify from here:** move Sevak to TechieRag 1.1.10.
+1. Remove `TechieRagManager.SeedCurrentModelPrices`, or keep only prices the library does not have.
+2. Ask the Assistant one question on claude-sonnet-5-5. The header should show a cost above $0.00 for today.
+3. Point the Assistant at a model the table does not know. The header should say the price is not known: read `IsCostComplete` or `UnpricedTokens` from the day's summary. It should never show $0.00.
+4. Set a cost budget with a small `MaxCostUsd` and run until the warning share is passed. `OnBudgetAlert` should fire.
+
+### 2026-11-13 — TR-RAG-059 and TR-RAG-060 fixed for 1.1.10
+
+Both are fixed in TechieRag 1.1.10, the same unpublished release as TR-RAG-061 to TR-RAG-063; the owner tags and publishes. This copy did not have either entry; both were copied in today from Sevak's file, unchanged apart from their status.
+
+- **TR-RAG-060 → `TechieRag#REQ-RAG-161`, Verified 2026-11-13, against a real PostgreSQL 18 with pgvector 0.8.6** (TechieRag's own test container, `pgvector/pgvector:0.8.6-pg18-trixie`). `PgVectorStore` now builds an HNSW index, which needs no training, so it is correct when built on the empty table. On start-up it drops an existing IVFFlat `IdxChunksEmbedding` and builds the HNSW one, with a logged warning; that happens once, on Sevak's existing database too. Each search runs in its own transaction with `hnsw.ef_search` raised to topK (40 to 1,000). On pgvector 0.8.0 and later it also uses `hnsw.iterative_scan = strict_order`, so a search filtered to one document still finds that document's chunks. Proven by `REQ-RAG-161 SearchOnNewDatabaseReturnsEveryChunk` (50 chunks, topK 50, with the planner held to the index): on 1.1.9 it returned **2 of 50**, now 50, in cosine order. Your repro, `REQ-RAG-161 TwoChunksComeBackEveryRun` (two texts, a search for two, five times), returned **0** on 1.1.9 and now returns 2 every time. Also covered: `REQ-RAG-161 EarlierIvfFlatIndexIsReplaced` ("ivfflat" on 1.1.9, now "hnsw") and `REQ-RAG-161 FilteredSearchFindsFarDocument`. Each test builds its tables in a new schema, so the index is always built on an empty table, as on a new database.
+- **TR-RAG-059 → `TechieRag#REQ-RAG-162`, Verified 2026-11-13.** `ITokenTracker` has `GetUsageBetween(fromUtc, toUtc)`, `GetUsageByDay(firstDay, lastDay, timeZone)` and `GetUsageByMonth(firstDay, lastDay, timeZone)`. Days and months are counted in the time zone you pass, so "today" is India's today. With `WithPersistence` (Sevak's server path included), every usage is also written to a `TrTokenUsage` table in the same database, so both figures include usage from before a restart. `UsageTracking.PersistUsage = false` turns this off; `WithTokenUsageLog(log)` takes another store. Proven by `REQ-RAG-162 RestartKeepsTodayAndThisMonth` (SQLite: a second tracker on the same file sees the first one's usage by day and by month, in UTC+05:30) and `REQ-RAG-162 PostgresLogKeepsUsageAcrossRestart` (the same on the real PostgreSQL). On 1.1.9 these methods did not exist, so the tests could not be built, and a restart started usage at zero. Usage from before the upgrade was never stored, so on the first day Sevak runs 1.1.10, "this month" starts from that day.
+
+**Verify from here:** move Sevak to TechieRag 1.1.10. (1) Remove `WithExactVectorSearch`'s `ivfflat.probes` option, start Sevak once on its existing database (the log should say the IVFFlat index is replaced), then run `Sevak#REQ-RAG-109` three times; it should pass each time. (2) In `ChatPane.RefreshSpend`, read `GetUsageByDay(today, today, india)[today]` and `GetUsageByMonth(today, today, india)[firstOfMonth]`. Make a call, restart Sevak, and check that both figures still include it.
+
+### 2026-11-11 — TR-RAG-061, TR-RAG-062 and TR-RAG-063 fixed for 1.1.10
+
+All three are fixed in TechieRag 1.1.10. The packages now carry 1.1.10, not 1.1.9: Sevak already built against 1.1.9, and a second 1.1.9 with other contents would stay hidden behind the copy in Sevak's package cache. Nothing is published yet; the owner tags and publishes. TR-RAG-059 and TR-RAG-060 are not in this copy and are not part of this release; they are planned for Thursday on Windows.
+
+- **TR-RAG-063 → `TechieRag#REQ-RAG-158`, Verified 2026-11-12 (live call made).** `AnthropicLlmProvider` leaves `temperature` and `top_p` out for Claude Fable and Mythos, Opus 4.7 and later, and every generation-5 model (`claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`). It still sends them to Opus 4.6, Sonnet 4.6, Haiku 4.5, older models and non-Claude models. A model the rule does not know that answers 400 naming a sampling option gets the call sent once more without them, and is remembered for the rest of the process. Proven by `REQ-RAG-158 SonnetFiveFiveChatWithTemperatureSucceeds`, against a stand-in that answers with your recorded 400 (`{"type":"error","error":{"type":"invalid_request_error","message":"temperature is deprecated for this model."}}`). It fails on 1.1.9 with `LlmHttpException … 400 (Bad Request). Provider message: temperature is deprecated for this model.` and passes now. The same holds inside `AgentLoopRunner` and while streaming. **Live call made 2026-11-12:** `REQ-RAG-158 LiveSonnetFiveFiveAnswersWithTemperatureSet` sent `Temperature = 0.3f` and `TopP = 0.9f` to the real `claude-sonnet-5-5` and got an answer (passed, 3 s).
+- **TR-RAG-062 → `TechieRag#REQ-RAG-159`, Verified 2026-11-11.** `AgentLoopRunner.RunAsync` and `RunStreamAsync` read a tool request written as text when it names one of the loop's tools: bare JSON, a code fence, or `<tool_call>` tags (several per turn). It runs through the loop's own tool handler, so `GuardedToolHandler` and your egress gate apply, and it counts against the iteration limit. Its result is fed back, and the request is never the final answer. While streaming, such text is held back, not shown. Proven by `REQ-RAG-159 BareJsonRequestRunsAsToolCall` (your exact shape), which fails on 1.1.9 (the answer was the request) and passes now. Also covered by `WrittenRequestGoesThroughTheGuard`, `WrittenRequestsObeyTheIterationLimit`, and `LocalModelWrittenRequestIsRun` through `LocalLlmProvider` with the Phi-3 template.
+- **TR-RAG-061 → `TechieRag#REQ-RAG-160`, Verified 2026-11-11.** Each entity and its fields are written once, in the first tool's description; the other four tools point to it. A host picks a turn's entities with `skill.BeginTurn(turnId, ["task", "project"])` or `skill.OfferEntities(...)`. A call naming another entity is refused with `HostDataEntityNotOffered`. Proven by `REQ-RAG-160 FifteenEntitiesFitAFourThousandTokenModel`: 15 entities with 2 to 9 fields, one agent call to a 4,096-token ChatML model through `LocalLlmProvider`. On 1.1.9 it throws `LocalPromptTooLongException` at 7,214 tokens (the test's word counter; your real tokenizer counted 7,805). Now the prompt is 2,458 tokens and the call answers. The Qwen weights are not on this machine, so the real tokenizer was not run.
+
+**Verify from here:** move Sevak to TechieRag 1.1.10. (1) Run the agent on `claude-sonnet-5-5` with `Temperature = 0.3f`; it should answer, and no 400 should appear in the log. (2) Ask Phi-3 mini a question that needs `rag-search`; the trace should show a `rag-search` tool step and then a real answer. (3) Register the 15 entities on Qwen 2.5 0.5B; the first call should answer with no `LocalPromptTooLongException`. Then try `BeginTurn(turnId, <the turn's entities>)` to shorten the prompt further.
 
 ### 2026-11-08 — TR-RAG-055 to TR-RAG-058 built for 1.1.9
 

@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Business Requirements</h1>
-    <div class="sub">Last rendered: 2026-10-06</div>
+    <div class="sub">Last rendered: 2026-11-13</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#summary">1. Summary</a></li>
@@ -143,7 +143,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Business Requirements</h1>
-    <div class="subtitle">Rendered 2026-10-06 &middot; source <code>TechieRag-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-11-13 &middot; source <code>TechieRag-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -374,6 +374,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-219</strong> — The PostgreSQL store shall return every stored chunk a search asks for, in cosine order, whatever plan PostgreSQL picks, on a new database or one an older version created <em>(REQ-RAG-161, added 2026-11-13)</em> <em>Screen:</em> Vector stores
+<ul>
+<li><em>Acceptance:</em> When a developer stores N chunks and searches with topK of N or more, then all N come back in cosine order.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="semantic-search">Semantic search<a class="anchor-link" href="#semantic-search">#</a></h3>
 <p>Returns ranked, scored chunks for a query, optionally scoped to one document.</p>
@@ -452,6 +458,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-221</strong> — The embedded package shall report the model as downloaded, and name its folder, from the folder the model actually loaded from <em>(REQ-RAG-163, added 2026-11-13)</em> <em>Screen:</em> Embedded package
+<ul>
+<li><em>Acceptance:</em> When a provider has loaded the model from any folder, then IsModelDownloaded() is true and GetModelDirectory() names that folder.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="llm-providers">LLM providers<a class="anchor-link" href="#llm-providers">#</a></h3>
 <p>One <code>ILlmProvider</code> contract over six hosted or local model servers, plus custom providers.</p>
@@ -495,6 +507,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-33</strong> — A developer can supply a custom LLM provider via factory, and read provider capability flags <em>(F-LLM)</em> <em>Screen:</em> LLM providers
 <ul>
 <li><em>Acceptance:</em> When a developer passes a factory to <code>UseCustomLlmProvider</code>, then <code>Build()</code> uses it and its capability flags are readable.
+</li>
+</ul>
+</li>
+<li><strong>BRD-216</strong> — The Anthropic provider shall leave out sampling options (temperature, top_p) for a Claude model that refuses them, send them to models that take them, and retry once without them on a refusal <em>(REQ-RAG-158, added 2026-11-13)</em> <em>Screen:</em> LLM providers
+<ul>
+<li><em>Acceptance:</em> When a developer sets Temperature on a Claude model that refuses it, then the call succeeds without it; a model that takes it still gets it.
 </li>
 </ul>
 </li>
@@ -570,6 +588,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-217</strong> — The agent loop shall run a tool request a model writes as text (bare JSON, a code fence or tool_call tags) naming an offered tool, under the same handler, limit and guardrails as a structured call <em>(REQ-RAG-159, added 2026-11-13)</em> <em>Screen:</em> Agent loop
+<ul>
+<li><em>Acceptance:</em> When a model writes a tool request as text naming an offered tool, then the loop runs it and the request text is never the answer.
+</li>
+</ul>
+</li>
+<li><strong>BRD-218</strong> — The host data skill (phase-3 BRD-211) shall describe each entity once across its tools and let a host offer only some entities for a turn, refusing a call to another <em>(REQ-RAG-160, added 2026-11-13)</em> <em>Screen:</em> Agent loop
+<ul>
+<li><em>Acceptance:</em> When a host registers 15 entities, then each appears once; when it offers some for a turn, then a call to another is refused.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="conversation-memory">Conversation memory<a class="anchor-link" href="#conversation-memory">#</a></h3>
 <p>Keeps multi-turn history within a token budget.</p>
@@ -617,6 +647,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-50</strong> — The system shall fire budget-alert and usage-recorded events, and optionally block on exceed <em>(F-TOKEN)</em> <em>Screen:</em> Token tracking
 <ul>
 <li><em>Acceptance:</em> When usage passes the alert threshold, then <code>OnBudgetAlert</code> fires; with <code>BlockOnExceeded</code> set, the next call is refused.
+</li>
+</ul>
+</li>
+<li><strong>BRD-220</strong> — The system shall keep every token usage in a durable log (with persistence, in the same database) and report usage by day and by month in a chosen time zone <em>(REQ-RAG-162, added 2026-11-13)</em> <em>Screen:</em> Token tracking
+<ul>
+<li><em>Acceptance:</em> When a host restarts and asks for today's or this month's usage, then usage recorded before the restart is counted.
+</li>
+</ul>
+</li>
+<li><strong>BRD-222</strong> — The pricing table shall carry Anthropic's list price for every current Claude model, and a usage on a model with no price shall be marked price not known, never costed at $0 <em>(REQ-RAG-164, added 2026-11-13)</em> <em>Screen:</em> Token tracking
+<ul>
+<li><em>Acceptance:</em> When a host records usage on a current Claude model, then it costs the list price; on an unpriced model, it says price not known.
 </li>
 </ul>
 </li>
@@ -811,7 +853,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <p>No <code>perf-budget:</code> line is written: the owner has stated no numeric budget. The logging requirement records the Stack answer set's Serilog default as overridden for a package: the library takes an <code>ILoggerFactory</code> and pins no sink.</p>
 <h2 id="development-status"><a id="7-development-status"></a>7. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-10-01.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-11-13.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -821,15 +863,15 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Non-functional</td><td>7</td><td>7</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Ingestion</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Embedding providers</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Vector stores</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Vector stores</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Semantic search</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Embedded package</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: LLM providers</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Embedded package</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: LLM providers</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: RAG generation</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Structured output</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Agent loop</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Agent loop</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Conversation memory</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Token tracking</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Token tracking</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Resilience</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Fallback provider</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Prompt templates</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>

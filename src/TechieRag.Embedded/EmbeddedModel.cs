@@ -132,11 +132,65 @@ public sealed class EmbeddedModel
     public string GetModelDirectory() => ModelRoot.GetModelDirectory(Name);
 
     /// <summary>
-    /// Gets whether every file of the model is already on disk (under the model root, or a complete
-    /// copy an older version left next to the assembly).
+    /// Gets whether the model is on disk: every file under the model root or in a complete copy an older
+    /// version left next to the assembly, or a folder a provider in this process loaded it from
+    /// (REQ-RAG-163, AstroLyfe TR-RAG-001).
     /// </summary>
     /// <returns><see langword="true"/> when using it downloads nothing.</returns>
-    public bool IsDownloaded() => ModelDownloadService.IsComplete(ResolveDirectory(), GetDownloadFiles());
+    public bool IsDownloaded() =>
+        LoadedFolderStillThere() is not null || ModelDownloadService.IsComplete(ResolveDirectory(), GetDownloadFiles());
+
+    /// <summary>
+    /// Gets the folder the model runs from: the folder a provider in this process loaded it from, else the
+    /// folder a provider would load it from now (the model root, or a complete older copy next to the
+    /// assembly) (REQ-RAG-163, AstroLyfe TR-RAG-001).
+    /// </summary>
+    /// <returns>The absolute folder path.</returns>
+    /// <remarks><see cref="GetModelDirectory"/> stays the folder a download writes to.</remarks>
+    public string GetLoadDirectory() => LoadedFolderStillThere() ?? ResolveDirectory();
+
+    /// <summary>The folder each model was last loaded from in this process, by model name.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> SharedLoadedFolders =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>A private record for one asynchronous flow, set by <see cref="IsolateLoadedFolders"/>; for tests.</summary>
+    private static readonly AsyncLocal<System.Collections.Concurrent.ConcurrentDictionary<string, string>?> IsolatedLoadedFolders = new();
+
+    /// <summary>The record in effect: this flow's private one, else the process-wide one.</summary>
+    private static System.Collections.Concurrent.ConcurrentDictionary<string, string> LoadedFolders =>
+        IsolatedLoadedFolders.Value ?? SharedLoadedFolders;
+
+    /// <summary>Records the folder a provider loaded this model from.</summary>
+    /// <param name="folder">The folder.</param>
+    internal void NoteLoaded(string folder) => LoadedFolders[Name] = Path.GetFullPath(folder);
+
+    /// <summary>
+    /// Gives the calling asynchronous flow an empty record of loaded folders of its own until the returned
+    /// object is disposed; for tests, so a model another test loads in parallel cannot change what this
+    /// flow reads, and a load in this flow is not seen by others.
+    /// </summary>
+    /// <returns>Dispose to return to the process-wide record.</returns>
+    internal static IDisposable IsolateLoadedFolders()
+    {
+        var previous = IsolatedLoadedFolders.Value;
+        IsolatedLoadedFolders.Value = new System.Collections.Concurrent.ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        return new Restore(previous);
+    }
+
+    /// <summary>Puts back the record that was in effect before <see cref="IsolateLoadedFolders"/>.</summary>
+    private sealed class Restore(System.Collections.Concurrent.ConcurrentDictionary<string, string>? previous) : IDisposable
+    {
+        public void Dispose() => IsolatedLoadedFolders.Value = previous;
+    }
+
+    /// <summary>The recorded load folder, when it still holds an ONNX model file.</summary>
+    /// <returns>The folder, or null.</returns>
+    private string? LoadedFolderStillThere() =>
+        LoadedFolders.TryGetValue(Name, out var folder)
+        && Directory.Exists(folder)
+        && Directory.EnumerateFiles(folder, "*.onnx").Any()
+            ? folder
+            : null;
 
     /// <summary>
     /// Gets the files a download fetches, with the mirror applied when one is configured.
@@ -201,6 +255,9 @@ public sealed class EmbeddedModel
         return legacy is not null && ModelDownloadService.IsComplete(legacy, downloadFiles) ? legacy : root;
     }
 
+    /// <summary>For tests: the folder that stands in for <c>&lt;assembly folder&gt;/models</c>.</summary>
+    internal static string? LegacyDirectoryOverride { get; set; }
+
     /// <summary>
     /// The folder versions before REQ-RAG-053 downloaded into: <c>&lt;assembly folder&gt;/models/&lt;name&gt;</c>.
     /// </summary>
@@ -208,6 +265,12 @@ public sealed class EmbeddedModel
     /// <returns>The folder, or <see langword="null"/> when the assembly has no file location.</returns>
     internal static string? LegacyDirectory(string modelName)
     {
+        var overridden = LegacyDirectoryOverride;
+        if (overridden is not null)
+        {
+            return Path.Combine(overridden, modelName);
+        }
+
         var assemblyLocation = typeof(EmbeddedModel).Assembly.Location;
         var assemblyDirectory = string.IsNullOrEmpty(assemblyLocation)
             ? AppContext.BaseDirectory

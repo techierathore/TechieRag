@@ -161,11 +161,7 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var sw = Stopwatch.StartNew();
         var request = BuildAnthropicRequest(messages, options);
-        var json = JsonSerializer.Serialize(request);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var response = await httpClient.PostAsync(messagesUri, content, callToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
+        using var response = await SendAsync(request, streaming: false, callToken).ConfigureAwait(false);
 
         var responseJson = await response.Content.ReadAsStringAsync(callToken).ConfigureAwait(false);
         var result = JsonSerializer.Deserialize<AnthropicResponse>(responseJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
@@ -222,13 +218,8 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
 
         var sw = Stopwatch.StartNew();
         var request = BuildAnthropicRequest(messages, options);
-        ((Dictionary<string, object>)request)["stream"] = true;
-        var json = JsonSerializer.Serialize(request);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-        var requestMessage = new HttpRequestMessage(HttpMethod.Post, messagesUri) { Content = content };
-        var response = await httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, callToken).ConfigureAwait(false);
-        await LlmHttpGuard.EnsureSuccessAsync(response, callToken).ConfigureAwait(false);
+        request["stream"] = true;
+        using var response = await SendAsync(request, streaming: true, callToken).ConfigureAwait(false);
 
         var stream = await response.Content.ReadAsStreamAsync(callToken).ConfigureAwait(false);
         using var reader = new StreamReader(stream);
@@ -295,7 +286,68 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
         return (int)Math.Ceiling(text.Length / 4.0);
     }
 
-    private object BuildAnthropicRequest(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options)
+    /// <summary>
+    /// Posts a request and returns the successful response. When the service refuses a sampling option the request
+    /// carried (HTTP 400 naming <c>temperature</c>, <c>top_p</c> or <c>top_k</c>), the call is sent once more without
+    /// them and the model is remembered, so later calls leave them out from the start (REQ-RAG-158, Sevak TR-RAG-063).
+    /// </summary>
+    /// <param name="request">The request body; the sampling options are removed from it on a retry.</param>
+    /// <param name="streaming">Whether to read the response as a stream (headers first).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The successful response; the caller disposes it.</returns>
+    /// <exception cref="LlmHttpException">The service refused the call, including the retry.</exception>
+    private async Task<HttpResponseMessage> SendAsync(Dictionary<string, object> request, bool streaming, CancellationToken cancellationToken)
+    {
+        var response = await SendOnceAsync(request, streaming, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
+            return response;
+        }
+        catch (LlmHttpException exception) when (AnthropicSamplingSupport.IsSamplingRefusal(exception, request))
+        {
+            response.Dispose();
+            var model = (string)request["model"];
+            logger.LogWarning("Model {Model} refused a sampling option ({ProviderMessage}); sending the call again without temperature, top_p and top_k", model, exception.ProviderMessage);
+            AnthropicSamplingSupport.Learn(model);
+            AnthropicSamplingSupport.RemoveSampling(request);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+
+        var retry = await SendOnceAsync(request, streaming, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await LlmHttpGuard.EnsureSuccessAsync(retry, cancellationToken).ConfigureAwait(false);
+            return retry;
+        }
+        catch
+        {
+            retry.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Serialises and posts one request.</summary>
+    /// <param name="request">The request body.</param>
+    /// <param name="streaming">Whether to return as soon as the headers arrive.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The response, successful or not.</returns>
+    private async Task<HttpResponseMessage> SendOnceAsync(Dictionary<string, object> request, bool streaming, CancellationToken cancellationToken)
+    {
+        var json = JsonSerializer.Serialize(request);
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, messagesUri)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        var completion = streaming ? HttpCompletionOption.ResponseHeadersRead : HttpCompletionOption.ResponseContentRead;
+        return await httpClient.SendAsync(requestMessage, completion, cancellationToken).ConfigureAwait(false);
+    }
+
+    private Dictionary<string, object> BuildAnthropicRequest(IReadOnlyList<ChatMessage> messages, LlmCompletionOptions? options)
     {
         var request = new Dictionary<string, object>
         {
@@ -401,8 +453,10 @@ public class AnthropicLlmProvider : ILlmProvider, IMultimodalLlmProvider
             var maxTokens = (int)request["max_tokens"];
             if (maxTokens <= budget) request["max_tokens"] = budget + maxTokens;
         }
-        else
+        else if (AnthropicSamplingSupport.TakesSampling((string)request["model"]))
         {
+            // Claude Fable, Opus 4.7+ and generation 5 refuse sampling options with a 400, so they are sent only to
+            // a model that takes them; one option set then works for every provider (REQ-RAG-158, Sevak TR-RAG-063).
             if (options?.Temperature is not null) request["temperature"] = options.Temperature.Value;
             if (options?.TopP is not null) request["top_p"] = options.TopP.Value;
         }

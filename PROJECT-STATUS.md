@@ -1,16 +1,16 @@
 ---
 project: TechieRag
-last_updated: 2026-11-08
+last_updated: 2026-11-14
 current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 42 verified
 last_verified_build: PASS
-last_verified_date: 2026-11-08
+last_verified_date: 2026-11-14
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak), handed off for UAT. 40 of 42 items are Verified; the other two wait on you (keys and a GPU runtime choice). The UsageGuide has the walkthroughs for PostgreSQL end to end, the host data skill and image generation, and the P3 DevGuide maps their code. Packages are set to 1.1.9; nothing is tagged, published or committed.
+Phase 3 of 3 (Consumer feedback from Sevak): 1.1.10 is committed on dev; PR #22's probe run failed. Fixed in the workflow, not yet committed: Apple builds no longer hide a failure, both Apple heads pin workload set 10.0.401 (Xcode 26.6, which the runner has), and the Android press waits for the emulator's network. The Android failure and its fix were reproduced on an API 34 emulator here. REQ-FN-057 stays open until the next CI run passes.
 
 ## Next command to run
 
@@ -22,7 +22,7 @@ OpenCode:
 ```
 (owner) commit, then build and publish the package — its shipped documents are current; no agent command
 ```
-Why: every phase-3 row is Verified or waits on an owner item, and the shipped documents are current. Tag `v1.1.9`.
+Why: every row in this phase's scope is terminal and the shipped documents were brought up to date; working docs/TechieRag-P3-Checklist.md.
 
 ## Open requirements
 
@@ -34,14 +34,15 @@ Why: every phase-3 row is Verified or waits on an owner item, and the shipped do
 | Needs re-verify | 0 |
 | Blocked | 2 |
 
-- [ ] REQ-RAG-146 — Graphics-card picture model (Phi-4 multimodal) loads through a GPU runtime (Blocked)
-- [ ] REQ-RAG-155 — Image generation: OpenAI and Gemini real-service checks wait on keys (Blocked)
+- [ ] REQ-RAG-146 — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, `microsoft/Phi-4-multimodal-instruct-onnx`, folder `gpu/gpu-int4-rtn-block-32` (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so *(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request) (Blocked)
+- [ ] REQ-RAG-155 — The library shall generate images: an `IImageGenerationProvider` with `GenerateImageAsync(prompt, size, options)` returning the image bytes, its media type and the usage, for OpenAI, Gemini and Venice, routed like the chat providers, with no key ever persisted; this re-scopes BRD-161 for images only *(Sevak feedback TR-RAG-058; Sevak BRD-127 and BRD-281; owner, 2026-11-07) (Blocked)
 
 ## Known blockers
 
-- REQ-RAG-155: add `OpenAIKey` and `GeminiKey` under `ImageGeneration` in `tests/TechieRag.Tests/livetests.settings.json` (git-ignored), then run `dotnet test tests/TechieRag.Tests --filter "Category=LiveImages"`. Venice passed.
-- REQ-RAG-146: the DirectML engine package stops at 0.14.1, below this library's engine 0.16.0 (ORTGENAI-003). Loading on a graphics card needs your choice of WinML or CUDA (Decision Request).
-- REQ-RAG-157 (Azure image route) was checked against a stand-in; no Azure OpenAI resource is available here.
+- REQ-FN-057 (phase 2) is Needs re-verify until a GitHub run of the probe workflow passes; the Apple heads cannot be built off a Mac. Run 43448574999 also got no Mac runner from GitHub (capacity), which no code change prevents; re-run if that happens again.
+- REQ-FN-057: one Android press crashed natively (signal 11) after downloading the model on a freshly wiped emulator; five other presses passed. Not reproduced on demand.
+- The Gmail test account has one message in Trash from the 13 Nov live test; move it back to INBOX.
+- REQ-RAG-146 (GPU runtime choice) and REQ-RAG-155 (OpenAI and Gemini keys) wait on you.
 
 ## Verification log
 
@@ -49,11 +50,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-11-08 | amend-docs | 37/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | build-phase | 39/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | build-phase | 39/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | verify-phase | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
-| 2026-11-08 | handoff-phase | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-12 | verify-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
+| 2026-11-12 | handoff-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
+| 2026-11-13 | triage-and-fix + handoff | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-13 | triage-and-fix + handoff + amend-docs | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-14 | fix-issues | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -63,13 +64,12 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 ## Standards compliance
 
-- Last check 2026-11-08: 0 findings in the new files, see the checklist Remarks.
+- Last check 2026-11-11: 0 findings in the files the fix run wrote, see the checklist Remarks.
 
 ## Deferred / future
 
-- Gemini thought signatures on function calls (newer Gemini models may ask for them back); not sent today.
-- Gemini's docs now lead with a newer "interactions" API; image generation uses `generateContent`, which still serves.
-- Image generation through the builder, `ITechieRag` and dependency injection; today only the factory route.
-- Checklist rows for the 1.1.7 Lekhak work whose tests carry REQ-RAG-135 and REQ-RAG-136.
-- Open consumer feedback entries (TR-RAG-020/021/022/026/035, etc.) for a future release.
-- Picture reading on phones: out of this phase (owner, 2026-11-05).
+- Anthropic still sends `budget_tokens` for thinking and `tool_choice` `any`; Opus 5.5 and Sonnet 5.5 refuse both.
+- The default Anthropic model is still `claude-sonnet-4-5-20250929`, which the pricing page marks deprecated.
+- Cache reads and writes are not priced by the token tracker.
+- Raise `APPLE_WORKLOAD_SET` in the probe workflow when GitHub's macOS image carries Xcode 27.
+- Open consumer feedback entries (TR-RAG-020/021/022/026/035) for a future release.
