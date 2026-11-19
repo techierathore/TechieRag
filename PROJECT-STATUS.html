@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Status</h1>
-    <div class="sub">Last rendered: 2026-11-14</div>
+    <div class="sub">Last rendered: 2026-11-19</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#where-i-am">Where I am</a></li>
@@ -121,7 +121,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Status</h1>
-    <div class="subtitle">Rendered 2026-11-14 &middot; source <code>PROJECT-STATUS.md</code></div>
+    <div class="subtitle">Rendered 2026-11-19 &middot; source <code>PROJECT-STATUS.md</code></div>
     <div class="cta-next" style="padding:20px; background:var(--cta-bg); border:2px solid var(--accent); border-radius:10px; margin:20px 0;">
       <div style="font-size:11px; color:var(--muted); letter-spacing:.5px;">NEXT COMMAND TO RUN</div>
       <div style="font-family:var(--mono); font-size:18px; margin-top:6px;">(owner) commit, then build and publish the package — its shipped documents are current; no agent command</div>
@@ -129,10 +129,10 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <tbody>
 <tr><th>project</th><td>TechieRag</td></tr>
-<tr><th>last_updated</th><td>2026-11-14</td></tr>
-<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 42 verified</td></tr>
+<tr><th>last_updated</th><td>2026-11-19</td></tr>
+<tr><th>current_phase</th><td>Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 41 verified, 1 not applicable</td></tr>
 <tr><th>last_verified_build</th><td>PASS</td></tr>
-<tr><th>last_verified_date</th><td>2026-11-14</td></tr>
+<tr><th>last_verified_date</th><td>2026-11-19</td></tr>
 </tbody>
 </table>
     <div class="toc-inline">
@@ -149,7 +149,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
       </ol>
     </div>
 <h2 id="where-i-am">Where I am<a class="anchor-link" href="#where-i-am">#</a></h2>
-<p>Phase 3 of 3 (Consumer feedback from Sevak): 1.1.10 is committed on dev; PR #22's probe run failed. Fixed in the workflow, not yet committed: Apple builds no longer hide a failure, both Apple heads pin workload set 10.0.401 (Xcode 26.6, which the runner has), and the Android press waits for the emulator's network. The Android failure and its fix were reproduced on an API 34 emulator here. REQ-FN-057 stays open until the next CI run passes.</p>
+<p>Phase 3 of 3 (Consumer feedback from Sevak), ready to release as 1.3.0. The 19 November feedback round is built and verified (REQ-RAG-165 to 172). Your two decisions are recorded: the graphics-card picture model is deferred (REQ-RAG-146 N/A) and Intel Macs are left out (REQ-RAG-173 N/A). Nothing waits on you except the OpenAI and Gemini keys. Nothing is committed.</p>
 <h2 id="next-command-to-run">Next command to run<a class="anchor-link" href="#next-command-to-run">#</a></h2>
 <p>Claude Code:</p>
 <pre><code>(owner) commit, then build and publish the package — its shipped documents are current; no agent command</code></pre>
@@ -164,24 +164,22 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>In Progress</td><td>0</td></tr>
 <tr><td>Implemented</td><td>0</td></tr>
 <tr><td>Needs re-verify</td><td>0</td></tr>
-<tr><td>Blocked</td><td>2</td></tr>
+<tr><td>Blocked</td><td>1</td></tr>
 </tbody>
 </table>
 <ul>
-<li>[ ] REQ-RAG-146 — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, <code>microsoft/Phi-4-multimodal-instruct-onnx</code>, folder <code>gpu/gpu-int4-rtn-block-32</code> (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so *(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request) (Blocked)
-</li>
 <li>[ ] REQ-RAG-155 — The library shall generate images: an <code>IImageGenerationProvider</code> with <code>GenerateImageAsync(prompt, size, options)</code> returning the image bytes, its media type and the usage, for OpenAI, Gemini and Venice, routed like the chat providers, with no key ever persisted; this re-scopes BRD-161 for images only *(Sevak feedback TR-RAG-058; Sevak BRD-127 and BRD-281; owner, 2026-11-07) (Blocked)
 </li>
 </ul>
 <h2 id="known-blockers">Known blockers<a class="anchor-link" href="#known-blockers">#</a></h2>
 <ul>
-<li>REQ-FN-057 (phase 2) is Needs re-verify until a GitHub run of the probe workflow passes; the Apple heads cannot be built off a Mac. Run 43448574999 also got no Mac runner from GitHub (capacity), which no code change prevents; re-run if that happens again.
+<li>REQ-RAG-155 waits on OpenAI and Gemini keys in the live-test settings file.
 </li>
-<li>REQ-FN-057: one Android press crashed natively (signal 11) after downloading the model on a freshly wiped emulator; five other presses passed. Not reproduced on demand.
+<li>REQ-FN-057 (phase 2) stays Needs re-verify until a GitHub probe run passes; run 44496269925's iOS failure (SDK 11 on the new macOS image) is fixed by an SDK pin, not yet run in CI.
 </li>
-<li>The Gmail test account has one message in Trash from the 13 Nov live test; move it back to INBOX.
+<li>Sevak and TrStudio must add the new <code>TechieRag.PgVector</code> package when they move to 1.3.0.
 </li>
-<li>REQ-RAG-146 (GPU runtime choice) and REQ-RAG-155 (OpenAI and Gemini keys) wait on you.
+<li>The Gmail live test refused one search once today and passed on re-run; the test account's Trash may hold its messages.
 </li>
 </ul>
 <h2 id="verification-log">Verification log<a class="anchor-link" href="#verification-log">#</a></h2>
@@ -189,11 +187,11 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Date</th><th>Phase</th><th>Result</th><th>Status table</th></tr></thead>
 <tbody>
-<tr><td>2026-11-12</td><td>verify-phase</td><td>27/27 Verified, 14 N/A</td><td>docs/TechieRag-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-11-12</td><td>handoff-phase</td><td>27/27 Verified, 14 N/A</td><td>docs/TechieRag-Checklist.md#requirements-status</td></tr>
-<tr><td>2026-11-13</td><td>triage-and-fix + handoff</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-11-13</td><td>triage-and-fix + handoff + amend-docs</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 <tr><td>2026-11-14</td><td>fix-issues</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-19</td><td>fix-issues</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-19</td><td>verify-phase</td><td>40/42 Verified</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
+<tr><td>2026-11-19</td><td>amend-docs</td><td>40/41 Verified, 1 N/A</td><td>docs/TechieRag-P3-Checklist.md#requirements-status</td></tr>
 </tbody>
 </table>
 <h2 id="library-feedback-summary">Library feedback summary<a class="anchor-link" href="#library-feedback-summary">#</a></h2>
@@ -207,20 +205,22 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="standards-compliance">Standards compliance<a class="anchor-link" href="#standards-compliance">#</a></h2>
 <ul>
-<li>Last check 2026-11-11: 0 findings in the files the fix run wrote, see the checklist Remarks.
+<li>Last check 2026-11-19: 0 findings in the files the fix run wrote, see the checklist Remarks.
 </li>
 </ul>
 <h2 id="deferred-future"><a id="deferred--future"></a>Deferred / future<a class="anchor-link" href="#deferred-future">#</a></h2>
 <ul>
+<li>The graphics-card picture model (Phi-4-multimodal), with a later engine upgrade (your decision 1, option C).
+</li>
+<li>A smaller multilingual embedded model for bulk ingest, if bge-m3-int8 (about 0.4 s a chunk) is still too slow for Sevak.
+</li>
+<li>The core still targets <code>net8.0</code>, which reached end of support on 10 Nov 2026, as did .NET 9.
+</li>
 <li>Anthropic still sends <code>budget_tokens</code> for thinking and <code>tool_choice</code> <code>any</code>; Opus 5.5 and Sonnet 5.5 refuse both.
 </li>
 <li>The default Anthropic model is still <code>claude-sonnet-4-5-20250929</code>, which the pricing page marks deprecated.
 </li>
 <li>Cache reads and writes are not priced by the token tracker.
-</li>
-<li>Raise <code>APPLE_WORKLOAD_SET</code> in the probe workflow when GitHub's macOS image carries Xcode 27.
-</li>
-<li>Open consumer feedback entries (TR-RAG-020/021/022/026/035) for a future release.
 </li>
 </ul>
   </main>

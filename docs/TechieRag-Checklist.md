@@ -14,30 +14,30 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 
 | ID | Requirement | Status | % | Remarks | Details |
 |----|-------------|--------|---|---------|---------|
-| REQ-FN-001 | Configuration & builder (fluent / appsettings / DI / config object) | Verified | 100% | 2026-10-01 verify: PASS — test `REQ-FN-001 SectionConfiguresProvidersAndRefusesKeys` | [view](#d-req-fn-001) |
-| REQ-FN-002 | AI-agent autodistribution (MSBuild skill deploy) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-002) |
-| REQ-FN-003 | NuGet packaging & publishing (GitHub Actions) | Done (pre-existing) | 100% | Verified 2026-09-03 (owner dispatch of publish-nuget.yml still the owner's; version rules 9/9 incl. live nuget.org). Migrated 2026-09-24, status preserved. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-003) |
-| REQ-NFR-001 | Performance targets (token est, streaming, batch) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-001) |
-| REQ-NFR-002 | Reliability (retry + circuit breaker + fallback) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-002) |
-| REQ-NFR-003 | Scalability (budget/model/history scaling) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-003) |
-| REQ-NFR-004 | Security (key handling, HTTPS, tool validation, budget block) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-004) |
-| REQ-NFR-005 | Observability (completion events, logging) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-005) |
-| REQ-NFR-006 | Portability / accessibility (formats, languages, uniform API) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-006) |
-| REQ-NFR-007 | Backward compatibility (v1 → v2 additive) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-nfr-007) |
-| REQ-RAG-001 | Document ingestion & processing (9 formats + chunking) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-001) |
-| REQ-RAG-002 | Embedding providers (6 + custom) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-002) |
-| REQ-RAG-003 | Vector stores (SQLite-vec / pgvector / Qdrant) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-003) |
-| REQ-RAG-004 | Semantic search & retrieval (topK, filter, scoring) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-004) |
-| REQ-RAG-005 | Offline embedded embedding (BGE-M3 ONNX) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-005) |
-| REQ-RAG-006 | LLM provider integration (6 providers) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-006) |
-| REQ-RAG-007 | Auto-RAG generation (Ask / AskStream / ChatWithRag) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-007) |
-| REQ-RAG-008 | Structured / typed output (CompleteAsync&lt;T&gt;) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-008) |
-| REQ-RAG-009 | Tool calling & agent loop | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-009) |
-| REQ-RAG-010 | Conversation memory (token-budget trimming) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-010) |
-| REQ-RAG-011 | Token tracking & budgets | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-011) |
-| REQ-RAG-012 | Resilience & retry (backoff / 429 / circuit breaker) | Done (pre-existing) | 100% | Verified 2026-07-02: Retry-After parsed via LlmHttpGuard in all six providers, 4 unit tests. Migrated 2026-09-24, status preserved. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-012) |
-| REQ-RAG-013 | Fallback LLM provider | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-013) |
-| REQ-RAG-014 | Prompt templates (default + custom) | Done (pre-existing) | 100% | Migrated 2026-09-24 by day-1 brownfield from the June checklist; was Done (pre-existing) 100% (library tests PASS 2026-09-24 via the build ladder). History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-rag-014) |
+| REQ-FN-001 | Configuration & builder (fluent / appsettings / DI / config object) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-FN-001 SectionConfiguresProvidersAndRefusesKeys` | [view](#d-req-fn-001) |
+| REQ-FN-002 | AI-agent autodistribution (MSBuild skill deploy) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-FN-002 ran | [view](#d-req-fn-002) |
+| REQ-FN-003 | NuGet packaging & publishing (GitHub Actions) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-FN-003 ran | [view](#d-req-fn-003) |
+| REQ-NFR-001 | Performance targets (token est, streaming, batch) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-001) |
+| REQ-NFR-002 | Reliability (retry + circuit breaker + fallback) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-002) |
+| REQ-NFR-003 | Scalability (budget/model/history scaling) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-003) |
+| REQ-NFR-004 | Security (key handling, HTTPS, tool validation, budget block) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-004) |
+| REQ-NFR-005 | Observability (completion events, logging) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-005) |
+| REQ-NFR-006 | Portability / accessibility (formats, languages, uniform API) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-006) |
+| REQ-NFR-007 | Backward compatibility (v1 → v2 additive) | Done (pre-existing) | 100% | 2026-11-19 verify: not observable — NFR row with no perf-budget and no unit test carrying its id | [view](#d-req-nfr-007) |
+| REQ-RAG-001 | Document ingestion & processing (9 formats + chunking) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-001 ran | [view](#d-req-rag-001) |
+| REQ-RAG-002 | Embedding providers (6 + custom) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-002 ran | [view](#d-req-rag-002) |
+| REQ-RAG-003 | Vector stores (SQLite-vec / pgvector / Qdrant) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-003 ran | [view](#d-req-rag-003) |
+| REQ-RAG-004 | Semantic search & retrieval (topK, filter, scoring) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-004 ran | [view](#d-req-rag-004) |
+| REQ-RAG-005 | Offline embedded embedding (BGE-M3 ONNX) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-005 ran | [view](#d-req-rag-005) |
+| REQ-RAG-006 | LLM provider integration (6 providers) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-006 ran | [view](#d-req-rag-006) |
+| REQ-RAG-007 | Auto-RAG generation (Ask / AskStream / ChatWithRag) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-007 ran | [view](#d-req-rag-007) |
+| REQ-RAG-008 | Structured / typed output (CompleteAsync&lt;T&gt;) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-008 ran | [view](#d-req-rag-008) |
+| REQ-RAG-009 | Tool calling & agent loop | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-009 ran | [view](#d-req-rag-009) |
+| REQ-RAG-010 | Conversation memory (token-budget trimming) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-010 ran | [view](#d-req-rag-010) |
+| REQ-RAG-011 | Token tracking & budgets | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-011 ran | [view](#d-req-rag-011) |
+| REQ-RAG-012 | Resilience & retry (backoff / 429 / circuit breaker) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-012 ran | [view](#d-req-rag-012) |
+| REQ-RAG-013 | Fallback LLM provider | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-013 ran | [view](#d-req-rag-013) |
+| REQ-RAG-014 | Prompt templates (default + custom) | Done (pre-existing) | 100% | 2026-11-19 verify: not measured — no test named REQ-RAG-014 ran | [view](#d-req-rag-014) |
 | REQ-FN-007 | Sevak (formerly TechieDesk): Home landing + navigation; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-001, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-007) |
 | REQ-FN-008 | Sevak (formerly TechieDesk): Settings page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-002, Done (pre-existing) 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-008) |
 | REQ-FN-009 | Sevak (formerly TechieDesk): LLM Settings page; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-003, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-009) |
@@ -52,13 +52,22 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 | REQ-FN-018 | Sevak (formerly TechieDesk): Qdrant Admin: collection CRUD; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-012, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-018) |
 | REQ-FN-019 | Sevak (formerly TechieDesk): Qdrant Admin: vector browse / search / detail / bulk delete; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-013, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-019) |
 | REQ-FN-020 | Sevak (formerly TechieDesk): Rename app TechieRagWeb → TechieDesk; screen moved to the Sevak repository 2026-09-24 | N/A | 100% | Was REQ-UI-014, Verified 100% on 2026-09-24. The screen belongs to Sevak since the split (BRD-87); kept here as history of the moved application. History: `docs/OldDocs/TechieRag-Checklist.md`. | [view](#d-req-fn-020) |
-| REQ-RAG-158 | Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063) | Verified | 100% | 2026-11-12 verify: PASS — test `REQ-RAG-158 SamplingRuleKnowsEachModel(model: "claude-opus-5` | [d](#d-req-rag-158) |
-| REQ-RAG-159 | Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062) | Verified | 100% | 2026-11-11 verify: PASS — test `REQ-RAG-159 JsonNamingNoOfferedToolStaysTheAnswer` | [d](#d-req-rag-159) |
-| REQ-RAG-160 | Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061) | Verified | 100% | 2026-11-11 verify: PASS — test `REQ-RAG-160 PartialEntityNamesItsOperations` | [d](#d-req-rag-160) |
-| REQ-RAG-161 | PgVectorStore search returns every stored chunk, whatever plan PostgreSQL picks (Sevak TR-RAG-060) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-161 IterativeScanOnWhenSupported` | [d](#d-req-rag-161) |
-| REQ-RAG-162 | Token usage by day and by month, kept across restarts (Sevak TR-RAG-059) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-162 LogFailureIsReportedNotThrown` | [d](#d-req-rag-162) |
-| REQ-RAG-163 | The embedding model's downloaded flag and folder name the folder the model loads from (AstroLyfe TR-RAG-001) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-163 FolderNamesOlderCopyWhenOnlyItIsComplete` | [d](#d-req-rag-163) |
-| REQ-RAG-164 | Current Claude models are priced, and a model with no price reads as not priced, never $0 (Sevak TR-RAG-064) | Verified | 100% | 2026-11-13 verify: PASS — test `REQ-RAG-164 CurrentClaudeModelsCostTheirListPrice(model: "cl` | [d](#d-req-rag-164) |
+| REQ-RAG-158 | Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063) | Verified | 100% | 2026-11-19 verify: not measured — 26 test(s) named REQ-RAG-158 passed and 1 skipped (`REQ-RAG-158 LiveSonnetFiveFiveAnswersWithTemperatu`: unit test skipped: REQ-RAG-158 LiveSonnetFiveFiveAnswersWith); a skipped test is part of the row's acceptance, so it is not measured until that test runs; Verified on 2026-11-12 stands, not re-measured | [d](#d-req-rag-158) |
+| REQ-RAG-159 | Agent loop reads a tool request a model writes as text (Sevak TR-RAG-062) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-159 JsonNamingNoOfferedToolStaysTheAnswer` | [d](#d-req-rag-159) |
+| REQ-RAG-160 | Host data skill describes its entities once and lets a host pick the entities for a turn (Sevak TR-RAG-061) | Verified | 100% | 2026-11-19 verify: PASS — test `ShippedReferenceNamesPhaseThreeMember(row: "REQ-RAG-160", me` | [d](#d-req-rag-160) |
+| REQ-RAG-161 | PgVectorStore search returns every stored chunk, whatever plan PostgreSQL picks (Sevak TR-RAG-060) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-161 SearchOnNewDatabaseReturnsEveryChunk` | [d](#d-req-rag-161) |
+| REQ-RAG-162 | Token usage by day and by month, kept across restarts (Sevak TR-RAG-059) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-162 LogFailureIsReportedNotThrown` | [d](#d-req-rag-162) |
+| REQ-RAG-163 | The embedding model's downloaded flag and folder name the folder the model loads from (AstroLyfe TR-RAG-001) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-163 FolderNamesOlderCopyWhenOnlyItIsComplete` | [d](#d-req-rag-163) |
+| REQ-RAG-164 | Current Claude models are priced, and a model with no price reads as not priced, never $0 (Sevak TR-RAG-064) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-164 CurrentClaudeModelsCostTheirListPrice(model: "cl` | [d](#d-req-rag-164) |
+| REQ-RAG-165 | The embedded package shall offer bge-m3 with 8-bit weights for bulk ingest, at least twice as fast as bge-m3 on a computer's processor (Sevak TR-RAG-065) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-165 Int8FolderIsNotStampedAsBgeM3` | [d](#d-req-rag-165) |
+| REQ-RAG-166 | The model list shall carry, per model, the published price per million tokens in and out, who runs the model, and whether it reasons, each empty when the service says nothing (Lekhak TR-RAG-011) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-166 PublicCallReturnsTheSameIdsWithDetails` | [d](#d-req-rag-166) |
+| REQ-RAG-167 | `UseSqliteVec` shall take a file path or a SQLite connection string, and the AI reference shall describe the store as shipped (TrStudio TR-RAG-005) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-167 ReferenceDescribesTheStoreAsShipped` | [d](#d-req-rag-167) |
+| REQ-RAG-168 | The core package shall carry no PostgreSQL, Qdrant or Azure client: the stores move to `TechieRag.PgVector` and `TechieRag.Qdrant`, found by the builder by name (TrStudio TR-RAG-006) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-168 AzureEmbeddingSpeaksHttpItself` | [d](#d-req-rag-168) |
+| REQ-RAG-169 | A search shall take a metadata filter applied inside the vector store (TrStudio TR-RAG-003) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-169 PgVectorFiltersInsideTheQuery` | [d](#d-req-rag-169) |
+| REQ-RAG-170 | An embedding service that cannot be reached shall throw a typed `EmbeddingUnavailableException`, still an `HttpRequestException` (TrStudio TR-RAG-004) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-170 TimeoutIsUnavailableButCancellationIsNot` | [d](#d-req-rag-170) |
+| REQ-RAG-171 | The AI reference shall show `IngestTextAsync` and the other ingestion calls with their shipped signatures (TrStudio TR-RAG-002) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-171 ReferenceShowsTheShippedIngestTextSignature` | [d](#d-req-rag-171) |
+| REQ-RAG-172 | The library shall give an exact count of matching entries with their sources, and withhold the answer when none match, without a model counting or refusing, also on `TechieRag.Local` (MyDiary TR-RAG-001) | Verified | 100% | 2026-11-19 verify: PASS — test `REQ-RAG-172 AnswerCarriesTheLibrarysCountAndSources` | [d](#d-req-rag-172) |
+| REQ-RAG-173 | The built-in model and the embedded models shall run on an Intel Mac (MyDiary TR-RAG-003) | N/A | 0 | [REQ-RAG-173] 2026-11-19 owner, Decision Request decision 2, option B: Intel Macs are left out of the built-in models; no second engine. MyDiary told in its feedback reply | [d](#d-req-rag-173) |
 
 **Status values:** `Not Started` · `In Progress` · `Implemented` · `Verified` · `Done (pre-existing)` · `Needs re-verify` · `PARTIAL` · `FAIL` · `Blocked` · `Owner-UAT` · `N/A`. `Owner-UAT` marks a row only the owner can close, by following the UsageGuide test plan; the verifier cannot reach it from this machine.
 
@@ -73,6 +82,10 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 <a id="d-req-fn-002"></a>
 - **REQ-FN-002** — AI-agent autodistribution (MSBuild skill deploy). *BRD:* BRD-57, BRD-58. *Phase 1.*
   - *Acceptance:* When a consumer builds a project referencing `TechieRag` on their machine, then `.techierag/TechieRag-AI-Reference.md` and the two command files appear in the repository root.
+
+<a id="d-req-rag-171"></a>
+- **REQ-RAG-171** — The AI reference shall show `IngestTextAsync` and the other ingestion calls with their shipped signatures (TrStudio TR-RAG-002). *BRD:* BRD-229. *Phase 1.*
+  - *Acceptance:* When a developer copies an ingestion call from the reference, then it compiles against the package.
 
 ## Surface: Packaging
 
@@ -122,6 +135,10 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-RAG-002** — Embedding providers (6 + custom). *BRD:* BRD-8, BRD-9, BRD-10, BRD-11. *Phase 1.*
   - *Acceptance:* When a developer calls `EmbedAsync` and `EmbedBatchAsync` on any provider, then vectors of the provider's dimension return for one text and for a batch.
 
+<a id="d-req-rag-170"></a>
+- **REQ-RAG-170** — An embedding service that cannot be reached shall throw a typed `EmbeddingUnavailableException`, still an `HttpRequestException` (TrStudio TR-RAG-004). *BRD:* BRD-228. *Phase 1.*
+  - *Acceptance:* When the embedding service is stopped and a host ingests or searches, then the call throws `EmbeddingUnavailableException` naming the provider.
+
 ## Surface: Vector stores
 
 <a id="d-req-rag-003"></a>
@@ -131,6 +148,18 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 <a id="d-req-rag-161"></a>
 - **REQ-RAG-161** — PgVectorStore search returns every stored chunk, whatever plan PostgreSQL picks (Sevak TR-RAG-060). *BRD:* BRD-219. *Phase 1.*
   - *Acceptance:* When a developer stores N chunks and searches with topK of N or more, then all N come back in cosine order.
+
+<a id="d-req-rag-167"></a>
+- **REQ-RAG-167** — `UseSqliteVec` shall take a file path or a SQLite connection string, and the AI reference shall describe the store as shipped (TrStudio TR-RAG-005). *BRD:* BRD-225. *Phase 1.*
+  - *Acceptance:* When a developer calls `UseSqliteVec("Data Source=app.db")` or `UseSqliteVec("app.db")`, then both open app.db.
+
+<a id="d-req-rag-168"></a>
+- **REQ-RAG-168** — The core package shall carry no PostgreSQL, Qdrant or Azure client: the stores move to `TechieRag.PgVector` and `TechieRag.Qdrant`, found by the builder by name (TrStudio TR-RAG-006). *BRD:* BRD-226. *Phase 1.*
+  - *Acceptance:* When a console app references only TechieRag, then no PostgreSQL, Qdrant, gRPC or Azure package or file reaches its output; when it adds TechieRag.PgVector, then `UsePostgres` works unchanged.
+
+<a id="d-req-rag-169"></a>
+- **REQ-RAG-169** — A search shall take a metadata filter applied inside the vector store (TrStudio TR-RAG-003). *BRD:* BRD-227. *Phase 1.*
+  - *Acceptance:* When a host searches with a metadata filter, then the results are the best matching chunks, even when other chunks are closer to the query.
 
 ## Surface: Semantic search
 
@@ -148,6 +177,14 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-RAG-163** — The embedding model's downloaded flag and folder name the folder the model loads from (AstroLyfe TR-RAG-001). *BRD:* BRD-221. *Phase 1.*
   - *Acceptance:* When a provider has loaded the model from any folder, then IsModelDownloaded() is true and GetModelDirectory() names that folder.
 
+<a id="d-req-rag-165"></a>
+- **REQ-RAG-165** — The embedded package shall offer bge-m3 with 8-bit weights for bulk ingest, at least twice as fast as bge-m3 on a computer's processor (Sevak TR-RAG-065). *BRD:* BRD-223. *Phase 1.*
+  - *Acceptance:* When a host embeds the same chunks with both models, then bge-m3-int8 takes at most 60 percent of bge-m3's time, its vectors at least 0.95 cosine to bge-m3's.
+
+<a id="d-req-rag-173"></a>
+- **REQ-RAG-173** — The built-in model and the embedded models shall run on an Intel Mac (MyDiary TR-RAG-003). *BRD:* BRD-231. *Phase 1.*
+  - *Acceptance:* When an app on an Intel Mac loads the built-in model, then it answers.
+
 ## Surface: LLM providers
 
 <a id="d-req-rag-006"></a>
@@ -158,11 +195,19 @@ Deliver the configurable .NET RAG library described in `docs/TechieRag-BRD.md` �
 - **REQ-RAG-158** — Anthropic provider leaves out sampling options a Claude model refuses (Sevak TR-RAG-063). *BRD:* BRD-216. *Phase 1.*
   - *Acceptance:* When a developer sets Temperature on a Claude model that refuses it, then the call succeeds without it; a model that takes it still gets it.
 
+<a id="d-req-rag-166"></a>
+- **REQ-RAG-166** — The model list shall carry, per model, the published price per million tokens in and out, who runs the model, and whether it reasons, each empty when the service says nothing (Lekhak TR-RAG-011). *BRD:* BRD-224. *Phase 1.*
+  - *Acceptance:* When a host lists a service's models with details, then each carries the price, data handling and reasoning the service publishes, and empty values where it publishes none.
+
 ## Surface: RAG generation
 
 <a id="d-req-rag-007"></a>
 - **REQ-RAG-007** — Auto-RAG generation (Ask / AskStream / ChatWithRag). *BRD:* BRD-34, BRD-35, BRD-36, BRD-37, BRD-38. *Phase 1.*
   - *Acceptance:* When a developer calls `AskAsync` with a question, then the answer, its sources with scores and token usage return.
+
+<a id="d-req-rag-172"></a>
+- **REQ-RAG-172** — The library shall give an exact count of matching entries with their sources, and withhold the answer when none match, without a model counting or refusing, also on `TechieRag.Local` (MyDiary TR-RAG-001). *BRD:* BRD-230. *Phase 1.*
+  - *Acceptance:* When a host asks a counting question, then the response's count is every matching entry; when nothing matches, then the response is marked withheld and no model was called.
 
 ## Surface: Structured output
 

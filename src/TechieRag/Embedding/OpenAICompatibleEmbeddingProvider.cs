@@ -229,7 +229,8 @@ public sealed class OpenAICompatibleEmbeddingProvider : IEmbeddingProvider, IDis
         if (inputType is not null) request["input_type"] = inputType;
 
         var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync(apiPath, content, cancellationToken).ConfigureAwait(false);
+        var response = await EmbeddingFailures.GuardAsync(
+            () => httpClient.PostAsync(apiPath, content, cancellationToken), Name, httpClient.BaseAddress, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

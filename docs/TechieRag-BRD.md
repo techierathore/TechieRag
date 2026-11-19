@@ -110,6 +110,8 @@ Turns text into vectors through any of eight providers or a custom one, chosen b
   - *Acceptance:* When a developer configures Azure OpenAI or an HTTP-compatible embedding endpoint, then `Build()` creates that provider and `EmbedAsync` reaches it.
 - **BRD-11** — A developer can supply a custom embedding provider via factory *(F-EMB)* *Screen:* Embedding providers
   - *Acceptance:* When a developer passes a factory to `UseCustomEmbeddingProvider`, then `Build()` uses that provider for every embedding call.
+- **BRD-228** — Every built-in HTTP embedding provider shall throw `EmbeddingUnavailableException` (an `HttpRequestException`) when its service cannot be reached or does not answer in time, and keep a plain `HttpRequestException` with the status for a service that answers with an error *(REQ-RAG-170, TrStudio TR-RAG-004, added 2026-11-19)* *Screen:* Embedding providers
+  - *Acceptance:* When the embedding service is stopped and a host ingests or searches, then the call throws `EmbeddingUnavailableException` naming the provider.
 
 ### Vector stores
 
@@ -125,6 +127,12 @@ Persists and searches embeddings in SQLite, PostgreSQL with pgvector or Qdrant.
   - *Acceptance:* When a developer upserts, batch-upserts, searches with a document filter, deletes and reads stats on each store, then every operation behaves the same.
 - **BRD-219** — The PostgreSQL store shall return every stored chunk a search asks for, in cosine order, whatever plan PostgreSQL picks, on a new database or one an older version created *(REQ-RAG-161, added 2026-11-13)* *Screen:* Vector stores
   - *Acceptance:* When a developer stores N chunks and searches with topK of N or more, then all N come back in cosine order.
+- **BRD-225** — `UseSqliteVec` shall accept a file path or a SQLite connection string that names the file, and the AI reference shall name the argument, the two tables (`Documents`, `Chunks`) and the managed cosine scan instead of a vec extension *(REQ-RAG-167, TrStudio TR-RAG-005, added 2026-11-19)* *Screen:* Vector stores
+  - *Acceptance:* When a developer calls `UseSqliteVec("Data Source=app.db")` or `UseSqliteVec("app.db")`, then both open app.db.
+- **BRD-226** — The TechieRag core package shall carry no PostgreSQL, Qdrant, gRPC or Azure client: the PostgreSQL stores ship in `TechieRag.PgVector`, the Qdrant store in `TechieRag.Qdrant`, the Azure OpenAI embedding provider uses raw HTTP, and the builder's existing calls find a store's package by name or name the package to add *(REQ-RAG-168, TrStudio TR-RAG-006, added 2026-11-19)* *Screen:* Vector stores
+  - *Acceptance:* When a console app references only TechieRag, then no PostgreSQL, Qdrant, gRPC or Azure package or file reaches its output; when it adds TechieRag.PgVector, then `UsePostgres` works unchanged.
+- **BRD-227** — `SearchOptions.MetadataFilter` shall limit a search to chunks whose metadata carries the given text values, applied inside the SQLite and PostgreSQL stores' own query, and by widening candidate sets in any other store *(REQ-RAG-169, TrStudio TR-RAG-003, added 2026-11-19)* *Screen:* Vector stores
+  - *Acceptance:* When a host searches with a metadata filter, then the results are the best matching chunks, even when other chunks are closer to the query.
 
 ### Semantic search
 
@@ -164,6 +172,10 @@ Gives a fully offline embedding path with a model downloaded once.
   - *Acceptance:* When a developer subscribes to `ModelDownloadService.ProgressChanged` during a download, then progress events with bytes and percentage arrive.
 - **BRD-221** — The embedded package shall report the model as downloaded, and name its folder, from the folder the model actually loaded from *(REQ-RAG-163, added 2026-11-13)* *Screen:* Embedded package
   - *Acceptance:* When a provider has loaded the model from any folder, then IsModelDownloaded() is true and GetModelDirectory() names that folder.
+- **BRD-223** — The embedded package shall offer bge-m3 with 8-bit weights (`EmbeddedModel.BgeM3Int8`), pinned to one commit, that embeds a chunk in at most 60 percent of bge-m3's time on a computer's processor with vectors at least 0.95 cosine to bge-m3's, and names its vectors apart from bge-m3's *(REQ-RAG-165, Sevak TR-RAG-065, added 2026-11-19)* *Screen:* Embedded package
+  - *Acceptance:* When a host embeds the same chunks with both models, then bge-m3-int8 takes at most 60 percent of bge-m3's time, its vectors at least 0.95 cosine to bge-m3's.
+- **BRD-231** — The built-in language model and the embedded embedding models shall run on an Intel Mac *(REQ-RAG-173, MyDiary TR-RAG-003, added 2026-11-19; not done: owner decision 2026-11-19 leaves Intel Macs out)* *Screen:* Embedded package
+  - *Acceptance:* When an app on an Intel Mac loads the built-in model, then it answers.
 
 ### LLM providers
 
@@ -185,6 +197,8 @@ One `ILlmProvider` contract over six hosted or local model servers, plus custom 
   - *Acceptance:* When a developer passes a factory to `UseCustomLlmProvider`, then `Build()` uses it and its capability flags are readable.
 - **BRD-216** — The Anthropic provider shall leave out sampling options (temperature, top_p) for a Claude model that refuses them, send them to models that take them, and retry once without them on a refusal *(REQ-RAG-158, added 2026-11-13)* *Screen:* LLM providers
   - *Acceptance:* When a developer sets Temperature on a Claude model that refuses it, then the call succeeds without it; a model that takes it still gets it.
+- **BRD-224** — `LlmProviderFactory.ListModelDetailsAsync` shall return, per model a service lists, its published input and output price per million tokens, whether the service runs the model itself, passes the text on or runs it locally, and whether it reasons, each empty when the service says nothing *(REQ-RAG-166, Lekhak TR-RAG-011, added 2026-11-19)* *Screen:* LLM providers
+  - *Acceptance:* When a host lists a service's models with details, then each carries the price, data handling and reasoning the service publishes, and empty values where it publishes none.
 
 ### RAG generation
 
@@ -200,6 +214,8 @@ Answers questions from retrieved context, single-turn or multi-turn, streamed or
   - *Acceptance:* When a developer iterates `ChatWithRagStreamAsync`, then the multi-turn answer streams in pieces.
 - **BRD-38** — The system shall behave identically to v1 (retrieval only) when no LLM is configured *(F-RAG)* *Screen:* RAG generation
   - *Acceptance:* When no LLM is configured and a developer searches and ingests, then behaviour equals v1 and `GetLlmProvider()` is null.
+- **BRD-230** — `FindMatchesAsync` shall return every document with a chunk at or above a score, counted by the library, and `AskWithEvidenceAsync` shall answer from the matches with that count and their sources, or withhold the answer without a model call when nothing matches, with any provider including `TechieRag.Local` *(REQ-RAG-172, MyDiary TR-RAG-001, added 2026-11-19)* *Screen:* RAG generation
+  - *Acceptance:* When a host asks a counting question, then the response's count is every matching entry; when nothing matches, then the response is marked withheld and no model was called.
 
 ### Structured output
 
@@ -288,6 +304,8 @@ Installs the AI skill files into a consuming repository on build.
   - *Acceptance:* When a consumer builds a project referencing `TechieRag` on their machine, then `.techierag/TechieRag-AI-Reference.md` and the two command files appear in the repository root.
 - **BRD-58** — The system shall refresh the deployed skill files on each package update without manual steps *(F-AUTODIST)* *Screen:* Autodistribution
   - *Acceptance:* When a consumer updates the package and rebuilds, then the deployed skill files are refreshed without a manual step.
+- **BRD-229** — The shipped AI reference shall show `IngestTextAsync` with `Dictionary<string, object>? metadata` returning `Task<string>`, and `IngestAsync` and `IngestDirectoryAsync` with their shipped return types *(REQ-RAG-171, TrStudio TR-RAG-002, added 2026-11-19)* *Screen:* Autodistribution
+  - *Acceptance:* When a developer copies an ingestion call from the reference, then it compiles against the package.
 
 ### Packaging
 
@@ -351,21 +369,21 @@ No `perf-budget:` line is written: the owner has stated no numeric budget. The l
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-11-13.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
+**Snapshot as of 2026-11-19.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
 | Surface: Configuration | 1 | 1 | 0 | Done |
-| Surface: Autodistribution | 1 | 1 | 0 | Done |
+| Surface: Autodistribution | 2 | 2 | 0 | Done |
 | Surface: Packaging | 1 | 1 | 0 | Done |
 | Non-functional | 7 | 7 | 0 | Done |
 | Surface: Ingestion | 1 | 1 | 0 | Done |
-| Surface: Embedding providers | 1 | 1 | 0 | Done |
-| Surface: Vector stores | 2 | 2 | 0 | Done |
+| Surface: Embedding providers | 2 | 2 | 0 | Done |
+| Surface: Vector stores | 5 | 5 | 0 | Done |
 | Surface: Semantic search | 1 | 1 | 0 | Done |
-| Surface: Embedded package | 2 | 2 | 0 | Done |
-| Surface: LLM providers | 2 | 2 | 0 | Done |
-| Surface: RAG generation | 1 | 1 | 0 | Done |
+| Surface: Embedded package | 3 | 3 | 0 | Done |
+| Surface: LLM providers | 3 | 3 | 0 | Done |
+| Surface: RAG generation | 2 | 2 | 0 | Done |
 | Surface: Structured output | 1 | 1 | 0 | Done |
 | Surface: Agent loop | 3 | 3 | 0 | Done |
 | Surface: Conversation memory | 1 | 1 | 0 | Done |

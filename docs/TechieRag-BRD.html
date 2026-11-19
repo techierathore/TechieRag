@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Business Requirements</h1>
-    <div class="sub">Last rendered: 2026-11-13</div>
+    <div class="sub">Last rendered: 2026-11-19</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#summary">1. Summary</a></li>
@@ -143,7 +143,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Business Requirements</h1>
-    <div class="subtitle">Rendered 2026-11-13 &middot; source <code>TechieRag-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-11-19 &middot; source <code>TechieRag-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -346,6 +346,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-228</strong> — Every built-in HTTP embedding provider shall throw <code>EmbeddingUnavailableException</code> (an <code>HttpRequestException</code>) when its service cannot be reached or does not answer in time, and keep a plain <code>HttpRequestException</code> with the status for a service that answers with an error <em>(REQ-RAG-170, TrStudio TR-RAG-004, added 2026-11-19)</em> <em>Screen:</em> Embedding providers
+<ul>
+<li><em>Acceptance:</em> When the embedding service is stopped and a host ingests or searches, then the call throws <code>EmbeddingUnavailableException</code> naming the provider.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="vector-stores">Vector stores<a class="anchor-link" href="#vector-stores">#</a></h3>
 <p>Persists and searches embeddings in SQLite, PostgreSQL with pgvector or Qdrant.</p>
@@ -377,6 +383,24 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-219</strong> — The PostgreSQL store shall return every stored chunk a search asks for, in cosine order, whatever plan PostgreSQL picks, on a new database or one an older version created <em>(REQ-RAG-161, added 2026-11-13)</em> <em>Screen:</em> Vector stores
 <ul>
 <li><em>Acceptance:</em> When a developer stores N chunks and searches with topK of N or more, then all N come back in cosine order.
+</li>
+</ul>
+</li>
+<li><strong>BRD-225</strong> — <code>UseSqliteVec</code> shall accept a file path or a SQLite connection string that names the file, and the AI reference shall name the argument, the two tables (<code>Documents</code>, <code>Chunks</code>) and the managed cosine scan instead of a vec extension <em>(REQ-RAG-167, TrStudio TR-RAG-005, added 2026-11-19)</em> <em>Screen:</em> Vector stores
+<ul>
+<li><em>Acceptance:</em> When a developer calls <code>UseSqliteVec("Data Source=app.db")</code> or <code>UseSqliteVec("app.db")</code>, then both open app.db.
+</li>
+</ul>
+</li>
+<li><strong>BRD-226</strong> — The TechieRag core package shall carry no PostgreSQL, Qdrant, gRPC or Azure client: the PostgreSQL stores ship in <code>TechieRag.PgVector</code>, the Qdrant store in <code>TechieRag.Qdrant</code>, the Azure OpenAI embedding provider uses raw HTTP, and the builder's existing calls find a store's package by name or name the package to add <em>(REQ-RAG-168, TrStudio TR-RAG-006, added 2026-11-19)</em> <em>Screen:</em> Vector stores
+<ul>
+<li><em>Acceptance:</em> When a console app references only TechieRag, then no PostgreSQL, Qdrant, gRPC or Azure package or file reaches its output; when it adds TechieRag.PgVector, then <code>UsePostgres</code> works unchanged.
+</li>
+</ul>
+</li>
+<li><strong>BRD-227</strong> — <code>SearchOptions.MetadataFilter</code> shall limit a search to chunks whose metadata carries the given text values, applied inside the SQLite and PostgreSQL stores' own query, and by widening candidate sets in any other store <em>(REQ-RAG-169, TrStudio TR-RAG-003, added 2026-11-19)</em> <em>Screen:</em> Vector stores
+<ul>
+<li><em>Acceptance:</em> When a host searches with a metadata filter, then the results are the best matching chunks, even when other chunks are closer to the query.
 </li>
 </ul>
 </li>
@@ -464,6 +488,18 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-223</strong> — The embedded package shall offer bge-m3 with 8-bit weights (<code>EmbeddedModel.BgeM3Int8</code>), pinned to one commit, that embeds a chunk in at most 60 percent of bge-m3's time on a computer's processor with vectors at least 0.95 cosine to bge-m3's, and names its vectors apart from bge-m3's <em>(REQ-RAG-165, Sevak TR-RAG-065, added 2026-11-19)</em> <em>Screen:</em> Embedded package
+<ul>
+<li><em>Acceptance:</em> When a host embeds the same chunks with both models, then bge-m3-int8 takes at most 60 percent of bge-m3's time, its vectors at least 0.95 cosine to bge-m3's.
+</li>
+</ul>
+</li>
+<li><strong>BRD-231</strong> — The built-in language model and the embedded embedding models shall run on an Intel Mac <em>(REQ-RAG-173, MyDiary TR-RAG-003, added 2026-11-19; not done: owner decision 2026-11-19 leaves Intel Macs out)</em> <em>Screen:</em> Embedded package
+<ul>
+<li><em>Acceptance:</em> When an app on an Intel Mac loads the built-in model, then it answers.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="llm-providers">LLM providers<a class="anchor-link" href="#llm-providers">#</a></h3>
 <p>One <code>ILlmProvider</code> contract over six hosted or local model servers, plus custom providers.</p>
@@ -516,6 +552,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-224</strong> — <code>LlmProviderFactory.ListModelDetailsAsync</code> shall return, per model a service lists, its published input and output price per million tokens, whether the service runs the model itself, passes the text on or runs it locally, and whether it reasons, each empty when the service says nothing <em>(REQ-RAG-166, Lekhak TR-RAG-011, added 2026-11-19)</em> <em>Screen:</em> LLM providers
+<ul>
+<li><em>Acceptance:</em> When a host lists a service's models with details, then each carries the price, data handling and reasoning the service publishes, and empty values where it publishes none.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="rag-generation">RAG generation<a class="anchor-link" href="#rag-generation">#</a></h3>
 <p>Answers questions from retrieved context, single-turn or multi-turn, streamed or not.</p>
@@ -547,6 +589,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <li><strong>BRD-38</strong> — The system shall behave identically to v1 (retrieval only) when no LLM is configured <em>(F-RAG)</em> <em>Screen:</em> RAG generation
 <ul>
 <li><em>Acceptance:</em> When no LLM is configured and a developer searches and ingests, then behaviour equals v1 and <code>GetLlmProvider()</code> is null.
+</li>
+</ul>
+</li>
+<li><strong>BRD-230</strong> — <code>FindMatchesAsync</code> shall return every document with a chunk at or above a score, counted by the library, and <code>AskWithEvidenceAsync</code> shall answer from the matches with that count and their sources, or withhold the answer without a model call when nothing matches, with any provider including <code>TechieRag.Local</code> <em>(REQ-RAG-172, MyDiary TR-RAG-001, added 2026-11-19)</em> <em>Screen:</em> RAG generation
+<ul>
+<li><em>Acceptance:</em> When a host asks a counting question, then the response's count is every matching entry; when nothing matches, then the response is marked withheld and no model was called.
 </li>
 </ul>
 </li>
@@ -726,6 +774,12 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
+<li><strong>BRD-229</strong> — The shipped AI reference shall show <code>IngestTextAsync</code> with <code>Dictionary&lt;string, object&gt;? metadata</code> returning <code>Task&lt;string&gt;</code>, and <code>IngestAsync</code> and <code>IngestDirectoryAsync</code> with their shipped return types <em>(REQ-RAG-171, TrStudio TR-RAG-002, added 2026-11-19)</em> <em>Screen:</em> Autodistribution
+<ul>
+<li><em>Acceptance:</em> When a developer copies an ingestion call from the reference, then it compiles against the package.
+</li>
+</ul>
+</li>
 </ul>
 <h3 id="packaging">Packaging<a class="anchor-link" href="#packaging">#</a></h3>
 <p>Builds, versions and publishes the packages to two feeds.</p>
@@ -853,21 +907,21 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <p>No <code>perf-budget:</code> line is written: the owner has stated no numeric budget. The logging requirement records the Stack answer set's Serilog default as overridden for a package: the library takes an <code>ILoggerFactory</code> and pins no sink.</p>
 <h2 id="development-status"><a id="7-development-status"></a>7. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-11-13.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-11-19.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
 <tr><td>Surface: Configuration</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Autodistribution</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Autodistribution</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Packaging</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Non-functional</td><td>7</td><td>7</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Ingestion</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Embedding providers</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Vector stores</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Embedding providers</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Vector stores</td><td>5</td><td>5</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Semantic search</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: Embedded package</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: LLM providers</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
-<tr><td>Surface: RAG generation</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: Embedded package</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: LLM providers</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
+<tr><td>Surface: RAG generation</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Structured output</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Agent loop</td><td>3</td><td>3</td><td>0</td><td>Done</td></tr>
 <tr><td>Surface: Conversation memory</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>

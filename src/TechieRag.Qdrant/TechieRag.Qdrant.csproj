@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Same targets as TechieRag core, so a net8.0 consumer of the Qdrant store keeps it. -->
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>TechieRag</RootNamespace>
+
+    <!-- Package Metadata -->
+    <PackageId>TechieRag.Qdrant</PackageId>
+    <Version>1.3.0</Version>
+    <Authors>Techie Rathor</Authors>
+    <Company>TechieRathor</Company>
+    <Description>Qdrant for TechieRag: the Qdrant vector store (QdrantStore, UseQdrant). Brings in Qdrant.Client and its gRPC libraries, which the TechieRag core package no longer carries.</Description>
+    <PackageTags>RAG;AI;VectorStore;Qdrant;TechieRag</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Same publishing posture as TechieRag core - see NUGET-PUBLISHING.md. -->
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TechieRag.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TechieRag\TechieRag.csproj" />
+  </ItemGroup>
+
+  <!-- REQ-RAG-168 (TrStudio TR-RAG-006): this left the core package, so an app that uses only SQLite no
+       longer carries the Qdrant and gRPC clients. -->
+  <ItemGroup>
+    <PackageReference Include="Qdrant.Client" Version="1.16.1" />
+  </ItemGroup>
+
+</Project>

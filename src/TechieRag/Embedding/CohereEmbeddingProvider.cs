@@ -161,7 +161,8 @@ public sealed class CohereEmbeddingProvider : IEmbeddingProvider, IDisposable
         };
 
         var content = new StringContent(JsonSerializer.Serialize(request), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync("/v2/embed", content, cancellationToken).ConfigureAwait(false);
+        var response = await EmbeddingFailures.GuardAsync(
+            () => httpClient.PostAsync("/v2/embed", content, cancellationToken), Name, httpClient.BaseAddress, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

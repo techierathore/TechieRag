@@ -96,6 +96,8 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
     private InferenceSession? session;
     private Tokenizer? tokenizer;
     private bool feedsTokenTypeIds;
+    private string[]? pooledOutputOnly;
+    private const string SentenceEmbeddingOutput = "sentence_embedding";
     private readonly int maxSequenceLength;
     private bool disposed;
     private bool initialized;
@@ -188,7 +190,10 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
         this.maxSequenceLength = maxSequenceLength;
         Dimensions = dimensions;
-        ModelName = dimensions == EmbeddedModel.BgeM3.Dimensions ? EmbeddedModel.BgeM3.Name : $"embedded-onnx-{dimensions}d";
+        // REQ-RAG-165: a folder of bge-m3-int8 files is named for that model, so its vectors are never
+        // stamped as bge-m3's.
+        ModelName = EmbeddedModel.RecognizeFolder(modelDirectory, dimensions)?.Name
+            ?? (dimensions == EmbeddedModel.BgeM3.Dimensions ? EmbeddedModel.BgeM3.Name : $"embedded-onnx-{dimensions}d");
 
         // Initialize immediately for pre-loaded models
         InitializeFromDirectory(modelDirectory);
@@ -240,6 +245,10 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
 
         session = new InferenceSession(modelPath, sessionOptions);
         feedsTokenTypeIds = session.InputMetadata.ContainsKey("token_type_ids");
+
+        // REQ-RAG-165: when the graph pools for us, ask for that output alone, so the per-token output
+        // (sequence length x 1024 floats) is never copied out of the runtime for each chunk.
+        pooledOutputOnly = session.OutputMetadata.ContainsKey(SentenceEmbeddingOutput) ? [SentenceEmbeddingOutput] : null;
         tokenizer = LoadTokenizer(tokenizerPath, modelDirectory);
         ModelDirectory = Path.GetFullPath(modelDirectory);
 
@@ -357,9 +366,9 @@ public class EmbeddedEmbeddingProvider : IEmbeddingProvider, IDisposable
             inputs.Add(NamedOnnxValue.CreateFromTensor("token_type_ids", new DenseTensor<long>(new long[seqLength], [1, seqLength])));
         }
 
-        using var outputs = session.Run(inputs);
+        using var outputs = pooledOutputOnly is null ? session.Run(inputs) : session.Run(inputs, pooledOutputOnly);
 
-        var output = outputs.FirstOrDefault(o => o.Name == "sentence_embedding")
+        var output = outputs.FirstOrDefault(o => o.Name == SentenceEmbeddingOutput)
                   ?? outputs.FirstOrDefault(o => o.Name == "last_hidden_state")
                   ?? outputs.First();
 

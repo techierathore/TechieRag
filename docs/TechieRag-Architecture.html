@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag — Architecture</h1>
-    <div class="sub">Last rendered: 2026-11-12</div>
+    <div class="sub">Last rendered: 2026-11-19</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#stack-decisions">1. Stack decisions</a></li>
@@ -123,7 +123,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag — Architecture</h1>
-    <div class="subtitle">Rendered 2026-11-12 &middot; source <code>TechieRag-Architecture.md</code></div>
+    <div class="subtitle">Rendered 2026-11-19 &middot; source <code>TechieRag-Architecture.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -172,18 +172,20 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Project</th><th>Kind</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>TechieRag</code></td><td>class library, NuGet package (<code>net10.0;net8.0</code>)</td><td>The core: ingestion and 13 document processors, 4 chunkers, 8 embedding providers, 3 vector stores, semantic search with optional reranking, 6 LLM providers behind <code>ILlmProvider</code>, auto-RAG (<code>Ask*</code>, <code>ChatWithRag*</code>), structured output, the tool-calling agent loop and flow orchestration, MCP client, data connectors (Confluence, email, repository), web ingestion, conversation and workspace stores, token tracking, resilience, prompt templates, and the MSBuild targets that install the AI skill files into a consumer's repository. 17 packages, no vendor AI SDKs.</td></tr>
+<tr><td><code>TechieRag</code></td><td>class library, NuGet package (<code>net10.0;net8.0</code>)</td><td>The core: ingestion and 13 document processors, 4 chunkers, 8 embedding providers, the SQLite vector store (PostgreSQL and Qdrant in their own packages since 1.3.0), semantic search with optional reranking, 6 LLM providers behind <code>ILlmProvider</code>, auto-RAG (<code>Ask*</code>, <code>ChatWithRag*</code>), structured output, the tool-calling agent loop and flow orchestration, MCP client, data connectors (Confluence, email, repository), web ingestion, conversation and workspace stores, token tracking, resilience, prompt templates, and the MSBuild targets that install the AI skill files into a consumer's repository. 17 packages, no vendor AI SDKs.</td></tr>
 <tr><td><code>TechieRag.Embedded</code></td><td>class library, NuGet package (<code>net10.0</code>)</td><td>Offline embeddings and reranking on ONNX Runtime: <code>UseEmbedded()</code> (bge-m3, 1024 dimensions, downloaded once), <code>UseMiniLM</code> / <code>UseBgeSmall</code> (384 dimensions), <code>UseEmbeddedReranker()</code> (bge-reranker-v2-m3), <code>ModelDownloadService</code>, the macOS native-library resolver.</td></tr>
-<tr><td><code>TechieRag.Telemetry</code></td><td>class library, NuGet package (<code>net10.0;net8.0</code>)</td><td>Opt-in OpenTelemetry exporters (OTLP, console) over the core's <code>ActivitySource</code> and <code>Meter</code>, so the core links no exporter. Never packed by either workflow today (Open question 4).</td></tr>
-<tr><td><code>TechieRag.Tests</code></td><td>xUnit test project (<code>net10.0</code>)</td><td>Unit tests plus live-gated tests for network, PostgreSQL, the ONNX reranker and the embedder tokenizer. References all three packages.</td></tr>
-<tr><td><code>TechieRag.Agents</code> <em>(BRD-84/85, ADR-008/011; built 2026-09-24)</em></td><td>class library, NuGet package (<code>net10.0;net8.0</code>)</td><td>Agents on Microsoft Agent Framework 1.22.0 over TechieRag: <code>TechieRagAgentBuilder</code> (LM Studio first), <code>ITechieRagAgent</code>, <code>RetrievalContextProvider</code> over the core <code>TechieRag.Agentic</code> contract, and the four public seam adapters in <code>Interop/</code>. References <code>Microsoft.Agents.AI</code> 1.22.0, <code>Microsoft.Extensions.AI</code> 10.10.0, <code>Microsoft.Extensions.AI.OpenAI</code> 10.10.0. No MSBuild targets.</td></tr>
-<tr><td><code>TechieRag.Agents.Tests</code></td><td>xUnit test project (<code>net10.0</code>)</td><td>Offline tests of the builder and adapters against a scripted <code>IChatClient</code> and a real <code>TechieRagClient</code>; live LM Studio tests gated by <code>LiveLmStudioFactAttribute</code>.</td></tr>
-<tr><td><code>TechieRag.Local</code> <em>(BRD-96…109, ADR-014; built 2026-09-24 up to the runtime)</em></td><td>class library, NuGet package (<code>net10.0</code>)</td><td>In-process local language model behind <code>UseLocalLlm()</code> (via <code>UseCustomLlmProvider</code>): one public <code>LocalLlmProvider</code> over the internal <code>ILocalLlmRuntime</code> seam; <code>LocalModel</code> catalog (Qwen2.5 0.5B on phones, Phi-3 mini on desktops; one pinned, SHA-256-hashed file set per runtime format); terms-gated resumable download through <code>TechieRag.Embedded</code>'s <code>ModelDownloadService</code> into the model root; <code>MemoryGate</code>; chat templates, stop sequences and the context-length refusal in managed code; <code>LocalLlm.Register()</code> for <code>LlmSource.Local</code>. References core and <code>TechieRag.Embedded</code>; <strong>no inference runtime and no <code>buildTransitive</code> targets yet</strong> — both wait for the owner's per-platform runtime choice (Open question 11).</td></tr>
-<tr><td><code>TechieRag.Local.Tests</code> <em>(built 2026-09-24)</em></td><td>xUnit test project (<code>net10.0</code>)</td><td>The runtime-neutral conformance suite (<code>LocalLlmConformanceTests</code>) run against a scripted runtime, provider, download (loopback HTTP), memory, template and registration tests; live tests gated by <code>LiveLocalLlmFactAttribute</code> in the non-parallel <code>LiveLocalLlm</code> collection.</td></tr>
-<tr><td><code>samples/TechieRag.Probe</code> <em>(planned, BRD-94)</em></td><td>.NET MAUI app, four heads</td><td>The four-platform proof: embed, store, search, generate, with timings. Not packed.</td></tr>
+<tr><td><code>TechieRag.PgVector</code> <em>(BRD-226)</em></td><td>NuGet package (<code>net10.0;net8.0</code>)</td><td>The PostgreSQL stores; a module initializer registers them in the core's <code>StorePackages</code>, which loads the assembly by name.</td></tr>
+<tr><td><code>TechieRag.Qdrant</code> <em>(BRD-226)</em></td><td>NuGet package (<code>net10.0;net8.0</code>)</td><td><code>QdrantStore</code>, found likewise.</td></tr>
+<tr><td><code>TechieRag.Telemetry</code></td><td>class library, NuGet package (<code>net10.0;net8.0</code>)</td><td>Opt-in OpenTelemetry exporters (OTLP, console) over the core's <code>ActivitySource</code> and <code>Meter</code>, so the core links no exporter.</td></tr>
+<tr><td><code>TechieRag.Tests</code></td><td>xUnit test project (<code>net10.0</code>)</td><td>Unit tests and live-gated tests; references every package.</td></tr>
+<tr><td><code>TechieRag.Agents</code> <em>(BRD-84/85, ADR-008/011; built 2026-09-24)</em></td><td>class library, NuGet package (<code>net10.0;net8.0</code>)</td><td>Agents on Microsoft Agent Framework 1.22.0 over TechieRag: <code>TechieRagAgentBuilder</code> (LM Studio first), <code>ITechieRagAgent</code>, <code>RetrievalContextProvider</code> over the core <code>TechieRag.Agentic</code> contract, and the four public seam adapters in <code>Interop/</code>. On Microsoft Agent Framework 1.22.0 and Microsoft.Extensions.AI 10.10.0.</td></tr>
+<tr><td><code>TechieRag.Agents.Tests</code></td><td>xUnit test project (<code>net10.0</code>)</td><td>Offline tests of the builder and adapters; live LM Studio tests gated by <code>LiveLmStudioFactAttribute</code>.</td></tr>
+<tr><td><code>TechieRag.Local</code> <em>(BRD-96…109, ADR-014)</em></td><td>class library, NuGet package (<code>net10.0</code>)</td><td>In-process local language model behind <code>UseLocalLlm()</code>: one public <code>LocalLlmProvider</code> over the internal <code>ILocalLlmRuntime</code> seam, on ONNX Runtime GenAI 0.16.0 (DECISIONS.md 2026-09-25); <code>LocalModel</code> catalog with pinned, hashed file sets; terms-gated download through <code>TechieRag.Embedded</code>; <code>MemoryGate</code>; chat templates, stop sequences and the context-length refusal in managed code.</td></tr>
+<tr><td><code>TechieRag.Local.Tests</code> <em>(built 2026-09-24)</em></td><td>xUnit test project (<code>net10.0</code>)</td><td>The runtime-neutral conformance suite against a scripted runtime, plus provider, download, memory and template tests; live tests gated by <code>LiveLocalLlmFactAttribute</code>.</td></tr>
+<tr><td><code>samples/TechieRag.Probe</code> <em>(planned, BRD-94)</em></td><td>.NET MAUI app, four heads</td><td>The four-platform proof, with timings. Not packed.</td></tr>
 </tbody>
 </table>
-<p>Removed on 2026-09-24 (BRD-87, <code>REQ-FN-006</code>): the five <code>apps/TechieDesk*</code> projects, <code>tests/TechieDesk.Tests</code>, <code>tests/appium</code>, <code>tests/verify</code>, <code>playwright.config.ts</code>, <code>publish-desktop.yml</code>, the application documents and mockups. They live in the Sevak repository, which pins <code>TechieRag</code> and <code>TechieRag.Embedded</code> 1.0.7.</p>
+<p>Removed 2026-09-24 (BRD-87): the TechieDesk application, now the Sevak repository.</p>
 <h2 id="component-map"><a id="3-component-map"></a>3. Component map<a class="anchor-link" href="#component-map">#</a></h2>
 <div class="diagram">
   <div class="dt">
@@ -505,6 +507,9 @@ internal interface ILocalLlmModel : ILocalTokenizer   // CountTokens(text): spec
 <tr><td>2026-11-05</td><td>Phi-3.5-vision (CPU, the pictures default) and Phi-4-multimodal (GPU); GPU engine DirectML, opt-in package; no phones</td><td>Owner, Decision Request 2026-11-05</td><td>CPU done; GPU blocked (BRD-204)</td></tr>
 <tr><td>2026-11-07</td><td>Host-data skill behind interfaces (ADR-002); <code>IImageGenerationProvider</code> on raw HttpClient (ADR-003); PostgreSQL proven on a harness-started PostgreSQL 18; no new package</td><td>Sevak phases 4 and 5 consume them (owner, 2026-11-07)</td><td>done (BRD-210 to BRD-213)</td></tr>
 <tr><td>2026-11-08</td><td><code>openai-compatible</code> and <code>azure-openai</code> image routes reuse the OpenAI image format</td><td>Owner, 2026-11-08</td><td>done (BRD-214, BRD-215)</td></tr>
+<tr><td>2026-11-19</td><td>PostgreSQL, Qdrant in sibling packages found by assembly name; Azure embeddings on HttpClient</td><td>TrStudio TR-RAG-006</td><td>done (BRD-226)</td></tr>
+<tr><td>2026-11-19</td><td><code>EmbeddedModel.BgeM3Int8</code>, opt-in; no batching</td><td>Sevak TR-RAG-065: about 3 times faster</td><td>done (BRD-223)</td></tr>
+<tr><td>2026-11-19</td><td>GPU picture model deferred; no Intel Mac engine</td><td>Owner, decisions 1C, 2B</td><td>done</td></tr>
 </tbody>
 </table>
 <h2 id="module-responsibilities"><a id="7-module-responsibilities"></a>7. Module responsibilities<a class="anchor-link" href="#module-responsibilities">#</a></h2>

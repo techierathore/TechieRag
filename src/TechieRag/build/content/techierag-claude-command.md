@@ -368,6 +368,6 @@ Shows all available providers:
 **Vector Stores:**
 | Store | Builder Method | Requires |
 |-------|---------------|----------|
-| SqliteVec | UseSqliteVec() | sqlite-vec extension (bundled) |
-| PgVector | UsePgVector() | PostgreSQL with pgvector |
-| Qdrant | UseQdrant() | Qdrant server |
+| SqliteVec | UseSqliteVec() / UseSqliteVec(path or "Data Source=…") | no native extension; exact cosine scan in managed code; tables `Documents` and `Chunks` |
+| PgVector | UsePgVector() | PostgreSQL with pgvector; add package TechieRag.PgVector (1.3.0+) |
+| Qdrant | UseQdrant() | Qdrant server; add package TechieRag.Qdrant (1.3.0+) |

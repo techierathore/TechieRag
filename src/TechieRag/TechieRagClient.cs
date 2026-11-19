@@ -475,8 +475,18 @@ public class TechieRagClient : ITechieRag
         var queryVector = await embeddingProvider.EmbedAsync(query, cancellationToken).ConfigureAwait(false);
         var fetchCount = useReranker ? Math.Max(topK, config.Rerank.CandidateCount) : topK;
 
+        // REQ-RAG-169 (TrStudio TR-RAG-003): a metadata filter runs inside the store, with the document scope.
         // REQ-RAG-114: a document set is one store query, never one per document.
-        var results = options.DocumentFilters is { Count: > 0 } documentSet
+        var results = options.MetadataFilter is { Count: > 0 } metadataFilter
+            ? await vectorStore
+                .SearchMatchingAsync(
+                    queryVector,
+                    fetchCount,
+                    options.DocumentFilters is { Count: > 0 } scope ? scope : options.DocumentFilter is { } single ? [single] : null,
+                    metadataFilter,
+                    cancellationToken)
+                .ConfigureAwait(false)
+            : options.DocumentFilters is { Count: > 0 } documentSet
             ? await vectorStore
                 .SearchDocumentsAsync(queryVector, fetchCount, documentSet, cancellationToken)
                 .ConfigureAwait(false)
@@ -648,6 +658,46 @@ public class TechieRagClient : ITechieRag
             Usage = response.Usage,
             Query = question,
             ModelName = response.ModelName
+        };
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Answers from the matching chunks themselves, the best <see cref="EvidenceAskOptions.MaxContextChunks"/> of them,
+    /// with the library's count and the matching names in the system prompt (REQ-RAG-172, MyDiary TR-RAG-001).
+    /// </remarks>
+    public async Task<RagResponse> AskWithEvidenceAsync(string question, EvidenceAskOptions options, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(question);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var report = await ((ITechieRag)this).FindMatchesAsync(question, options.Match, cancellationToken).ConfigureAwait(false);
+        if (report.IsEmpty)
+        {
+            logger.LogInformation("AskWithEvidenceAsync: nothing scored {MinScore} or more; the answer is withheld", options.Match.MinScore);
+            return new RagResponse { Answer = string.Empty, Sources = [], Usage = new TokenUsage(), Query = question, Matches = report, Abstained = true };
+        }
+
+        EnsureLlmConfigured();
+        var sources = report.Documents
+            .SelectMany(document => document.Chunks)
+            .OrderByDescending(result => result.Score)
+            .Take(Math.Max(1, options.MaxContextChunks))
+            .ToList();
+        var messages = promptTemplate.BuildRagPrompt(
+            question,
+            sources,
+            EvidencePrompt.Build(options.SystemPrompt ?? config.Prompt.SystemPrompt, report));
+        var response = await llmProvider!.ChatAsync(messages, options.CompletionOptions, cancellationToken).ConfigureAwait(false);
+
+        return new RagResponse
+        {
+            Answer = response.Content ?? string.Empty,
+            Sources = sources,
+            Usage = response.Usage,
+            Query = question,
+            ModelName = response.ModelName,
+            Matches = report
         };
     }
 

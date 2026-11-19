@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout no-toc">
   <main>
     <h1>TechieRag — Business Requirements — Phase 3: Consumer feedback from Sevak</h1>
-    <div class="subtitle">Rendered 2026-11-13 &middot; source <code>TechieRag-P3-BRD.md</code></div>
+    <div class="subtitle">Rendered 2026-11-19 &middot; source <code>TechieRag-P3-BRD.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -384,7 +384,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </li>
 </ul>
 </li>
-<li><strong>BRD-204</strong> — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, <code>microsoft/Phi-4-multimodal-instruct-onnx</code>, folder <code>gpu/gpu-int4-rtn-block-32</code> (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so <em>(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request)</em> <em>Screen:</em> Local picture reading
+<li><strong>BRD-204</strong> — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, <code>microsoft/Phi-4-multimodal-instruct-onnx</code>, folder <code>gpu/gpu-int4-rtn-block-32</code> (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so <em>(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request)</em> <em>Screen:</em> Local picture reading <em>Deferred 2026-11-19 by the owner (Decision Request decision 1, option C): the graphics-card load waits for a later engine upgrade; the refusal before download stays.</em>
 <ul>
 <li><em>Acceptance:</em> When a developer loads the Phi-4 multimodal model on Local picture reading, then it loads with the GPU runtime and refuses before any download without it.
 </li>
@@ -481,7 +481,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 </ul>
 <h2 id="development-status"><a id="5-development-status"></a>5. Development status<a class="anchor-link" href="#development-status">#</a></h2>
 <p>Written by the status gate after every build, verify and handoff; not by hand.</p>
-<p><strong>Snapshot as of 2026-11-13.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
+<p><strong>Snapshot as of 2026-11-19.</strong> Live per-requirement status: <code>PROJECT-STATUS.md</code> and the Requirements Status table in <code>docs/TechieRag-P3-Checklist.md</code>.</p>
 <table>
 <thead><tr><th>Screen</th><th>Requirements</th><th>Verified</th><th>Open</th><th>Status</th></tr></thead>
 <tbody>
@@ -490,7 +490,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <tr><td>Model routing</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
 <tr><td>Local model lifetime</td><td>1</td><td>1</td><td>0</td><td>Done</td></tr>
 <tr><td>LLM streaming</td><td>8</td><td>8</td><td>0</td><td>Done</td></tr>
-<tr><td>Local picture reading (<code>LocalModel</code>, <code>LocalLlmProvider</code> as <code>IMultimodalLlmProvider</code>, <code>ChatImage</code>, <code>ChatContentPart</code>)</td><td>7</td><td>6</td><td>1</td><td>Partial</td></tr>
+<tr><td>Local picture reading (<code>LocalModel</code>, <code>LocalLlmProvider</code> as <code>IMultimodalLlmProvider</code>, <code>ChatImage</code>, <code>ChatContentPart</code>)</td><td>6</td><td>6</td><td>0</td><td>Done</td></tr>
 <tr><td>Host data skill (<code>HostDataSkill</code>, <code>IHostEntity</code>, <code>HostDataChange</code>)</td><td>2</td><td>2</td><td>0</td><td>Done</td></tr>
 <tr><td>Image generation (<code>IImageGenerationProvider</code>, <code>GenerateImageAsync</code>)</td><td>3</td><td>2</td><td>1</td><td>Partial</td></tr>
 </tbody>

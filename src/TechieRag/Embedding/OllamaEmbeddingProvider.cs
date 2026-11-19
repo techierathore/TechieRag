@@ -120,9 +120,14 @@ public class OllamaEmbeddingProvider : IEmbeddingProvider, IDisposable
             response = await httpClient.PostAsJsonAsync("/api/embeddings", request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (EmbeddingFailures.Unavailable(ex, Name, httpClient.BaseAddress, $"Failed to connect to Ollama at {endpoint}. Ensure Ollama is running.", cancellationToken) is { } unavailable)
         {
-            throw new HttpRequestException($"Failed to connect to Ollama at {endpoint}. Ensure Ollama is running.", ex);
+            // REQ-RAG-170 (TrStudio TR-RAG-004): a stopped Ollama is a typed "not reachable", still an HttpRequestException.
+            throw unavailable;
+        }
+        catch (HttpRequestException ex) when (ex is not Models.EmbeddingUnavailableException)
+        {
+            throw new HttpRequestException($"Failed to connect to Ollama at {endpoint}. Ensure Ollama is running.", ex, ex.StatusCode);
         }
 
         var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>(cancellationToken: cancellationToken);
@@ -173,7 +178,8 @@ public class OllamaEmbeddingProvider : IEmbeddingProvider, IDisposable
                 Prompt = text
             };
 
-            var response = await httpClient.PostAsJsonAsync("/api/embeddings", request, cancellationToken);
+            var response = await EmbeddingFailures.GuardAsync(
+                () => httpClient.PostAsJsonAsync("/api/embeddings", request, cancellationToken), Name, httpClient.BaseAddress, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<OllamaEmbeddingResponse>(cancellationToken: cancellationToken);

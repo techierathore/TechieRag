@@ -12,6 +12,8 @@ namespace TechieRag.Llm;
 /// key as a bearer token, and an Anthropic-compatible one <c>GET {endpoint}/v1/models</c> with
 /// <c>x-api-key</c> (REQ-RAG-130; a service without that call answers 404, which throws). All map onto
 /// the same list of ids.</para>
+/// <para><b>Details (REQ-RAG-166):</b> the same one call also yields each model's published price, data handling
+/// and reasoning, read by <see cref="ModelDetailsReader"/>; the id list is the details' ids.</para>
 /// <para><b>A failure throws:</b> an unreachable or refusing service raises
 /// <see cref="HttpRequestException"/> rather than returning an empty list, so a host never shows "no
 /// models" for a server that is down. The API key never appears in a message.</para>
@@ -33,6 +35,27 @@ internal static class LlmModelLister
         LlmConnectorDescriptor connector,
         string? apiKey,
         HttpMessageHandler? handler,
+        CancellationToken cancellationToken) =>
+        (await ListDetailsAsync(connector, apiKey, handler, cancellationToken).ConfigureAwait(false))
+            .Select(model => model.Id)
+            .ToList();
+
+    /// <summary>
+    /// Lists the models a connector's service reports, each with the price, data handling and reasoning the
+    /// service publishes for it (REQ-RAG-166, Lekhak TR-RAG-011).
+    /// </summary>
+    /// <param name="connector">The connector, its endpoint already resolved.</param>
+    /// <param name="apiKey">The API key, or null for a service that needs none.</param>
+    /// <param name="handler">The HTTP handler; null uses the default network stack (tests pass a stub).</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>One entry per distinct id, sorted ordinally by id; the first entry the service gave for an id wins.</returns>
+    /// <exception cref="InvalidOperationException">The connector needs a key and none was given, or it has no endpoint.</exception>
+    /// <exception cref="NotSupportedException">The connector's service has no listing call this library knows.</exception>
+    /// <exception cref="HttpRequestException">The service could not be reached or refused the request.</exception>
+    public static async Task<IReadOnlyList<LlmModelDetails>> ListDetailsAsync(
+        LlmConnectorDescriptor connector,
+        string? apiKey,
+        HttpMessageHandler? handler,
         CancellationToken cancellationToken)
     {
         if (connector.RequiresApiKey && string.IsNullOrEmpty(apiKey))
@@ -40,13 +63,13 @@ internal static class LlmModelLister
             throw new InvalidOperationException($"An API key is required for the '{connector.Name}' connector.");
         }
 
-        var (path, read) = connector.Source switch
+        var (path, arrayName, idName) = connector.Source switch
         {
-            LlmSource.LmStudio => ("v1/models", (Func<JsonElement, IEnumerable<string>>)ReadOpenAIModels),
-            LlmSource.OpenAICompatible => ("models", ReadOpenAIModels),
-            LlmSource.Ollama => ("api/tags", ReadOllamaModels),
+            LlmSource.LmStudio => ("v1/models", "data", "id"),
+            LlmSource.OpenAICompatible => ("models", "data", "id"),
+            LlmSource.Ollama => ("api/tags", "models", "name"),
             // REQ-RAG-130: Anthropic's GET /v1/models answers in the same {"data":[{"id":…}]} shape.
-            LlmSource.Anthropic => ("models", ReadOpenAIModels),
+            LlmSource.Anthropic => ("models", "data", "id"),
             _ => throw new NotSupportedException(
                 $"Listing models is not supported for the '{connector.Name}' connector; it covers LM Studio, Ollama, OpenAI-compatible and Anthropic-compatible connectors.")
         };
@@ -79,26 +102,18 @@ internal static class LlmModelLister
         await LlmHttpGuard.EnsureSuccessAsync(response, cancellationToken).ConfigureAwait(false);
         await using var body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
         using var document = await JsonDocument.ParseAsync(body, cancellationToken: cancellationToken).ConfigureAwait(false);
-        return read(document.RootElement)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
+
+        // LM Studio and Ollama run models on a machine the host points at, never at a hosted service.
+        var local = connector.Source is LlmSource.LmStudio or LlmSource.Ollama;
+        return ReadArray(document.RootElement, arrayName, idName)
+            .Where(item => !string.IsNullOrWhiteSpace(item.Id))
+            .DistinctBy(item => item.Id, StringComparer.Ordinal)
+            .OrderBy(item => item.Id, StringComparer.Ordinal)
+            .Select(item => ModelDetailsReader.Read(item.Id, item.Element, local))
             .ToList();
     }
 
-    /// <summary>Reads <c>{"data":[{"id":"…"}]}</c>, the OpenAI and LM Studio shape.</summary>
-    /// <param name="root">The response body.</param>
-    /// <returns>The ids.</returns>
-    private static IEnumerable<string> ReadOpenAIModels(JsonElement root) =>
-        ReadArray(root, "data", "id");
-
-    /// <summary>Reads <c>{"models":[{"name":"…"}]}</c>, Ollama's <c>/api/tags</c> shape.</summary>
-    /// <param name="root">The response body.</param>
-    /// <returns>The model names, as <c>ollama/&lt;name&gt;</c> routes take them.</returns>
-    private static IEnumerable<string> ReadOllamaModels(JsonElement root) =>
-        ReadArray(root, "models", "name");
-
-    private static IEnumerable<string> ReadArray(JsonElement root, string arrayName, string idName)
+    private static IEnumerable<(string Id, JsonElement Element)> ReadArray(JsonElement root, string arrayName, string idName)
     {
         if (root.ValueKind != JsonValueKind.Object
             || !root.TryGetProperty(arrayName, out var items)
@@ -113,7 +128,7 @@ internal static class LlmModelLister
                 && item.TryGetProperty(idName, out var id)
                 && id.ValueKind == JsonValueKind.String)
             {
-                yield return id.GetString()!;
+                yield return (id.GetString()!, item);
             }
         }
     }

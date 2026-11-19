@@ -13,11 +13,11 @@
 
     <!-- Package Metadata -->
     <PackageId>TechieRag</PackageId>
-    <Version>1.1.10</Version>
+    <Version>1.3.0</Version>
     <Authors>Techie Rathor</Authors>
     <Company>TechieRathor</Company>
-    <Description>A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. Supports multiple embedding providers (Ollama, LM Studio, OpenAI, Azure OpenAI, ONNX, HTTP) and vector stores (SQLite-vec, PostgreSQL/pgvector, Qdrant). Built-in document processors for PDF, DOCX, XLSX, PPTX, CSV, HTML, Markdown, JSON, TOML, and code files.</Description>
-    <PackageTags>RAG;AI;Embeddings;VectorStore;LLM;OpenAI;Ollama;Qdrant;pgvector;SQLite;DocumentProcessing</PackageTags>
+    <Description>A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. Supports multiple embedding providers (Ollama, LM Studio, OpenAI, Azure OpenAI, ONNX, HTTP) and vector stores (SQLite in this package; PostgreSQL/pgvector in TechieRag.PgVector and Qdrant in TechieRag.Qdrant since 1.3.0). Built-in document processors for PDF, DOCX, XLSX, PPTX, CSV, HTML, Markdown, JSON, TOML, and code files.</Description>
+    <PackageTags>RAG;AI;Embeddings;VectorStore;LLM;OpenAI;Ollama;SQLite;DocumentProcessing</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/techierathore/TechieRag</PackageProjectUrl>
     <RepositoryUrl>https://github.com/techierathore/TechieRag.git</RepositoryUrl>
@@ -47,6 +47,11 @@
     <InternalsVisibleTo Include="TechieRag.Tests" />
     <!-- One think-block splitter for every provider, without public surface (REQ-RAG-142). -->
     <InternalsVisibleTo Include="TechieRag.Local" />
+    <!-- REQ-RAG-168 (TrStudio TR-RAG-006): the PostgreSQL and Qdrant stores live in sibling packages and
+         register with the builder through VectorStores.StorePackages; the relational base classes and the
+         SQL helpers they build on stay here. All packages ship at one version. -->
+    <InternalsVisibleTo Include="TechieRag.PgVector" />
+    <InternalsVisibleTo Include="TechieRag.Qdrant" />
   </ItemGroup>
 
   <!-- AI Agent Files: Distributed to consumer projects via NuGet -->
@@ -66,6 +71,11 @@
     <None Include="build\content\techierag-codex-agent.toml" Pack="true" PackagePath="build\content\" />
   </ItemGroup>
 
+  <!-- REQ-RAG-168 (TrStudio TR-RAG-006): no PostgreSQL, Qdrant or Azure client here. Npgsql and Pgvector are in
+       TechieRag.PgVector, Qdrant.Client in TechieRag.Qdrant, and the Azure OpenAI embedding provider speaks HTTP
+       itself (ADR-003), so a SQLite-only app carries none of them. CorePackageCarriesNoServerClientsTests fails
+       if one comes back. -->
+
   <!-- REQ-FN-056: no Dapper. Its Reflection.Emit mappers throw in every AOT-compiled iOS and
        Mac Catalyst Release build; the SQLite and relational stores use plain ADO.NET
        (Persistence/DbCommandExtensions.cs). DataAccessIsAotSafeTests fails if it comes back. -->
@@ -84,12 +94,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.3" />
-    <PackageReference Include="Npgsql" Version="10.0.1" />
     <PackageReference Include="PdfPig" Version="0.1.13" />
-    <PackageReference Include="Pgvector" Version="0.3.2" />
-    <PackageReference Include="Qdrant.Client" Version="1.16.1" />
     <PackageReference Include="Tomlyn" Version="0.20.0" />
-    <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
   </ItemGroup>
 
 </Project>

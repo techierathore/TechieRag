@@ -406,7 +406,7 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         int topK = 5,
         string? documentFilter = null,
         CancellationToken cancellationToken = default) =>
-        SearchCoreAsync(queryVector, topK, documentFilter, null, cancellationToken);
+        SearchCoreAsync(queryVector, topK, documentFilter, null, null, cancellationToken);
 
     /// <summary>
     /// Performs one cosine-distance query restricted to a set of documents (REQ-RAG-114 / BRD-174).
@@ -426,7 +426,40 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(documentIds);
         return documentIds.Count == 0
             ? Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>())
-            : SearchCoreAsync(queryVector, topK, null, documentIds.Distinct(StringComparer.Ordinal).ToArray(), cancellationToken);
+            : SearchCoreAsync(queryVector, topK, null, documentIds.Distinct(StringComparer.Ordinal).ToArray(), null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Performs one cosine-distance query over the chunks whose metadata matches a filter, optionally within a set
+    /// of documents (REQ-RAG-169, TrStudio TR-RAG-003).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return.</param>
+    /// <param name="documentIds">The documents to search, or null for all; an empty set returns no results.</param>
+    /// <param name="metadataFilter">Key and text pairs every result's metadata must match.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The best matching chunks, highest first.</returns>
+    /// <remarks>Each pair is a <c>Metadata</c> text lookup in the query's own <c>WHERE</c>, with the strict-order
+    /// iterative scan a filtered search uses (REQ-RAG-161), so the result is the best matching chunks, not the best
+    /// chunks that happen to match.</remarks>
+    public Task<IReadOnlyList<SearchResult>> SearchMatchingAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string>? documentIds,
+        IReadOnlyDictionary<string, string> metadataFilter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadataFilter);
+        MetadataMatch.Validate(metadataFilter);
+        return documentIds is { Count: 0 }
+            ? Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>())
+            : SearchCoreAsync(
+                queryVector,
+                topK,
+                null,
+                documentIds?.Distinct(StringComparer.Ordinal).ToArray(),
+                metadataFilter.Count == 0 ? null : metadataFilter.ToList(),
+                cancellationToken);
     }
 
     /// <summary>The query shared by the single-document and document-set searches.</summary>
@@ -434,6 +467,7 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
     /// <param name="topK">How many results to return.</param>
     /// <param name="documentFilter">One document to restrict to, or null.</param>
     /// <param name="documentIds">A set of documents to restrict to, or null; wins over <paramref name="documentFilter"/>.</param>
+    /// <param name="metadataFilter">Metadata pairs every chunk must match, or null for none (REQ-RAG-169).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Ranked results.</returns>
     private async Task<IReadOnlyList<SearchResult>> SearchCoreAsync(
@@ -441,6 +475,7 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         int topK,
         string? documentFilter,
         string[]? documentIds,
+        IReadOnlyList<KeyValuePair<string, string>>? metadataFilter,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(queryVector);
@@ -456,7 +491,7 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
         {
             await using var settingsCmd = connection.CreateCommand();
             settingsCmd.Transaction = transaction;
-            settingsCmd.CommandText = SearchSettingsSql(topK, supportsIterativeScan, documentIds is not null || documentFilter is not null);
+            settingsCmd.CommandText = SearchSettingsSql(topK, supportsIterativeScan, documentIds is not null || documentFilter is not null || metadataFilter is not null);
             await settingsCmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
 
@@ -499,6 +534,24 @@ public class PgVectorStore : IVectorStore, IAsyncDisposable
                 ORDER BY Embedding <=> @QueryVector
                 LIMIT @TopK
                 """;
+        }
+
+        // REQ-RAG-169: the text lookup reads a text value as itself and a number or true/false as its JSON text,
+        // the rule MetadataMatch states for every store.
+        if (metadataFilter is not null)
+        {
+            var clauses = new List<string>(metadataFilter.Count);
+            for (var i = 0; i < metadataFilter.Count; i++)
+            {
+                clauses.Add($"Metadata->>@MetaKey{i} = @MetaValue{i}");
+                cmd.Parameters.AddWithValue("MetaKey" + i, metadataFilter[i].Key);
+                cmd.Parameters.AddWithValue("MetaValue" + i, metadataFilter[i].Value);
+            }
+
+            cmd.CommandText = cmd.CommandText.Replace(
+                "Embedding IS NOT NULL",
+                "Embedding IS NOT NULL AND " + string.Join(" AND ", clauses),
+                StringComparison.Ordinal);
         }
 
         cmd.Parameters.AddWithValue("QueryVector", new Vector(queryVector));

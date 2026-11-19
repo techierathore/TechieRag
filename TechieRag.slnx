@@ -19,6 +19,10 @@
     <!-- REQ-RAG-057 / BRD-96, ADR-014: the in-process local language model, a sibling package so the
          core never references a local inference runtime. -->
     <Project Path="src/TechieRag.Local/TechieRag.Local.csproj" />
+    <!-- REQ-RAG-168 (TrStudio TR-RAG-006): the PostgreSQL and Qdrant stores, sibling packages so an app that
+         uses only SQLite carries no server client. -->
+    <Project Path="src/TechieRag.PgVector/TechieRag.PgVector.csproj" />
+    <Project Path="src/TechieRag.Qdrant/TechieRag.Qdrant.csproj" />
   </Folder>
   <Folder Name="/docs/">
     <File Path="docs/TechieRag-BRD.md" />

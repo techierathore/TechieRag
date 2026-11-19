@@ -6,8 +6,9 @@ namespace TechieRag.Embedded;
 /// An embedding model <c>UseEmbedded()</c> can download and run: its name, width, files and size.
 /// </summary>
 /// <remarks>
-/// <para><b>Two models ship.</b> <see cref="BgeM3"/> (1024 dimensions, multilingual, 2.3 GB) is
-/// the desktop default. <see cref="MiniLM"/> (all-MiniLM-L6-v2, 384 dimensions, English, 91 MB)
+/// <para><b>Three models ship.</b> <see cref="BgeM3"/> (1024 dimensions, multilingual, 2.3 GB) is
+/// the desktop default. <see cref="BgeM3Int8"/> is the same model with 8-bit weights (0.6 GB, about 2.3 times
+/// as fast on a processor), for a host that embeds a large folder (REQ-RAG-165). <see cref="MiniLM"/> (all-MiniLM-L6-v2, 384 dimensions, English, 91 MB)
 /// is the default on Android and iOS, where bge-m3 is refused (REQ-RAG-054 / BRD-91).
 /// <see cref="PlatformDefault"/> picks between them.</para>
 /// <para><b>Where the files go.</b> <see cref="GetModelDirectory"/> is
@@ -61,6 +62,40 @@ public sealed class EmbeddedModel
         ]);
 
     /// <summary>
+    /// bge-m3 with its weights stored as 8-bit integers: the same 1024 dimensions, languages, tokenizer and
+    /// 8,192 tokens as <see cref="BgeM3"/>, a 0.6 GB download, and about 2.3 times as fast on a computer's
+    /// processor (REQ-RAG-165, Sevak TR-RAG-065). Desktop only.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why it is faster.</b> Nearly all of bge-m3's time on a processor goes into its matrix
+    /// multiplications (88 percent, measured with ONNX Runtime's profiler). Integer multiplications run several
+    /// times faster than 32-bit float ones on any x64 processor with AVX2 and faster still with VNNI.
+    /// Measured on an Intel Core i5-11300H, 24 chunks of 500 characters (about 131 tokens each), one at a time:
+    /// bge-m3 1,400 ms a chunk, this model 607 ms a chunk.</para>
+    /// <para><b>Its vectors are close to bge-m3's, not equal.</b> The cosine between the two models' vectors for the
+    /// same text is about 0.98, and nine in ten nearest neighbours agree. The model name differs, so the
+    /// <c>EmbeddingSignature</c> differs: a corpus embedded with <see cref="BgeM3"/> reads as stale under this
+    /// model and is embedded again, never mixed.</para>
+    /// <para><b>Source.</b> <c>onnx/sentence_transformers_int8.onnx</c> from <c>Xenova/bge-m3</c> (MIT, as bge-m3),
+    /// pinned to commit 4de13258303883538bd53b696b452bf8099f0858: the same graph as bge-m3's own ONNX export
+    /// (the one <see cref="BgeM3"/> downloads), with its weights quantized to 8 bits.</para>
+    /// </remarks>
+    public static EmbeddedModel BgeM3Int8 { get; } = new(
+        "bge-m3-int8",
+        dimensions: 1024,
+        maxSequenceLength: 8192,
+        runsOnPhones: false,
+        defaultBaseUrl: "https://huggingface.co/Xenova/bge-m3/resolve/4de13258303883538bd53b696b452bf8099f0858",
+        mirrorAtRoot: false,
+        files:
+        [
+            ("model.onnx", "onnx/sentence_transformers_int8.onnx", 568_599_071),
+            ("tokenizer.json", "tokenizer.json", 17_082_821),
+            ("sentencepiece.bpe.model", "sentencepiece.bpe.model", 5_069_051),
+            ("config.json", "config.json", 770)
+        ]);
+
+    /// <summary>
     /// sentence-transformers all-MiniLM-L6-v2: 384 dimensions, English, 256 tokens; a 91 MB download.
     /// The default on Android and iOS.
     /// </summary>
@@ -78,7 +113,7 @@ public sealed class EmbeddedModel
         ]);
 
     /// <summary>Every model this package can download.</summary>
-    public static IReadOnlyList<EmbeddedModel> All { get; } = [BgeM3, MiniLM];
+    public static IReadOnlyList<EmbeddedModel> All { get; } = [BgeM3, BgeM3Int8, MiniLM];
 
     /// <summary>
     /// Gets the model <c>UseEmbedded()</c> picks on this platform: <see cref="MiniLM"/> on Android
@@ -124,6 +159,25 @@ public sealed class EmbeddedModel
     /// <returns>The model, or <see langword="null"/> when none has that name.</returns>
     public static EmbeddedModel? FromName(string? name) =>
         All.FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Names the downloadable model a folder holds, from its ONNX file's size: a folder of
+    /// <see cref="BgeM3Int8"/> files is that model, not <see cref="BgeM3"/> (REQ-RAG-165).
+    /// </summary>
+    /// <param name="folder">The folder a caller gave the provider.</param>
+    /// <param name="dimensions">The width the caller said the model produces.</param>
+    /// <returns>The model whose <c>model.onnx</c> has exactly the folder's size, or <see langword="null"/>.</returns>
+    internal static EmbeddedModel? RecognizeFolder(string folder, int dimensions)
+    {
+        var modelFile = new FileInfo(Path.Combine(folder, "model.onnx"));
+        if (!modelFile.Exists)
+        {
+            return null;
+        }
+
+        return All.FirstOrDefault(m => m.Dimensions == dimensions
+            && m.files.Any(f => f.FileName == "model.onnx" && f.Bytes == modelFile.Length));
+    }
 
     /// <summary>
     /// Gets the folder this model's files live in: <c>&lt;ModelRoot&gt;/&lt;Name&gt;</c>.
