@@ -39,7 +39,7 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 ## Known blockers
 
 - REQ-RAG-155 waits on OpenAI and Gemini keys in the live-test settings file.
-- REQ-FN-057 (phase 2) stays Needs re-verify until a GitHub run of the probe workflow passes.
+- REQ-FN-057 (phase 2) stays Needs re-verify until a GitHub probe run passes; run 44496269925's iOS failure (SDK 11 on the new macOS image) is fixed by an SDK pin, not yet run in CI.
 - Sevak and TrStudio must add the new `TechieRag.PgVector` package when they move to 1.3.0.
 - The Gmail live test refused one search once today and passed on re-run; the test account's Trash may hold its messages.
 

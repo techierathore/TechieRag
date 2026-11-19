@@ -38,6 +38,13 @@ env:
   # Raise it when GitHub's macOS image carries the Xcode a newer set needs (dotnet/macios release notes
   # name both).
   APPLE_WORKLOAD_SET: 10.0.401
+  # Every head pins a .NET 10 SDK in a global.json before it installs a workload. GitHub's runner images
+  # now carry .NET SDK 11.0.100 (macos-26 image 20261117.0516), and dotnet runs the newest SDK it finds:
+  # run 44496269925's iOS head landed on that image and "dotnet workload install maui-ios --version
+  # 10.0.401" failed in five seconds (workload set 10.0.401 belongs to the 10.0.400 band; under SDK 11 its
+  # manifests conflict), while its Mac Catalyst head, on the older image, passed. The Apple heads pin the
+  # band of APPLE_WORKLOAD_SET (latestPatch), the other heads any 10.0 SDK (latestFeature). The file is
+  # written in the job only; the repository has no global.json, so local builds are unchanged.
 
 jobs:
   windows:
@@ -48,6 +55,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Pin the .NET 10 SDK
+        shell: bash
+        run: |
+          printf '{\n  "sdk": { "version": "%s", "rollForward": "latestFeature" }\n}\n' "10.0.100" > global.json
+          cat global.json
+          dotnet --version
       - name: Install MAUI workload
         run: dotnet workload install maui-windows
       - name: Build Windows head
@@ -81,6 +94,12 @@ jobs:
         with:
           distribution: microsoft
           java-version: '17'
+      - name: Pin the .NET 10 SDK
+        shell: bash
+        run: |
+          printf '{\n  "sdk": { "version": "%s", "rollForward": "latestFeature" }\n}\n' "10.0.100" > global.json
+          cat global.json
+          dotnet --version
       - name: Install MAUI workload
         run: dotnet workload install maui-android
       - name: Build Android head
@@ -123,6 +142,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Pin the .NET 10 SDK band of the workload set
+        shell: bash
+        run: |
+          band="${APPLE_WORKLOAD_SET%.*}.$(( ${APPLE_WORKLOAD_SET##*.} / 100 * 100 ))"
+          printf '{\n  "sdk": { "version": "%s", "rollForward": "latestPatch" }\n}\n' "$band" > global.json
+          cat global.json
+          dotnet --version
       - name: Install MAUI workload
         run: dotnet workload install maui-maccatalyst --version ${{ env.APPLE_WORKLOAD_SET }}
       - name: Select the Xcode this .NET for Mac Catalyst asks for
@@ -145,6 +171,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - name: Pin the .NET 10 SDK band of the workload set
+        shell: bash
+        run: |
+          band="${APPLE_WORKLOAD_SET%.*}.$(( ${APPLE_WORKLOAD_SET##*.} / 100 * 100 ))"
+          printf '{\n  "sdk": { "version": "%s", "rollForward": "latestPatch" }\n}\n' "$band" > global.json
+          cat global.json
+          dotnet --version
       - name: Install MAUI workload
         run: dotnet workload install maui-ios --version ${{ env.APPLE_WORKLOAD_SET }}
       - name: Select the Xcode this .NET for iOS asks for

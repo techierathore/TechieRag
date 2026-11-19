@@ -190,6 +190,40 @@ public class ProbeWorkflowTests
     }
 
     /// <summary>
+    /// REQ-FN-057: every head pins a .NET 10 SDK in a <c>global.json</c> before it installs a workload, so an SDK
+    /// 11 on the runner image is never the one that runs. Run 44496269925 (19 Nov 2026): the iOS head landed on
+    /// macos-26 image 20261117.0516, which carries SDK 11.0.100, and <c>dotnet workload install maui-ios
+    /// --version 10.0.401</c> failed in five seconds while the Mac Catalyst head, on the older image, passed.
+    /// Reproduced here with SDK 11.0.100 and 10.0.404 side by side: without a pin the install fails with a
+    /// manifest conflict; with the 10.0.400-band pin <c>dotnet --version</c> is 10.0.404 and it installs.
+    /// </summary>
+    /// <param name="job">The workflow job.</param>
+    /// <param name="workload">Its workload id.</param>
+    /// <param name="apple">Whether it is an Apple head, which pins the band of <c>APPLE_WORKLOAD_SET</c>.</param>
+    [Theory(DisplayName = "REQ-FN-057 EveryHeadPinsADotnetTenSdkBeforeItsWorkload")]
+    [InlineData("windows", "maui-windows", false)]
+    [InlineData("android", "maui-android", false)]
+    [InlineData("maccatalyst", "maui-maccatalyst", true)]
+    [InlineData("ios", "maui-ios", true)]
+    public void EveryHeadPinsADotnetTenSdkBeforeItsWorkload(string job, string workload, bool apple)
+    {
+        var body = Job(LibraryRepoFiles.Read(Workflow).Replace("\r\n", "\n", StringComparison.Ordinal), job);
+        var pin = body.IndexOf("> global.json", StringComparison.Ordinal);
+        var install = body.IndexOf($"dotnet workload install {workload}", StringComparison.Ordinal);
+
+        Assert.True(pin > 0 && pin < install, $"The {job} head installs {workload} without pinning a .NET 10 SDK first.");
+        if (apple)
+        {
+            Assert.Contains("band=\"${APPLE_WORKLOAD_SET%.*}.$(( ${APPLE_WORKLOAD_SET##*.} / 100 * 100 ))\"", body, StringComparison.Ordinal);
+            Assert.Contains("\"rollForward\": \"latestPatch\"", body, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("\"rollForward\": \"latestFeature\" }\\n}\\n' \"10.0.100\"", body, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
     /// REQ-FN-057: the Android button script waits until the emulator resolves the model host before
     /// pressing, and says "no network" plainly when it never does. "Booted" is not "online": a press right
     /// after boot failed with "HttpRequestException: Connection failure" (run 43448574999; reproduced
