@@ -285,7 +285,7 @@ public class SqliteVecStore : IVectorStore
         int topK = 5,
         string? documentFilter = null,
         CancellationToken cancellationToken = default) =>
-        SearchCoreAsync(queryVector, topK, documentFilter is null ? null : [documentFilter], cancellationToken);
+        SearchCoreAsync(queryVector, topK, documentFilter is null ? null : [documentFilter], null, cancellationToken);
 
     /// <summary>
     /// Performs one exact cosine scan restricted to a set of documents (REQ-RAG-114 / BRD-174).
@@ -305,19 +305,52 @@ public class SqliteVecStore : IVectorStore
         ArgumentNullException.ThrowIfNull(documentIds);
         return documentIds.Count == 0
             ? Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>())
-            : SearchCoreAsync(queryVector, topK, documentIds.Distinct(StringComparer.Ordinal).ToList(), cancellationToken);
+            : SearchCoreAsync(queryVector, topK, documentIds.Distinct(StringComparer.Ordinal).ToList(), null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Performs one exact cosine scan over the chunks whose metadata matches a filter, optionally within a set of
+    /// documents (REQ-RAG-169, TrStudio TR-RAG-003).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return.</param>
+    /// <param name="documentIds">The documents to search, or null for all; an empty set returns no results.</param>
+    /// <param name="metadataFilter">Key and text pairs every result's metadata must match.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The best matching chunks, highest first.</returns>
+    /// <remarks>The filter is part of the scan's own <c>WHERE</c> (<c>json_extract</c> on the <c>Metadata</c> column), so
+    /// a chunk that does not match is never scored.</remarks>
+    public Task<IReadOnlyList<SearchResult>> SearchMatchingAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string>? documentIds,
+        IReadOnlyDictionary<string, string> metadataFilter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadataFilter);
+        MetadataMatch.Validate(metadataFilter);
+        return documentIds is { Count: 0 }
+            ? Task.FromResult<IReadOnlyList<SearchResult>>(Array.Empty<SearchResult>())
+            : SearchCoreAsync(
+                queryVector,
+                topK,
+                documentIds?.Distinct(StringComparer.Ordinal).ToList(),
+                metadataFilter.Count == 0 ? null : metadataFilter.ToList(),
+                cancellationToken);
     }
 
     /// <summary>The two-pass search shared by the single-document and document-set overloads.</summary>
     /// <param name="queryVector">The query vector.</param>
     /// <param name="topK">How many results to return.</param>
     /// <param name="documentIds">The documents to restrict to, or null for all.</param>
+    /// <param name="metadataFilter">Metadata pairs every chunk must match, or null for none (REQ-RAG-169).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Ranked results.</returns>
     private async Task<IReadOnlyList<SearchResult>> SearchCoreAsync(
         float[] queryVector,
         int topK,
         IReadOnlyList<string>? documentIds,
+        IReadOnlyList<KeyValuePair<string, string>>? metadataFilter,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(queryVector);
@@ -331,7 +364,7 @@ public class SqliteVecStore : IVectorStore
         using var connection = new SqliteConnection(connectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 
-        var winners = ScoreAllChunks(connection, queryVector, topK, documentIds, cancellationToken);
+        var winners = ScoreAllChunks(connection, queryVector, topK, documentIds, metadataFilter, cancellationToken);
         if (winners.Count == 0)
         {
             return Array.Empty<SearchResult>();
@@ -372,6 +405,7 @@ public class SqliteVecStore : IVectorStore
     /// <param name="queryVector">The query vector.</param>
     /// <param name="topK">How many winners to keep.</param>
     /// <param name="documentIds">Optional document ID filter: one or more ids, or null for all.</param>
+    /// <param name="metadataFilter">Metadata pairs every chunk must match, or null for none (REQ-RAG-169).</param>
     /// <param name="cancellationToken">Checked every 1,024 rows.</param>
     /// <returns>The winners, best first.</returns>
     private static IReadOnlyList<ManagedVectorSearch.Candidate> ScoreAllChunks(
@@ -379,15 +413,27 @@ public class SqliteVecStore : IVectorStore
         float[] queryVector,
         int topK,
         IReadOnlyList<string>? documentIds,
+        IReadOnlyList<KeyValuePair<string, string>>? metadataFilter,
         CancellationToken cancellationToken)
     {
         // Straight to SQLite's C API: sqlite3_column_blob hands back a span over SQLite's own row
         // buffer, so a vector is scored where it lies — no byte[] per row, no copy. SqliteDataReader
         // offers only copying reads (GetBytes, GetFieldValue<byte[]>), which cost more than the maths.
+        var documentCount = documentIds?.Count ?? 0;
         var sql = documentIds is null
             ? "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL"
             : "SELECT rowid, Vector FROM Chunks WHERE Vector IS NOT NULL AND DocumentId IN ("
-                + string.Join(", ", Enumerable.Range(1, documentIds.Count).Select(i => "?" + i)) + ")";
+                + string.Join(", ", Enumerable.Range(1, documentCount).Select(i => "?" + i)) + ")";
+
+        // REQ-RAG-169: each pair is a JSON path and a text, numbered after the document ids. A true/false reads as
+        // "true"/"false" and a number as its JSON text, the rule MetadataMatch states for every store.
+        for (var i = 0; metadataFilter is not null && i < metadataFilter.Count; i++)
+        {
+            var path = "?" + (documentCount + (2 * i) + 1);
+            var value = "?" + (documentCount + (2 * i) + 2);
+            sql += $" AND (CASE json_type(Metadata, {path}) WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' "
+                + $"ELSE CAST(json_extract(Metadata, {path}) AS TEXT) END) = {value}";
+        }
 
         var database = connection.Handle!;
         var rc = raw.sqlite3_prepare_v2(database, sql, out var statement);
@@ -402,6 +448,13 @@ public class SqliteVecStore : IVectorStore
             for (var i = 0; documentIds is not null && i < documentIds.Count; i++)
             {
                 SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(statement, i + 1, documentIds[i]), database);
+            }
+
+            for (var i = 0; metadataFilter is not null && i < metadataFilter.Count; i++)
+            {
+                var (key, value) = metadataFilter[i];
+                SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(statement, documentCount + (2 * i) + 1, $"$.\"{key}\""), database);
+                SqliteException.ThrowExceptionForRC(raw.sqlite3_bind_text(statement, documentCount + (2 * i) + 2, value), database);
             }
 
             while ((rc = raw.sqlite3_step(statement)) == raw.SQLITE_ROW)

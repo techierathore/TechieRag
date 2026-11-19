@@ -76,6 +76,8 @@ jobs:
           dotnet restore src/TechieRag.Telemetry/TechieRag.Telemetry.csproj
           dotnet restore src/TechieRag.Agents/TechieRag.Agents.csproj
           dotnet restore src/TechieRag.Local/TechieRag.Local.csproj
+          dotnet restore src/TechieRag.PgVector/TechieRag.PgVector.csproj
+          dotnet restore src/TechieRag.Qdrant/TechieRag.Qdrant.csproj
 
       - name: Build
         run: |
@@ -84,6 +86,8 @@ jobs:
           dotnet build src/TechieRag.Telemetry/TechieRag.Telemetry.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
           dotnet build src/TechieRag.Agents/TechieRag.Agents.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
           dotnet build src/TechieRag.Local/TechieRag.Local.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build src/TechieRag.PgVector/TechieRag.PgVector.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet build src/TechieRag.Qdrant/TechieRag.Qdrant.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.version }}
           dotnet build tests/TechieRag.Tests/TechieRag.Tests.csproj --configuration Release -p:Version=${{ steps.version.outputs.version }}
 
       - name: Run tests
@@ -103,6 +107,8 @@ jobs:
           dotnet pack src/TechieRag.Telemetry/TechieRag.Telemetry.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
           dotnet pack src/TechieRag.Agents/TechieRag.Agents.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
           dotnet pack src/TechieRag.Local/TechieRag.Local.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+          dotnet pack src/TechieRag.PgVector/TechieRag.PgVector.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
+          dotnet pack src/TechieRag.Qdrant/TechieRag.Qdrant.csproj --configuration Release --no-build -p:Version=${{ steps.version.outputs.version }} --output ./nupkgs
 
       - name: Check assembly versions
         # TR-RAG-048 / REQ-FN-071: every lib/*/TechieRag*.dll in every package must carry the

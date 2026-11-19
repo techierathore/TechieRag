@@ -4,11 +4,11 @@
 |---|---|
 | App | Sevak |
 | Upstream | TechieRag |
-| Updated | 2026-11-13, later (TR-RAG-064 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-13 (TR-RAG-059 and TR-RAG-060 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-11 (TR-RAG-061 to TR-RAG-063 added from Sevak's 9 November report, relayed by the owner, and answered: fixed for TechieRag 1.1.10); 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
+| Updated | 2026-11-19 (TR-RAG-065 copied in from Sevak's file and fixed for TechieRag 1.3.0; replies added under TR-RAG-058 to TR-RAG-065; 1.1.10 was published as 1.2.0); 2026-11-13, later (TR-RAG-064 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-13 (TR-RAG-059 and TR-RAG-060 copied in from Sevak's file and answered: fixed for TechieRag 1.1.10); 2026-11-11 (TR-RAG-061 to TR-RAG-063 added from Sevak's 9 November report, relayed by the owner, and answered: fixed for TechieRag 1.1.10); 2026-11-07 (TR-RAG-055 to TR-RAG-058 added: four requests for Sevak's assistant phases, written as TechieRag BRD-210 to BRD-213; evening: TR-RAG-055 blocks nothing, the live tests take a settings file, 056 and 057 name package 1.1.9) |
 
 ## Summary
 
-Nothing is blocked: no entry is open. 61 entries: 0 open, 46 fixed upstream and not yet re-checked here, 15 closed (as `tf-feedback.sh` counts them). TR-RAG-059 to TR-RAG-064 are fixed upstream for TechieRag 1.1.10, not yet published: 059, 060 and 064 on 2026-11-13 (060 proven on a real PostgreSQL 18 with pgvector 0.8.6; 064 against Anthropic's pricing page of that day), 061 to 063 on 2026-11-11. TR-RAG-055 to TR-RAG-058 (Sevak's phase 4 and 5 requests) were built for 1.1.9 on 2026-11-08 and ship with 1.1.10; TR-RAG-056 and TR-RAG-057 hold Sevak's REQ-RAG-116 and REQ-UI-087 until that package is on the feed. TR-RAG-053 and TR-RAG-049 are worked around in Sevak until it moves to the new package.
+Nothing is blocked: no entry is open. 62 entries, as `tf-feedback.sh` counts them. TR-RAG-065 (the embedded model is slow on a processor) is fixed upstream on 2026-11-19 for TechieRag 1.3.0, not yet published: `EmbeddedModel.BgeM3Int8`, 1,186 → 388 ms a chunk on Windows on the same input. TR-RAG-059 to TR-RAG-064 shipped in 1.2.0 (the release this file calls 1.1.10); Sevak closed 059, 060 and 064 on 2026-11-14 and 061 to 063 wait for its re-check. 1.3.0 moves the PostgreSQL stores to a new package, `TechieRag.PgVector`, which Sevak must add with the upgrade (`UsePostgres` is unchanged).
 
 These are the application's findings against `src/TechieRag`, filed while it lived in this repository (TechieRagWeb, then TechieDesk, now Sevak), restructured 2026-09-24 into the feedback template with the original text unchanged; the earlier summary is under "Replies from TechieRag". Accepted items are ledgered as TechieRag requirements (BRD-121, 126, 127, 142, 143, 148, 158; phase 3; BRD-210 to 213).
 
@@ -1282,6 +1282,8 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** Canva and Venice called directly from Sevak until the library route exists.
 - **Suggested fix:** TechieRag BRD-213 as written.
 
+> **Reply from TechieRag, 2026-11-19.** Unchanged since 1.1.9: `TechieRag#REQ-RAG-155` stays Blocked only on its live proof for OpenAI and Gemini, because the live-test settings file still has no OpenAI or Gemini key (the Venice key is there and its live test passes). The 9 unit tests named REQ-RAG-155 pass in today's suite. Nothing for Sevak to do.
+
 ### TR-RAG-059 — request: token usage by day and by month, not only since the app started (minor, found 2026-11-08 building Sevak phase 4 group L) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
 - **Status:** fixed upstream 2026-11-13 — TechieRag REQ-RAG-162 Verified; ships in 1.1.10, not yet published. (Copied into this file on 2026-11-13 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`.)
@@ -1293,6 +1295,8 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Encountered in:** `apps/Sevak/Components/Assistant/ChatPane.razor` `RefreshSpend`, docs/mockups/assistant.html `assistant-header-spend` ("₹41 today · ₹1,240 this month").
 - **Workaround:** none taken beyond showing the session figure labelled "today".
 - **Suggested fix:** persist each `TokenUsage` with its timestamp (the record already carries `Timestamp`) and add a ranged query.
+
+> **Reply from TechieRag, 2026-11-19.** Fixed in TechieRag 1.2.0, which Sevak runs; no code change today. Its proving tests ran again in today's full suite on the 1.3.0 code and pass: 8 tests named `REQ-RAG-162`. Sevak closed this on 2026-11-14.
 
 ### TR-RAG-060 — PgVectorStore builds its IVFFlat index on an empty table, so a search returns some, one or none of the stored chunks (major, found 2026-11-09 in Sevak phase 4 fix cycle 1) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
@@ -1306,6 +1310,8 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** the session option above, documented at `WithExactVectorSearch`; remove it once a release fixes the index.
 - **Suggested fix:** use an HNSW index (`USING hnsw (Embedding vector_cosine_ops)`), which needs no training and works from an empty table; or build the IVFFlat index only after enough rows exist and set `ivfflat.probes` (or `ivfflat.iterative_scan`) on the store's own connections.
 
+> **Reply from TechieRag, 2026-11-19.** Fixed in TechieRag 1.2.0, which Sevak runs; no code change today. Its proving tests ran again in today's full suite on the 1.3.0 code and pass: 18 tests named `REQ-RAG-161`, including the live PostgreSQL 18 ones (`SearchOnNewDatabaseReturnsEveryChunk`, `TwoChunksComeBackEveryRun`). Sevak closed this on 2026-11-14. From 1.3.0 `PgVectorStore` is in the new `TechieRag.PgVector` package; add it with the upgrade (see TR-RAG-065's reply and the 1.3.0 release notes).
+
 ### TR-RAG-061 — the host-data tool definitions repeat every entity's fields in each of the five tools (minor, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
 - **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-160 Verified; ships in 1.1.10, not yet published.
@@ -1317,6 +1323,8 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (entry relayed in full by the owner on 2026-11-11; this copy did not have it).
 - **Workaround:** none relayed.
 - **Suggested fix:** as Expected.
+
+> **Reply from TechieRag, 2026-11-19.** Fixed in TechieRag 1.2.0, which Sevak runs; no code change today. Its proving tests ran again in today's full suite on the 1.3.0 code and pass: 6 tests named `REQ-RAG-160`, including `FifteenEntitiesFitAFourThousandTokenModel`. Waiting for Sevak's re-check; your work-round can go once it passes.
 
 ### TR-RAG-062 — `AgentLoopRunner` takes a tool request that a local model writes as text for the final answer (major, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
@@ -1330,6 +1338,8 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** none relayed.
 - **Suggested fix:** as Expected.
 
+> **Reply from TechieRag, 2026-11-19.** Fixed in TechieRag 1.2.0, which Sevak runs; no code change today. Its proving tests ran again in today's full suite on the 1.3.0 code and pass: 9 tests named `REQ-RAG-159`, including `BareJsonRequestRunsAsToolCall`. Waiting for Sevak's re-check.
+
 ### TR-RAG-063 — `AnthropicLlmProvider` always sends temperature when `LlmCompletionOptions.Temperature` is set, and current Claude models refuse it (major, found 2026-11-09 on TechieRag 1.1.9) — **fixed upstream 2026-11-11, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
 - **Status:** fixed upstream 2026-11-11 — TechieRag REQ-RAG-158 Verified 2026-11-12, including a live call to `claude-sonnet-5-5` with temperature set. Ships in 1.1.10, not yet published.
@@ -1341,6 +1351,8 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Encountered in:** Sevak, 2026-11-09, on TechieRag 1.1.9 (relayed by the owner on 2026-11-11).
 - **Workaround:** none relayed.
 - **Suggested fix:** as Expected.
+
+> **Reply from TechieRag, 2026-11-19.** Fixed in TechieRag 1.2.0, which Sevak runs; no code change today. Its proving tests ran again in today's full suite on the 1.3.0 code and pass: 25 tests named `REQ-RAG-158` (the live Anthropic one skipped: no key in this run). Waiting for Sevak's re-check; `AssistantModelGateway.TemperatureFor` can go once it passes.
 
 ### TR-RAG-064 — TokenUsageTracker prices a model it does not know at $0, and its table lacks every current Claude model, so spend reads $0.00 (major, found 2026-11-13 in Sevak triage-and-fix) — **fixed upstream 2026-11-13, ships in TechieRag 1.1.10 (not yet published), not yet re-checked here**
 
@@ -1354,9 +1366,51 @@ Downloaded from GitHub Packages and read with .NET's assembly reader: `lib/net10
 - **Workaround:** above.
 - **Suggested fix:** add the current models to `InitializeDefaultPricing`, and mark an unpriced usage instead of pricing it at zero.
 
+> **Reply from TechieRag, 2026-11-19.** Fixed in TechieRag 1.2.0, which Sevak runs; no code change today. Its proving tests ran again in today's full suite on the 1.3.0 code and pass: 36 tests named `REQ-RAG-164`. Sevak closed this on 2026-11-15.
+
+### TR-RAG-065 — The embedded BGE-M3 model embeds about one chunk every two seconds on a computer's processor, so a folder of notes takes more than a day to become searchable (major, found 2026-11-17 in Sevak triage-and-fix) — **fixed upstream 2026-11-19, ships in TechieRag 1.3.0 (not yet published), not yet re-checked here**
+
+- **Status:** fixed upstream 2026-11-19 — TechieRag REQ-RAG-165, tests pass; ships in 1.3.0, not yet published. (Copied into this file on 2026-11-19 from Sevak's own `docs/Sevak-TechieRag-Feedback.md`, unchanged apart from its status.)
+- **Severity:** major
+- **Blocks:** no — Sevak no longer waits for it: Import's Finish writes the rows and returns in under a minute, and the workspace fills in the background in batches of eight files, resuming at the next start (`ImportIndexQueue`, MISS-Sevak-20261117-15).
+- **Repro:** Sevak on Windows (x64, no GPU), TechieRag 1.2.0, embedding source `Embedded` (BGE-M3), `IWorkspaceManager.IngestTextAsync` over the owner's notes folder: the log shows "Embedding 51 chunks" to "Embedding 13 chunks" a minute or more apart, about 2 s a chunk; the first batch of eight files took about eight minutes. The folder is 127 MB of files and 237 MB of transcripts.
+- **Expected:** a host can make a thousand notes searchable in well under an hour on an ordinary computer: chunks embedded in batches, or a smaller embedded model offered for bulk ingest.
+- **Actual:** one chunk at a time, about 2 s each.
+- **Encountered in:** `Sevak#REQ-RAG-129` (BRD-246), the owner's day one, 17 November 2026.
+- **Workaround:** the background queue above; chat answers cite the files as they are added.
+- **Suggested fix:** batch the embedded model's calls (several chunks a forward pass) and report progress per document; or ship a small embedded model for bulk ingest beside BGE-M3.
+
+> **Reply from TechieRag, 2026-11-19 — fixed for 1.3.0 (`TechieRag#REQ-RAG-165`).**
+>
+> **Where the time goes.** On the real bge-m3 weights, ONNX Runtime's profiler puts 88 percent of each chunk in the model's 32-bit float matrix multiplications. Not the cause, each measured: tokenizing (about 8 ms a chunk), pooling, the copy out of the runtime, the thread count (8 threads was slower than the default 4) and denormal handling. Batching chunks into one padded pass, the entry's first suggestion, was slower in 32-bit (2,119 against 1,544 ms a chunk for eight chunks), and in 8-bit it would make a text's vector depend on the other texts in its batch, so it was not adopted.
+>
+> **The cut.** `EmbeddedModel.BgeM3Int8` is bge-m3's own graph with its weights stored as 8-bit integers (`onnx/sentence_transformers_int8.onnx` from `Xenova/bge-m3`, MIT, pinned to commit 4de13258303883538bd53b696b452bf8099f0858, 0.6 GB instead of 2.3 GB). Same 1024 dimensions, tokenizer and languages.
+>
+> **Before and after, same input:** the 34 chunks (500 characters, 50 overlap, about 128 tokens each, the opening of this file, kept as the test fixture `tests/TechieRag.Tests/Embedding/Fixtures/bulk-ingest-sample.md`), embedded one at a time as ingestion does, five alternating rounds, median per chunk, Intel Core i5-11300H, no GPU:
+>
+> | Where | bge-m3 (what 1.2.0 runs) | bge-m3-int8 (1.3.0) |
+> |---|---|---|
+> | Windows, native win-x64 build | 1,186 ms | 388 ms (3.1× faster) |
+> | WSL, linux-x64 | 962 ms | 360 ms (2.7× faster) |
+>
+> The first measurement on this machine reproduced your figure: 1,988 ms a chunk for bge-m3 on 24 chunks of this file. Quality: the 8-bit vectors are 0.977 to 0.98 cosine to bge-m3's for every chunk, nine in ten nearest neighbours agree, and the Hindi question "फ्रांस की राजधानी क्या है?" still scores the English passage that answers it at 0.70 (bge-m3 0.72) against 0.23 for an unrelated one.
+>
+> **What it means for your folder.** About 0.4 s a chunk instead of about 2 s, so a batch that took eight minutes takes about two and a half. At your earlier rate of about 30 chunks a file, a thousand notes is still roughly three to four hours on this processor, not "well under an hour": that would need a smaller model than bge-m3, which changes retrieval quality and is your call.
+>
+> **To use it:** `builder.UseEmbedded(EmbeddedModel.BgeM3Int8)`. The model name is part of the vector stamp (`EmbeddingSignature`), so a workspace embedded with bge-m3 shows as stale (`DetectStaleEmbeddingsAsync`) and must be embedded again, never mixed. bge-m3 stays the default. A folder of bge-m3-int8 files passed to `new EmbeddedEmbeddingProvider(folder)` is named for that model.
+>
+> **Proving tests:** `REQ-RAG-165 Int8ModelIsOfferedPinned` and `REQ-RAG-165 Int8FolderIsNotStampedAsBgeM3` fail on 1.2.0 (no such model; the folder was stamped `bge-m3`) and pass now; `REQ-RAG-165 Int8EmbedsTheSampleInUnderSixtyPercentOfTheTime` times both models on the fixture (it passes at 29 percent here).
+>
+> **Close step:** move to 1.3.0, switch Embedded to `EmbeddedModel.BgeM3Int8`, re-ingest, and time one batch of eight files against the eight minutes in the entry.
+
 ## Replies from TechieRag
 
 <!-- The upstream team's answers, newest block first. -->
+
+
+### 2026-11-19 — TR-RAG-065 fixed for 1.3.0
+
+TR-RAG-065 → `TechieRag#REQ-RAG-165`; the reply, with the before and after figures, is under the entry. Replies under TR-RAG-058 to TR-RAG-064 record that their tests pass again on the 1.3.0 code. **With 1.3.0, add the `TechieRag.PgVector` package**: the PostgreSQL stores left the core package (TrStudio TR-RAG-006); `UsePostgres` and every class name are unchanged, and without the package `Build()` says which one to add.
 
 ### 2026-11-13 (later) — TR-RAG-064 fixed for 1.1.10
 

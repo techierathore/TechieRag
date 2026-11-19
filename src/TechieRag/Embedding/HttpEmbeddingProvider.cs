@@ -371,16 +371,25 @@ public class HttpEmbeddingProvider : IEmbeddingProvider, IDisposable
         }
         catch (OperationCanceledException ex)
         {
-            // Timeout - wrap in a more descriptive exception
-            throw new HttpRequestException(
+            // Timeout - wrap in a more descriptive exception; a typed "not reachable" since REQ-RAG-170.
+            throw new Models.EmbeddingUnavailableException(
+                Name,
                 $"HTTP embedding service at {endpoint}{apiPath} timed out after {maxRetries} retries. " +
                 $"Consider increasing timeout or checking server load.", ex);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is null)
+        {
+            // REQ-RAG-170 (TrStudio TR-RAG-004): the service is not there at all.
+            throw new Models.EmbeddingUnavailableException(
+                Name,
+                $"Failed to connect to HTTP embedding service at {endpoint}{apiPath} after {maxRetries} retries. " +
+                $"Ensure the service is running and accessible. Error: {ex.Message}", ex);
         }
         catch (HttpRequestException ex)
         {
             throw new HttpRequestException(
                 $"Failed to connect to HTTP embedding service at {endpoint}{apiPath} after {maxRetries} retries. " +
-                $"Ensure the service is running and accessible. Error: {ex.Message}", ex);
+                $"Ensure the service is running and accessible. Error: {ex.Message}", ex, ex.StatusCode);
         }
     }
 

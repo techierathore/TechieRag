@@ -125,6 +125,8 @@ public interface ITechieRag
     /// therefore <b>ignores</b> <see cref="SearchOptions.Rerank"/>; implementers that wrap or
     /// delegate to TechieRagClient should override it and forward the options object intact.
     /// TechieRagClient overrides it with the full implementation.</para>
+    /// <para><b>Metadata filter (REQ-RAG-169):</b> the default throws <see cref="NotSupportedException"/> when
+    /// <see cref="SearchOptions.MetadataFilter"/> is set; TechieRagClient applies it inside the store.</para>
     /// <para><b>Document sets (REQ-RAG-114):</b> the default honours
     /// <see cref="SearchOptions.DocumentFilters"/> with one legacy search per document, merged by
     /// score; TechieRagClient runs it as one filtered store query.</para>
@@ -134,6 +136,13 @@ public interface ITechieRag
         SearchOptions? options,
         CancellationToken cancellationToken = default)
     {
+        if (options?.MetadataFilter is { Count: > 0 })
+        {
+            // REQ-RAG-169: never hand back unfiltered results as if they were filtered.
+            throw new NotSupportedException(
+                $"{GetType().Name} does not filter by metadata; override SearchAsync(string, SearchOptions, CancellationToken) to support SearchOptions.MetadataFilter.");
+        }
+
         var topK = options?.TopK ?? 5;
         if (options?.DocumentFilters is not { Count: > 0 } documentSet)
         {
@@ -245,6 +254,93 @@ public interface ITechieRag
         string? documentFilter = null,
         LlmCompletionOptions? options = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Finds every document with a chunk at or above a relevance score and counts them, without a language model
+    /// (REQ-RAG-172, MyDiary TR-RAG-001).
+    /// </summary>
+    /// <param name="query">The text to match, such as "went to the gym".</param>
+    /// <param name="options">The score a match needs and an optional scope.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The matching documents, their chunks and the count; empty when nothing matches.</returns>
+    /// <exception cref="ArgumentException">The query is empty.</exception>
+    /// <exception cref="ArgumentNullException">The options are null.</exception>
+    /// <remarks>
+    /// <para><b>Exact.</b> Matches are read best-first in widening batches until one scores below
+    /// <see cref="MatchOptions.MinScore"/>, so every chunk at or above it is in the report, however many there are
+    /// (up to <see cref="MatchOptions.MaxMatches"/>). Scores are vector similarities; the reranker is not used.</para>
+    /// <para><b>Default implementation</b> (ADR-005 additive change): built on
+    /// <see cref="SearchAsync(string, SearchOptions, CancellationToken)"/>, so any implementation that searches
+    /// correctly counts correctly.</para>
+    /// </remarks>
+    async Task<MatchReport> FindMatchesAsync(string query, MatchOptions options, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(query);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var limit = Math.Max(1, options.MaxMatches);
+        var ask = Math.Min(32, limit + 1);
+        while (true)
+        {
+            var results = await SearchAsync(
+                query,
+                new SearchOptions { TopK = ask, DocumentFilters = options.DocumentFilters, MetadataFilter = options.MetadataFilter, Rerank = false },
+                cancellationToken).ConfigureAwait(false);
+            var matched = results.Where(result => result.Score >= options.MinScore).ToList();
+            var passedBelow = matched.Count < results.Count;
+            if (passedBelow || results.Count < ask || ask > limit)
+            {
+                return Services.EvidencePrompt.Report(query, options.MinScore, matched.Take(limit), complete: matched.Count <= limit && (passedBelow || results.Count < ask));
+            }
+
+            ask = (int)Math.Min((long)ask * 4, limit + 1L);
+        }
+    }
+
+    /// <summary>
+    /// Answers from the matching documents only, with the library's own count and sources, and withholds the answer
+    /// when nothing matches (REQ-RAG-172, MyDiary TR-RAG-001).
+    /// </summary>
+    /// <param name="question">The user's question.</param>
+    /// <param name="options">What counts as a match, and how the answer is generated.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>
+    /// The answer with <see cref="RagResponse.Matches"/> set; when nothing matched, <see cref="RagResponse.Abstained"/>
+    /// is true, the answer and sources are empty and no model was called.
+    /// </returns>
+    /// <exception cref="ArgumentException">The question is empty.</exception>
+    /// <exception cref="ArgumentNullException">The options are null.</exception>
+    /// <remarks>
+    /// <para><b>Counted, sourced, abstaining.</b> <see cref="FindMatchesAsync"/> counts the matches first. With none,
+    /// the call returns at once. With some, the best <see cref="EvidenceAskOptions.MaxContextChunks"/> go into the
+    /// prompt with the exact count and the matching names, so even a small local model states the right number; the
+    /// host shows <see cref="RagResponse.Matches"/> as the count and the sources whatever the model wrote. No tool call
+    /// is needed, so it works with <c>TechieRag.Local</c>.</para>
+    /// <para><b>Default implementation</b> (ADR-005): counts through <see cref="FindMatchesAsync"/>, then answers
+    /// through <see cref="AskAsync"/> with the count in the system prompt, so its context is the best chunks overall
+    /// rather than the best matching ones; TechieRagClient answers from the matching chunks themselves.</para>
+    /// </remarks>
+    async Task<RagResponse> AskWithEvidenceAsync(string question, EvidenceAskOptions options, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(question);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var report = await FindMatchesAsync(question, options.Match, cancellationToken).ConfigureAwait(false);
+        if (report.IsEmpty)
+        {
+            return new RagResponse { Answer = string.Empty, Sources = [], Usage = new TokenUsage(), Query = question, Matches = report, Abstained = true };
+        }
+
+        var response = await AskAsync(
+            question,
+            Math.Max(1, options.MaxContextChunks),
+            Services.EvidencePrompt.Build(options.SystemPrompt ?? new PromptConfig().SystemPrompt, report),
+            documentFilter: null,
+            options.CompletionOptions,
+            cancellationToken).ConfigureAwait(false);
+        response.Matches = report;
+        return response;
+    }
 
     /// <summary>
     /// Performs a complete RAG operation with streaming response.

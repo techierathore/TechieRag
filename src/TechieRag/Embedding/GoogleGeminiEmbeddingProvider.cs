@@ -175,7 +175,8 @@ public sealed class GoogleGeminiEmbeddingProvider : IEmbeddingProvider, IDisposa
         var content = new StringContent(payload, Encoding.UTF8, "application/json");
 
         var path = $"/{apiVersion}/{qualifiedModel}:batchEmbedContents";
-        var response = await httpClient.PostAsync(path, content, cancellationToken).ConfigureAwait(false);
+        var response = await EmbeddingFailures.GuardAsync(
+            () => httpClient.PostAsync(path, content, cancellationToken), Name, httpClient.BaseAddress, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

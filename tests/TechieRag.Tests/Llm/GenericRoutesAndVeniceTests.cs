@@ -372,10 +372,11 @@ public sealed class GenericRoutesAndVeniceTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => llm.ChatAsync([ChatMessage.User("hi")], new LlmCompletionOptions { RequestTimeout = TimeSpan.FromMilliseconds(100) }, shortCts.Token));
 
-        // A long per-call timeout lets the slow reply finish even though the old default was 120 s.
+        // A long per-call timeout lets the slow reply finish even though the old default was 120 s. Ten seconds, not
+        // two: under a full parallel suite run on 2026-11-19 the 300 ms reply missed a 2 s budget once.
         var response = await llm.ChatAsync(
             [ChatMessage.User("hi")],
-            new LlmCompletionOptions { RequestTimeout = TimeSpan.FromSeconds(2) });
+            new LlmCompletionOptions { RequestTimeout = TimeSpan.FromSeconds(10) });
         Assert.Equal("ok", response.Content);
     }
 

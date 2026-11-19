@@ -8,7 +8,7 @@ namespace TechieRag.Abstractions;
 /// </summary>
 /// <remarks>
 /// <para><b>Built in:</b> <see cref="Persistence.SqliteTokenUsageLog"/> and
-/// <see cref="Persistence.PostgresTokenUsageLog"/>, both writing the <c>TrTokenUsage</c> table. The builder
+/// <c>Persistence.PostgresTokenUsageLog</c> (package <c>TechieRag.PgVector</c> since 1.3.0), both writing the <c>TrTokenUsage</c> table. The builder
 /// creates one in the persistence database whenever <c>WithPersistence</c> is set, unless
 /// <see cref="UsageTrackingConfig.PersistUsage"/> is false; <c>WithTokenUsageLog</c> supplies any other.</para>
 /// <para><b>Synchronous on purpose.</b> <see cref="ITokenTracker.RecordUsage"/> is synchronous and runs from

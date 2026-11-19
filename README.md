@@ -10,7 +10,7 @@ A flexible, configurable RAG (Retrieval-Augmented Generation) library for .NET. 
 ## Features
 
 - **Multiple Embedding Providers**: Ollama, LM Studio, OpenAI, Azure OpenAI, ONNX, or any HTTP-compatible API
-- **Multiple Vector Stores**: SQLite-vec (local), PostgreSQL/pgvector, Qdrant
+- **Multiple Vector Stores**: SQLite (local, in the core package), PostgreSQL/pgvector (`TechieRag.PgVector`), Qdrant (`TechieRag.Qdrant`)
 - **Built-in Document Processors**: PDF, DOCX, HTML, Markdown, JSON, TOML, and code files
 - **Fluent Builder API**: Easy configuration with method chaining
 - **Offline after one download**: `TechieRag.Embedded` downloads the BGE-M3 model once, then works offline; `TechieRag.Local` does the same for an in-process language model
@@ -211,8 +211,8 @@ await rag.InitializeAsync();
 | Store | Method | Connection String Example |
 |-------|--------|--------------------------|
 | SQLite-vec | `.UseSqliteVec(dbPath)` | `techierag.db` |
-| PostgreSQL/pgvector | `.UsePgVector(connectionString)` | `Host=localhost;Database=mydb;...` |
-| Qdrant | `.UseQdrant(endpoint, apiKey)` | `http://localhost:6334` |
+| PostgreSQL/pgvector (package `TechieRag.PgVector` since 1.3.0) | `.UsePgVector(connectionString)` | `Host=localhost;Database=mydb;...` |
+| Qdrant (package `TechieRag.Qdrant` since 1.3.0) | `.UseQdrant(endpoint, apiKey)` | `http://localhost:6334` |
 
 ### LLM routes
 

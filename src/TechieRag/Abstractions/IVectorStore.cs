@@ -87,6 +87,54 @@ public interface IVectorStore
     }
 
     /// <summary>
+    /// Performs one vector similarity search over the chunks whose metadata matches a filter, optionally within a set
+    /// of documents (REQ-RAG-169, TrStudio TR-RAG-003).
+    /// </summary>
+    /// <param name="queryVector">The embedding vector of the search query.</param>
+    /// <param name="topK">Maximum number of results to return.</param>
+    /// <param name="documentIds">The documents to search, or null for all; an empty set returns no results.</param>
+    /// <param name="metadataFilter">Key and text pairs every result's metadata must match; see <see cref="SearchOptions.MetadataFilter"/>.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The best matching chunks, highest score first.</returns>
+    /// <exception cref="ArgumentException">A filter key is empty or holds a double quote or backslash, or a value is null.</exception>
+    /// <remarks>
+    /// <para><b>Default implementation</b> (ADR-005 additive change): asks <see cref="SearchAsync"/> or
+    /// <see cref="SearchDocumentsAsync"/> for four times <paramref name="topK"/> candidates (at least 32), keeps the
+    /// matching ones, and asks for four times as many again until it has <paramref name="topK"/> matches or the
+    /// store has no more chunks. The result is the same as a native filter, at the cost of the extra reads.
+    /// SqliteVec and PgVector override it with a filter inside their own query; a third-party store should too.</para>
+    /// </remarks>
+    async Task<IReadOnlyList<SearchResult>> SearchMatchingAsync(
+        float[] queryVector,
+        int topK,
+        IReadOnlyCollection<string>? documentIds,
+        IReadOnlyDictionary<string, string> metadataFilter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(metadataFilter);
+        VectorStores.MetadataMatch.Validate(metadataFilter);
+        if (topK <= 0 || documentIds is { Count: 0 })
+        {
+            return [];
+        }
+
+        var ask = Math.Max(topK * 4, 32);
+        while (true)
+        {
+            var candidates = documentIds is null
+                ? await SearchAsync(queryVector, ask, null, cancellationToken).ConfigureAwait(false)
+                : await SearchDocumentsAsync(queryVector, ask, documentIds, cancellationToken).ConfigureAwait(false);
+            var matched = candidates.Where(result => VectorStores.MetadataMatch.Matches(result.Chunk, metadataFilter)).Take(topK).ToList();
+            if (matched.Count >= topK || candidates.Count < ask || ask > int.MaxValue / 4)
+            {
+                return matched;
+            }
+
+            ask *= 4;
+        }
+    }
+
+    /// <summary>
     /// Deletes a specific chunk by its ID.
     /// </summary>
     /// <param name="chunkId">The ID of the chunk to delete.</param>

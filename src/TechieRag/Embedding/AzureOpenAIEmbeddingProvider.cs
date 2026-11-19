@@ -1,7 +1,7 @@
-using System.ClientModel;
 using System.Diagnostics;
-using Azure.AI.OpenAI;
-using OpenAI.Embeddings;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using TechieRag.Abstractions;
 
 namespace TechieRag.Embedding;
@@ -14,11 +14,18 @@ namespace TechieRag.Embedding;
 /// providing enterprise-grade cloud embedding capabilities with Azure security and compliance.</para>
 /// <para><b>Code Flow:</b> Created by TechieRagBuilder when EmbeddingSource.AzureOpenAI is configured.
 /// Called by TechieRagClient during ingestion (to embed chunks) and search (to embed queries).</para>
-/// <para><b>API:</b> Uses Azure.AI.OpenAI SDK with EmbeddingsClient for embedding operations.</para>
+/// <para><b>API:</b> <c>POST {endpoint}/openai/deployments/{deployment}/embeddings?api-version=2024-10-21</c> with the
+/// key in the <c>api-key</c> header, over a raw <see cref="HttpClient"/> and <c>System.Text.Json</c> like every other
+/// provider (ADR-003). Until 1.3.0 this class used the Azure.AI.OpenAI SDK, which sent the same request; dropping it
+/// took the SDK and its OpenAI and System.ClientModel libraries out of the core package (REQ-RAG-168, TrStudio
+/// TR-RAG-006).</para>
 /// <para><b>Dependencies:</b> Requires Azure OpenAI resource with deployed embedding model.</para>
 /// </remarks>
 public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
 {
+    /// <summary>The Azure OpenAI data-plane API version this provider sends; the one Azure.AI.OpenAI 2.1.0 sent.</summary>
+    public const string ApiVersion = "2024-10-21";
+
     /// <inheritdoc/>
     public string Name => "Azure OpenAI";
 
@@ -37,8 +44,12 @@ public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
     /// </remarks>
     public string EmbeddingSignature => Models.EmbeddingStaleness.Signature(Name, ModelName);
 
-    private readonly EmbeddingClient embeddingClient;
-    private readonly string endpoint;
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(100);
+
+    private readonly HttpClient httpClient;
+    private readonly bool ownsHttpClient;
+    private readonly Uri embeddingsUri;
+    private readonly string apiKey;
     private bool disposed;
 
     /// <inheritdoc/>
@@ -51,7 +62,7 @@ public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
     /// <param name="apiKey">API key for authentication.</param>
     /// <param name="deploymentName">Name of the deployed embedding model.</param>
     /// <param name="dimensions">Vector dimensions (default: 1536 for text-embedding-ada-002, 3072 for text-embedding-3-large).</param>
-    /// <exception cref="ArgumentException">Thrown when endpoint, apiKey, or deploymentName is null or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown when endpoint, apiKey, or deploymentName is null or empty, or the endpoint is not an absolute URL.</exception>
     /// <remarks>
     /// <para><b>Common Models:</b></para>
     /// <list type="bullet">
@@ -61,6 +72,17 @@ public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
     /// </list>
     /// </remarks>
     public AzureOpenAIEmbeddingProvider(string endpoint, string apiKey, string deploymentName, int dimensions = 1536)
+        : this(endpoint, apiKey, deploymentName, dimensions, handler: null)
+    {
+    }
+
+    /// <summary>Creates the provider over a given HTTP handler; tests pass a stub.</summary>
+    /// <param name="endpoint">Azure OpenAI endpoint URL.</param>
+    /// <param name="apiKey">API key for authentication.</param>
+    /// <param name="deploymentName">Name of the deployed embedding model.</param>
+    /// <param name="dimensions">Vector dimensions.</param>
+    /// <param name="handler">The handler, or null for the default network stack.</param>
+    internal AzureOpenAIEmbeddingProvider(string endpoint, string apiKey, string deploymentName, int dimensions, HttpMessageHandler? handler)
     {
         if (string.IsNullOrWhiteSpace(endpoint))
             throw new ArgumentException("Endpoint cannot be null or empty.", nameof(endpoint));
@@ -68,96 +90,47 @@ public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
             throw new ArgumentException("API key cannot be null or empty.", nameof(apiKey));
         if (string.IsNullOrWhiteSpace(deploymentName))
             throw new ArgumentException("Deployment name cannot be null or empty.", nameof(deploymentName));
+        if (!Uri.TryCreate(endpoint.TrimEnd('/') + "/", UriKind.Absolute, out var baseUri))
+            throw new ArgumentException("Endpoint must be an absolute URL.", nameof(endpoint));
 
-        this.endpoint = endpoint.TrimEnd('/');
         ModelName = deploymentName;
         Dimensions = dimensions;
-
-        var azureClient = new AzureOpenAIClient(new Uri(this.endpoint), new ApiKeyCredential(apiKey));
-        embeddingClient = azureClient.GetEmbeddingClient(deploymentName);
+        this.apiKey = apiKey;
+        embeddingsUri = new Uri(baseUri, $"openai/deployments/{Uri.EscapeDataString(deploymentName)}/embeddings?api-version={ApiVersion}");
+        httpClient = handler is null ? new HttpClient() : new HttpClient(handler, disposeHandler: false);
+        httpClient.Timeout = DefaultTimeout;
+        ownsHttpClient = true;
     }
 
     /// <summary>
-    /// Creates a new Azure OpenAI embedding provider instance with a pre-configured EmbeddingClient.
-    /// </summary>
-    /// <param name="embeddingClient">Pre-configured EmbeddingClient instance.</param>
-    /// <param name="modelName">Model/deployment name for telemetry purposes.</param>
-    /// <param name="dimensions">Vector dimensions.</param>
-    /// <exception cref="ArgumentNullException">Thrown when embeddingClient is null.</exception>
-    /// <remarks>
-    /// <para><b>Use Case:</b> Allows reuse of existing Azure OpenAI client instances,
-    /// useful when multiple providers share the same connection.</para>
-    /// </remarks>
-    public AzureOpenAIEmbeddingProvider(EmbeddingClient embeddingClient, string modelName, int dimensions = 1536)
-    {
-        this.embeddingClient = embeddingClient ?? throw new ArgumentNullException(nameof(embeddingClient));
-        endpoint = "pre-configured";
-        ModelName = modelName;
-        Dimensions = dimensions;
-    }
-
-    /// <summary>
-    /// Generates an embedding vector for a single text input.
+    /// Generates an embedding vector for a single text string.
     /// </summary>
     /// <param name="text">The text to embed.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A float array representing the embedding vector.</returns>
     /// <exception cref="ArgumentException">Thrown when text is null or empty.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when the Azure OpenAI API returns an invalid response.</exception>
-    /// <remarks>
-    /// <para><b>Flow:</b> Sends request to Azure OpenAI embedding endpoint via SDK,
-    /// receives vector response, and raises telemetry event.</para>
-    /// </remarks>
+    /// <exception cref="HttpRequestException">Thrown when the Azure OpenAI request fails; <see cref="Models.EmbeddingUnavailableException"/> when the service cannot be reached.</exception>
     public async Task<float[]> EmbedAsync(string text, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new ArgumentException("Text cannot be null or empty.", nameof(text));
 
-        ObjectDisposedException.ThrowIf(disposed, this);
-
-        var stopwatch = Stopwatch.StartNew();
-
-        ClientResult<OpenAIEmbedding> result;
-        try
-        {
-            result = await embeddingClient.GenerateEmbeddingAsync(text, cancellationToken: cancellationToken);
-        }
-        catch (ClientResultException ex)
-        {
-            throw new HttpRequestException($"Azure OpenAI embedding request failed: {ex.Message}", ex);
-        }
-
-        var embedding = result.Value;
-        if (embedding == null)
-        {
-            throw new InvalidOperationException("Azure OpenAI returned an invalid embedding response.");
-        }
-
-        var vector = embedding.ToFloats().ToArray();
-
-        stopwatch.Stop();
-
-        RaiseEmbeddingCompleted(text, 1, stopwatch.Elapsed, null);
-
-        return vector;
+        var vectors = await EmbedBatchAsync([text], cancellationToken).ConfigureAwait(false);
+        return vectors[0];
     }
 
     /// <summary>
-    /// Generates embedding vectors for multiple texts in a batch operation.
+    /// Generates embedding vectors for multiple texts in a single batch request.
     /// </summary>
-    /// <param name="texts">Collection of texts to embed.</param>
-    /// <param name="cancellationToken">Token to cancel the operation.</param>
-    /// <returns>List of embedding vectors corresponding to each input text.</returns>
+    /// <param name="texts">The texts to embed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A list of float arrays, one per input text, in the same order.</returns>
     /// <exception cref="ArgumentNullException">Thrown when texts is null.</exception>
-    /// <remarks>
-    /// <para><b>Performance:</b> Azure OpenAI supports batch embedding operations,
-    /// which are more efficient than individual calls for multiple texts.</para>
-    /// </remarks>
+    /// <exception cref="HttpRequestException">Thrown when the Azure OpenAI request fails; <see cref="Models.EmbeddingUnavailableException"/> when the service cannot be reached.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the service answers with an unreadable or incomplete body.</exception>
     public async Task<IReadOnlyList<float[]>> EmbedBatchAsync(IEnumerable<string> texts, CancellationToken cancellationToken = default)
     {
-        if (texts == null)
-            throw new ArgumentNullException(nameof(texts));
-
+        ArgumentNullException.ThrowIfNull(texts);
         ObjectDisposedException.ThrowIf(disposed, this);
 
         var textList = texts.ToList();
@@ -165,44 +138,51 @@ public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
             return Array.Empty<float[]>();
 
         var stopwatch = Stopwatch.StartNew();
+        using var request = new HttpRequestMessage(HttpMethod.Post, embeddingsUri)
+        {
+            Content = JsonContent.Create(new EmbeddingRequest(textList))
+        };
+        request.Headers.TryAddWithoutValidation("api-key", apiKey);
 
-        ClientResult<OpenAIEmbeddingCollection> result;
+        using var response = await EmbeddingFailures.SendAsync(httpClient, request, Name, embeddingsUri, cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new HttpRequestException(
+                $"Azure OpenAI embedding request failed: {(int)response.StatusCode} ({response.ReasonPhrase}). {Trim(body)}",
+                inner: null,
+                response.StatusCode);
+        }
+
+        EmbeddingResponse? payload;
         try
         {
-            result = await embeddingClient.GenerateEmbeddingsAsync(textList, cancellationToken: cancellationToken);
+            payload = await response.Content.ReadFromJsonAsync<EmbeddingResponse>(cancellationToken).ConfigureAwait(false);
         }
-        catch (ClientResultException ex)
+        catch (JsonException exception)
         {
-            throw new HttpRequestException($"Azure OpenAI batch embedding request failed: {ex.Message}", ex);
+            throw new InvalidOperationException("Azure OpenAI returned an invalid embedding response.", exception);
         }
 
-        var embeddings = result.Value;
-        if (embeddings == null || embeddings.Count != textList.Count)
+        if (payload?.Data is not { } data || data.Count != textList.Count || data.Any(item => item.Embedding is null))
         {
             throw new InvalidOperationException("Azure OpenAI returned an invalid batch embedding response.");
         }
 
-        // Ensure results are in the correct order (by index)
-        var orderedResults = embeddings
-            .OrderBy(e => e.Index)
-            .Select(e => e.ToFloats().ToArray())
-            .ToList();
-
+        var ordered = data.OrderBy(item => item.Index).Select(item => item.Embedding!).ToList();
         stopwatch.Stop();
-
-        var totalText = string.Join("", textList);
-        RaiseEmbeddingCompleted(totalText, textList.Count, stopwatch.Elapsed, null);
-
-        return orderedResults;
+        RaiseEmbeddingCompleted(string.Concat(textList), textList.Count, stopwatch.Elapsed, payload.Usage?.PromptTokens);
+        return ordered;
     }
 
-    /// <summary>
-    /// Raises the OnEmbeddingCompleted event with telemetry data.
-    /// </summary>
+    /// <summary>Keeps an error body short enough for a message.</summary>
+    private static string Trim(string body) => body.Length <= 500 ? body : body[..500] + "…";
+
+    /// <summary>Raises the OnEmbeddingCompleted event with usage metrics.</summary>
     /// <param name="text">The text(s) that were embedded.</param>
-    /// <param name="textCount">Number of texts embedded.</param>
-    /// <param name="duration">Duration of the embedding operation.</param>
-    /// <param name="actualTokenCount">Actual token count from the API response, if available.</param>
+    /// <param name="textCount">Number of texts in the batch.</param>
+    /// <param name="duration">Time taken.</param>
+    /// <param name="actualTokenCount">The token count the service reported, if any.</param>
     private void RaiseEmbeddingCompleted(string text, int textCount, TimeSpan duration, int? actualTokenCount)
     {
         OnEmbeddingCompleted?.Invoke(this, new EmbeddingCompletedEventArgs
@@ -215,33 +195,46 @@ public class AzureOpenAIEmbeddingProvider : IEmbeddingProvider, IDisposable
         });
     }
 
-    /// <summary>
-    /// Estimates the token count for a given text.
-    /// </summary>
-    /// <param name="text">The text to estimate tokens for.</param>
-    /// <returns>Approximate token count.</returns>
-    /// <remarks>
-    /// <para>Uses a simple heuristic of ~4 characters per token, which is a reasonable
-    /// approximation for English text. For more accurate counts, consider using a tokenizer.</para>
-    /// </remarks>
-    private static int EstimateTokenCount(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-            return 0;
-
-        return (int)Math.Ceiling(text.Length / 4.0);
-    }
+    /// <summary>Estimates token count when the service reports none (about 4 characters a token).</summary>
+    /// <param name="text">The text.</param>
+    /// <returns>Estimated token count.</returns>
+    private static int EstimateTokenCount(string text) =>
+        string.IsNullOrEmpty(text) ? 0 : (int)Math.Ceiling(text.Length / 4.0);
 
     /// <summary>
-    /// Disposes resources used by this provider.
+    /// Disposes the provider and its HTTP client.
     /// </summary>
-    /// <remarks>
-    /// <para><b>Note:</b> The EmbeddingClient is managed by the Azure SDK and does not
-    /// require explicit disposal, but this method is provided for interface compliance.</para>
-    /// </remarks>
     public void Dispose()
     {
+        if (disposed) return;
         disposed = true;
+        if (ownsHttpClient) httpClient.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private sealed record EmbeddingRequest([property: JsonPropertyName("input")] IReadOnlyList<string> Input);
+
+    private sealed class EmbeddingResponse
+    {
+        [JsonPropertyName("data")]
+        public List<EmbeddingItem>? Data { get; set; }
+
+        [JsonPropertyName("usage")]
+        public EmbeddingUsage? Usage { get; set; }
+    }
+
+    private sealed class EmbeddingItem
+    {
+        [JsonPropertyName("index")]
+        public int Index { get; set; }
+
+        [JsonPropertyName("embedding")]
+        public float[]? Embedding { get; set; }
+    }
+
+    private sealed class EmbeddingUsage
+    {
+        [JsonPropertyName("prompt_tokens")]
+        public int? PromptTokens { get; set; }
     }
 }

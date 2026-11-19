@@ -1,16 +1,16 @@
 ---
 project: TechieRag
-last_updated: 2026-11-14
-current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 42 verified
+last_updated: 2026-11-19
+current_phase: Phase 3 of 3 (Consumer feedback from Sevak) · Release — handoff done, 40 of 41 verified, 1 not applicable
 last_verified_build: PASS
-last_verified_date: 2026-11-14
+last_verified_date: 2026-11-19
 ---
 
 # TechieRag — Status
 
 ## Where I am
 
-Phase 3 of 3 (Consumer feedback from Sevak): 1.1.10 is committed on dev; PR #22's probe run failed. Fixed in the workflow, not yet committed: Apple builds no longer hide a failure, both Apple heads pin workload set 10.0.401 (Xcode 26.6, which the runner has), and the Android press waits for the emulator's network. The Android failure and its fix were reproduced on an API 34 emulator here. REQ-FN-057 stays open until the next CI run passes.
+Phase 3 of 3 (Consumer feedback from Sevak), ready to release as 1.3.0. The 19 November feedback round is built and verified (REQ-RAG-165 to 172). Your two decisions are recorded: the graphics-card picture model is deferred (REQ-RAG-146 N/A) and Intel Macs are left out (REQ-RAG-173 N/A). Nothing waits on you except the OpenAI and Gemini keys. Nothing is committed.
 
 ## Next command to run
 
@@ -32,17 +32,16 @@ Why: every row in this phase's scope is terminal and the shipped documents were 
 | In Progress | 0 |
 | Implemented | 0 |
 | Needs re-verify | 0 |
-| Blocked | 2 |
+| Blocked | 1 |
 
-- [ ] REQ-RAG-146 — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, `microsoft/Phi-4-multimodal-instruct-onnx`, folder `gpu/gpu-int4-rtn-block-32` (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so *(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request) (Blocked)
 - [ ] REQ-RAG-155 — The library shall generate images: an `IImageGenerationProvider` with `GenerateImageAsync(prompt, size, options)` returning the image bytes, its media type and the usage, for OpenAI, Gemini and Venice, routed like the chat providers, with no key ever persisted; this re-scopes BRD-161 for images only *(Sevak feedback TR-RAG-058; Sevak BRD-127 and BRD-281; owner, 2026-11-07) (Blocked)
 
 ## Known blockers
 
-- REQ-FN-057 (phase 2) is Needs re-verify until a GitHub run of the probe workflow passes; the Apple heads cannot be built off a Mac. Run 43448574999 also got no Mac runner from GitHub (capacity), which no code change prevents; re-run if that happens again.
-- REQ-FN-057: one Android press crashed natively (signal 11) after downloading the model on a freshly wiped emulator; five other presses passed. Not reproduced on demand.
-- The Gmail test account has one message in Trash from the 13 Nov live test; move it back to INBOX.
-- REQ-RAG-146 (GPU runtime choice) and REQ-RAG-155 (OpenAI and Gemini keys) wait on you.
+- REQ-RAG-155 waits on OpenAI and Gemini keys in the live-test settings file.
+- REQ-FN-057 (phase 2) stays Needs re-verify until a GitHub run of the probe workflow passes.
+- Sevak and TrStudio must add the new `TechieRag.PgVector` package when they move to 1.3.0.
+- The Gmail live test refused one search once today and passed on re-run; the test account's Trash may hold its messages.
 
 ## Verification log
 
@@ -50,11 +49,11 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 | Date | Phase | Result | Status table |
 |---|---|---|---|
-| 2026-11-12 | verify-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
-| 2026-11-12 | handoff-phase | 27/27 Verified, 14 N/A | docs/TechieRag-Checklist.md#requirements-status |
-| 2026-11-13 | triage-and-fix + handoff | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-11-13 | triage-and-fix + handoff + amend-docs | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
 | 2026-11-14 | fix-issues | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-19 | fix-issues | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-19 | verify-phase | 40/42 Verified | docs/TechieRag-P3-Checklist.md#requirements-status |
+| 2026-11-19 | amend-docs | 40/41 Verified, 1 N/A | docs/TechieRag-P3-Checklist.md#requirements-status |
 
 ## Library feedback summary
 
@@ -64,12 +63,13 @@ Last five passes; older passes live in `docs/metrics/gates.jsonl`.
 
 ## Standards compliance
 
-- Last check 2026-11-11: 0 findings in the files the fix run wrote, see the checklist Remarks.
+- Last check 2026-11-19: 0 findings in the files the fix run wrote, see the checklist Remarks.
 
 ## Deferred / future
 
+- The graphics-card picture model (Phi-4-multimodal), with a later engine upgrade (your decision 1, option C).
+- A smaller multilingual embedded model for bulk ingest, if bge-m3-int8 (about 0.4 s a chunk) is still too slow for Sevak.
+- The core still targets `net8.0`, which reached end of support on 10 Nov 2026, as did .NET 9.
 - Anthropic still sends `budget_tokens` for thinking and `tool_choice` `any`; Opus 5.5 and Sonnet 5.5 refuse both.
 - The default Anthropic model is still `claude-sonnet-4-5-20250929`, which the pricing page marks deprecated.
 - Cache reads and writes are not priced by the token tracker.
-- Raise `APPLE_WORKLOAD_SET` in the probe workflow when GitHub's macOS image carries Xcode 27.
-- Open consumer feedback entries (TR-RAG-020/021/022/026/035) for a future release.

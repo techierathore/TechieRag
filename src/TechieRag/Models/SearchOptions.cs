@@ -38,6 +38,26 @@ public class SearchOptions
     public IReadOnlyCollection<string>? DocumentFilters { get; set; }
 
     /// <summary>
+    /// Gets or sets metadata every result must carry: key and text pairs, all of which must match, applied inside the
+    /// vector store, or null for no metadata filter (REQ-RAG-169, TrStudio TR-RAG-003).
+    /// </summary>
+    /// <remarks>
+    /// <para>Scopes a search to one owner, character or tenant without over-fetching:
+    /// <c>new SearchOptions { TopK = 5, MetadataFilter = new Dictionary&lt;string, string&gt; { ["userId"] = userId } }</c>
+    /// returns the five best chunks whose metadata has <c>userId</c> equal to that text. Combines with
+    /// <see cref="DocumentFilter"/> and <see cref="DocumentFilters"/>. An empty dictionary is no filter.</para>
+    /// <para><b>Matching:</b> a value is compared as text, ordinally; a number or a true/false is compared by its
+    /// JSON form (<c>42</c>, <c>true</c>). Store the values you filter on as text. A key may not hold a double
+    /// quote or a backslash.</para>
+    /// <para><b>Where it runs:</b> SqliteVec and PgVector filter in their own query, so the result is the best
+    /// <see cref="TopK"/> among matching chunks. Qdrant and a third-party store without an override of
+    /// <c>IVectorStore.SearchMatchingAsync</c> fetch wider candidate sets and filter them, which returns the same
+    /// result more slowly. An <c>ITechieRag</c> implementation that does not override the options overload throws
+    /// <see cref="NotSupportedException"/> rather than return unfiltered results.</para>
+    /// </remarks>
+    public IReadOnlyDictionary<string, string>? MetadataFilter { get; set; }
+
+    /// <summary>
     /// Gets or sets the per-call rerank switch.
     /// </summary>
     /// <remarks>

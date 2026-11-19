@@ -26,6 +26,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TechieRag\TechieRag.csproj" />
+    <!-- REQ-RAG-168: the PostgreSQL and Qdrant stores moved to sibling packages; their tests stay here. -->
+    <ProjectReference Include="..\..\src\TechieRag.PgVector\TechieRag.PgVector.csproj" />
+    <ProjectReference Include="..\..\src\TechieRag.Qdrant\TechieRag.Qdrant.csproj" />
     <!--
       TR-RAG-025: added so the ONNX native load is actually exercised by the suite. It was not
       referenced before, which is exactly why "TechieRag.Embedded cannot load its native library on a

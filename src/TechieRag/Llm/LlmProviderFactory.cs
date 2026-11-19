@@ -226,6 +226,72 @@ public static class LlmProviderFactory
         return LlmModelLister.ListAsync(WithEndpoint(connector, endpoint), apiKey, handler: null, cancellationToken);
     }
 
+    /// <summary>
+    /// Lists the models a route's service reports, each with what the service publishes about it: the price per
+    /// million tokens in and out, whether it runs the model itself or passes the text on, and whether the model
+    /// reasons; each empty when the service says nothing (REQ-RAG-166, Lekhak TR-RAG-011).
+    /// </summary>
+    /// <param name="route">The route; only its connector is used.</param>
+    /// <param name="apiKey">The API key, or null for a local runtime.</param>
+    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it. An endpoint written
+    /// on the route wins.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>One entry per model id, distinct and sorted by id, the same ids <see cref="ListModelsAsync(ModelRoute, string?, string?, CancellationToken)"/> returns.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="route"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the connector needs a key and none was given.</exception>
+    /// <exception cref="NotSupportedException">Thrown for Gemini, subscription and in-process connectors.</exception>
+    /// <exception cref="HttpRequestException">Thrown when the service cannot be reached or refuses; never an empty list for a down server.</exception>
+    /// <remarks>
+    /// The values come from the service's own model list, one request, the same one
+    /// <see cref="ListModelsAsync(ModelRoute, string?, string?, CancellationToken)"/> makes. Venice publishes all
+    /// three; OpenRouter publishes the price and reasoning; LM Studio and Ollama models are
+    /// <see cref="LlmModelDataHandling.Local"/>; other services give ids only. See <see cref="LlmModelDetails"/>.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var models = await LlmProviderFactory.ListModelDetailsAsync(ModelRouter.Require("venice/x"), key);
+    /// foreach (var model in models)
+    /// {
+    ///     var price = model.InputPricePerMillionUsd is { } input ? $"${input}/M in" : "price not known";
+    ///     var who = model.DataHandling == LlmModelDataHandling.PassesOn ? "passed on to another company" : model.DataHandling.ToString();
+    /// }
+    /// </code>
+    /// </example>
+    public static Task<IReadOnlyList<LlmModelDetails>> ListModelDetailsAsync(
+        ModelRoute route,
+        string? apiKey,
+        string? endpoint = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        return ListModelDetailsAsync(WithEndpoint(route, endpoint).Connector, apiKey, endpoint: null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Lists the models a connector's service reports, each with the price, data handling and reasoning the service
+    /// publishes for it, each empty when the service says nothing (REQ-RAG-166, Lekhak TR-RAG-011).
+    /// </summary>
+    /// <param name="connector">The connector, for example <c>LlmConnectorCatalog.Require("venice")</c>.</param>
+    /// <param name="apiKey">The API key, or null for a local runtime.</param>
+    /// <param name="endpoint">The service's base URL in place of the connector's; null keeps it.</param>
+    /// <param name="cancellationToken">Cancels the request.</param>
+    /// <returns>One entry per model id, distinct and sorted by id.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connector"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="endpoint"/> is not an absolute http or https URL.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the connector needs a key and none was given.</exception>
+    /// <exception cref="NotSupportedException">Thrown for Gemini, subscription and in-process connectors.</exception>
+    /// <exception cref="HttpRequestException">Thrown when the service cannot be reached or refuses.</exception>
+    public static Task<IReadOnlyList<LlmModelDetails>> ListModelDetailsAsync(
+        LlmConnectorDescriptor connector,
+        string? apiKey,
+        string? endpoint = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connector);
+        return LlmModelLister.ListDetailsAsync(WithEndpoint(connector, endpoint), apiKey, handler: null, cancellationToken);
+    }
+
     /// <summary>Returns the route with its connector's endpoint replaced, or unchanged for a null endpoint.</summary>
     /// <param name="route">The route.</param>
     /// <param name="endpoint">The base URL, or null.</param>

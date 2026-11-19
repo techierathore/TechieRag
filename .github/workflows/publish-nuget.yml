@@ -52,11 +52,14 @@ env:
   TELEMETRY_PROJECT: src/TechieRag.Telemetry/TechieRag.Telemetry.csproj
   AGENTS_PROJECT: src/TechieRag.Agents/TechieRag.Agents.csproj
   LOCAL_PROJECT: src/TechieRag.Local/TechieRag.Local.csproj
+  # REQ-RAG-168 (TrStudio TR-RAG-006): the PostgreSQL and Qdrant stores, out of the core since 1.3.0.
+  PGVECTOR_PROJECT: src/TechieRag.PgVector/TechieRag.PgVector.csproj
+  QDRANT_PROJECT: src/TechieRag.Qdrant/TechieRag.Qdrant.csproj
   TEST_PROJECT: tests/TechieRag.Tests/TechieRag.Tests.csproj
   # Package IDs whose published versions gate the increment check (lower-case, as the flat
-  # container API keys them). All five ship together at the same version (REQ-FN-005, REQ-FN-065);
+  # container API keys them). All seven ship together at the same version (REQ-FN-005, REQ-FN-065);
   # a package never published yet (404) simply has no latest version to beat.
-  PACKAGE_IDS: techierag techierag.embedded techierag.telemetry techierag.agents techierag.local
+  PACKAGE_IDS: techierag techierag.embedded techierag.telemetry techierag.agents techierag.local techierag.pgvector techierag.qdrant
 
 jobs:
   publish:
@@ -98,6 +101,8 @@ jobs:
           dotnet restore "$TELEMETRY_PROJECT"
           dotnet restore "$AGENTS_PROJECT"
           dotnet restore "$LOCAL_PROJECT"
+          dotnet restore "$PGVECTOR_PROJECT"
+          dotnet restore "$QDRANT_PROJECT"
           dotnet restore "$TEST_PROJECT"
 
       - name: Build
@@ -110,6 +115,8 @@ jobs:
           dotnet build "$TELEMETRY_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
           dotnet build "$AGENTS_PROJECT"   --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
           dotnet build "$LOCAL_PROJECT"    --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$PGVECTOR_PROJECT" --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
+          dotnet build "$QDRANT_PROJECT"   --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
           dotnet build "$TEST_PROJECT"     --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }}
 
       - name: Test
@@ -128,6 +135,8 @@ jobs:
           dotnet pack "$TELEMETRY_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
           dotnet pack "$AGENTS_PROJECT"   --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
           dotnet pack "$LOCAL_PROJECT"    --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
+          dotnet pack "$PGVECTOR_PROJECT" --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
+          dotnet pack "$QDRANT_PROJECT"   --configuration Release --no-build -p:ContinuousIntegrationBuild=true -p:Version=${{ steps.version.outputs.version }} --output ./artifacts
 
       - name: Confirm packed version
         id: pkg
@@ -137,7 +146,7 @@ jobs:
           EXPECTED: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          for id in TechieRag TechieRag.Embedded TechieRag.Telemetry TechieRag.Agents TechieRag.Local; do
+          for id in TechieRag TechieRag.Embedded TechieRag.Telemetry TechieRag.Agents TechieRag.Local TechieRag.PgVector TechieRag.Qdrant; do
             pkg="./artifacts/${id}.${EXPECTED}.nupkg"
             if [ ! -f "$pkg" ]; then
               echo "::error::Expected $pkg but the pack step produced:"; ls -1 ./artifacts/; exit 1

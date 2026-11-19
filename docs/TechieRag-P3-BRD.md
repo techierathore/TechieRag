@@ -144,7 +144,7 @@ An app reads a picture with a model on the user's own machine, through the same 
 
 - **BRD-203** — TechieRag.Local shall download, check and load a model that reads pictures from Hugging Face the same way it loads text models today (terms, fit check, fingerprint check, then load), with ONNX Runtime GenAI's multimodal processor. The catalogue shall name one that runs on a laptop CPU: Phi-3.5-vision-instruct, `microsoft/Phi-3.5-vision-instruct-onnx`, folder `cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4` (MIT, about 3.2 GB), pinned to one commit *(owner, added 2026-11-05)* *Screen:* Local picture reading
   - *Acceptance:* When a developer loads the Phi-3.5 vision model on Local picture reading on a CPU-only laptop, then its files download, pass their fingerprints and load.
-- **BRD-204** — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, `microsoft/Phi-4-multimodal-instruct-onnx`, folder `gpu/gpu-int4-rtn-block-32` (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so *(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request)* *Screen:* Local picture reading
+- **BRD-204** — On a machine with a GPU the catalogue shall name a GPU model that reads pictures: Phi-4-multimodal-instruct, `microsoft/Phi-4-multimodal-instruct-onnx`, folder `gpu/gpu-int4-rtn-block-32` (MIT, about 5.1 GB), pinned to one commit, loaded through an ONNX Runtime GenAI GPU runtime. Asking for it where no GPU runtime is present shall refuse before the download with a message saying so *(owner, added 2026-11-05; which GPU runtime is open, see the Decision Request)* *Screen:* Local picture reading *Deferred 2026-11-19 by the owner (Decision Request decision 1, option C): the graphics-card load waits for a later engine upgrade; the refusal before download stays.*
   - *Acceptance:* When a developer loads the Phi-4 multimodal model on Local picture reading, then it loads with the GPU runtime and refuses before any download without it.
 - **BRD-205** — The local provider shall implement `IMultimodalLlmProvider`: a chat turn with one or more `ChatImage` parts shall reach a model that reads pictures, in order with the text, and the answer comes back as text like any other chat *(owner, added 2026-11-05)* *Screen:* Local picture reading
   - *Acceptance:* When a developer on Local picture reading sends a turn with two images to a vision model, then both reach the model and text comes back.
@@ -196,7 +196,7 @@ Images from a prompt, through the same routing as the chat providers.
 
 Written by the status gate after every build, verify and handoff; not by hand.
 
-**Snapshot as of 2026-11-13.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
+**Snapshot as of 2026-11-19.** Live per-requirement status: `PROJECT-STATUS.md` and the Requirements Status table in `docs/TechieRag-P3-Checklist.md`.
 
 | Screen | Requirements | Verified | Open | Status |
 |---|---|---|---|---|
@@ -205,7 +205,7 @@ Written by the status gate after every build, verify and handoff; not by hand.
 | Model routing | 8 | 8 | 0 | Done |
 | Local model lifetime | 1 | 1 | 0 | Done |
 | LLM streaming | 8 | 8 | 0 | Done |
-| Local picture reading (`LocalModel`, `LocalLlmProvider` as `IMultimodalLlmProvider`, `ChatImage`, `ChatContentPart`) | 7 | 6 | 1 | Partial |
+| Local picture reading (`LocalModel`, `LocalLlmProvider` as `IMultimodalLlmProvider`, `ChatImage`, `ChatContentPart`) | 6 | 6 | 0 | Done |
 | Host data skill (`HostDataSkill`, `IHostEntity`, `HostDataChange`) | 2 | 2 | 0 | Done |
 | Image generation (`IImageGenerationProvider`, `GenerateImageAsync`) | 3 | 2 | 1 | Partial |
 

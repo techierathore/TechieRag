@@ -233,10 +233,23 @@ public class TechieRagBuilder
     }
 
     /// <summary>Uses the SQLite vector store in the given database file.</summary>
-    /// <param name="databasePath">The database file, absolute or relative; used exactly as given (REQ-RAG-122).</param>
+    /// <param name="databasePath">
+    /// The database file, absolute or relative, used exactly as given (REQ-RAG-122); or a SQLite connection
+    /// string that names it, such as <c>"Data Source=app.db"</c>, used as it is (REQ-RAG-167, TrStudio TR-RAG-005).
+    /// </param>
     /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>
+    /// <para>The store needs no native SQLite extension: it keeps each vector in a column and ranks by an exact
+    /// cosine scan in managed code, the same on every platform. It creates two tables, <c>Documents</c> and
+    /// <c>Chunks</c>.</para>
+    /// <para>Before 1.3.0 a connection string was wrapped in a second <c>Data Source=</c> and opening the
+    /// database failed with <c>SQLite Error 14: 'unable to open database file'</c>.</para>
+    /// </remarks>
     public TechieRagBuilder UseSqliteVec(string databasePath = "techierag.db")
-        => UseVectorStore(VectorStoreType.SqliteVec, $"Data Source={databasePath}");
+    {
+        ArgumentNullException.ThrowIfNull(databasePath);
+        return UseVectorStore(VectorStoreType.SqliteVec, VectorStores.SqliteConnectionStrings.FromPathOrConnectionString(databasePath));
+    }
 
     /// <summary>
     /// Uses the SQLite vector store in the per-app default database (REQ-RAG-122 / BRD-182).
@@ -268,6 +281,13 @@ public class TechieRagBuilder
         return this;
     }
 
+    /// <summary>Uses the PostgreSQL (pgvector) vector store.</summary>
+    /// <param name="connectionString">The PostgreSQL connection string; the server needs the <c>vector</c> extension.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>Since 1.3.0 the store is in the <c>TechieRag.PgVector</c> package, which the app must reference;
+    /// without it <see cref="Build"/> throws an <see cref="InvalidOperationException"/> naming the package
+    /// (REQ-RAG-168, TrStudio TR-RAG-006).</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="connectionString"/> is null.</exception>
     public TechieRagBuilder UsePgVector(string connectionString)
     {
         ArgumentNullException.ThrowIfNull(connectionString);
@@ -287,6 +307,7 @@ public class TechieRagBuilder
     /// <c>WithPersistence(StoreProvider.Postgres, connectionString, defaultUserId)</c>: one call, one database,
     /// so a host can offer its users a server database of their own. Each store creates its own tables
     /// on first use (<c>Documents</c>/<c>Chunks</c>, <c>TrThread</c>/<c>TrMessage</c>, <c>TrWorkspace</c>/<c>TrWorkspaceDocument</c>).
+    /// Since 1.3.0 the stores are in the <c>TechieRag.PgVector</c> package, which the app must reference (REQ-RAG-168).
     /// </remarks>
     /// <exception cref="ArgumentException"><paramref name="connectionString"/> is null or empty.</exception>
     public TechieRagBuilder UsePostgres(string connectionString, string defaultUserId = "default")
@@ -296,6 +317,12 @@ public class TechieRagBuilder
         return WithPersistence(StoreProvider.Postgres, connectionString, defaultUserId);
     }
 
+    /// <summary>Uses the Qdrant vector store.</summary>
+    /// <param name="endpoint">The Qdrant gRPC endpoint.</param>
+    /// <param name="apiKey">The Qdrant API key, or null when the server needs none.</param>
+    /// <returns>The builder instance for method chaining.</returns>
+    /// <remarks>Since 1.3.0 the store is in the <c>TechieRag.Qdrant</c> package, which the app must reference;
+    /// without it <see cref="Build"/> throws an <see cref="InvalidOperationException"/> naming the package (REQ-RAG-168).</remarks>
     public TechieRagBuilder UseQdrant(string endpoint = "http://localhost:6334", string? apiKey = null)
         => UseVectorStore(VectorStoreType.Qdrant, endpoint, apiKey);
 
@@ -995,7 +1022,8 @@ public class TechieRagBuilder
     {
         StoreProvider.None => null,
         StoreProvider.Sqlite => new Persistence.SqliteConversationStore(RequirePersistenceConnectionString()),
-        StoreProvider.Postgres => new Persistence.PostgresConversationStore(RequirePersistenceConnectionString()),
+        StoreProvider.Postgres => VectorStores.StorePackages.Require(
+            () => VectorStores.StorePackages.PostgresConversationStore, VectorStores.StorePackages.PgVectorPackage, "The PostgreSQL conversation store")(RequirePersistenceConnectionString()),
         _ => throw new InvalidOperationException($"Unsupported persistence provider: {config.Persistence.Provider}")
     };
 
@@ -1019,7 +1047,8 @@ public class TechieRagBuilder
         return config.Persistence.Provider switch
         {
             StoreProvider.Sqlite => new Persistence.SqliteTokenUsageLog(RequirePersistenceConnectionString()),
-            StoreProvider.Postgres => new Persistence.PostgresTokenUsageLog(RequirePersistenceConnectionString()),
+            StoreProvider.Postgres => VectorStores.StorePackages.Require(
+                () => VectorStores.StorePackages.PostgresTokenUsageLog, VectorStores.StorePackages.PgVectorPackage, "The PostgreSQL token-usage log")(RequirePersistenceConnectionString()),
             _ => null
         };
     }
@@ -1028,7 +1057,8 @@ public class TechieRagBuilder
     {
         StoreProvider.None => null,
         StoreProvider.Sqlite => new Persistence.SqliteWorkspaceStore(RequirePersistenceConnectionString()),
-        StoreProvider.Postgres => new Persistence.PostgresWorkspaceStore(RequirePersistenceConnectionString()),
+        StoreProvider.Postgres => VectorStores.StorePackages.Require(
+            () => VectorStores.StorePackages.PostgresWorkspaceStore, VectorStores.StorePackages.PgVectorPackage, "The PostgreSQL workspace store")(RequirePersistenceConnectionString()),
         _ => throw new InvalidOperationException($"Unsupported persistence provider: {config.Persistence.Provider}")
     };
 
@@ -1215,7 +1245,9 @@ public class TechieRagBuilder
                     : DataRoot.ResolveDefaultConnectionString(config.LoggerFactory?.CreateLogger(typeof(DataRoot).FullName!)),
                 dimensions),
             VectorStoreType.PgVector => CreatePgVectorStore(dimensions),
-            VectorStoreType.Qdrant => new VectorStores.QdrantStore(config.VectorStore.ConnectionString, dimensions, apiKey: config.VectorStore.ApiKey),
+            VectorStoreType.Qdrant => VectorStores.StorePackages.Require(
+                () => VectorStores.StorePackages.QdrantStore, VectorStores.StorePackages.QdrantPackage, "The Qdrant vector store")(
+                config.VectorStore.ConnectionString, dimensions, config.VectorStore.ApiKey),
             _ => throw new InvalidOperationException($"Unsupported vector store type: {config.VectorStore.Type}")
         };
     }
@@ -1223,12 +1255,13 @@ public class TechieRagBuilder
     /// <summary>The vector width a store falls back to when the embedder reports none (BGE-M3).</summary>
     private const int DefaultVectorDimensions = 1024;
 
-    private VectorStores.PgVectorStore CreatePgVectorStore(int dimensions)
-    {
-        var pgLogger = config.LoggerFactory?.CreateLogger<VectorStores.PgVectorStore>()
-            ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<VectorStores.PgVectorStore>.Instance;
-        return new VectorStores.PgVectorStore(config.VectorStore.ConnectionString, pgLogger, dimensions);
-    }
+    /// <summary>Creates the pgvector store through the <c>TechieRag.PgVector</c> package (REQ-RAG-168).</summary>
+    /// <param name="dimensions">The vector width.</param>
+    /// <returns>The store.</returns>
+    private IVectorStore CreatePgVectorStore(int dimensions) =>
+        VectorStores.StorePackages.Require(
+            () => VectorStores.StorePackages.PgVectorStore, VectorStores.StorePackages.PgVectorPackage, "The pgvector vector store")(
+            config.VectorStore.ConnectionString, config.LoggerFactory, dimensions);
 
     private Abstractions.IEmbeddingProvider CreateEmbeddingProvider()
     {

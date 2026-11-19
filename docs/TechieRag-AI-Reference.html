@@ -106,7 +106,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <div class="layout">
   <nav class="side">
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="sub">Last rendered: 2026-11-13</div>
+    <div class="sub">Last rendered: 2026-11-19</div>
     <div class="group">Contents</div>
     <ol>
         <li><a href="#overview">Overview</a></li>
@@ -173,6 +173,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#embedded-model-downloaded-flag-and-folder-req-rag-163">Embedded model: downloaded flag and folder (REQ-RAG-163)</a></li>
         <li class="h3"><a href="#claude-prices-and-price-not-known-req-rag-164">Claude prices and &quot;price not known&quot; (REQ-RAG-164)</a></li>
         <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
+        <li><a href="#additions">1.3.0 Additions</a></li>
+        <li class="h3"><a href="#postgresql-and-qdrant-are-packages-of-their-own-req-rag-168">PostgreSQL and Qdrant are packages of their own (REQ-RAG-168)</a></li>
+        <li class="h3"><a href="#embedded-bge-m3-with-8-bit-weights-for-bulk-ingest-req-rag-165">Embedded bge-m3 with 8-bit weights for bulk ingest (REQ-RAG-165)</a></li>
+        <li class="h3"><a href="#model-list-with-price-data-handling-and-reasoning-req-rag-166">Model list with price, data handling and reasoning (REQ-RAG-166)</a></li>
+        <li class="h3"><a href="#metadata-filter-in-search-req-rag-169">Metadata filter in search (REQ-RAG-169)</a></li>
+        <li class="h3"><a href="#embedding-service-unavailable-req-rag-170">Embedding service unavailable (REQ-RAG-170)</a></li>
+        <li class="h3"><a href="#exact-counts-sources-and-abstention-req-rag-172">Exact counts, sources and abstention (REQ-RAG-172)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -212,7 +219,7 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
   </nav>
   <main>
     <h1>TechieRag v3 - AI Agent Reference Guide</h1>
-    <div class="subtitle">Rendered 2026-11-13 &middot; source <code>TechieRag-AI-Reference.md</code></div>
+    <div class="subtitle">Rendered 2026-11-19 &middot; source <code>TechieRag-AI-Reference.md</code></div>
 
     <div class="toc-inline">
       <div>Contents</div>
@@ -281,6 +288,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
         <li class="h3"><a href="#embedded-model-downloaded-flag-and-folder-req-rag-163">Embedded model: downloaded flag and folder (REQ-RAG-163)</a></li>
         <li class="h3"><a href="#claude-prices-and-price-not-known-req-rag-164">Claude prices and &quot;price not known&quot; (REQ-RAG-164)</a></li>
         <li class="h3"><a href="#image-generation-req-rag-155">Image generation (REQ-RAG-155)</a></li>
+        <li><a href="#additions">1.3.0 Additions</a></li>
+        <li class="h3"><a href="#postgresql-and-qdrant-are-packages-of-their-own-req-rag-168">PostgreSQL and Qdrant are packages of their own (REQ-RAG-168)</a></li>
+        <li class="h3"><a href="#embedded-bge-m3-with-8-bit-weights-for-bulk-ingest-req-rag-165">Embedded bge-m3 with 8-bit weights for bulk ingest (REQ-RAG-165)</a></li>
+        <li class="h3"><a href="#model-list-with-price-data-handling-and-reasoning-req-rag-166">Model list with price, data handling and reasoning (REQ-RAG-166)</a></li>
+        <li class="h3"><a href="#metadata-filter-in-search-req-rag-169">Metadata filter in search (REQ-RAG-169)</a></li>
+        <li class="h3"><a href="#embedding-service-unavailable-req-rag-170">Embedding service unavailable (REQ-RAG-170)</a></li>
+        <li class="h3"><a href="#exact-counts-sources-and-abstention-req-rag-172">Exact counts, sources and abstention (REQ-RAG-172)</a></li>
         <li><a href="#itechierag-interface-complete-method-reference">ITechieRag Interface - Complete Method Reference</a></li>
         <li class="h3"><a href="#document-processing-v1">Document Processing (v1)</a></li>
         <li class="h3"><a href="#auto-rag-methods-v2">Auto-RAG Methods (v2)</a></li>
@@ -362,11 +376,13 @@ h2:hover .anchor-link,h3:hover .anchor-link,h4:hover .anchor-link{opacity:1}
 <table>
 <thead><tr><th>Package</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td><code>TechieRag</code></td><td>Core library - embeddings, vector stores, document processing, LLM providers, tools and agent loop, MCP, flows, connectors, web ingestion, persistence, all services (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
+<tr><td><code>TechieRag</code></td><td>Core library - embeddings, the SQLite vector store, document processing, LLM providers, tools and agent loop, MCP, flows, connectors, web ingestion, persistence, all services (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
 <tr><td><code>TechieRag.Embedded</code></td><td>ONNX-based embedded embedding provider and reranker (no external API; the models download once, then work offline). Carries the native ONNX Runtime wiring for MAUI heads (<code>net10.0</code>)</td></tr>
 <tr><td><code>TechieRag.Telemetry</code></td><td>Opt-in OpenTelemetry exporters (OTLP, console) for the core's traces and metrics; the core links no exporter (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
 <tr><td><code>TechieRag.Local</code></td><td>In-process local language model behind <code>UseLocalLlm()</code> on ONNX Runtime GenAI: Windows, Apple-silicon macOS, Linux, Android, iOS, Mac Catalyst. Depends on <code>TechieRag.Embedded</code> for downloads and native wiring (<code>net10.0</code>)</td></tr>
 <tr><td><code>TechieRag.Agents</code></td><td>Agents on Microsoft Agent Framework over TechieRag: <code>TechieRagAgentBuilder</code>, <code>ITechieRagAgent</code>, the seam adapters, <code>AddTechieRagAgent</code> (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
+<tr><td><code>TechieRag.PgVector</code></td><td>PostgreSQL since 1.3.0: <code>PgVectorStore</code> (<code>UsePgVector</code>) and the PostgreSQL conversation, workspace and token-usage stores (<code>UsePostgres</code>, <code>WithPersistence(StoreProvider.Postgres)</code>); brings Npgsql and Pgvector (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
+<tr><td><code>TechieRag.Qdrant</code></td><td>Qdrant since 1.3.0: <code>QdrantStore</code> (<code>UseQdrant</code>); brings Qdrant.Client and gRPC (<code>net10.0</code>, <code>net8.0</code>)</td></tr>
 </tbody>
 </table>
 <h3 id="install-commands">Install Commands<a class="anchor-link" href="#install-commands">#</a></h3>
@@ -378,7 +394,11 @@ dotnet add package TechieRag.Telemetry
 # Optional: in-process local language model (the model downloads once after the user accepts its terms)
 dotnet add package TechieRag.Local
 # Optional: agents on Microsoft Agent Framework over TechieRag
-dotnet add package TechieRag.Agents</code></pre>
+dotnet add package TechieRag.Agents
+# Needed for PostgreSQL / pgvector (UsePgVector, UsePostgres) since 1.3.0
+dotnet add package TechieRag.PgVector
+# Needed for Qdrant (UseQdrant) since 1.3.0
+dotnet add package TechieRag.Qdrant</code></pre>
 <h3 id="nuget-configuration">NuGet Configuration<a class="anchor-link" href="#nuget-configuration">#</a></h3>
 <p>No <code>nuget.config</code> change is required. If the project already has a <code>nuget.config</code> with <code>&lt;clear /&gt;</code>, make sure nuget.org is listed — that is the only source TechieRag needs:</p>
 <pre><code class="language-xml">&lt;?xml version="1.0" encoding="utf-8"?&gt;
@@ -586,7 +606,7 @@ var response = await rag.AskAsync("What is quantum computing?");</code></pre>
 <table>
 <thead><tr><th>Method</th><th>Description</th></tr></thead>
 <tbody>
-<tr><td><code>UseSqliteVec(connectionString)</code></td><td>SQLite with vec extension; <code>UseSqliteVec()</code> with no path uses the per-app default database (<code>DataRoot.DefaultDatabasePath</code>)</td></tr>
+<tr><td><code>UseSqliteVec(databasePath)</code></td><td>SQLite store in one database file. The argument is a file path, used exactly as given, or a connection string that names the file, such as <code>"Data Source=app.db"</code> (REQ-RAG-167; before 1.3.0 that form failed with SQLite Error 14). No native SQLite extension is loaded: vectors are kept in a column and ranked by an exact cosine scan in managed code, the same on every platform. The store creates two tables, <code>Documents</code> and <code>Chunks</code>. <code>UseSqliteVec()</code> with no path uses the per-app default database (<code>DataRoot.DefaultDatabasePath</code>)</td></tr>
 <tr><td><code>UsePgVector(connectionString)</code></td><td>PostgreSQL with pgvector extension</td></tr>
 <tr><td><code>UsePostgres(connectionString, defaultUserId)</code></td><td>Vectors, conversations and workspaces in one PostgreSQL database (REQ-RAG-152)</td></tr>
 <tr><td><code>UseQdrant(endpoint, apiKey)</code></td><td>Qdrant vector database</td></tr>
@@ -1840,25 +1860,91 @@ var azure = ImageGenerationProviderFactory.CreateForModel("azure-openai/hero-ima
 // Or directly: new AzureOpenAIImageGenerationProvider(azureKey, "hero-images", endpoint, apiVersion: "…")</code></pre>
 <p>A bare model name resolves when it names one service: <code>gpt-image-*</code> and <code>dall-e-*</code> are OpenAI, <code>gemini-*</code> is Gemini. A size the model does not make throws <code>ArgumentException</code> before any request, and a refusal throws <code>LlmHttpException</code>. The key is held in memory and sent only in a header (<code>Authorization</code>, or <code>x-goog-api-key</code> for Gemini). It is never put in a URL, a log or a file. Options: <code>Model</code>, <code>Quality</code> (OpenAI, Venice), <code>NegativePrompt</code> and <code>Seed</code> (Venice), <code>Timeout</code> (default 120 s).</p>
 <hr>
+<h2 id="additions"><a id="130-additions"></a>1.3.0 Additions<a class="anchor-link" href="#additions">#</a></h2>
+<p>Seven packages ship together at one version from 1.3.0: TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Agents, TechieRag.Local, and the new TechieRag.PgVector and TechieRag.Qdrant.</p>
+<h3 id="postgresql-and-qdrant-are-packages-of-their-own-req-rag-168">PostgreSQL and Qdrant are packages of their own (REQ-RAG-168)<a class="anchor-link" href="#postgresql-and-qdrant-are-packages-of-their-own-req-rag-168">#</a></h3>
+<p><strong>TrStudio TR-RAG-006.</strong> The core package no longer carries Npgsql, Pgvector, Qdrant.Client (and its three gRPC libraries) or Azure.AI.OpenAI, so an app that uses only SQLite ships none of them. Add <code>TechieRag.PgVector</code> for <code>UsePgVector</code>, <code>UsePostgres</code>, <code>WithPersistence(StoreProvider.Postgres)</code> and <code>PgVectorStore</code> / <code>PostgresConversationStore</code> / <code>PostgresWorkspaceStore</code> / <code>PostgresTokenUsageLog</code>; add <code>TechieRag.Qdrant</code> for <code>UseQdrant</code> and <code>QdrantStore</code>. Namespaces and builder calls are unchanged, so code compiles as before; the builder finds the package at build time. Without it, <code>Build()</code> throws <code>InvalidOperationException</code> naming the package to add. <code>AzureOpenAIEmbeddingProvider</code> now sends the same request over raw HTTP (<code>api-version</code> 2024-10-21, key in <code>api-key</code>); its constructor that took the SDK's <code>EmbeddingClient</code> is gone.</p>
+<pre><code class="language-csharp">// dotnet add package TechieRag.PgVector   (same version as TechieRag)
+var rag = new TechieRagBuilder()
+    .UseEmbedded()
+    .UsePostgres(connectionString)   // unchanged call; now served by TechieRag.PgVector
+    .Build();</code></pre>
+<h3 id="embedded-bge-m3-with-8-bit-weights-for-bulk-ingest-req-rag-165">Embedded bge-m3 with 8-bit weights for bulk ingest (REQ-RAG-165)<a class="anchor-link" href="#embedded-bge-m3-with-8-bit-weights-for-bulk-ingest-req-rag-165">#</a></h3>
+<p><strong>Sevak TR-RAG-065.</strong> On a processor, 88 percent of bge-m3's time per chunk is 32-bit float matrix multiplication. <code>EmbeddedModel.BgeM3Int8</code> (<code>bge-m3-int8</code>) is the same graph with 8-bit weights: 1024 dimensions, the same tokenizer and languages, a 0.6 GB download pinned to one commit of <code>Xenova/bge-m3</code> (MIT). On the same 34 chunks of 500 characters, one at a time, median per chunk: bge-m3 962 ms, bge-m3-int8 360 ms under WSL; 1,186 ms and 388 ms on Windows (Intel Core i5-11300H). Its vectors are about 0.98 cosine to bge-m3's, but its <code>EmbeddingSignature</code> differs, so a corpus embedded with bge-m3 reads as stale and is embedded again, never mixed. Batching chunks into one padded pass was measured and not adopted: slower in 32-bit, and in 8-bit the padding changes each text's quantization scale. <code>BgeM3</code> stays the default; desktop only.</p>
+<pre><code class="language-csharp">var rag = new TechieRagBuilder()
+    .UseEmbedded(EmbeddedModel.BgeM3Int8)   // 0.6 GB once; about 2.5 times as fast on a processor
+    .UseSqliteVec()
+    .Build();
+var stale = await rag.DetectStaleEmbeddingsAsync();   // a bge-m3 corpus shows here: re-ingest it</code></pre>
+<h3 id="model-list-with-price-data-handling-and-reasoning-req-rag-166">Model list with price, data handling and reasoning (REQ-RAG-166)<a class="anchor-link" href="#model-list-with-price-data-handling-and-reasoning-req-rag-166">#</a></h3>
+<p><strong>Lekhak TR-RAG-011.</strong> <code>LlmProviderFactory.ListModelDetailsAsync(route or connector, apiKey, endpoint?)</code> returns <code>LlmModelDetails</code> per model: <code>Id</code>, <code>InputPricePerMillionUsd</code>, <code>OutputPricePerMillionUsd</code>, <code>DataHandling</code> (<code>LlmModelDataHandling.NotKnown</code>, <code>RunsItself</code>, <code>PassesOn</code>, <code>Local</code>) and <code>SupportsReasoning</code>, each empty when the service says nothing. It makes the same one request as <code>ListModelsAsync</code> and returns the same ids. Read today: Venice (<code>model_spec.pricing</code> per million, <code>privacy</code> "private" = runs it itself, "anonymized" = passes the text on, <code>capabilities.supportsReasoning</code>) and OpenRouter (<code>pricing.prompt</code> / <code>completion</code> per token, scaled to a million; <code>supported_parameters</code> naming <code>reasoning</code>), recognised by the answer's shape; LM Studio and Ollama models are <code>Local</code>. The library keeps no price table for this list.</p>
+<pre><code class="language-csharp">var models = await LlmProviderFactory.ListModelDetailsAsync(ModelRouter.Require("venice/x"), key);
+foreach (var model in models)
+{
+    var price = model.InputPricePerMillionUsd is { } input ? $"${input}/M in, ${model.OutputPricePerMillionUsd}/M out" : "price not known";
+    var leaves = model.DataHandling == LlmModelDataHandling.PassesOn;   // warn: the text goes to another company
+}</code></pre>
+<h3 id="metadata-filter-in-search-req-rag-169">Metadata filter in search (REQ-RAG-169)<a class="anchor-link" href="#metadata-filter-in-search-req-rag-169">#</a></h3>
+<p><strong>TrStudio TR-RAG-003.</strong> <code>SearchOptions.MetadataFilter</code> (<code>IReadOnlyDictionary&lt;string, string&gt;</code>) keeps only chunks whose metadata carries every given value, compared as text (a number or true/false by its JSON form). SqliteVec and PgVector apply it in their own query, so the result is the best matching chunks even when other chunks are closer; other stores take the default <code>IVectorStore.SearchMatchingAsync</code>, which widens its candidate set until it has enough matches. It combines with <code>DocumentFilter</code> / <code>DocumentFilters</code>. A key may not hold <code>"</code> or <code>\</code>. An <code>ITechieRag</code> implementation that does not override the options overload throws <code>NotSupportedException</code> instead of returning unfiltered results.</p>
+<pre><code class="language-csharp">var results = await rag.SearchAsync(query, new SearchOptions
+{
+    TopK = 5,
+    MetadataFilter = new Dictionary&lt;string, string&gt; { ["userId"] = userId.ToString(), ["characterId"] = characterId.ToString() }
+});</code></pre>
+<h3 id="embedding-service-unavailable-req-rag-170">Embedding service unavailable (REQ-RAG-170)<a class="anchor-link" href="#embedding-service-unavailable-req-rag-170">#</a></h3>
+<p><strong>TrStudio TR-RAG-004.</strong> When an embedding service cannot be reached (connection refused, host not found, TLS failure) or does not answer in time, every built-in HTTP embedding provider throws <code>EmbeddingUnavailableException</code> (namespace <code>TechieRag.Models</code>, an <code>HttpRequestException</code>, with <code>ProviderName</code>). It reaches the caller of <code>IngestTextAsync</code>, <code>IngestAsync</code> and <code>SearchAsync</code>. A service that answers with an error status still throws a plain <code>HttpRequestException</code> with <code>StatusCode</code>; a cancellation the caller asked for stays an <code>OperationCanceledException</code>.</p>
+<pre><code class="language-csharp">try
+{
+    results = await rag.SearchAsync(query);
+}
+catch (EmbeddingUnavailableException)
+{
+    results = KeywordSearch(query);   // embeddings are down; fall back
+}</code></pre>
+<h3 id="exact-counts-sources-and-abstention-req-rag-172">Exact counts, sources and abstention (REQ-RAG-172)<a class="anchor-link" href="#exact-counts-sources-and-abstention-req-rag-172">#</a></h3>
+<p><strong>MyDiary TR-RAG-001.</strong> <code>ITechieRag.FindMatchesAsync(query, new MatchOptions { MinScore = … })</code> returns a <code>MatchReport</code>: every document with a chunk at or above the score (<code>Documents</code>, each <code>MatchedDocument</code> with <code>DocumentId</code>, <code>DocumentName</code>, <code>BestScore</code>, <code>Chunks</code>), <code>DocumentCount</code>, <code>ChunkCount</code>, <code>IsEmpty</code>, <code>IsComplete</code>. The count is the library's: matches are read best-first until one scores below <code>MinScore</code> (cap <code>MaxMatches</code>, 10,000), with no model involved. <code>AskWithEvidenceAsync(question, new EvidenceAskOptions { Match = … })</code> counts first; when nothing matches it returns at once with <code>RagResponse.Abstained</code> true, an empty answer and no model call; otherwise it answers from the best matching chunks with the exact count and names in the prompt, asking the model to begin its reply with the count, and sets <code>RagResponse.Matches</code>. No tool call is needed, so it works with <code>TechieRag.Local</code>. <code>MinScore</code> is required: the right value depends on the embedding model (for bge-m3 start near 0.5 to 0.6 and check against your data). <code>MatchOptions</code> also takes <code>DocumentFilters</code> and <code>MetadataFilter</code>.</p>
+<pre><code class="language-csharp">var response = await rag.AskWithEvidenceAsync("How many times did I go to the gym in October?", new EvidenceAskOptions
+{
+    Match = new MatchOptions { MinScore = 0.55f, MetadataFilter = new Dictionary&lt;string, string&gt; { ["month"] = "2026-10" } }
+});
+if (response.Abstained)
+{
+    ShowNoMatchingEntries();                       // the host's own words and language
+}
+else
+{
+    ShowCount(response.Matches!.DocumentCount);    // the library's count, not the model's
+    ShowSources(response.Matches.Documents);
+    ShowAnswer(response.Answer);
+}</code></pre>
 <h2 id="itechierag-interface-complete-method-reference"><a id="itechierag-interface---complete-method-reference"></a>ITechieRag Interface - Complete Method Reference<a class="anchor-link" href="#itechierag-interface-complete-method-reference">#</a></h2>
 <h3 id="document-processing-v1">Document Processing (v1)<a class="anchor-link" href="#document-processing-v1">#</a></h3>
 <pre><code class="language-csharp">// Initialize the client (must be called before other operations)
 Task InitializeAsync(CancellationToken ct = default);
 
-// Ingest a single file
-Task&lt;IngestionStats&gt; IngestAsync(string filePath, CancellationToken ct = default);
+// Ingest a single file; returns the new document's id
+Task&lt;string&gt; IngestAsync(string filePath, CancellationToken ct = default);
 
-// Ingest all files in a directory
-Task&lt;IngestionStats&gt; IngestDirectoryAsync(string directoryPath, string searchPattern = "*.*",
+// Ingest all files in a directory; returns the new documents' ids
+Task&lt;IReadOnlyList&lt;string&gt;&gt; IngestDirectoryAsync(string directoryPath, string searchPattern = "*.*",
     CancellationToken ct = default);
 
-// Ingest raw text directly
-Task&lt;IngestionStats&gt; IngestTextAsync(string text, string documentId,
-    Dictionary&lt;string, string&gt;? metadata = null, CancellationToken ct = default);
+// Ingest raw text directly; returns the new document's id. Metadata values are object (REQ-RAG-171, TrStudio
+// TR-RAG-002): pass strings, numbers or true/false. They come back on SearchResult.Chunk.Metadata as object too
+// (a JsonElement once read from a store), so read them with ?.ToString() before parsing (for example Guid.TryParse).
+Task&lt;string&gt; IngestTextAsync(string text, string documentName,
+    Dictionary&lt;string, object&gt;? metadata = null, CancellationToken ct = default);
+
+// The same under a caller key: an earlier document stored under that key is replaced (REQ-RAG-120)
+Task&lt;string&gt; IngestTextAsync(string text, string documentName, string? sourceKey,
+    Dictionary&lt;string, object&gt;? metadata, CancellationToken ct = default);
 
 // Search for similar content
 Task&lt;IReadOnlyList&lt;SearchResult&gt;&gt; SearchAsync(string query, int topK = 5,
     string? documentFilter = null, CancellationToken ct = default);
+
+// Search with per-call options: document set, metadata filter (REQ-RAG-169), rerank switch
+Task&lt;IReadOnlyList&lt;SearchResult&gt;&gt; SearchAsync(string query, SearchOptions? options, CancellationToken ct = default);
 
 // Delete a document and its vectors
 Task DeleteDocumentAsync(string documentId, CancellationToken ct = default);</code></pre>

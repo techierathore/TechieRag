@@ -120,9 +120,14 @@ public class LmStudioEmbeddingProvider : IEmbeddingProvider, IDisposable
             response = await httpClient.PostAsJsonAsync("/v1/embeddings", request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (EmbeddingFailures.Unavailable(ex, Name, httpClient.BaseAddress, $"Failed to connect to LM Studio at {endpoint}. Ensure LM Studio is running with a loaded embedding model.", cancellationToken) is { } unavailable)
         {
-            throw new HttpRequestException($"Failed to connect to LM Studio at {endpoint}. Ensure LM Studio is running with a loaded embedding model.", ex);
+            // REQ-RAG-170 (TrStudio TR-RAG-004): a stopped LM Studio is a typed "not reachable".
+            throw unavailable;
+        }
+        catch (HttpRequestException ex) when (ex is not Models.EmbeddingUnavailableException)
+        {
+            throw new HttpRequestException($"Failed to connect to LM Studio at {endpoint}. Ensure LM Studio is running with a loaded embedding model.", ex, ex.StatusCode);
         }
 
         var result = await response.Content.ReadFromJsonAsync<OpenAiEmbeddingResponse>(cancellationToken: cancellationToken);
@@ -173,9 +178,14 @@ public class LmStudioEmbeddingProvider : IEmbeddingProvider, IDisposable
             response = await httpClient.PostAsJsonAsync("/v1/embeddings", request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (EmbeddingFailures.Unavailable(ex, Name, httpClient.BaseAddress, $"Failed to connect to LM Studio at {endpoint}. Ensure LM Studio is running with a loaded embedding model.", cancellationToken) is { } unavailable)
         {
-            throw new HttpRequestException($"Failed to connect to LM Studio at {endpoint}. Ensure LM Studio is running with a loaded embedding model.", ex);
+            // REQ-RAG-170 (TrStudio TR-RAG-004): a stopped LM Studio is a typed "not reachable".
+            throw unavailable;
+        }
+        catch (HttpRequestException ex) when (ex is not Models.EmbeddingUnavailableException)
+        {
+            throw new HttpRequestException($"Failed to connect to LM Studio at {endpoint}. Ensure LM Studio is running with a loaded embedding model.", ex, ex.StatusCode);
         }
 
         var result = await response.Content.ReadFromJsonAsync<OpenAiEmbeddingResponse>(cancellationToken: cancellationToken);

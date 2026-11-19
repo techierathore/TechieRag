@@ -1,8 +1,41 @@
 # TechieRag release notes
 
-Paste the section for a release into its GitHub Release when you publish it. All five packages (TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Local, TechieRag.Agents) ship together at one version. The newest release is first.
+Paste the section for a release into its GitHub Release when you publish it. All packages ship together at one version: five up to 1.2.0 (TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Local, TechieRag.Agents), seven from 1.3.0 (adding TechieRag.PgVector and TechieRag.Qdrant). The newest release is first.
 
-## 1.1.10
+## 1.3.0
+
+All seven packages are set to 1.3.0 in their project files: TechieRag, TechieRag.Embedded, TechieRag.Telemetry, TechieRag.Agents, TechieRag.Local, and two new ones, TechieRag.PgVector and TechieRag.Qdrant. It follows 1.2.0, which was published from the section headed 1.1.10 below. The published version still comes from the tag (`publish-nuget.yml`, which now packs all seven). A minor version, not a patch: an app that uses PostgreSQL or Qdrant must add a package (see "Behaviour, stated plainly").
+
+### New
+
+- **bge-m3 with 8-bit weights for bulk ingest** (REQ-RAG-165, Sevak TR-RAG-065). `EmbeddedModel.BgeM3Int8` (`UseEmbedded(EmbeddedModel.BgeM3Int8)`) is bge-m3's own graph with its weights stored as 8-bit integers: the same 1024 dimensions, languages and tokenizer, a 0.6 GB download instead of 2.3 GB, pinned to one commit of `Xenova/bge-m3` (MIT). Where the time went: ONNX Runtime's profiler puts 88 percent of each chunk in 32-bit float matrix multiplication; tokenizing, pooling, thread count and denormal handling were measured and are not the cause, and batching chunks into one padded pass was slower. Before and after, same input (34 chunks of 500 characters, about 128 tokens each, one at a time as ingestion embeds them, five alternating rounds, median per chunk, Intel Core i5-11300H): **bge-m3 962 ms, bge-m3-int8 360 ms under WSL; 1,186 ms and 388 ms on Windows**. Its vectors are about 0.98 cosine to bge-m3's and nine in ten nearest neighbours agree; a Hindi question still finds the English passage that answers it. bge-m3 stays the default.
+- **Model list with price, data handling and reasoning** (REQ-RAG-166, Lekhak TR-RAG-011). `LlmProviderFactory.ListModelDetailsAsync(route or connector, apiKey, endpoint?)` returns `LlmModelDetails` per model: `InputPricePerMillionUsd`, `OutputPricePerMillionUsd`, `DataHandling` (`NotKnown`, `RunsItself`, `PassesOn`, `Local`) and `SupportsReasoning`, each empty when the service says nothing. Venice publishes all three, OpenRouter the price and reasoning; LM Studio and Ollama models are `Local`.
+- **Metadata filter in search** (REQ-RAG-169, TrStudio TR-RAG-003). `SearchOptions.MetadataFilter` keeps only chunks whose metadata carries the given text values. The SQLite and PostgreSQL stores apply it in their own query, so a small owner's chunks are found even when another owner's are closer; other stores widen their candidate set until they have enough. New default interface member `IVectorStore.SearchMatchingAsync`.
+- **`EmbeddingUnavailableException`** (REQ-RAG-170, TrStudio TR-RAG-004). A stopped or unreachable embedding service, or one that times out, now throws this `HttpRequestException` subclass from every built-in HTTP embedding provider, so a host can fall back without catching every HTTP error.
+- **Exact counts, sources and abstention** (REQ-RAG-172, MyDiary TR-RAG-001). `ITechieRag.FindMatchesAsync(query, MatchOptions)` returns every document with a chunk at or above a score, counted by the library (`MatchReport`). `AskWithEvidenceAsync(question, EvidenceAskOptions)` answers from those matches with the exact count in the prompt and sets `RagResponse.Matches`, or withholds the answer (`RagResponse.Abstained`) without calling a model when nothing matches. No tool call is involved, so it works on `TechieRag.Local` (tested with Qwen2.5 0.5B).
+
+### Fixed
+
+- **`UseSqliteVec("Data Source=app.db")` opens app.db** (REQ-RAG-167, TrStudio TR-RAG-005). The builder wrapped a connection string in a second `Data Source=` and the first call failed with `SQLite Error 14: 'unable to open database file'`. A bare path works as before. The AI reference now names the argument, the two tables (`Documents`, `Chunks`) and the managed cosine scan; there is no vec extension.
+- **The AI reference shows the shipped ingestion signatures** (REQ-RAG-171, TrStudio TR-RAG-002): `IngestTextAsync(text, documentName, Dictionary<string, object>? metadata)` returning `Task<string>`, and `IngestAsync` / `IngestDirectoryAsync` with their real return types.
+- **An embedded-model folder of bge-m3-int8 files is named for that model**, so its vectors are never stamped as bge-m3's (REQ-RAG-165).
+
+### Behaviour, stated plainly
+
+- **PostgreSQL and Qdrant moved out of the core package** (REQ-RAG-168, TrStudio TR-RAG-006). An app that uses `UsePgVector`, `UsePostgres`, `WithPersistence(StoreProvider.Postgres)` or the PostgreSQL store classes must add `TechieRag.PgVector`; one that uses `UseQdrant` or `QdrantStore` must add `TechieRag.Qdrant`, at the same version as TechieRag. Nothing else changes: namespaces, class names, builder calls and configuration keys are the same, and the builder finds the package by name. Without the package, `Build()` throws `InvalidOperationException` naming it. An app that uses only SQLite no longer carries Npgsql, Pgvector, Qdrant.Client, three gRPC libraries or Azure.AI.OpenAI (8 files, about 4 MB). **Sevak uses `UsePostgres` and must add `TechieRag.PgVector`.**
+- **`AzureOpenAIEmbeddingProvider` speaks HTTP itself**, sending the request the Azure SDK sent (`api-version` 2024-10-21, key in `api-key`). Its constructor taking the SDK's `EmbeddingClient` is removed with the SDK; use the endpoint, key and deployment constructor.
+- **A bge-m3 corpus reads as stale under bge-m3-int8.** The model name is part of `EmbeddingSignature`; switching models means embedding the corpus again (`DetectStaleEmbeddingsAsync` lists it). Nothing switches unless the host asks for `EmbeddedModel.BgeM3Int8`.
+- **An `ITechieRag` implementation that does not override `SearchAsync(string, SearchOptions, CancellationToken)` throws `NotSupportedException` when `SearchOptions.MetadataFilter` is set**, rather than return unfiltered results. Without a filter nothing changes.
+- **A stopped Ollama or LM Studio now throws `EmbeddingUnavailableException`** where it threw `HttpRequestException`; it is a subclass, so existing `catch (HttpRequestException)` blocks still catch it. The message text is unchanged.
+- **Intel Macs:** the built-in model and the embedded models still do not run there: neither ONNX Runtime GenAI 0.16.0 nor ONNX Runtime 1.30.0 ships an osx-x64 build (MyDiary TR-RAG-003). By the owner's decision of 2026-11-19 no second engine is added for them.
+- **No `net9.0` target was added** to TechieRag.Local or TechieRag.Embedded (MyDiary TR-RAG-002): .NET 9 reached end of support on 10 November 2026.
+
+### For maintainers
+
+- Both publish workflows restore, build and pack `src/TechieRag.PgVector` and `src/TechieRag.Qdrant`, and the version check covers seven packages.
+- The live tests for the 8-bit model run where both models are staged in `~/.cache/techierag-models/bge-m3` and `~/.cache/techierag-models/bge-m3-int8`; they skip elsewhere.
+
+## 1.1.10 (published as 1.2.0)
 
 All five packages are set to 1.1.10 in their project files. 1.1.9 was never published, but Sevak already built against it, so these fixes take a new number: a package cache never mixes up the two. The published version still comes from the tag (`publish-nuget.yml`).
 
