@@ -835,7 +835,11 @@
     },
     "techieflow:tasks:develop-end-to-end": {
       "template": "{file:./.tfcore/tasks/develop-end-to-end.md}",
-      "description": "A new app from a brief to UAT, unattended: Day 1 both stages, build with inline verify and fixes, handoff; tf-develop.sh commits and pushes after each phase and writes the Build Report with time and tokens per phase. Driven by /flow-master."
+      "description": "Runs in its own process, on --model or this session's model; this window follows it to the end; --follow, --stop and --resume act on a running or stopped run. An app to UAT, unattended, from a brief or from documents already written: Day 1 where missing, then every phase in order with build, inline verify, fixes and handoff; tf-develop.sh commits and pushes after each step (--no-git leaves git to the owner) and writes the Build Report with time and tokens per step. Driven by /flow-master."
+    },
+    "techieflow:tasks:develop-status": {
+      "template": "{file:./.tfcore/tasks/develop-status.md}",
+      "description": "From any window: whether the app's develop run is alive (its process checked, never assumed), its harness and model, step, phase, rows, last activity, tokens, log and report. Reads only. Driven by /flow-master."
     },
     "techieflow:tasks:estimate-phase": {
       "template": "{file:./.tfcore/tasks/estimate-phase.md}",

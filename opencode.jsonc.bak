@@ -837,6 +837,10 @@
       "template": "{file:./.tfcore/tasks/develop-end-to-end.md}",
       "description": "A new app from a brief to UAT, unattended: Day 1 both stages, build with inline verify and fixes, handoff; tf-develop.sh commits and pushes after each phase and writes the Build Report with time and tokens per phase. Driven by /flow-master."
     },
+    "techieflow:tasks:estimate-phase": {
+      "template": "{file:./.tfcore/tasks/estimate-phase.md}",
+      "description": "Before *build-phase: estimates the phase's output tokens and wall time (build, machine QA = verify + fix, total; low/mid/high quartiles) from this repo's live run history per row prefix, falling back to named family repos, else 'no precedent'. Writes docs/metrics/estimates.jsonl through tf-estimate.sh; never touches runs.jsonl. Driven by /flow-master."
+    },
     "techieflow:tasks:build-phase": {
       "template": "{file:./.tfcore/tasks/build-phase.md}",
       "description": "The single unified build: implement every open REQ (UI/FN/RAG/NFR) from the one Checklist by clustering and calling /trblazeui (from mockups) + /techierag as sub-agents; self-smoke (data + visual); chain the verifier. Driven by /flow-master."
